@@ -101,8 +101,14 @@ if (states[2].variables.left !== 0) {
 }
 
 if (
-    JSON.stringify(states[3].arrays.nums) !==
-    JSON.stringify([2, 7, 11])
+    (states[3].arrays.nums as {
+        values?: unknown[];
+    })?.values &&
+    JSON.stringify(
+        (states[3].arrays.nums as {
+            values?: unknown[];
+        }).values
+    ) !== JSON.stringify([2, 7, 11])
 ) {
     throw new Error("array state was not replayed");
 }
