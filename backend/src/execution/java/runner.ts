@@ -231,15 +231,35 @@ export async function runJava(
         } catch (error: any) {
 
             if (isTimeout(error)) {
+                const stdout =
+                    error.stdout ?? "";
+
+                const trace =
+                    parseTrace(stdout);
+
+                const lastSequence =
+                    trace.events.at(-1)
+                        ?.sequence ?? 0;
+
+                trace.events.push({
+                    sequence:
+                        lastSequence + 1,
+                    type: "TIMEOUT",
+                    data: {
+                        message:
+                            "Java execution exceeded 3000 ms"
+                    }
+                });
+
                 return {
                     success: false,
                     kind: "TIMEOUT",
-                    stdout:
-                        error.stdout ?? "",
+                    stdout,
                     stderr:
                         error.stderr ?? "",
                     message:
-                        "Java execution exceeded 3000 ms"
+                        "Java execution exceeded 3000 ms",
+                    trace
                 };
             }
 
@@ -344,63 +364,32 @@ function parseTrace(
             "__YV_EVENT__=".length
         );
 
-        const parts = payload.split("|");
+        try {
+            const parsed =
+                JSON.parse(payload) as ExecutionEvent;
 
-        if (parts.length < 5) {
-            continue;
+            if (
+                typeof parsed.sequence !== "number" ||
+                typeof parsed.type !== "string"
+            ) {
+                continue;
+            }
+
+            events.push(parsed);
+
+        } catch {
+            // Ignore malformed trace records rather than
+            // failing the user's program execution.
         }
-
-        const sequence =
-            Number(parts[0]);
-
-        const type =
-            parts[1] as ExecutionEvent["type"];
-
-        const lineNumber =
-            Number(parts[2]);
-
-        const depth =
-            Number(parts[3]);
-
-        const method =
-            unescapeTrace(parts[4]);
-
-        const detail =
-            unescapeTrace(
-                parts.slice(5).join("|")
-            );
-
-        events.push({
-            sequence,
-            type,
-            line:
-                Number.isFinite(lineNumber)
-                    ? lineNumber
-                    : undefined,
-            method,
-            depth:
-                Number.isFinite(depth)
-                    ? depth
-                    : undefined,
-            data:
-                detail
-                    ? { detail }
-                    : undefined
-        });
     }
+
+    events.sort(
+        (a, b) =>
+            a.sequence - b.sequence
+    );
 
     return {
         version: 1,
         events
     };
-}
-
-function unescapeTrace(
-    value: string
-): string {
-    return value
-        .replace(/\\\\/g, "\\")
-        .replace(/\\n/g, "\n")
-        .replace(/\\r/g, "\r")
-        .replace(/\\\|/g, "|");
 }
