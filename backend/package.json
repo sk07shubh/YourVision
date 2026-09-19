@@ -10,13 +10,16 @@
         "test:java-runtime": "tsx scripts/smoke-java-runtime.ts",
         "test:trace-state": "tsx scripts/smoke-trace-state.ts",
         "test:trace-enrichment": "tsx scripts/smoke-trace-enrichment.ts",
-        "test:all": "npm run typecheck && npm run test:trace-state && npm run test:trace-enrichment && npm run test:java-runtime && npm run test:java-state && npm run test:leetcode-structures && npm run test:leetcode-algorithms && npm run test:java-exception-unwind && npm run test:array-discovery",
+        "test:all": "npm run typecheck && npm run test:trace-state && npm run test:trace-enrichment && npm run test:trace-replay && npm run test:java-runtime && npm run test:java-state && npm run test:leetcode-structures && npm run test:leetcode-algorithms && npm run test:backend-readiness && npm run test:java-safety && npm run test:java-exception-unwind && npm run test:array-discovery",
         "typecheck": "tsc --noEmit",
         "test:array-discovery": "tsx scripts/smoke-java-array-access-discovery.ts",
         "test:java-state": "tsx scripts/smoke-java-state-integration.ts",
         "test:leetcode-structures": "tsx scripts/smoke-leetcode-structures.ts",
         "test:java-exception-unwind": "tsx scripts/smoke-java-exception-unwind.ts",
-        "test:leetcode-algorithms": "tsx scripts/smoke-leetcode-algorithms.ts"
+        "test:leetcode-algorithms": "tsx scripts/smoke-leetcode-algorithms.ts",
+        "test:backend-readiness": "tsx scripts/smoke-backend-readiness.ts",
+        "test:trace-replay": "tsx scripts/smoke-trace-replay.ts",
+        "test:java-safety": "tsx scripts/smoke-java-safety.ts"
     },
     "keywords": [],
     "author": "",
