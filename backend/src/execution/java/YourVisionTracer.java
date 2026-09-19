@@ -263,6 +263,21 @@ public class YourVisionTracer {
             }
         }
 
+        int targetExitCode = 0;
+
+        try {
+            vm.process().waitFor(
+                500,
+                TimeUnit.MILLISECONDS
+            );
+
+            if (!vm.process().isAlive()) {
+                targetExitCode =
+                    vm.process().exitValue();
+            }
+        } catch (Exception ignored) {
+        }
+
         try {
             stdoutPipe.join(500);
             stderrPipe.join(500);
@@ -280,6 +295,10 @@ public class YourVisionTracer {
         try {
             vm.dispose();
         } catch (Exception ignored) {
+        }
+
+        if (targetExitCode != 0) {
+            System.exit(targetExitCode);
         }
     }
 
