@@ -146,6 +146,8 @@ export async function runJava(
             await execFileAsync(
                 "javac",
                 [
+                    "--add-modules",
+                    "jdk.jdi",
                     "-g",
                     "-d",
                     tempDir,
