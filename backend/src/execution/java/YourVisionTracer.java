@@ -97,15 +97,17 @@ public class YourVisionTracer {
         VirtualMachine vm =
             connector.launch(connectorArguments);
 
-        pipeStream(
-            vm.process().getInputStream(),
-            false
-        );
+        Thread stdoutPipe =
+            pipeStream(
+                vm.process().getInputStream(),
+                false
+            );
 
-        pipeStream(
-            vm.process().getErrorStream(),
-            true
-        );
+        Thread stderrPipe =
+            pipeStream(
+                vm.process().getErrorStream(),
+                true
+            );
 
         EventRequestManager manager =
             vm.eventRequestManager();
@@ -152,6 +154,37 @@ public class YourVisionTracer {
                         step.location(),
                         step.thread()
                     );
+
+                } else if (event instanceof ExceptionEvent exception) {
+                    if (isTraced(exception.location())) {
+                        Map<String, Object> data =
+                            new LinkedHashMap<>();
+
+                        ObjectReference thrown =
+                            exception.exception();
+
+                        data.put(
+                            "type",
+                            thrown.referenceType().name()
+                        );
+
+                        String message =
+                            exceptionMessage(thrown);
+
+                        if (message != null) {
+                            data.put(
+                                "message",
+                                message
+                            );
+                        }
+
+                        emit(
+                            "ERROR",
+                            exception.location(),
+                            exception.thread(),
+                            data
+                        );
+                    }
 
                 } else if (event instanceof MethodEntryEvent entry) {
                     if (isTraced(entry.location())) {
@@ -207,6 +240,13 @@ public class YourVisionTracer {
             }
         }
 
+        try {
+            stdoutPipe.join(500);
+            stderrPipe.join(500);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+
         emit(
             "PROGRAM_END",
             null,
@@ -249,6 +289,19 @@ public class YourVisionTracer {
             EventRequest.SUSPEND_EVENT_THREAD
         );
         exit.enable();
+
+        ExceptionRequest exception =
+            manager.createExceptionRequest(
+                null,
+                true,
+                true
+            );
+
+        exception.addClassFilter(tracedClass);
+        exception.setSuspendPolicy(
+            EventRequest.SUSPEND_EVENT_THREAD
+        );
+        exception.enable();
 
         VMDeathRequest death =
             manager.createVMDeathRequest();
@@ -605,7 +658,7 @@ public class YourVisionTracer {
 
             if (thread != null) {
                 depth =
-                    thread.frameCount();
+                    userFrameDepth(thread);
             }
 
         } catch (Exception ignored) {
@@ -657,7 +710,7 @@ public class YourVisionTracer {
         System.out.flush();
     }
 
-    private static void pipeStream(
+    private static Thread pipeStream(
         InputStream stream,
         boolean error
     ) {
@@ -695,6 +748,62 @@ public class YourVisionTracer {
 
         pipe.setDaemon(true);
         pipe.start();
+        return pipe;
+    }
+
+    private static int userFrameDepth(
+        ThreadReference thread
+    ) {
+        try {
+            int depth = 0;
+
+            for (StackFrame frame : thread.frames()) {
+                if (
+                    tracedClass.equals(
+                        frame.location()
+                            .declaringType()
+                            .name()
+                    )
+                ) {
+                    depth++;
+                }
+            }
+
+            return depth;
+
+        } catch (Exception ex) {
+            return 0;
+        }
+    }
+
+    private static String exceptionMessage(
+        ObjectReference exception
+    ) {
+        try {
+            Field detailMessage =
+                exception.referenceType()
+                    .fieldByName("detailMessage");
+
+            if (detailMessage == null) {
+                return null;
+            }
+
+            Value value =
+                exception.getValue(
+                    detailMessage
+                );
+
+            if (value instanceof StringReference text) {
+                return text.value();
+            }
+
+            return value == null
+                ? null
+                : String.valueOf(value);
+
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     private static String buildMainCommand(
