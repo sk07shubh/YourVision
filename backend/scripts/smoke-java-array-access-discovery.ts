@@ -78,12 +78,12 @@ const records =
         return {
             line: Number(parts[0]),
             kind: parts[1],
-            text: Buffer.from(parts[8], "base64").toString("utf8"),
-            index: Buffer.from(parts[9], "base64").toString("utf8")
+            text: Buffer.from(parts[8] ?? "", "base64").toString("utf8"),
+            index: Buffer.from(parts[9] ?? "", "base64").toString("utf8")
         };
     });
 
-const expected = [
+const expected: readonly (readonly [string, string, string])[] = [
     ["READ", "nums[i]", "i"],
     ["READ", "nums[i++]", "i++"],
     ["READ", "nums[index()]", "index()"],
