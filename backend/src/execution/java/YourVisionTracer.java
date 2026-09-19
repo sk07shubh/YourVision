@@ -438,7 +438,8 @@ public class YourVisionTracer {
             data.put(
                 "accesses",
                 captureArrayAccesses(
-                    frame
+                    frame,
+                    location.lineNumber()
                 )
             );
 
@@ -454,7 +455,8 @@ public class YourVisionTracer {
     }
 
     private static List<Map<String, Object>> captureArrayAccesses(
-        StackFrame frame
+        StackFrame frame,
+        int line
     ) {
         List<Map<String, Object>> accesses =
             new java.util.ArrayList<>();
@@ -489,6 +491,11 @@ public class YourVisionTracer {
                 access.put(
                     "length",
                     array.length()
+                );
+
+                access.put(
+                    "line",
+                    line
                 );
 
                 accesses.add(access);
