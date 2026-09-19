@@ -127,6 +127,71 @@ console.log(
 );
 
 
+const accessTrace: ExecutionTrace = {
+    version: 1,
+    events: [
+        {
+            sequence: 1,
+            type: "STEP",
+            line: 3,
+            method: "read",
+            depth: 1,
+            data: {
+                variables: {
+                    nums: {
+                        $arrayId: "12",
+                        $type: "int[]",
+                        values: [4, 8, 15]
+                    }
+                }
+            }
+        },
+        {
+            sequence: 2,
+            type: "STEP",
+            line: 4,
+            method: "read",
+            depth: 1,
+            data: {
+                variables: {
+                    nums: {
+                        $arrayId: "12",
+                        $type: "int[]",
+                        values: [4, 8, 15]
+                    }
+                },
+                accesses: [
+                    {
+                        array: "nums",
+                        arrayId: "12",
+                        length: 3
+                    }
+                ]
+            }
+        }
+    ]
+};
+
+const enrichedAccessTrace =
+    enrichTrace(accessTrace);
+
+const accessEvent =
+    enrichedAccessTrace.events.find(
+        (event) =>
+            event.type ===
+            "ARRAY_ACCESS"
+    );
+
+if (
+    !accessEvent ||
+    accessEvent.data?.array !== "nums" ||
+    accessEvent.data?.arrayId !== "12"
+) {
+    throw new Error(
+        "array access event was not normalized"
+    );
+}
+
 const objectTrace: ExecutionTrace = {
     version: 1,
     events: [
