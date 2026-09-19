@@ -950,7 +950,8 @@ public class YourVisionRuntime {
             return parts;
         }
 
-        int depth = 0;
+        int bracketDepth = 0;
+        int braceDepth = 0;
         boolean inString = false;
         boolean inChar = false;
         boolean escaped = false;
@@ -998,12 +999,17 @@ public class YourVisionRuntime {
             }
 
             if (current == '[') {
-                depth++;
+                bracketDepth++;
             } else if (current == ']') {
-                depth--;
+                bracketDepth--;
+            } else if (current == '{') {
+                braceDepth++;
+            } else if (current == '}') {
+                braceDepth--;
             } else if (
                 current == ',' &&
-                depth == 0
+                bracketDepth == 0 &&
+                braceDepth == 0
             ) {
                 parts.add(
                     body.substring(
@@ -1017,7 +1023,8 @@ public class YourVisionRuntime {
         }
 
         if (
-            depth != 0 ||
+            bracketDepth != 0 ||
+            braceDepth != 0 ||
             inString ||
             inChar
         ) {
