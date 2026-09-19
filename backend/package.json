@@ -10,7 +10,8 @@
         "test:java-runtime": "tsx scripts/smoke-java-runtime.ts",
         "test:trace-state": "tsx scripts/smoke-trace-state.ts",
         "test:trace-enrichment": "tsx scripts/smoke-trace-enrichment.ts",
-        "test:all": "npm run test:trace-state && npm run test:trace-enrichment && npm run test:java-runtime"
+        "test:all": "npm run typecheck && npm run test:trace-state && npm run test:trace-enrichment && npm run test:java-runtime",
+        "typecheck": "tsc --noEmit"
     },
     "keywords": [],
     "author": "",
