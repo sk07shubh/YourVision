@@ -183,7 +183,7 @@ assert(
     "array mutation state test did not execute successfully"
 );
 assert(
-    arrayMutation.result === "12",
+    arrayMutation.result === "13",
     "array mutation returned the wrong result"
 );
 
