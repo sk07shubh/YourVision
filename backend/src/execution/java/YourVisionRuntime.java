@@ -109,6 +109,10 @@ public class YourVisionRuntime {
         int depth,
         String detail
     ) {
+        if (!Boolean.getBoolean("yourvision.trace")) {
+            return;
+        }
+
         traceSequence++;
         System.out.println(
             "__YV_EVENT__=" +
