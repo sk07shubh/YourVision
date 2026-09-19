@@ -135,13 +135,18 @@ assert(deepMutation.result === "10", "deep object mutation returned the wrong re
 const deepTypes = traceTypes(deepMutation);
 
 assert(
-    deepTypes.has("OBJECT_CREATE"),
-    "deep object mutation did not emit OBJECT_CREATE"
-);
-
-assert(
     deepTypes.has("OBJECT_FIELD_WRITE"),
     "deep object mutation did not emit OBJECT_FIELD_WRITE"
+);
+
+const deepState = deepMutation.states?.at(-1);
+const head = deepState?.variables.head as Record<string, unknown> | undefined;
+const next = head?.fields?.next as Record<string, unknown> | undefined;
+const tail = next?.fields?.next as Record<string, unknown> | undefined;
+
+assert(
+    tail?.fields?.value === 10,
+    "deep object state did not preserve the final nested field value"
 );
 
 const helper = await runJava(source, { method: "helper" });
