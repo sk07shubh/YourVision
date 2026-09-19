@@ -3,6 +3,7 @@ import java.util.*;
 
 public class YourVisionRuntime {
     private static final String NO_ARGS = "__YV_NO_ARGS__";
+    private static final String ENCODED_ARGUMENT_PREFIX = "__YV_B64__";
     private static long traceSequence = 0;
 
     public static void main(String[] args) throws Exception {
@@ -18,7 +19,9 @@ public class YourVisionRuntime {
             // Explicit zero-argument call.
         } else {
             for (int i = 2; i < args.length; i++) {
-                rawArguments.add(args[i]);
+                rawArguments.add(
+                    decodeArgument(args[i])
+                );
             }
         }
 
@@ -93,6 +96,28 @@ public class YourVisionRuntime {
             cause.printStackTrace(System.err);
             System.exit(7);
         }
+    }
+
+    private static String decodeArgument(
+        String value
+    ) {
+        if (
+            !value.startsWith(
+                ENCODED_ARGUMENT_PREFIX
+            )
+        ) {
+            return value;
+        }
+
+        String encoded =
+            value.substring(
+                ENCODED_ARGUMENT_PREFIX.length()
+            );
+
+        return new String(
+            Base64.getDecoder().decode(encoded),
+            java.nio.charset.StandardCharsets.UTF_8
+        );
     }
 
     private static void emitEvent(
