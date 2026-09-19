@@ -19,16 +19,19 @@ import com.sun.jdi.connect.LaunchingConnector;
 import com.sun.jdi.event.BreakpointEvent;
 import com.sun.jdi.event.ClassPrepareEvent;
 import com.sun.jdi.event.EventSet;
+import com.sun.jdi.event.StepEvent;
 import com.sun.jdi.event.VMDeathEvent;
 import com.sun.jdi.event.VMDisconnectEvent;
 import com.sun.jdi.request.BreakpointRequest;
 import com.sun.jdi.request.ClassPrepareRequest;
 import com.sun.jdi.request.VMDeathRequest;
+import com.sun.jdi.request.StepRequest;
 
 import java.util.*;
 
 public class YourVisionTracer {
     private static long sequence = 0;
+    private static String tracedClass = "";
 
     public static void main(String[] args) throws Exception {
         if (args.length < 3) {
@@ -40,6 +43,7 @@ public class YourVisionTracer {
         String classpath = args[0];
         String mainClass = args[1];
         String breakClass = args[2];
+        tracedClass = breakClass;
         String[] programArgs =
             Arrays.copyOfRange(args, 3, args.length);
 
@@ -110,6 +114,12 @@ public class YourVisionTracer {
 
                 } else if (event instanceof BreakpointEvent breakpoint) {
                     recordStep(breakpoint);
+                    enableLineStepping(manager, breakpoint.thread());
+
+                } else if (event instanceof StepEvent step) {
+                    if (step.location().declaringType().name().equals(tracedClass)) {
+                        recordStep(step.location(), step.thread());
+                    }
 
                 } else if (
                     event instanceof VMDeathEvent ||
@@ -168,8 +178,19 @@ public class YourVisionTracer {
     private static void recordStep(
         BreakpointEvent breakpoint
     ) {
-        ThreadReference thread =
-            breakpoint.thread();
+        recordStep(
+            breakpoint.location(),
+            breakpoint.thread()
+        );
+    }
+
+    private static void recordStep(
+        Location location,
+        ThreadReference thread
+    ) {
+        if (!location.declaringType().name().equals(tracedClass)) {
+            return;
+        }
 
         Map<String, Object> data =
             new LinkedHashMap<>();
@@ -188,10 +209,31 @@ public class YourVisionTracer {
 
         emit(
             "STEP",
-            breakpoint.location(),
+            location,
             thread,
             data
         );
+    }
+
+    private static void enableLineStepping(
+        EventRequestManager manager,
+        ThreadReference thread
+    ) {
+        try {
+            StepRequest step =
+                manager.createStepRequest(
+                    thread,
+                    StepRequest.STEP_LINE,
+                    StepRequest.STEP_OVER
+                );
+
+            step.addClassFilter(tracedClass);
+            step.setSuspendPolicy(
+                com.sun.jdi.request.EventRequest.SUSPEND_EVENT_THREAD
+            );
+            step.enable();
+        } catch (Exception ignored) {
+        }
     }
 
     private static Map<String, Object> readLocals(
