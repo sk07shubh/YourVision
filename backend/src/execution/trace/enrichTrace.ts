@@ -20,6 +20,13 @@ export function enrichTrace(
             previousStep
         ) {
             enriched.push(
+                ...deriveArrayAccessEvents(
+                    previousStep,
+                    event
+                )
+            );
+
+            enriched.push(
                 ...deriveChanges(
                     previousStep,
                     event
@@ -45,6 +52,40 @@ export function enrichTrace(
                 })
             )
     };
+}
+
+function deriveArrayAccessEvents(
+    previous: ExecutionEvent,
+    current: ExecutionEvent
+): ExecutionEvent[] {
+    const accesses =
+        current.data?.accesses;
+
+    if (
+        !Array.isArray(accesses)
+    ) {
+        return [];
+    }
+
+    return accesses.map(
+        (access) => ({
+            sequence: 0,
+            type: "ARRAY_ACCESS",
+            line:
+                current.line,
+            method:
+                current.method,
+            depth:
+                current.depth,
+            data:
+                access &&
+                typeof access === "object"
+                    ? access as Record<string, unknown>
+                    : {
+                        value: access
+                    }
+        })
+    );
 }
 
 function deriveChanges(
