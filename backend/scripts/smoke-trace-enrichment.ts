@@ -125,3 +125,106 @@ if (
 console.log(
     "PASS: trace enrichment"
 );
+
+
+const objectTrace: ExecutionTrace = {
+    version: 1,
+    events: [
+        {
+            sequence: 1,
+            type: "STEP",
+            line: 10,
+            method: "link",
+            depth: 1,
+            data: {
+                variables: {
+                    node: {
+                        $objectId: "90",
+                        $type: "Solution$Node",
+                        fields: {
+                            val: 1,
+                            next: null
+                        }
+                    }
+                }
+            }
+        },
+        {
+            sequence: 2,
+            type: "STEP",
+            line: 11,
+            method: "link",
+            depth: 1,
+            data: {
+                variables: {
+                    node: {
+                        $objectId: "90",
+                        $type: "Solution$Node",
+                        fields: {
+                            val: 2,
+                            next: {
+                                $objectId: "91",
+                                $type: "Solution$Node",
+                                fields: {
+                                    val: 3,
+                                    next: null
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    ]
+};
+
+const enrichedObjectTrace =
+    enrichTrace(objectTrace);
+
+const objectWrite =
+    enrichedObjectTrace.events.find(
+        (event) =>
+            event.type ===
+            "OBJECT_FIELD_WRITE"
+    );
+
+const objectChanges =
+    objectWrite?.data?.changes as
+        Array<{
+            fields: string[];
+        }> | undefined;
+
+if (
+    !objectWrite ||
+    objectWrite.data?.objectId !== "90" ||
+    !objectChanges ||
+    objectChanges.length !== 2
+) {
+    throw new Error(
+        "object field mutations were not derived"
+    );
+}
+
+const objectStates =
+    buildStates(
+        enrichedObjectTrace
+    );
+
+const objectWriteState =
+    objectStates.find(
+        (state) =>
+            state.lastEvent?.type ===
+            "OBJECT_FIELD_WRITE"
+    );
+
+if (
+    !objectWriteState?.objects["90"]
+) {
+    throw new Error(
+        "object mutation was not replayed"
+    );
+}
+
+console.log(
+    "PASS: object mutation enrichment"
+);
