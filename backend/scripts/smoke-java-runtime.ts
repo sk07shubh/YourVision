@@ -85,6 +85,76 @@ class Solution {
     public List<Integer> listResult() {
         return Arrays.asList(1, 2, 3);
     }
+
+    public List<Integer> linkedListResult() {
+        return new LinkedList<>(Arrays.asList(3, 1, 2));
+    }
+
+    public List<Integer> dequeResult() {
+        ArrayDeque<Integer> deque = new ArrayDeque<>();
+        deque.addLast(2);
+        deque.addFirst(1);
+        deque.addLast(3);
+        return new ArrayList<>(deque);
+    }
+
+    public List<Integer> stackResult() {
+        Stack<Integer> stack = new Stack<>();
+        stack.push(1);
+        stack.push(2);
+        stack.push(3);
+        return new ArrayList<>(stack);
+    }
+
+    public List<Integer> priorityQueueResult() {
+        PriorityQueue<Integer> queue = new PriorityQueue<>();
+        queue.add(3);
+        queue.add(1);
+        queue.add(2);
+        return new ArrayList<>(queue);
+    }
+
+    public List<List<Integer>> nestedCollectionsResult() {
+        return Arrays.asList(
+            Arrays.asList(1, 2),
+            new LinkedList<>(Arrays.asList(3, 4))
+        );
+    }
+
+    public List<Integer> nullCollectionResult() {
+        List<Integer> values = new ArrayList<>();
+        values.add(1);
+        values.add(null);
+        values.add(3);
+        return values;
+    }
+
+    static class Node {
+        int value;
+
+        Node(int value) {
+            this.value = value;
+        }
+
+        @Override
+        public String toString() {
+            return "Node(" + value + ")";
+        }
+    }
+
+    public List<Node> objectCollectionResult() {
+        return Arrays.asList(
+            new Node(1),
+            new Node(2)
+        );
+    }
+
+    public List<int[]> arrayCollectionResult() {
+        return Arrays.asList(
+            new int[]{1, 2},
+            new int[]{3, 4}
+        );
+    }
 }
 `;
 
@@ -205,6 +275,62 @@ const cases: Case[] = [
         method: "listResult",
         expectedKind: "OK",
         expectedResult: "{\"a\":1,\"b\":2}"
+    },
+    {
+        name: "linked list result formatting",
+        source,
+        method: "linkedListResult",
+        expectedKind: "OK",
+        expectedResult: "[3,1,2]"
+    },
+    {
+        name: "array deque result formatting",
+        source,
+        method: "dequeResult",
+        expectedKind: "OK",
+        expectedResult: "[1,2,3]"
+    },
+    {
+        name: "stack result formatting",
+        source,
+        method: "stackResult",
+        expectedKind: "OK",
+        expectedResult: "[1,2,3]"
+    },
+    {
+        name: "priority queue result formatting",
+        source,
+        method: "priorityQueueResult",
+        expectedKind: "OK",
+        expectedResult: "[1,2,3]"
+    },
+    {
+        name: "nested collections result formatting",
+        source,
+        method: "nestedCollectionsResult",
+        expectedKind: "OK",
+        expectedResult: "[[1,2],[3,4]]"
+    },
+    {
+        name: "collection containing null",
+        source,
+        method: "nullCollectionResult",
+        expectedKind: "OK",
+        expectedResult: "[1,null,3]"
+    },
+    {
+        name: "collection containing objects",
+        source,
+        method: "objectCollectionResult",
+        expectedKind: "OK",
+        expectedResult: "[\"Node(1)\",\"Node(2)\"]"
+    },
+    {
+        name: "collection containing arrays",
+        source,
+        method: "arrayCollectionResult",
+        expectedKind: "OK",
+        expectedResult: "[[1,2],[3,4]]"
     },
     {
         name: "runtime exception",
