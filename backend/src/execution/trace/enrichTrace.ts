@@ -20,8 +20,7 @@ export function enrichTrace(
             previousStep
         ) {
             enriched.push(
-                ...deriveArrayAccessEvents(
-                    previousStep,
+                ...deriveArrayReferenceEvents(
                     event
                 )
             );
@@ -54,12 +53,11 @@ export function enrichTrace(
     };
 }
 
-function deriveArrayAccessEvents(
-    previous: ExecutionEvent,
+function deriveArrayReferenceEvents(
     current: ExecutionEvent
 ): ExecutionEvent[] {
-    const accesses =
-        current.data?.accesses;
+    const references =
+        current.data?.arrayReferences;
 
     if (
         !Array.isArray(accesses)
@@ -76,7 +74,7 @@ function deriveArrayAccessEvents(
         .map(
         (access) => ({
             sequence: 0,
-            type: "ARRAY_ACCESS",
+            type: "ARRAY_REFERENCE",
             line:
                 current.line,
             method:
