@@ -12,6 +12,18 @@ function traceTypes(result: Awaited<ReturnType<typeof runJava>>): Set<string> {
     );
 }
 
+function snapshotField(value: unknown, field: string): unknown {
+    if (
+        typeof value !== "object" ||
+        value === null ||
+        Array.isArray(value)
+    ) {
+        return undefined;
+    }
+
+    return (value as Record<string, unknown>)[field];
+}
+
 const source = `
 class Solution {
     static class Node {
@@ -140,12 +152,13 @@ assert(
 );
 
 const deepState = deepMutation.states?.at(-1);
-const head = deepState?.variables.head as Record<string, unknown> | undefined;
-const next = head?.fields?.next as Record<string, unknown> | undefined;
-const tail = next?.fields?.next as Record<string, unknown> | undefined;
+const head = deepState?.variables.head;
+const next = snapshotField(snapshotField(head, "fields"), "next");
+const tail = snapshotField(snapshotField(next, "fields"), "next");
+const tailValue = snapshotField(snapshotField(tail, "fields"), "value");
 
 assert(
-    tail?.fields?.value === 10,
+    tailValue === 10,
     "deep object state did not preserve the final nested field value"
 );
 
