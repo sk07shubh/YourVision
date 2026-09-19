@@ -492,6 +492,24 @@ assert(
     "call stack was not unwound after nested runtime exception"
 );
 
+const timeoutState = await runJava(
+    "class Solution { public int loop() { while (true) {} } }",
+    { method: "loop" }
+);
+
+assert(
+    timeoutState.kind === "TIMEOUT",
+    "timeout state test did not report TIMEOUT"
+);
+assert(
+    traceTypes(timeoutState).has("TIMEOUT"),
+    "timeout state test did not emit TIMEOUT"
+);
+assert(
+    timeoutState.states?.at(-1)?.error === undefined,
+    "timeout state incorrectly recorded an ordinary error"
+);
+
 const collectionMutation = await runJava(source, { method: "collectionMutation" });
 
 assert(
