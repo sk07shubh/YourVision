@@ -57,6 +57,35 @@ const trace: ExecutionTrace = {
                 type: "IndexOutOfBoundsException",
                 message: "index 3"
             }
+        },
+        {
+            sequence: 8,
+            type: "STEP",
+            line: 8,
+            method: "twoSum",
+            depth: 1,
+            data: {
+                variables: {
+                    left: 1,
+                    nums: {
+                        $arrayId: "41",
+                        $type: "int[]",
+                        values: [2, 7, 11]
+                    },
+                    node: {
+                        $objectId: "99",
+                        $type: "Solution$Node",
+                        fields: {
+                            val: 7,
+                            next: {
+                                $objectId: "99",
+                                $type: "Solution$Node",
+                                $ref: "99"
+                            }
+                        }
+                    }
+                }
+            }
         }
     ]
 };
@@ -90,6 +119,32 @@ if (
     "IndexOutOfBoundsException"
 ) {
     throw new Error("error state was not replayed");
+}
+
+if (
+    states[7].variables.left !== 1
+) {
+    throw new Error("STEP variables were not hydrated");
+}
+
+const nums =
+    states[7].arrays.nums as {
+        objectId?: string;
+        values?: unknown[];
+    };
+
+if (
+    nums.objectId !== "41" ||
+    JSON.stringify(nums.values) !==
+        JSON.stringify([2, 7, 11])
+) {
+    throw new Error("STEP array snapshot was not hydrated");
+}
+
+if (
+    !states[7].objects["99"]
+) {
+    throw new Error("object identity snapshot was not hydrated");
 }
 
 console.log("PASS: trace state builder");
