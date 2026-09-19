@@ -514,6 +514,17 @@ public class YourVisionRuntime {
             return new ParseResult(map, 65);
         }
 
+        if (type == Object.class) {
+            return new ParseResult(
+                parseUntypedValue(text),
+                40
+            );
+        }
+
+        if (text.startsWith("{") && text.endsWith("}")) {
+            return parseObject(text, type);
+        }
+
         if (type.isEnum()) {
             @SuppressWarnings({
                 "rawtypes",
@@ -541,6 +552,131 @@ public class YourVisionRuntime {
     }
 
     @SuppressWarnings("unchecked")
+    private static ParseResult parseObject(
+        String text,
+        Class<?> type
+    ) {
+        Object instance;
+
+        try {
+            Constructor<?> constructor =
+                type.getDeclaredConstructor();
+
+            constructor.setAccessible(true);
+            instance = constructor.newInstance();
+
+        } catch (Exception ex) {
+            throw new IllegalArgumentException(
+                "object type requires an accessible no-argument constructor: " +
+                type.getTypeName(),
+                ex
+            );
+        }
+
+        List<String> entries =
+            splitTopLevel(
+                text.substring(1, text.length() - 1)
+            );
+
+        int score = 60;
+
+        for (String entry : entries) {
+            int separator =
+                findTopLevelSeparator(entry, ':');
+
+            if (separator < 0) {
+                throw new IllegalArgumentException(
+                    "object field must use name:value syntax"
+                );
+            }
+
+            String fieldName =
+                unquote(
+                    entry.substring(0, separator).trim()
+                );
+
+            Field field =
+                findField(type, fieldName);
+
+            if (field == null) {
+                throw new IllegalArgumentException(
+                    "unknown field " +
+                    fieldName +
+                    " for " +
+                    type.getTypeName()
+                );
+            }
+
+            int modifiers = field.getModifiers();
+
+            if (
+                Modifier.isStatic(modifiers) ||
+                Modifier.isFinal(modifiers)
+            ) {
+                throw new IllegalArgumentException(
+                    "field " +
+                    fieldName +
+                    " is not writable"
+                );
+            }
+
+            try {
+                field.setAccessible(true);
+
+                ParseResult value =
+                    parseValue(
+                        entry.substring(separator + 1),
+                        field.getType()
+                    );
+
+                field.set(
+                    instance,
+                    value.value
+                );
+
+                score +=
+                    Math.min(
+                        value.score,
+                        10
+                    );
+
+            } catch (IllegalArgumentException ex) {
+                throw ex;
+
+            } catch (Exception ex) {
+                throw new IllegalArgumentException(
+                    "could not set field " +
+                    fieldName +
+                    " on " +
+                    type.getTypeName(),
+                    ex
+                );
+            }
+        }
+
+        return new ParseResult(
+            instance,
+            score
+        );
+    }
+
+    private static Field findField(
+        Class<?> type,
+        String name
+    ) {
+        Class<?> current = type;
+
+        while (current != null) {
+            try {
+                return current.getDeclaredField(name);
+            } catch (NoSuchFieldException ignored) {
+                current = current.getSuperclass();
+            }
+        }
+
+        return null;
+    }
+
     private static Collection<Object> createCollection(
         Class<?> type
     ) {
