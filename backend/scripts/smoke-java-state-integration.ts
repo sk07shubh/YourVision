@@ -70,6 +70,21 @@ class Solution {
         return node.next.value;
     }
 
+    public int nullableNode(Node node) {
+        return node == null ? 1 : node.value;
+    }
+
+    static class PrivateNode {
+        private int value;
+
+        PrivateNode() {
+        }
+    }
+
+    public int readPrivateNode(PrivateNode node) {
+        return node.value;
+    }
+
     public int deepMutation() {
         Node head = new Node(1);
         head.next = new Node(2);
@@ -249,6 +264,35 @@ const inputObjectTailValue = snapshotField(
 assert(
     inputObjectTailValue === 42,
     "object argument state did not preserve the nested mutation"
+);
+
+const nullObjectArgument = await runJava(source, {
+    method: "nullableNode",
+    arguments: ["null"]
+});
+
+assert(
+    nullObjectArgument.kind === "OK" &&
+    nullObjectArgument.result === "1",
+    "null object argument was not parsed or executed correctly"
+);
+
+assert(
+    nullObjectArgument.states?.some(
+        (state) => state.variables.node === null
+    ) === true,
+    "null object argument state did not preserve the null value"
+);
+
+const privateObjectArgument = await runJava(source, {
+    method: "readPrivateNode",
+    arguments: ["{\"value\":37}"]
+});
+
+assert(
+    privateObjectArgument.kind === "OK" &&
+    privateObjectArgument.result === "37",
+    "private-field object argument was not parsed correctly"
 );
 
 const deepMutation = await runJava(source, { method: "deepMutation" });
