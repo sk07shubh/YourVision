@@ -1,5 +1,14 @@
 import { runJava } from "../src/execution/java/runner.js";
 
+function assert(
+    condition: boolean,
+    message: string
+): void {
+    if (!condition) {
+        throw new Error(message);
+    }
+}
+
 type Case = {
     name: string;
     source: string;
