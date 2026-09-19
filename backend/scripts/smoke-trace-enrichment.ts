@@ -160,7 +160,7 @@ const accessTrace: ExecutionTrace = {
                         values: [4, 8, 15]
                     }
                 },
-                accesses: [
+                arrayReferences: [
                     {
                         array: "nums",
                         arrayId: "12",
