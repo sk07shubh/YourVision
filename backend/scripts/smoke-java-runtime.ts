@@ -115,6 +115,13 @@ class Solution {
         return values.get(0).size() + values.get(1).size();
     }
 
+    public List<Object> cyclicCollectionResult() {
+        List<Object> values = new ArrayList<>();
+        values.add(1);
+        values.add(values);
+        return values;
+    }
+
     public List<Integer> linkedListResult() {
         return new LinkedList<>(Arrays.asList(3, 1, 2));
     }
@@ -336,6 +343,13 @@ const cases: Case[] = [
         args: ["[[1,2],[3,4,5]]"],
         expectedKind: "OK",
         expectedResult: "5"
+    },
+    {
+        name: "cyclic collection formatting",
+        source,
+        method: "cyclicCollectionResult",
+        expectedKind: "OK",
+        expectedResult: "[1,\"<cycle>\"]"
     },
     {
         name: "linked list result formatting",
