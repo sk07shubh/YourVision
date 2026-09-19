@@ -260,6 +260,36 @@ class Solution {
         return a.next.value + a.value;
     }
 
+    public String objectOverload(Object value) {
+        return "object";
+    }
+
+    public String objectOverload(Node value) {
+        return "node";
+    }
+
+    static class BaseNode {
+        private int value;
+
+        BaseNode() {
+        }
+    }
+
+    static class ChildNode extends BaseNode {
+        ChildNode() {
+        }
+    }
+
+    public int inheritedField(ChildNode value) {
+        try {
+            Field field = BaseNode.class.getDeclaredField("value");
+            field.setAccessible(true);
+            return field.getInt(value);
+        } catch (ReflectiveOperationException ex) {
+            throw new IllegalStateException(ex);
+        }
+    }
+
     public List<int[]> arrayCollectionResult() {
         return Arrays.asList(
             new int[]{1, 2},
@@ -509,6 +539,22 @@ const cases: Case[] = [
         requiredTraceTypes: [
             "OBJECT_FIELD_WRITE"
         ]
+    },
+    {
+        name: "structured object overload selection",
+        source,
+        method: "objectOverload",
+        args: ["{\"value\":7}"],
+        expectedKind: "OK",
+        expectedResult: "\"node\""
+    },
+    {
+        name: "inherited private object field parsing",
+        source,
+        method: "inheritedField",
+        args: ["{\"value\":37}"],
+        expectedKind: "OK",
+        expectedResult: "37"
     },
     {
         name: "array reference capture",
