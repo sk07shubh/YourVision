@@ -82,6 +82,10 @@ function applyEvent(
             }
             break;
 
+        case "ARRAY_ACCESS":
+            next.lastEvent = event;
+            break;
+
         case "VARIABLE_UPDATE":
             if (typeof data.name === "string") {
                 next.variables = {
