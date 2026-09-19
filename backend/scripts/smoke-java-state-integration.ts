@@ -86,6 +86,10 @@ class Solution {
         return result;
     }
 
+    public int throwsError() {
+        throw new IllegalArgumentException("bad input");
+    }
+
     public int collectionMutation() {
         List<Integer> values = new ArrayList<>();
         values.add(1);
@@ -234,6 +238,25 @@ assert(
 assert(
     helperStates.at(-1)?.callStack.length === 0,
     "call stack was not restored after method return"
+);
+
+const runtimeError = await runJava(source, { method: "throwsError" });
+
+assert(
+    runtimeError.kind === "RUNTIME_ERROR",
+    "runtime exception state test did not report RUNTIME_ERROR"
+);
+
+assert(
+    traceTypes(runtimeError).has("ERROR"),
+    "runtime exception did not emit ERROR"
+);
+
+const errorState = runtimeError.states?.find((state) => state.error?.type === "java.lang.IllegalArgumentException");
+
+assert(
+    errorState?.error?.message === "bad input",
+    "runtime exception state did not preserve the error details"
 );
 
 const collectionMutation = await runJava(source, { method: "collectionMutation" });
