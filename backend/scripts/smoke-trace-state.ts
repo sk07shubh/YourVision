@@ -1,5 +1,21 @@
 import { buildStates } from "../src/execution/trace/stateBuilder.js";
-import type { ExecutionTrace } from "../src/execution/trace/schema.js";
+import type {
+    ExecutionTrace,
+    TraceState
+} from "../src/execution/trace/schema.js";
+
+function stateAt(
+    states: TraceState[],
+    index: number
+): TraceState {
+    const state = states[index];
+
+    if (!state) {
+        throw new Error(`missing replay state at index ${index}`);
+    }
+
+    return state;
+}
 
 const trace: ExecutionTrace = {
     version: 1,
@@ -96,12 +112,14 @@ if (states.length !== trace.events.length) {
     throw new Error("one replay state must exist per event");
 }
 
-if (states[2].variables.left !== 0) {
+const state2 = stateAt(states, 2);
+
+if (state2.variables.left !== 0) {
     throw new Error("variable update was not replayed");
 }
 
 const replayedNums =
-    states[3].arrays.nums as {
+    stateAt(states, 3).arrays.nums as {
         values?: unknown[];
     };
 
@@ -113,27 +131,27 @@ if (
 }
 
 if (
-    JSON.stringify(states[5].callStack) !==
+    JSON.stringify(stateAt(states, 5).callStack) !==
     JSON.stringify(["twoSum"])
 ) {
     throw new Error("method enter/exit stack was not replayed");
 }
 
 if (
-    states[6].error?.type !==
+    stateAt(states, 6).error?.type !==
     "IndexOutOfBoundsException"
 ) {
     throw new Error("error state was not replayed");
 }
 
 if (
-    states[7].variables.left !== 1
+    stateAt(states, 7).variables.left !== 1
 ) {
     throw new Error("STEP variables were not hydrated");
 }
 
 const nums =
-    states[7].arrays.nums as {
+    stateAt(states, 7).arrays.nums as {
         objectId?: string;
         values?: unknown[];
     };
@@ -147,7 +165,7 @@ if (
 }
 
 if (
-    !states[7].objects["99"]
+    !stateAt(states, 7).objects["99"]
 ) {
     throw new Error("object identity snapshot was not hydrated");
 }
