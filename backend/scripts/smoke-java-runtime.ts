@@ -483,14 +483,14 @@ const cases: Case[] = [
         ]
     },
     {
-        name: "array access capture",
+        name: "array reference capture",
         source,
         method: "sideEffectWrite",
         args: ["[1,2,3]"],
         expectedKind: "OK",
         expectedResult: "10",
         requiredTraceTypes: [
-            "ARRAY_ACCESS",
+            "ARRAY_REFERENCE",
             "ARRAY_WRITE"
         ]
     },
@@ -602,7 +602,9 @@ for (const test of cases) {
             test.source,
             {
                 method: test.method,
-                arguments: test.args
+                ...(test.args === undefined
+                    ? {}
+                    : { arguments: test.args })
             }
         );
 
