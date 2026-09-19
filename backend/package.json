@@ -9,15 +9,15 @@
         "dev": "tsx src/server.ts",
         "test:java-runtime": "tsx scripts/smoke-java-runtime.ts",
         "test:trace-state": "tsx scripts/smoke-trace-state.ts",
-        "test:trace-enrichment": "tsx scripts/smoke-trace-enrichment.ts"
+        "test:trace-enrichment": "tsx scripts/smoke-trace-enrichment.ts",
+        "test:all": "npm run test:trace-state && npm run test:trace-enrichment && npm run test:java-runtime"
     },
     "keywords": [],
     "author": "",
     "license": "ISC",
     "dependencies": {
         "cors": "^2.8.6",
-        "express": "^5.2.1",
-        "java-ast": "^0.4.1"
+        "express": "^5.2.1"
     },
     "devDependencies": {
         "@types/cors": "^2.8.19",
