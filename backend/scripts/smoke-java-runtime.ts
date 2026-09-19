@@ -22,6 +22,7 @@ type Case = {
 
 const source = `
 import java.util.*;
+import java.lang.reflect.Field;
 
 class Solution {
     public int zero() {
