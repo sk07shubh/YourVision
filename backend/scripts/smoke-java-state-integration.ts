@@ -74,6 +74,74 @@ class Solution {
         return node == null ? 1 : node.value;
     }
 
+
+    static class ListNode {
+        int val;
+        ListNode next;
+
+        ListNode() {
+        }
+
+        ListNode(int val) {
+            this.val = val;
+        }
+    }
+
+    static class TreeNode {
+        int val;
+        TreeNode left;
+        TreeNode right;
+
+        TreeNode() {
+        }
+
+        TreeNode(int val) {
+            this.val = val;
+        }
+    }
+
+    public ListNode reverseList(ListNode head) {
+        ListNode previous = null;
+        ListNode current = head;
+
+        while (current != null) {
+            ListNode next = current.next;
+            current.next = previous;
+            previous = current;
+            current = next;
+        }
+
+        return previous;
+    }
+
+    public int sumListNodes(ListNode head) {
+        int sum = 0;
+        while (head != null) {
+            sum += head.val;
+            head = head.next;
+        }
+        return sum;
+    }
+
+    public int maxDepth(TreeNode root) {
+        if (root == null) {
+            return 0;
+        }
+        return 1 + Math.max(maxDepth(root.left), maxDepth(root.right));
+    }
+
+    public int twoSumTarget(int[] nums, int target) {
+        java.util.HashMap<Integer, Integer> seen = new java.util.HashMap<>();
+        for (int i = 0; i < nums.length; i++) {
+            int need = target - nums[i];
+            if (seen.containsKey(need)) {
+                return seen.get(need) + i;
+            }
+            seen.put(nums[i], i);
+        }
+        return -1;
+    }
+
     static class PrivateNode {
         private int value;
 
@@ -624,3 +692,65 @@ assert(
 );
 
 console.log("PASS: Java state integration");
+const reversedList = await runJava(source, {
+    method: "reverseList",
+    arguments: ["{\"val\":1,\"next\":{\"val\":2,\"next\":{\"val\":3}}}"]
+});
+
+assert(
+    reversedList.kind === "OK",
+    "LeetCode linked-list reverse did not execute successfully"
+);
+assert(
+    reversedList.states?.some((state) => state.callStack.includes("reverseList")) === true,
+    "linked-list reverse did not produce method states"
+);
+assert(
+    traceTypes(reversedList).has("OBJECT_FIELD_WRITE"),
+    "linked-list reverse did not emit object field writes"
+);
+
+const reversedHead = reversedList.states?.at(-1)?.variables.previous;
+const reversedNext = snapshotField(snapshotField(reversedHead, "fields"), "next");
+const reversedTail = snapshotField(snapshotField(reversedNext, "fields"), "next");
+assert(
+    snapshotField(snapshotField(reversedHead, "fields"), "val") === 3 &&
+    snapshotField(snapshotField(reversedNext, "fields"), "val") === 2 &&
+    snapshotField(snapshotField(reversedTail, "fields"), "val") === 1,
+    "linked-list reverse state did not preserve the reversed structure"
+);
+
+const treeDepth = await runJava(source, {
+    method: "maxDepth",
+    arguments: ["{\"val\":1,\"left\":{\"val\":2},\"right\":{\"val\":3,\"left\":{\"val\":4}}}"]
+});
+
+assert(
+    treeDepth.kind === "OK" && treeDepth.result === "3",
+    "LeetCode tree recursion did not return the correct depth"
+);
+assert(
+    treeDepth.states?.some(
+        (state) => state.callStack.filter((method) => method === "maxDepth").length >= 3
+    ) === true,
+    "tree recursion did not preserve nested maxDepth calls"
+);
+
+const twoSumTarget = await runJava(source, {
+    method: "twoSumTarget",
+    arguments: ["[2,7,11,15]", "9"]
+});
+
+assert(
+    twoSumTarget.kind === "OK" && twoSumTarget.result === "1",
+    "LeetCode HashMap two-sum execution returned the wrong result"
+);
+assert(
+    twoSumTarget.states?.some(
+        (state) => state.callStack.includes("twoSumTarget")
+    ) === true,
+    "HashMap two-sum did not produce execution states"
+);
+
+console.log("PASS: LeetCode linked-list, tree, and HashMap integration");
+

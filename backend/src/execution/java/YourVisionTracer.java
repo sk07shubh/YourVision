@@ -192,7 +192,10 @@ public class YourVisionTracer {
                         // synthetic exits so replay state can unwind the
                         // call stack while preserving the ERROR state above.
                         try {
-                            if (exception.catchLocation() == null) {
+                            if (
+                                exception.catchLocation() == null ||
+                                !isTraced(exception.catchLocation())
+                            ) {
                                 for (StackFrame frame : exception.thread().frames()) {
                                     if (!isTraced(frame.location())) {
                                         continue;
