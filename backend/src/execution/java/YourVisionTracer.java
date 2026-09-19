@@ -76,7 +76,7 @@ public class YourVisionTracer {
         tracedClass = args[2];
 
         String[] programArgs =
-            Arrays.copyOfRange(args, 3, args.length);
+            Arrays.copyOfRange(args, 2, args.length);
 
         LaunchingConnector connector =
             Bootstrap.virtualMachineManager()
