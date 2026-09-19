@@ -198,7 +198,14 @@ export async function runJava(
             ...(
                 rawArguments.length === 0
                     ? [NO_ARGS]
-                    : rawArguments
+                    : rawArguments.map(
+                        (value) =>
+                            "__YV_B64__" +
+                            Buffer.from(
+                                value,
+                                "utf8"
+                            ).toString("base64")
+                    )
             )
         ];
 
