@@ -168,6 +168,45 @@ const cases: Case[] = [
         expectedResult: "[1,2,3]"
     },
     {
+        name: "nested collection result formatting",
+        source: source.replace(
+            "public List<Integer> listResult() {",
+            "public List<List<Integer>> listResult() {"
+        ).replace(
+            "return Arrays.asList(1, 2, 3);",
+            "return Arrays.asList(Arrays.asList(1, 2), Arrays.asList(3, 4));"
+        ),
+        method: "listResult",
+        expectedKind: "OK",
+        expectedResult: "[[1,2],[3,4]]"
+    },
+    {
+        name: "tree set result formatting",
+        source: source.replace(
+            "public List<Integer> listResult() {",
+            "public Set<Integer> listResult() {"
+        ).replace(
+            "return Arrays.asList(1, 2, 3);",
+            "return new TreeSet<>(Arrays.asList(3, 1, 2));"
+        ),
+        method: "listResult",
+        expectedKind: "OK",
+        expectedResult: "[1,2,3]"
+    },
+    {
+        name: "tree map result formatting",
+        source: source.replace(
+            "public List<Integer> listResult() {",
+            "public Map<String, Integer> listResult() {"
+        ).replace(
+            "return Arrays.asList(1, 2, 3);",
+            "Map<String,Integer> map = new TreeMap<>(); map.put(\"b\",2); map.put(\"a\",1); return map;"
+        ),
+        method: "listResult",
+        expectedKind: "OK",
+        expectedResult: "{\"a\":1,\"b\":2}"
+    },
+    {
         name: "runtime exception",
         source,
         method: "boom",
