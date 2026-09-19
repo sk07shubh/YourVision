@@ -44,7 +44,7 @@ await execFileAsync(
     [
         "--add-modules",
         "jdk.compiler",
-        "backend/src/execution/java/YourVisionSourceProbe.java"
+        "src/execution/java/YourVisionSourceProbe.java"
     ]
 );
 
@@ -55,7 +55,7 @@ const result =
             "--add-modules",
             "jdk.compiler",
             "-cp",
-            "backend/src/execution/java",
+            "src/execution/java",
             "YourVisionSourceProbe",
             encoded
         ]
