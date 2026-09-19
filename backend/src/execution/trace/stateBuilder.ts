@@ -82,6 +82,10 @@ function applyEvent(
             }
             break;
 
+        case "ARRAY_REFERENCE":
+            next.lastEvent = event;
+            break;
+
         case "ARRAY_ACCESS":
             next.lastEvent = event;
             break;
