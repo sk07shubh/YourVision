@@ -193,7 +193,14 @@ class Solution {
         queue.add(3);
         queue.add(1);
         queue.add(2);
-        return new ArrayList<>(queue);
+
+        List<Integer> result = new ArrayList<>();
+
+        while (!queue.isEmpty()) {
+            result.add(queue.remove());
+        }
+
+        return result;
     }
 
     public List<List<Integer>> nestedCollectionsResult() {
