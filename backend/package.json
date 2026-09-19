@@ -1,24 +1,32 @@
 {
-  "name": "backend",
-  "version": "1.0.0",
-  "type": "module",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "cors": "^2.8.6",
-    "express": "^5.2.1"
-  },
-  "devDependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6",
-    "@types/node": "^22.20.3",
-    "tsx": "^4.23.13",
-    "typescript": "^7.0.2"
-  }
+    "name": "backend",
+    "version": "1.0.0",
+    "type": "module",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "dev": "tsx src/server.ts",
+        "test:java-runtime": "tsx scripts/smoke-java-runtime.ts",
+        "test:trace-state": "tsx scripts/smoke-trace-state.ts",
+        "test:trace-enrichment": "tsx scripts/smoke-trace-enrichment.ts",
+        "test:all": "npm run typecheck && npm run test:trace-state && npm run test:trace-enrichment && npm run test:java-runtime && npm run test:java-state && npm run test:array-discovery",
+        "typecheck": "tsc --noEmit",
+        "test:array-discovery": "tsx scripts/smoke-java-array-access-discovery.ts",
+        "test:java-state": "tsx scripts/smoke-java-state-integration.ts"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "cors": "^2.8.6",
+        "express": "^5.2.1"
+    },
+    "devDependencies": {
+        "@types/cors": "^2.8.19",
+        "@types/express": "^5.0.6",
+        "@types/node": "^22.20.3",
+        "tsx": "^4.23.13",
+        "typescript": "^7.0.2"
+    }
 }

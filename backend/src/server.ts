@@ -15,30 +15,49 @@ app.get("/health", (req, res) => {
 });
 
 app.post("/visualize", async (req, res) => {
-    const { language, source, testcase } = req.body;
+    const {
+        language,
+        source,
+        testcase
+    } = req.body;
 
     if (!language || !source) {
         return res.status(400).json({
             success: false,
-            message: "language and source are required"
+            message:
+                "language and source are required"
         });
     }
 
     if (language !== "java") {
         return res.status(400).json({
             success: false,
-            message: "Only Java is supported right now"
+            message:
+                "Only Java is supported right now"
         });
     }
 
-    const result = await runJava(source);
+    const result =
+        await runJava(
+            source,
+            testcase
+        );
 
-    res.json({
+    const status =
+        result.kind ===
+            "VALIDATION_ERROR"
+            ? 400
+            : 200;
+
+    res.status(status).json({
         language,
         testcase,
         execution: result
     });
 });
+
 app.listen(3000, () => {
-    console.log("YourVision backend running on http://localhost:3000");
+    console.log(
+        "YourVision backend running on http://localhost:3000"
+    );
 });
