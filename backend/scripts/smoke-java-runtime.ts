@@ -8,6 +8,7 @@ type Case = {
     expectedKind: string;
     expectedResult?: string;
     expectedErrorType?: string;
+    requiredTraceTypes?: string[];
 };
 
 const source = `
@@ -224,7 +225,12 @@ const cases: Case[] = [
         method: "sum",
         args: ["[1,2,3]"],
         expectedKind: "OK",
-        expectedResult: "6"
+        expectedResult: "6",
+        requiredTraceTypes: [
+            "METHOD_ENTER",
+            "STEP",
+            "METHOD_EXIT"
+        ]
     },
     {
         name: "nested jagged array with null row",
@@ -264,7 +270,12 @@ const cases: Case[] = [
         method: "recursive",
         args: ["8"],
         expectedKind: "OK",
-        expectedResult: "21"
+        expectedResult: "21",
+        requiredTraceTypes: [
+            "METHOD_ENTER",
+            "METHOD_EXIT",
+            "STEP"
+        ]
     },
     {
         name: "collection result formatting",
@@ -413,7 +424,10 @@ const cases: Case[] = [
         method: "boom",
         expectedKind: "RUNTIME_ERROR",
         expectedErrorType:
-            "java.lang.ArrayIndexOutOfBoundsException"
+            "java.lang.ArrayIndexOutOfBoundsException",
+        requiredTraceTypes: [
+            "ERROR"
+        ]
     },
     {
         name: "compile error",
@@ -457,10 +471,27 @@ for (const test of cases) {
         result.errorType ===
             test.expectedErrorType;
 
+    const traceTypes =
+        new Set(
+            result.trace?.events.map(
+                (event) => event.type
+            ) ?? []
+        );
+
+    const traceMatches =
+        test.requiredTraceTypes === undefined ||
+        test.requiredTraceTypes.every(
+            (type) =>
+                traceTypes.has(
+                    type as any
+                )
+        );
+
     if (
         kindMatches &&
         resultMatches &&
-        errorMatches
+        errorMatches &&
+        traceMatches
     ) {
         console.log(
             "PASS:",
@@ -487,6 +518,10 @@ for (const test of cases) {
                 test.expectedErrorType,
             actualErrorType:
                 result.errorType,
+            requiredTraceTypes:
+                test.requiredTraceTypes,
+            actualTraceTypes:
+                [...traceTypes],
             stderr:
                 result.stderr
         }
