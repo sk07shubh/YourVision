@@ -102,6 +102,32 @@ class Solution {
         return values[row][col];
     }
 
+    public int readIndex(int[] values, int index) {
+        return values[index];
+    }
+
+    public int postIncrementRead(int[] values) {
+        int i = 0;
+        return values[i++] + i;
+    }
+
+    public int functionIndexRead(int[] values) {
+        return values[nextIndex()];
+    }
+
+    private int nextIndex() {
+        return 1;
+    }
+
+    public int nestedIndexRead(int[][] values, int row, int col) {
+        return values[row][col];
+    }
+
+    public int aliasIndexRead(int[] values, int index) {
+        int[] alias = values;
+        return alias[index];
+    }
+
     public List<Integer> listResult() {
         return Arrays.asList(1, 2, 3);
     }
@@ -500,6 +526,46 @@ const cases: Case[] = [
         requiredTraceTypes: [
             "ARRAY_WRITE"
         ]
+    },
+    {
+        name: "simple array index read semantics",
+        source,
+        method: "readIndex",
+        args: ["[4,8,15]", "1"],
+        expectedKind: "OK",
+        expectedResult: "8"
+    },
+    {
+        name: "post increment index read semantics",
+        source,
+        method: "postIncrementRead",
+        args: ["[4,8,15]"],
+        expectedKind: "OK",
+        expectedResult: "5"
+    },
+    {
+        name: "method call index read semantics",
+        source,
+        method: "functionIndexRead",
+        args: ["[4,8,15]"],
+        expectedKind: "OK",
+        expectedResult: "8"
+    },
+    {
+        name: "nested array index read semantics",
+        source,
+        method: "nestedIndexRead",
+        args: ["[[1,2],[3,4]]", "1", "0"],
+        expectedKind: "OK",
+        expectedResult: "3"
+    },
+    {
+        name: "array alias index read semantics",
+        source,
+        method: "aliasIndexRead",
+        args: ["[4,8,15]", "2"],
+        expectedKind: "OK",
+        expectedResult: "15"
     },
     {
         name: "runtime exception",
