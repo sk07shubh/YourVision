@@ -457,6 +457,18 @@ const cases: Case[] = [
         ]
     },
     {
+        name: "array access capture",
+        source,
+        method: "sideEffectWrite",
+        args: ["[1,2,3]"],
+        expectedKind: "OK",
+        expectedResult: "10",
+        requiredTraceTypes: [
+            "ARRAY_ACCESS",
+            "ARRAY_WRITE"
+        ]
+    },
+    {
         name: "side effect array index write",
         source,
         method: "sideEffectWrite",
