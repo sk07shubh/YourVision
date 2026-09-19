@@ -134,6 +134,18 @@ function applyEvent(
             }
             break;
 
+        case "OBJECT_FIELD_WRITE":
+            if (
+                typeof data.objectId === "string"
+            ) {
+                next.objects = {
+                    ...next.objects,
+                    [data.objectId]:
+                        data.value
+                };
+            }
+            break;
+
         case "METHOD_ENTER":
             if (event.method) {
                 next.callStack = [
