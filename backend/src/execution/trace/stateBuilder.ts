@@ -75,7 +75,8 @@ function applyEvent(
                         value,
                         name,
                         next.arrays,
-                        next.objects
+                        next.objects,
+                        true
                     );
                 }
             }
@@ -155,7 +156,8 @@ function collectSnapshots(
     value: unknown,
     variableName: string,
     arrays: Record<string, unknown>,
-    objects: Record<string, unknown>
+    objects: Record<string, unknown>,
+    registerNamedArray: boolean
 ): void {
     if (
         !value ||
@@ -170,7 +172,8 @@ function collectSnapshots(
                 item,
                 variableName,
                 arrays,
-                objects
+                objects,
+                false
             );
         }
 
@@ -184,6 +187,7 @@ function collectSnapshots(
         typeof record.$arrayId === "string"
     ) {
         if (
+            registerNamedArray &&
             !record.$ref &&
             Array.isArray(record.values)
         ) {
@@ -204,11 +208,12 @@ function collectSnapshots(
         if (Array.isArray(record.values)) {
             for (const item of record.values) {
                 collectSnapshots(
-                    item,
-                    variableName,
-                    arrays,
-                    objects
-                );
+                item,
+                variableName,
+                arrays,
+                objects,
+                false
+            );
             }
         }
 
@@ -239,7 +244,8 @@ function collectSnapshots(
                     child,
                     variableName,
                     arrays,
-                    objects
+                    objects,
+                    false
                 );
             }
         }
@@ -252,7 +258,8 @@ function collectSnapshots(
             child,
             variableName,
             arrays,
-            objects
+            objects,
+            false
         );
     }
 }
