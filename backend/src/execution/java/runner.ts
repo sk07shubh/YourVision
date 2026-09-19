@@ -327,8 +327,9 @@ export async function runJava(
                     buildStates(trace),
                 stdout,
                 stderr,
-                errorType:
-                    errorType || undefined,
+                ...(errorType
+                    ? { errorType }
+                    : {}),
                 message:
                     message ||
                     "Java execution failed"
