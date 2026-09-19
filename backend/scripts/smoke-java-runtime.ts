@@ -161,6 +161,10 @@ class Solution {
         return values.get(0).size() + values.get(1).size();
     }
 
+    public int nestedMapListSize(List<Map<String, Integer>> values) {
+        return values.get(0).size() + values.get(1).size();
+    }
+
     public List<Object> cyclicCollectionResult() {
         List<Object> values = new ArrayList<>();
         values.add(1);
@@ -415,6 +419,14 @@ const cases: Case[] = [
         args: ["[[1,2],[3,4,5]]"],
         expectedKind: "OK",
         expectedResult: "5"
+    },
+    {
+        name: "nested map collection input parsing",
+        source,
+        method: "nestedMapListSize",
+        args: ["[{\"a\":1,\"b\":2},{\"c\":3}]"],
+        expectedKind: "OK",
+        expectedResult: "3"
     },
     {
         name: "cyclic collection formatting",
