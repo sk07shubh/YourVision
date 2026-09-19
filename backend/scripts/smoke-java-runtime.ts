@@ -83,6 +83,25 @@ class Solution {
         return values[2];
     }
 
+    public int sideEffectWrite(int[] values) {
+        int i = 0;
+        values[i++] = 9;
+        return i + values[0];
+    }
+
+    public int postIncrementWrite(int[] values) {
+        int i = 1;
+        values[i]++;
+        return values[i];
+    }
+
+    public int nestedWrite(int[][] values) {
+        int row = 0;
+        int col = 1;
+        values[row][col] = 8;
+        return values[row][col];
+    }
+
     public List<Integer> listResult() {
         return Arrays.asList(1, 2, 3);
     }
@@ -417,6 +436,39 @@ const cases: Case[] = [
         method: "arrayCollectionResult",
         expectedKind: "OK",
         expectedResult: "[[1,2],[3,4]]"
+    },
+    {
+        name: "side effect array index write",
+        source,
+        method: "sideEffectWrite",
+        args: ["[1,2,3]"],
+        expectedKind: "OK",
+        expectedResult: "10",
+        requiredTraceTypes: [
+            "ARRAY_WRITE"
+        ]
+    },
+    {
+        name: "post increment array write",
+        source,
+        method: "postIncrementWrite",
+        args: ["[1,2,3]"],
+        expectedKind: "OK",
+        expectedResult: "3",
+        requiredTraceTypes: [
+            "ARRAY_WRITE"
+        ]
+    },
+    {
+        name: "nested array write",
+        source,
+        method: "nestedWrite",
+        args: ["[[1,2],[3,4]]"],
+        expectedKind: "OK",
+        expectedResult: "8",
+        requiredTraceTypes: [
+            "ARRAY_WRITE"
+        ]
     },
     {
         name: "runtime exception",
