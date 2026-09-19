@@ -162,7 +162,7 @@ public final class YourVisionSourceProbe {
                     unused
                 );
             }
-        }.scan(unit);
+        }.scan(unit, null);
 
         fileManager.close();
     }
