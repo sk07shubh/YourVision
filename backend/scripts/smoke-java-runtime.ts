@@ -613,6 +613,40 @@ const cases: Case[] = [
     }
 ];
 
+const validationCases = [
+    {
+        name: "missing testcase method",
+        source: "class Solution { public int ok() { return 1; } }",
+        testcase: undefined,
+        expectedMessage: "testcase.method is required"
+    },
+    {
+        name: "non-array testcase arguments",
+        source: "class Solution { public int ok() { return 1; } }",
+        testcase: { method: "ok", arguments: "1" as unknown as string[] },
+        expectedMessage: "testcase.arguments must be an array of strings"
+    },
+    {
+        name: "non-string testcase argument",
+        source: "class Solution { public int ok(int value) { return value; } }",
+        testcase: { method: "ok", arguments: [1 as unknown as string] },
+        expectedMessage: "every testcase argument must be a string"
+    }
+];
+
+for (const test of validationCases) {
+    const result = await runJava(test.source, test.testcase);
+
+    assert(
+        result.kind === "VALIDATION_ERROR",
+        test.name + " did not return VALIDATION_ERROR"
+    );
+    assert(
+        result.message === test.expectedMessage,
+        test.name + " returned the wrong validation message"
+    );
+}
+
 let failures = 0;
 
 for (const test of cases) {
