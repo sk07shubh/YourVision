@@ -51,6 +51,36 @@ function applyEvent(
     const data = event.data ?? {};
 
     switch (event.type) {
+        case "STEP":
+            if (
+                data.variables &&
+                typeof data.variables === "object" &&
+                !Array.isArray(data.variables)
+            ) {
+                const variables =
+                    data.variables as Record<string, unknown>;
+
+                next.variables = {
+                    ...variables
+                };
+
+                next.arrays = {};
+                next.objects = {};
+
+                for (
+                    const [name, value] of
+                    Object.entries(variables)
+                ) {
+                    collectSnapshots(
+                        value,
+                        name,
+                        next.arrays,
+                        next.objects
+                    );
+                }
+            }
+            break;
+
         case "VARIABLE_UPDATE":
             if (typeof data.name === "string") {
                 next.variables = {
@@ -118,4 +148,111 @@ function applyEvent(
     }
 
     return next;
+}
+
+
+function collectSnapshots(
+    value: unknown,
+    variableName: string,
+    arrays: Record<string, unknown>,
+    objects: Record<string, unknown>
+): void {
+    if (
+        !value ||
+        typeof value !== "object"
+    ) {
+        return;
+    }
+
+    if (Array.isArray(value)) {
+        for (const item of value) {
+            collectSnapshots(
+                item,
+                variableName,
+                arrays,
+                objects
+            );
+        }
+
+        return;
+    }
+
+    const record =
+        value as Record<string, unknown>;
+
+    if (
+        typeof record.$arrayId === "string"
+    ) {
+        if (
+            !record.$ref &&
+            Array.isArray(record.values)
+        ) {
+            arrays[variableName] = {
+                objectId:
+                    record.$arrayId,
+                type:
+                    record.$type,
+                values:
+                    record.values,
+                truncated:
+                    record.truncated === true,
+                length:
+                    record.length
+            };
+        }
+
+        if (Array.isArray(record.values)) {
+            for (const item of record.values) {
+                collectSnapshots(
+                    item,
+                    variableName,
+                    arrays,
+                    objects
+                );
+            }
+        }
+
+        return;
+    }
+
+    if (
+        typeof record.$objectId === "string"
+    ) {
+        const objectId =
+            record.$objectId;
+
+        objects[objectId] = value;
+
+        if (
+            record.fields &&
+            typeof record.fields === "object" &&
+            !Array.isArray(record.fields)
+        ) {
+            for (
+                const child of
+                Object.values(
+                    record.fields as
+                        Record<string, unknown>
+                )
+            ) {
+                collectSnapshots(
+                    child,
+                    variableName,
+                    arrays,
+                    objects
+                );
+            }
+        }
+
+        return;
+    }
+
+    for (const child of Object.values(record)) {
+        collectSnapshots(
+            child,
+            variableName,
+            arrays,
+            objects
+        );
+    }
 }
