@@ -28,6 +28,7 @@ export interface JavaExecutionResult {
     errorType?: string;
     message?: string;
     trace?: ExecutionTrace;
+    states?: TraceState[];
 }
 
 const RUNTIME_FILE =
@@ -310,18 +311,18 @@ export async function runJava(
                     "__YV_EXCEPTION_MESSAGE__="
                 );
 
+            const trace =
+                parseTrace(stdout);
+
             return {
                 success: false,
                 kind:
                     errorType
                         ? "RUNTIME_ERROR"
                         : "HARNESS_ERROR",
-                trace:
-                    parseTrace(stdout),
+                trace,
                 states:
-                    buildStates(
-                        parseTrace(stdout)
-                    ),
+                    buildStates(trace),
                 stdout,
                 stderr,
                 errorType:
