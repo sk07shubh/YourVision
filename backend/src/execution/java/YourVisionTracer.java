@@ -436,8 +436,8 @@ public class YourVisionTracer {
             );
 
             data.put(
-                "accesses",
-                captureArrayAccesses(
+                "arrayReferences",
+                captureArrayReferences(
                     frame,
                     location.lineNumber()
                 )
@@ -490,7 +490,7 @@ public class YourVisionTracer {
 
                 access.put(
                     "kind",
-                    "array-reference"
+                    "local-array-reference"
                 );
 
                 access.put(
