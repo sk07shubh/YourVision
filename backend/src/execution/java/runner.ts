@@ -4,7 +4,7 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import { fileURLToPath } from "url";
-import type { ExecutionTrace, ExecutionEvent } from "../trace/schema.js";
+import type { ExecutionTrace, ExecutionEvent, TraceState } from "../trace/schema.js";\nimport { buildStates } from "../trace/stateBuilder.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -231,6 +231,8 @@ export async function runJava(
                     stdout,
                     stderr,
                     trace,
+                    states:
+                        buildStates(trace),
                     message:
                         "Java execution exceeded trace event limit"
                 };
@@ -246,7 +248,9 @@ export async function runJava(
                     ),
                 stdout,
                 stderr,
-                trace
+                trace,
+                states:
+                    buildStates(trace)
             };
 
         } catch (error: any) {
@@ -280,7 +284,9 @@ export async function runJava(
                         error.stderr ?? "",
                     message:
                         "Java execution exceeded 3000 ms",
-                    trace
+                    trace,
+                    states:
+                        buildStates(trace)
                 };
             }
 
@@ -312,6 +318,10 @@ export async function runJava(
                         : "HARNESS_ERROR",
                 trace:
                     parseTrace(stdout),
+                states:
+                    buildStates(
+                        parseTrace(stdout)
+                    ),
                 stdout,
                 stderr,
                 errorType:
