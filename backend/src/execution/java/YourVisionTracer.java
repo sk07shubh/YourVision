@@ -3,7 +3,7 @@ import com.sun.jdi.Bootstrap;
 import com.sun.jdi.BooleanValue;
 import com.sun.jdi.ByteValue;
 import com.sun.jdi.CharValue;
-import com.sun.jdi.Connector;
+import com.sun.jdi.connect.Connector;
 import com.sun.jdi.DoubleValue;
 import com.sun.jdi.Field;
 import com.sun.jdi.FloatValue;
