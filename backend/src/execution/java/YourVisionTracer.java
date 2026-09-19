@@ -1,37 +1,66 @@
 import com.sun.jdi.ArrayReference;
 import com.sun.jdi.Bootstrap;
-import com.sun.jdi.ClassType;
+import com.sun.jdi.BooleanValue;
+import com.sun.jdi.ByteValue;
+import com.sun.jdi.CharValue;
 import com.sun.jdi.Connector;
-import com.sun.jdi.Event;
-import com.sun.jdi.EventQueue;
-import com.sun.jdi.EventRequestManager;
-import com.sun.jdi.Location;
+import com.sun.jdi.DoubleValue;
+import com.sun.jdi.Field;
+import com.sun.jdi.FloatValue;
+import com.sun.jdi.IntegerValue;
 import com.sun.jdi.LocalVariable;
+import com.sun.jdi.Location;
+import com.sun.jdi.LongValue;
 import com.sun.jdi.Method;
-import com.sun.jdi.PrimitiveValue;
+import com.sun.jdi.ObjectReference;
 import com.sun.jdi.ReferenceType;
+import com.sun.jdi.ShortValue;
 import com.sun.jdi.StackFrame;
 import com.sun.jdi.StringReference;
 import com.sun.jdi.ThreadReference;
 import com.sun.jdi.Value;
 import com.sun.jdi.VirtualMachine;
+import com.sun.jdi.Bootstrap;
 import com.sun.jdi.connect.LaunchingConnector;
 import com.sun.jdi.event.BreakpointEvent;
 import com.sun.jdi.event.ClassPrepareEvent;
+import com.sun.jdi.event.Event;
 import com.sun.jdi.event.EventSet;
+import com.sun.jdi.event.MethodEntryEvent;
+import com.sun.jdi.event.MethodExitEvent;
 import com.sun.jdi.event.StepEvent;
 import com.sun.jdi.event.VMDeathEvent;
 import com.sun.jdi.event.VMDisconnectEvent;
 import com.sun.jdi.request.BreakpointRequest;
 import com.sun.jdi.request.ClassPrepareRequest;
-import com.sun.jdi.request.VMDeathRequest;
+import com.sun.jdi.request.EventRequest;
+import com.sun.jdi.request.EventRequestManager;
+import com.sun.jdi.request.MethodEntryRequest;
+import com.sun.jdi.request.MethodExitRequest;
 import com.sun.jdi.request.StepRequest;
+import com.sun.jdi.request.VMDeathRequest;
 
-import java.util.*;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class YourVisionTracer {
+    private static final String EVENT_PREFIX = "__YV_EVENT__=";
+    private static final int MAX_ARRAY_ITEMS = 128;
+    private static final int MAX_OBJECT_DEPTH = 8;
+    private static final int MAX_FIELDS = 64;
+
     private static long sequence = 0;
     private static String tracedClass = "";
+    private static final Set<Long> steppedThreads = new HashSet<>();
 
     public static void main(String[] args) throws Exception {
         if (args.length < 3) {
@@ -42,8 +71,8 @@ public class YourVisionTracer {
 
         String classpath = args[0];
         String mainClass = args[1];
-        String breakClass = args[2];
-        tracedClass = breakClass;
+        tracedClass = args[2];
+
         String[] programArgs =
             Arrays.copyOfRange(args, 3, args.length);
 
@@ -51,42 +80,37 @@ public class YourVisionTracer {
             Bootstrap.virtualMachineManager()
                 .defaultConnector();
 
-        Map<String, Connector.Argument> arguments =
+        Map<String, Connector.Argument> connectorArguments =
             connector.defaultArguments();
 
-        arguments.get("main").setValue(
+        connectorArguments.get("main").setValue(
             buildMainCommand(
                 mainClass,
                 programArgs
             )
         );
 
-        arguments.get("options").setValue(
+        connectorArguments.get("options").setValue(
             "-cp " + quote(classpath)
         );
 
         VirtualMachine vm =
-            connector.launch(arguments);
+            connector.launch(connectorArguments);
+
+        pipeStream(
+            vm.process().getInputStream(),
+            false
+        );
+
+        pipeStream(
+            vm.process().getErrorStream(),
+            true
+        );
 
         EventRequestManager manager =
             vm.eventRequestManager();
 
-        ClassPrepareRequest prepare =
-            manager.createClassPrepareRequest();
-
-        prepare.addClassFilter(breakClass);
-        prepare.setSuspendPolicy(
-            com.sun.jdi.request.EventRequest.SUSPEND_ALL
-        );
-        prepare.enable();
-
-        VMDeathRequest death =
-            manager.createVMDeathRequest();
-
-        death.setSuspendPolicy(
-            com.sun.jdi.request.EventRequest.SUSPEND_ALL
-        );
-        death.enable();
+        installRequests(manager);
 
         emit(
             "PROGRAM_START",
@@ -95,11 +119,11 @@ public class YourVisionTracer {
             Map.of()
         );
 
-        EventQueue queue = vm.eventQueue();
         boolean finished = false;
 
         while (!finished) {
-            EventSet events = queue.remove(2000);
+            EventSet events =
+                vm.eventQueue().remove(2000);
 
             if (events == null) {
                 continue;
@@ -113,12 +137,60 @@ public class YourVisionTracer {
                     );
 
                 } else if (event instanceof BreakpointEvent breakpoint) {
-                    recordStep(breakpoint);
-                    enableLineStepping(manager, breakpoint.thread());
+                    enableLineStepping(
+                        manager,
+                        breakpoint.thread()
+                    );
+
+                    recordStep(
+                        breakpoint.location(),
+                        breakpoint.thread()
+                    );
 
                 } else if (event instanceof StepEvent step) {
-                    if (step.location().declaringType().name().equals(tracedClass)) {
-                        recordStep(step.location(), step.thread());
+                    recordStep(
+                        step.location(),
+                        step.thread()
+                    );
+
+                } else if (event instanceof MethodEntryEvent entry) {
+                    if (isTraced(entry.location())) {
+                        emit(
+                            "METHOD_ENTER",
+                            entry.location(),
+                            entry.thread(),
+                            Map.of()
+                        );
+                    }
+
+                } else if (event instanceof MethodExitEvent exit) {
+                    if (isTraced(exit.location())) {
+                        Map<String, Object> data =
+                            new LinkedHashMap<>();
+
+                        try {
+                            Value returnValue =
+                                exit.returnValue();
+
+                            if (returnValue != null) {
+                                data.put(
+                                    "returnValue",
+                                    snapshotValue(
+                                        returnValue,
+                                        0,
+                                        new HashSet<>()
+                                    )
+                                );
+                            }
+                        } catch (Exception ignored) {
+                        }
+
+                        emit(
+                            "METHOD_EXIT",
+                            exit.location(),
+                            exit.thread(),
+                            data
+                        );
                     }
 
                 } else if (
@@ -129,7 +201,10 @@ public class YourVisionTracer {
                 }
             }
 
-            events.resume();
+            try {
+                events.resume();
+            } catch (Exception ignored) {
+            }
         }
 
         emit(
@@ -143,6 +218,45 @@ public class YourVisionTracer {
             vm.dispose();
         } catch (Exception ignored) {
         }
+    }
+
+    private static void installRequests(
+        EventRequestManager manager
+    ) {
+        ClassPrepareRequest prepare =
+            manager.createClassPrepareRequest();
+
+        prepare.addClassFilter(tracedClass);
+        prepare.setSuspendPolicy(
+            EventRequest.SUSPEND_ALL
+        );
+        prepare.enable();
+
+        MethodEntryRequest entry =
+            manager.createMethodEntryRequest();
+
+        entry.addClassFilter(tracedClass);
+        entry.setSuspendPolicy(
+            EventRequest.SUSPEND_EVENT_THREAD
+        );
+        entry.enable();
+
+        MethodExitRequest exit =
+            manager.createMethodExitRequest();
+
+        exit.addClassFilter(tracedClass);
+        exit.setSuspendPolicy(
+            EventRequest.SUSPEND_EVENT_THREAD
+        );
+        exit.enable();
+
+        VMDeathRequest death =
+            manager.createVMDeathRequest();
+
+        death.setSuspendPolicy(
+            EventRequest.SUSPEND_ALL
+        );
+        death.enable();
     }
 
     private static void installBreakpoints(
@@ -164,31 +278,51 @@ public class YourVisionTracer {
                     );
 
                 breakpoint.setSuspendPolicy(
-                    com.sun.jdi.request.EventRequest.SUSPEND_ALL
+                    EventRequest.SUSPEND_EVENT_THREAD
                 );
 
                 breakpoint.enable();
 
             } catch (Exception ignored) {
-                // Synthetic/abstract/native methods may not have a code location.
+                // Abstract/native/synthetic methods may not have code locations.
             }
         }
     }
 
-    private static void recordStep(
-        BreakpointEvent breakpoint
+    private static void enableLineStepping(
+        EventRequestManager manager,
+        ThreadReference thread
     ) {
-        recordStep(
-            breakpoint.location(),
-            breakpoint.thread()
-        );
+        try {
+            long threadId =
+                thread.uniqueID();
+
+            if (!steppedThreads.add(threadId)) {
+                return;
+            }
+
+            StepRequest step =
+                manager.createStepRequest(
+                    thread,
+                    StepRequest.STEP_LINE,
+                    StepRequest.STEP_INTO
+                );
+
+            step.addClassFilter(tracedClass);
+            step.setSuspendPolicy(
+                EventRequest.SUSPEND_EVENT_THREAD
+            );
+            step.enable();
+
+        } catch (Exception ignored) {
+        }
     }
 
     private static void recordStep(
         Location location,
         ThreadReference thread
     ) {
-        if (!location.declaringType().name().equals(tracedClass)) {
+        if (!isTraced(location)) {
             return;
         }
 
@@ -215,31 +349,10 @@ public class YourVisionTracer {
         );
     }
 
-    private static void enableLineStepping(
-        EventRequestManager manager,
-        ThreadReference thread
-    ) {
-        try {
-            StepRequest step =
-                manager.createStepRequest(
-                    thread,
-                    StepRequest.STEP_LINE,
-                    StepRequest.STEP_OVER
-                );
-
-            step.addClassFilter(tracedClass);
-            step.setSuspendPolicy(
-                com.sun.jdi.request.EventRequest.SUSPEND_EVENT_THREAD
-            );
-            step.enable();
-        } catch (Exception ignored) {
-        }
-    }
-
     private static Map<String, Object> readLocals(
         StackFrame frame
     ) {
-        Map<String, Object> values =
+        Map<String, Object> variables =
             new LinkedHashMap<>();
 
         try {
@@ -247,76 +360,228 @@ public class YourVisionTracer {
                 LocalVariable variable :
                 frame.visibleVariables()
             ) {
-                values.put(
+                variables.put(
                     variable.name(),
-                    formatValue(
-                        frame.getValue(variable)
+                    snapshotValue(
+                        frame.getValue(variable),
+                        0,
+                        new HashSet<>()
                     )
                 );
             }
+
+            ObjectReference thisObject =
+                frame.thisObject();
+
+            if (thisObject != null) {
+                variables.put(
+                    "this",
+                    snapshotValue(
+                        thisObject,
+                        0,
+                        new HashSet<>()
+                    )
+                );
+            }
+
         } catch (Exception ignored) {
         }
 
-        return values;
+        return variables;
     }
 
-    private static String formatValue(
-        Value value
+    private static Object snapshotValue(
+        Value value,
+        int depth,
+        Set<Long> activeObjects
     ) {
         if (value == null) {
-            return "null";
+            return null;
         }
 
-        if (
-            value instanceof PrimitiveValue ||
-            value instanceof StringReference
-        ) {
-            return String.valueOf(value);
-        }
+        if (value instanceof BooleanValue v) return v.booleanValue();
+        if (value instanceof ByteValue v) return v.byteValue();
+        if (value instanceof ShortValue v) return v.shortValue();
+        if (value instanceof IntegerValue v) return v.intValue();
+        if (value instanceof LongValue v) return v.longValue();
+        if (value instanceof FloatValue v) return v.floatValue();
+        if (value instanceof DoubleValue v) return v.doubleValue();
+        if (value instanceof CharValue v) return String.valueOf(v.charValue());
+        if (value instanceof StringReference v) return v.value();
 
         if (value instanceof ArrayReference array) {
-            try {
-                StringBuilder result =
-                    new StringBuilder("[");
+            long id =
+                array.uniqueID();
 
-                int length = array.length();
-                int limit = Math.min(length, 128);
+            Map<String, Object> result =
+                new LinkedHashMap<>();
+
+            result.put(
+                "$arrayId",
+                String.valueOf(id)
+            );
+
+            result.put(
+                "$type",
+                array.referenceType().name()
+            );
+
+            if (!activeObjects.add(id)) {
+                result.put(
+                    "$ref",
+                    String.valueOf(id)
+                );
+
+                return result;
+            }
+
+            try {
+                List<Value> values =
+                    array.getValues();
+
+                int limit =
+                    Math.min(
+                        values.size(),
+                        MAX_ARRAY_ITEMS
+                    );
+
+                Object[] snapshot =
+                    new Object[limit];
 
                 for (int i = 0; i < limit; i++) {
-                    if (i > 0) {
-                        result.append(',');
-                    }
+                    snapshot[i] =
+                        snapshotValue(
+                            values.get(i),
+                            depth + 1,
+                            activeObjects
+                        );
+                }
 
-                    result.append(
-                        formatValue(
-                            array.getValue(i)
-                        )
+                result.put(
+                    "values",
+                    snapshot
+                );
+
+                if (values.size() > limit) {
+                    result.put(
+                        "truncated",
+                        true
+                    );
+
+                    result.put(
+                        "length",
+                        values.size()
                     );
                 }
 
-                if (length > limit) {
-                    result.append(
-                        ",...<truncated>"
-                    );
-                }
+                return result;
 
-                return result.append(']').toString();
-
-            } catch (Exception ex) {
-                return "<array>";
+            } finally {
+                activeObjects.remove(id);
             }
         }
 
-        if (value instanceof com.sun.jdi.ObjectReference object) {
-            return
-                "<object:" +
-                object.uniqueID() +
-                ":" +
-                object.referenceType().name() +
-                ">";
+        if (value instanceof ObjectReference object) {
+            long id =
+                object.uniqueID();
+
+            Map<String, Object> result =
+                new LinkedHashMap<>();
+
+            result.put(
+                "$objectId",
+                String.valueOf(id)
+            );
+
+            result.put(
+                "$type",
+                object.referenceType().name()
+            );
+
+            if (
+                depth >= MAX_OBJECT_DEPTH ||
+                !activeObjects.add(id)
+            ) {
+                result.put(
+                    "$ref",
+                    String.valueOf(id)
+                );
+
+                return result;
+            }
+
+            try {
+                Map<String, Object> fields =
+                    new LinkedHashMap<>();
+
+                int count = 0;
+
+                for (
+                    Field field :
+                    object.referenceType()
+                        .allFields()
+                ) {
+                    if (field.isStatic()) {
+                        continue;
+                    }
+
+                    if (count >= MAX_FIELDS) {
+                        fields.put(
+                            "<truncated>",
+                            true
+                        );
+
+                        break;
+                    }
+
+                    try {
+                        fields.put(
+                            field.name(),
+                            snapshotValue(
+                                object.getValue(field),
+                                depth + 1,
+                                activeObjects
+                            )
+                        );
+
+                    } catch (Exception ex) {
+                        fields.put(
+                            field.name(),
+                            "<unavailable>"
+                        );
+                    }
+
+                    count++;
+                }
+
+                result.put(
+                    "fields",
+                    fields
+                );
+
+                return result;
+
+            } finally {
+                activeObjects.remove(id);
+            }
         }
 
         return String.valueOf(value);
+    }
+
+    private static boolean isTraced(
+        Location location
+    ) {
+        try {
+            return
+                location != null &&
+                tracedClass.equals(
+                    location.declaringType()
+                        .name()
+                );
+        } catch (Exception ex) {
+            return false;
+        }
     }
 
     private static void emit(
@@ -331,39 +596,105 @@ public class YourVisionTracer {
 
         try {
             if (location != null) {
-                line = location.lineNumber();
+                line =
+                    location.lineNumber();
+
                 method =
                     location.method().name();
             }
 
             if (thread != null) {
-                depth = thread.frameCount();
+                depth =
+                    thread.frameCount();
             }
+
         } catch (Exception ignored) {
         }
 
+        Map<String, Object> event =
+            new LinkedHashMap<>();
+
+        event.put(
+            "sequence",
+            ++sequence
+        );
+
+        event.put(
+            "type",
+            type
+        );
+
+        event.put(
+            "line",
+            line
+        );
+
+        event.put(
+            "method",
+            method
+        );
+
+        event.put(
+            "depth",
+            depth
+        );
+
+        if (
+            data != null &&
+            !data.isEmpty()
+        ) {
+            event.put(
+                "data",
+                data
+            );
+        }
+
         System.out.println(
-            "__YV_EVENT__=" +
-            (++sequence) +
-            "|" +
-            type +
-            "|" +
-            line +
-            "|" +
-            depth +
-            "|" +
-            escape(method) +
-            "|" +
-            escape(
-                String.valueOf(
-                    data == null
-                        ? ""
-                        : data
-                )
-            )
+            EVENT_PREFIX +
+            toJson(event)
         );
 
         System.out.flush();
+    }
+
+    private static void pipeStream(
+        InputStream stream,
+        boolean error
+    ) {
+        Thread pipe =
+            new Thread(
+                () -> {
+                    try (
+                        BufferedReader reader =
+                            new BufferedReader(
+                                new InputStreamReader(
+                                    stream,
+                                    StandardCharsets.UTF_8
+                                )
+                            )
+                    ) {
+                        String line;
+
+                        while (
+                            (line = reader.readLine()) != null
+                        ) {
+                            if (error) {
+                                System.err.println(line);
+                            } else {
+                                System.out.println(line);
+                            }
+                        }
+
+                    } catch (Exception ignored) {
+                    }
+                },
+                error
+                    ? "yv-stderr-pipe"
+                    : "yv-stdout-pipe"
+            );
+
+        pipe.setDaemon(true);
+        pipe.start();
     }
 
     private static String buildMainCommand(
@@ -377,7 +708,9 @@ public class YourVisionTracer {
 
         for (String arg : args) {
             command.append(' ')
-                .append(quote(arg));
+                .append(
+                    quote(arg)
+                );
         }
 
         return command.toString();
@@ -387,21 +720,181 @@ public class YourVisionTracer {
         String value
     ) {
         return
-            """ +
+            "\"" +
             value
-                .replace("\\", "\\\\")
-                .replace(""", "\\"") +
-            """;
+                .replace(
+                    "\\",
+                    "\\\\"
+                )
+                .replace(
+                    "\"",
+                    "\\\""
+                ) +
+            "\"";
     }
 
-    private static String escape(
+    private static String toJson(
+        Object value
+    ) {
+        if (value == null) {
+            return "null";
+        }
+
+        if (
+            value instanceof Boolean ||
+            value instanceof Byte ||
+            value instanceof Short ||
+            value instanceof Integer ||
+            value instanceof Long
+        ) {
+            return String.valueOf(value);
+        }
+
+        if (
+            value instanceof Float ||
+            value instanceof Double
+        ) {
+            double number =
+                ((Number) value)
+                    .doubleValue();
+
+            if (
+                Double.isNaN(number) ||
+                Double.isInfinite(number)
+            ) {
+                return
+                    "\"" +
+                    escapeJson(
+                        String.valueOf(value)
+                    ) +
+                    "\"";
+            }
+
+            return String.valueOf(value);
+        }
+
+        if (value instanceof String text) {
+            return
+                "\"" +
+                escapeJson(text) +
+                "\"";
+        }
+
+        if (value instanceof Map<?, ?> map) {
+            StringBuilder result =
+                new StringBuilder("{");
+
+            boolean first = true;
+
+            for (
+                Map.Entry<?, ?> entry :
+                map.entrySet()
+            ) {
+                if (!first) {
+                    result.append(',');
+                }
+
+                first = false;
+
+                result.append(
+                    toJson(
+                        String.valueOf(
+                            entry.getKey()
+                        )
+                    )
+                );
+
+                result.append(':');
+
+                result.append(
+                    toJson(
+                        entry.getValue()
+                    )
+                );
+            }
+
+            return result
+                .append('}')
+                .toString();
+        }
+
+        if (value instanceof Iterable<?> items) {
+            StringBuilder result =
+                new StringBuilder("[");
+
+            boolean first = true;
+
+            for (Object item : items) {
+                if (!first) {
+                    result.append(',');
+                }
+
+                first = false;
+
+                result.append(
+                    toJson(item)
+                );
+            }
+
+            return result
+                .append(']')
+                .toString();
+        }
+
+        if (value.getClass().isArray()) {
+            int length =
+                java.lang.reflect.Array
+                    .getLength(value);
+
+            StringBuilder result =
+                new StringBuilder("[");
+
+            for (int i = 0; i < length; i++) {
+                if (i > 0) {
+                    result.append(',');
+                }
+
+                result.append(
+                    toJson(
+                        java.lang.reflect.Array
+                            .get(value, i)
+                    )
+                );
+            }
+
+            return result
+                .append(']')
+                .toString();
+        }
+
+        return toJson(
+            String.valueOf(value)
+        );
+    }
+
+    private static String escapeJson(
         String value
     ) {
-        return
-            value
-                .replace("\\", "\\\\")
-                .replace("|", "\\|")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r");
+        return value
+            .replace(
+                "\\",
+                "\\\\"
+            )
+            .replace(
+                "\"",
+                "\\\""
+            )
+            .replace(
+                "\n",
+                "\\n"
+            )
+            .replace(
+                "\r",
+                "\\r"
+            )
+            .replace(
+                "\t",
+                "\\t"
+            );
     }
 }
