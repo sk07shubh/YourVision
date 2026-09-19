@@ -80,14 +80,16 @@ const changes =
             after: unknown;
         }> | undefined;
 
+const firstChange = changes?.[0];
+
 if (
-    !changes ||
+    !firstChange ||
     changes.length !== 1 ||
     JSON.stringify(
-        changes[0].indices
+        firstChange.indices
     ) !== "[0]" ||
-    changes[0].before !== 1 ||
-    changes[0].after !== 9
+    firstChange.before !== 1 ||
+    firstChange.after !== 9
 ) {
     throw new Error(
         "array mutation was not derived correctly"
