@@ -60,12 +60,12 @@ function deriveArrayReferenceEvents(
         current.data?.arrayReferences;
 
     if (
-        !Array.isArray(accesses)
+        !Array.isArray(references)
     ) {
         return [];
     }
 
-    return accesses
+    return references
         .filter(
             (access) =>
                 access &&
