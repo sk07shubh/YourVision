@@ -363,6 +363,71 @@ public class YourVisionRuntime {
             );
         }
 
+        if (Collection.class.isAssignableFrom(type)) {
+            if (!text.startsWith("[") || !text.endsWith("]")) {
+                throw new IllegalArgumentException(
+                    "collection must use [..] syntax"
+                );
+            }
+
+            List<String> parts = splitTopLevel(
+                text.substring(1, text.length() - 1)
+            );
+
+            Collection<Object> collection =
+                createCollection(type);
+
+            int score = 70;
+
+            for (String part : parts) {
+                // Generic element types are erased at runtime. Preserve
+                // nested collection/array structure from the testcase text.
+                collection.add(
+                    parseUntypedValue(part)
+                );
+                score += 1;
+            }
+
+            return new ParseResult(collection, score);
+        }
+
+        if (Map.class.isAssignableFrom(type)) {
+            if (!text.startsWith("{") || !text.endsWith("}")) {
+                throw new IllegalArgumentException(
+                    "map must use {key:value,...} syntax"
+                );
+            }
+
+            Map<Object, Object> map =
+                createMap(type);
+
+            List<String> entries = splitTopLevel(
+                text.substring(1, text.length() - 1)
+            );
+
+            for (String entry : entries) {
+                int separator = findTopLevelSeparator(entry, ':');
+
+                if (separator < 0) {
+                    throw new IllegalArgumentException(
+                        "map entry must use key:value syntax"
+                    );
+                }
+
+                Object key = parseUntypedValue(
+                    entry.substring(0, separator).trim()
+                );
+
+                Object value = parseUntypedValue(
+                    entry.substring(separator + 1).trim()
+                );
+
+                map.put(key, value);
+            }
+
+            return new ParseResult(map, 65);
+        }
+
         if (type.isEnum()) {
             @SuppressWarnings({
                 "rawtypes",
@@ -387,6 +452,222 @@ public class YourVisionRuntime {
             "unsupported parameter type: " +
             type.getTypeName()
         );
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Collection<Object> createCollection(
+        Class<?> type
+    ) {
+        if (type == Stack.class) {
+            return (Collection<Object>) (Collection<?>) new Stack<>();
+        }
+
+        if (type == LinkedList.class) {
+            return new LinkedList<>();
+        }
+
+        if (type == ArrayDeque.class ||
+            type == Deque.class ||
+            type == Queue.class) {
+            return new ArrayDeque<>();
+        }
+
+        if (type == PriorityQueue.class) {
+            return new PriorityQueue<>();
+        }
+
+        if (type == Set.class ||
+            type == SortedSet.class ||
+            type == HashSet.class ||
+            type == LinkedHashSet.class ||
+            type == TreeSet.class) {
+            if (type == TreeSet.class ||
+                type == SortedSet.class) {
+                return (Collection<Object>) (Collection<?>) new TreeSet<>();
+            }
+
+            if (type == LinkedHashSet.class) {
+                return new LinkedHashSet<>();
+            }
+
+            return new HashSet<>();
+        }
+
+        if (type.isInterface() ||
+            type == Collection.class ||
+            type == List.class) {
+            return new ArrayList<>();
+        }
+
+        try {
+            return (Collection<Object>)
+                type.getDeclaredConstructor().newInstance();
+        } catch (Exception ex) {
+            throw new IllegalArgumentException(
+                "unsupported collection type: " +
+                type.getTypeName()
+            );
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<Object, Object> createMap(
+        Class<?> type
+    ) {
+        if (type == SortedMap.class ||
+            type == TreeMap.class) {
+            return new TreeMap<>();
+        }
+
+        if (type == LinkedHashMap.class) {
+            return new LinkedHashMap<>();
+        }
+
+        if (type == Map.class ||
+            type == HashMap.class ||
+            type.isInterface()) {
+            return new LinkedHashMap<>();
+        }
+
+        try {
+            return (Map<Object, Object>)
+                type.getDeclaredConstructor().newInstance();
+        } catch (Exception ex) {
+            throw new IllegalArgumentException(
+                "unsupported map type: " +
+                type.getTypeName()
+            );
+        }
+    }
+
+    private static Object parseUntypedValue(
+        String raw
+    ) {
+        String text = raw.trim();
+
+        if ("null".equals(text)) {
+            return null;
+        }
+
+        if (text.startsWith("[") &&
+            text.endsWith("]")) {
+            List<String> parts = splitTopLevel(
+                text.substring(1, text.length() - 1)
+            );
+
+            List<Object> values = new ArrayList<>();
+
+            for (String part : parts) {
+                values.add(parseUntypedValue(part));
+            }
+
+            return values;
+        }
+
+        if (text.startsWith("{") &&
+            text.endsWith("}")) {
+            Map<Object, Object> map =
+                new LinkedHashMap<>();
+
+            List<String> entries = splitTopLevel(
+                text.substring(1, text.length() - 1)
+            );
+
+            for (String entry : entries) {
+                int separator =
+                    findTopLevelSeparator(entry, ':');
+
+                if (separator < 0) {
+                    throw new IllegalArgumentException(
+                        "map entry must use key:value syntax"
+                    );
+                }
+
+                map.put(
+                    parseUntypedValue(
+                        entry.substring(0, separator)
+                    ),
+                    parseUntypedValue(
+                        entry.substring(separator + 1)
+                    )
+                );
+            }
+
+            return map;
+        }
+
+        if (quoted(text)) {
+            return parseString(text);
+        }
+
+        if (text.matches("-?\\d+")) {
+            return Integer.parseInt(text);
+        }
+
+        if (text.matches("-?\\d+L")) {
+            return Long.parseLong(
+                text.substring(0, text.length() - 1)
+            );
+        }
+
+        if ("true".equals(text) ||
+            "false".equals(text)) {
+            return Boolean.parseBoolean(text);
+        }
+
+        return text;
+    }
+
+    private static int findTopLevelSeparator(
+        String text,
+        char separator
+    ) {
+        int bracketDepth = 0;
+        int braceDepth = 0;
+        boolean inString = false;
+        boolean inChar = false;
+        boolean escaped = false;
+
+        for (int i = 0; i < text.length(); i++) {
+            char current = text.charAt(i);
+
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+
+            if ((inString || inChar) &&
+                current == '\\') {
+                escaped = true;
+                continue;
+            }
+
+            if (!inChar && current == '"') {
+                inString = !inString;
+                continue;
+            }
+
+            if (!inString && current == '\'') {
+                inChar = !inChar;
+                continue;
+            }
+
+            if (inString || inChar) {
+                continue;
+            }
+
+            if (current == '[') bracketDepth++;
+            else if (current == ']') bracketDepth--;
+            else if (current == '{') braceDepth++;
+            else if (current == '}') braceDepth--;
+            else if (current == separator &&
+                     bracketDepth == 0 &&
+                     braceDepth == 0) {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     private static String stripNumberSuffix(
