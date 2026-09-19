@@ -454,7 +454,7 @@ public class YourVisionTracer {
         );
     }
 
-    private static List<Map<String, Object>> captureArrayAccesses(
+    private static List<Map<String, Object>> captureArrayReferences(
         StackFrame frame,
         int line
     ) {
