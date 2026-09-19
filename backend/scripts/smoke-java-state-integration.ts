@@ -33,6 +33,9 @@ class Solution {
         int value;
         Node next;
 
+        Node() {
+        }
+
         Node(int value) {
             this.value = value;
         }
@@ -60,6 +63,11 @@ class Solution {
         Node b = a;
         b.value = 7;
         return a.value;
+    }
+
+    public int mutateNode(Node node) {
+        node.next.value = 42;
+        return node.next.value;
     }
 
     public int deepMutation() {
@@ -195,6 +203,38 @@ assert(
 assert(
     traceTypes(aliasing).has("OBJECT_FIELD_WRITE"),
     "object aliasing mutation did not emit OBJECT_FIELD_WRITE"
+);
+
+const inputObjectMutation = await runJava(source, {
+    method: "mutateNode",
+    arguments: ["{\"value\":5,\"next\":{\"value\":8}}"]
+});
+
+assert(
+    inputObjectMutation.kind === "OK",
+    "object argument mutation test did not execute successfully"
+);
+assert(
+    inputObjectMutation.result === "42",
+    "object argument mutation returned the wrong result"
+);
+assert(
+    traceTypes(inputObjectMutation).has("OBJECT_FIELD_WRITE"),
+    "object argument mutation did not emit OBJECT_FIELD_WRITE"
+);
+
+const inputObjectState = inputObjectMutation.states?.at(-1);
+const inputObject = inputObjectState?.variables.node;
+const inputObjectFields = snapshotField(inputObject, "fields");
+const inputObjectTail = snapshotField(inputObjectFields, "next");
+const inputObjectTailValue = snapshotField(
+    snapshotField(inputObjectTail, "fields"),
+    "value"
+);
+
+assert(
+    inputObjectTailValue === 42,
+    "object argument state did not preserve the nested mutation"
 );
 
 const deepMutation = await runJava(source, { method: "deepMutation" });
