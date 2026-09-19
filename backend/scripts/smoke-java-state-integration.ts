@@ -25,6 +25,9 @@ function snapshotField(value: unknown, field: string): unknown {
 }
 
 const source = `
+import java.util.ArrayList;
+import java.util.List;
+
 class Solution {
     static class Node {
         int value;
@@ -81,6 +84,14 @@ class Solution {
     private int doubleIt(int value) {
         int result = value * 2;
         return result;
+    }
+
+    public int collectionMutation() {
+        List<Integer> values = new ArrayList<>();
+        values.add(1);
+        values.add(2);
+        values.set(0, 9);
+        return values.get(0) + values.get(1);
     }
 
     public int recursive(int value) {
@@ -223,6 +234,40 @@ assert(
 assert(
     helperStates.at(-1)?.callStack.length === 0,
     "call stack was not restored after method return"
+);
+
+const collectionMutation = await runJava(source, { method: "collectionMutation" });
+
+assert(
+    collectionMutation.kind === "OK",
+    "collection mutation state test did not execute successfully"
+);
+assert(
+    collectionMutation.result === "11",
+    "collection mutation returned the wrong result"
+);
+
+const collectionState = collectionMutation.states?.at(-1);
+const values = collectionState?.variables.values;
+const valuesFields = snapshotField(values, "fields") as Record<string, unknown> | undefined;
+
+assert(
+    typeof valuesFields?.size === "number" && valuesFields.size === 2,
+    "collection state did not preserve the final collection size"
+);
+assert(
+    typeof valuesFields?.elementData === "object" && valuesFields.elementData !== null,
+    "collection state did not preserve the backing array"
+);
+
+const collectionArray = valuesFields?.elementData;
+const collectionArrayValues = snapshotField(collectionArray, "values");
+
+assert(
+    Array.isArray(collectionArrayValues) &&
+    collectionArrayValues[0] === 9 &&
+    collectionArrayValues[1] === 2,
+    "collection state did not preserve mutated elements"
 );
 
 const recursive = await runJava(source, {
