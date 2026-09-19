@@ -186,6 +186,36 @@ public class YourVisionTracer {
                             exception.thread(),
                             data
                         );
+
+                        // Uncaught exceptions do not reliably produce
+                        // MethodExitEvents for every user frame. Emit
+                        // synthetic exits so replay state can unwind the
+                        // call stack while preserving the ERROR state above.
+                        try {
+                            if (exception.catchLocation() == null) {
+                                for (StackFrame frame : exception.thread().frames()) {
+                                    if (!isTraced(frame.location())) {
+                                        continue;
+                                    }
+
+                                    Map<String, Object> unwindData =
+                                        new LinkedHashMap<>();
+
+                                    unwindData.put(
+                                        "exceptional",
+                                        true
+                                    );
+
+                                    emit(
+                                        "METHOD_EXIT",
+                                        frame.location(),
+                                        exception.thread(),
+                                        unwindData
+                                    );
+                                }
+                            }
+                        } catch (Exception ignored) {
+                        }
                     }
 
                 } else if (event instanceof MethodEntryEvent entry) {
