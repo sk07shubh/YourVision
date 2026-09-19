@@ -77,6 +77,17 @@ class Solution {
         return nums[1] + nums[2];
     }
 
+    public int mutateInput(int[] nums) {
+        nums[0] = 9;
+        return nums[0];
+    }
+
+    public int prints() {
+        System.out.println("hello from YourVision");
+        System.err.println("warning from YourVision");
+        return 1;
+    }
+
     public int helper() {
         return doubleIt(5);
     }
@@ -217,6 +228,56 @@ const arrayValues = snapshotField(nums, "values");
 assert(
     JSON.stringify(arrayValues) === "[1,9,4]",
     "array state did not preserve the final mutated values"
+);
+
+const inputArrayMutation = await runJava(source, {
+    method: "mutateInput",
+    arguments: ["[1,2,3]"]
+});
+
+assert(
+    inputArrayMutation.kind === "OK",
+    "argument array mutation test did not execute successfully"
+);
+assert(
+    inputArrayMutation.result === "9",
+    "argument array mutation returned the wrong result"
+);
+assert(
+    traceTypes(inputArrayMutation).has("ARRAY_WRITE"),
+    "argument array mutation did not emit ARRAY_WRITE"
+);
+
+const inputArrayState = inputArrayMutation.states?.at(-1);
+const inputArray = inputArrayState?.variables.nums;
+const inputArrayValues = snapshotField(inputArray, "values");
+
+assert(
+    JSON.stringify(inputArrayValues) === "[9,2,3]",
+    "argument array state did not preserve the caller-provided mutation"
+);
+
+const prints = await runJava(source, { method: "prints" });
+
+assert(
+    prints.kind === "OK",
+    "stdout/stderr test did not execute successfully"
+);
+assert(
+    prints.result === "1",
+    "stdout/stderr test returned the wrong result"
+);
+assert(
+    prints.stdout.includes("hello from YourVision"),
+    "stdout was not captured from generic Java execution"
+);
+assert(
+    prints.stderr.includes("warning from YourVision"),
+    "stderr was not captured from generic Java execution"
+);
+assert(
+    (prints.states?.length ?? 0) > 0,
+    "stdout/stderr execution did not produce trace states"
 );
 
 const helper = await runJava(source, { method: "helper" });
