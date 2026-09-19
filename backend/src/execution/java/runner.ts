@@ -214,6 +214,28 @@ export async function runJava(
                     }
                 );
 
+            const trace =
+                parseTrace(stdout);
+
+            const traceLimited =
+                trace.events.some(
+                    (event) =>
+                        event.type ===
+                        "TRACE_LIMIT"
+                );
+
+            if (traceLimited) {
+                return {
+                    success: false,
+                    kind: "TIMEOUT",
+                    stdout,
+                    stderr,
+                    trace,
+                    message:
+                        "Java execution exceeded trace event limit"
+                };
+            }
+
             return {
                 success: true,
                 kind: "OK",
@@ -224,8 +246,7 @@ export async function runJava(
                     ),
                 stdout,
                 stderr,
-                trace:
-                    parseTrace(stdout)
+                trace
             };
 
         } catch (error: any) {
