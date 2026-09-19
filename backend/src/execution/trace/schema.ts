@@ -3,6 +3,7 @@ export type ExecutionEventType =
     | "PROGRAM_END"
     | "STEP"
     | "VARIABLE_UPDATE"
+    | "ARRAY_REFERENCE"
     | "ARRAY_ACCESS"
     | "ARRAY_WRITE"
     | "OBJECT_CREATE"
