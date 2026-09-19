@@ -263,10 +263,16 @@ assert(
 const collectionArray = valuesFields?.elementData;
 const collectionArrayValues = snapshotField(collectionArray, "values");
 
+const firstElement = Array.isArray(collectionArrayValues)
+    ? collectionArrayValues[0]
+    : undefined;
+const secondElement = Array.isArray(collectionArrayValues)
+    ? collectionArrayValues[1]
+    : undefined;
+
 assert(
-    Array.isArray(collectionArrayValues) &&
-    collectionArrayValues[0] === 9 &&
-    collectionArrayValues[1] === 2,
+    snapshotField(snapshotField(firstElement, "fields"), "value") === 9 &&
+    snapshotField(snapshotField(secondElement, "fields"), "value") === 2,
     "collection state did not preserve mutated elements"
 );
 
