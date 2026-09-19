@@ -127,6 +127,14 @@ class Solution {
         throw new IllegalArgumentException("bad input");
     }
 
+    public int outerThrows() {
+        return throwHelper();
+    }
+
+    private int throwHelper() {
+        throw new IllegalArgumentException("nested bad input");
+    }
+
     public int collectionMutation() {
         List<Integer> values = new ArrayList<>();
         values.add(1);
@@ -426,6 +434,32 @@ const errorState = runtimeError.states?.find((state) => state.error?.type === "j
 assert(
     errorState?.error?.message === "bad input",
     "runtime exception state did not preserve the error details"
+);
+
+const nestedRuntimeError = await runJava(source, {
+    method: "outerThrows"
+});
+
+assert(
+    nestedRuntimeError.kind === "RUNTIME_ERROR",
+    "nested runtime exception did not report RUNTIME_ERROR"
+);
+assert(
+    traceTypes(nestedRuntimeError).has("ERROR"),
+    "nested runtime exception did not emit ERROR"
+);
+assert(
+    nestedRuntimeError.states?.some(
+        (state) =>
+            state.callStack.includes("outerThrows") &&
+            state.callStack.includes("throwHelper") &&
+            state.error?.type === "java.lang.IllegalArgumentException"
+    ) === true,
+    "nested runtime exception did not preserve the throwing call stack"
+);
+assert(
+    nestedRuntimeError.states?.at(-1)?.callStack.length === 0,
+    "call stack was not unwound after nested runtime exception"
 );
 
 const collectionMutation = await runJava(source, { method: "collectionMutation" });
