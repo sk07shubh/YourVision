@@ -435,6 +435,13 @@ public class YourVisionTracer {
                 readLocals(frame)
             );
 
+            data.put(
+                "accesses",
+                captureArrayAccesses(
+                    frame
+                )
+            );
+
         } catch (Exception ignored) {
         }
 
@@ -444,6 +451,52 @@ public class YourVisionTracer {
             thread,
             data
         );
+    }
+
+    private static List<Map<String, Object>> captureArrayAccesses(
+        StackFrame frame
+    ) {
+        List<Map<String, Object>> accesses =
+            new java.util.ArrayList<>();
+
+        try {
+            for (
+                LocalVariable variable :
+                frame.visibleVariables()
+            ) {
+                Value value =
+                    frame.getValue(variable);
+
+                if (!(value instanceof ArrayReference array)) {
+                    continue;
+                }
+
+                Map<String, Object> access =
+                    new LinkedHashMap<>();
+
+                access.put(
+                    "array",
+                    variable.name()
+                );
+
+                access.put(
+                    "arrayId",
+                    String.valueOf(
+                        array.uniqueID()
+                    )
+                );
+
+                access.put(
+                    "length",
+                    array.length()
+                );
+
+                accesses.add(access);
+            }
+        } catch (Exception ignored) {
+        }
+
+        return accesses;
     }
 
     private static Map<String, Object> readLocals(
