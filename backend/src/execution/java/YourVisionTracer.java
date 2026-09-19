@@ -232,6 +232,29 @@ public class YourVisionTracer {
                 ) {
                     finished = true;
                 }
+
+                if (
+                    !finished &&
+                    sequence >= MAX_EVENTS
+                ) {
+                    emit(
+                        "TRACE_LIMIT",
+                        null,
+                        null,
+                        Map.of(
+                            "maxEvents",
+                            MAX_EVENTS
+                        )
+                    );
+
+                    try {
+                        vm.exit(124);
+                    } catch (Exception ignored) {
+                    }
+
+                    finished = true;
+                    break;
+                }
             }
 
             try {
