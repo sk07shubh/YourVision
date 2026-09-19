@@ -97,10 +97,16 @@ const expected: readonly (readonly [string, string, string])[] = [
 if (
     records.length !== expected.length ||
     records.some(
-        (record, index) =>
-            record.kind !== expected[index][0] ||
-            record.text !== expected[index][1] ||
-            record.index !== expected[index][2]
+        (record, index) => {
+            const target = expected[index];
+
+            return (
+                target === undefined ||
+                record.kind !== target[0] ||
+                record.text !== target[1] ||
+                record.index !== target[2]
+            );
+        }
     )
 ) {
     console.error("Expected array access discovery:");
