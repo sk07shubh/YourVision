@@ -67,6 +67,13 @@ class Solution {
         return head.next.next.value;
     }
 
+    public int arrayMutation() {
+        int[] nums = {1, 2, 3};
+        nums[1] = 9;
+        nums[2]++;
+        return nums[1] + nums[2];
+    }
+
     public int helper() {
         return doubleIt(5);
     }
@@ -74,6 +81,13 @@ class Solution {
     private int doubleIt(int value) {
         int result = value * 2;
         return result;
+    }
+
+    public int recursive(int value) {
+        if (value <= 1) {
+            return value;
+        }
+        return value + recursive(value - 1);
     }
 }
 `;
@@ -160,6 +174,34 @@ const tailValue = snapshotField(snapshotField(tail, "fields"), "value");
 assert(
     tailValue === 10,
     "deep object state did not preserve the final nested field value"
+);
+
+const arrayMutation = await runJava(source, { method: "arrayMutation" });
+
+assert(
+    arrayMutation.kind === "OK",
+    "array mutation state test did not execute successfully"
+);
+assert(
+    arrayMutation.result === "12",
+    "array mutation returned the wrong result"
+);
+
+const arrayTypes = traceTypes(arrayMutation);
+
+assert(
+    arrayTypes.has("ARRAY_WRITE"),
+    "array mutation did not emit ARRAY_WRITE"
+);
+
+const arrayState = arrayMutation.states?.at(-1);
+const nums = arrayState?.variables.nums;
+
+const arrayValues = snapshotField(nums, "values");
+
+assert(
+    JSON.stringify(arrayValues) === "[1,9,4]",
+    "array state did not preserve the final mutated values"
 );
 
 const helper = await runJava(source, { method: "helper" });
