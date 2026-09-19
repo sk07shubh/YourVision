@@ -96,9 +96,31 @@ function applyEvent(
                 typeof data.name === "string" &&
                 Array.isArray(data.values)
             ) {
+                const current =
+                    next.arrays[data.name];
+
+                const currentRecord =
+                    current &&
+                    typeof current === "object" &&
+                    !Array.isArray(current)
+                        ? current as Record<string, unknown>
+                        : {};
+
                 next.arrays = {
                     ...next.arrays,
-                    [data.name]: [...data.values]
+                    [data.name]: {
+                        ...currentRecord,
+                        objectId:
+                            typeof data.objectId === "string"
+                                ? data.objectId
+                                : currentRecord.objectId,
+                        values:
+                            [...data.values],
+                        changes:
+                            Array.isArray(data.changes)
+                                ? data.changes
+                                : undefined
+                    }
                 };
             }
             break;
