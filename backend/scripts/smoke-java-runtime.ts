@@ -187,6 +187,7 @@ class Solution {
 
     static class Node {
         int value;
+        Node next;
 
         Node(int value) {
             this.value = value;
@@ -203,6 +204,14 @@ class Solution {
             new Node(1),
             new Node(2)
         );
+    }
+
+    public int linkNodes() {
+        Node a = new Node(1);
+        Node b = new Node(2);
+        a.next = b;
+        a.value = 7;
+        return a.next.value + a.value;
     }
 
     public List<int[]> arrayCollectionResult() {
@@ -436,6 +445,16 @@ const cases: Case[] = [
         method: "arrayCollectionResult",
         expectedKind: "OK",
         expectedResult: "[[1,2],[3,4]]"
+    },
+    {
+        name: "object field mutations",
+        source,
+        method: "linkNodes",
+        expectedKind: "OK",
+        expectedResult: "9",
+        requiredTraceTypes: [
+            "OBJECT_FIELD_WRITE"
+        ]
     },
     {
         name: "side effect array index write",
