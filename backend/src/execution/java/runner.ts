@@ -4,6 +4,7 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import { fileURLToPath } from "url";
+import type { ExecutionTrace, ExecutionEvent } from "../trace/schema.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -26,6 +27,7 @@ export interface JavaExecutionResult {
     stderr: string;
     errorType?: string;
     message?: string;
+    trace?: ExecutionTrace;
 }
 
 const RUNTIME_FILE =
@@ -37,6 +39,13 @@ const RUNTIME_FILE =
     );
 
 const NO_ARGS = "__YV_NO_ARGS__";
+const TRACER_FILE =
+    fileURLToPath(
+        new URL(
+            "./YourVisionTracer.java",
+            import.meta.url
+        )
+    );
 
 export async function runJava(
     source: string,
@@ -111,6 +120,12 @@ export async function runJava(
             "YourVisionRuntime.java"
         );
 
+    const tracerPath =
+        path.join(
+            tempDir,
+            "YourVisionTracer.java"
+        );
+
     try {
         await fs.writeFile(
             solutionPath,
@@ -122,6 +137,11 @@ export async function runJava(
             runtimePath
         );
 
+        await fs.copyFile(
+            TRACER_FILE,
+            tracerPath
+        );
+
         try {
             await execFileAsync(
                 "javac",
@@ -130,7 +150,8 @@ export async function runJava(
                     "-d",
                     tempDir,
                     solutionPath,
-                    runtimePath
+                    runtimePath,
+                    tracerPath
                 ],
                 {
                     timeout: 5000,
@@ -160,7 +181,11 @@ export async function runJava(
         }
 
         const childArguments = [
+            "--add-modules",
+            "jdk.jdi",
             "-cp",
+            tempDir,
+            "YourVisionTracer",
             tempDir,
             "YourVisionRuntime",
             "Solution",
@@ -196,7 +221,9 @@ export async function runJava(
                         "__YV_RESULT__="
                     ),
                 stdout,
-                stderr
+                stderr,
+                trace:
+                    parseTrace(stdout)
             };
 
         } catch (error: any) {
@@ -240,6 +267,8 @@ export async function runJava(
                     errorType
                         ? "RUNTIME_ERROR"
                         : "HARNESS_ERROR",
+                trace:
+                    parseTrace(stdout),
                 stdout,
                 stderr,
                 errorType:
@@ -296,4 +325,80 @@ function isTimeout(
         error?.signal ===
             "SIGTERM"
     );
+}
+
+
+function parseTrace(
+    stdout: string
+): ExecutionTrace {
+    const events: ExecutionEvent[] = [];
+
+    for (const line of stdout.split(/\r?\n/)) {
+        if (!line.startsWith("__YV_EVENT__=")) {
+            continue;
+        }
+
+        const payload = line.slice(
+            "__YV_EVENT__=".length
+        );
+
+        const parts = payload.split("|");
+
+        if (parts.length < 5) {
+            continue;
+        }
+
+        const sequence =
+            Number(parts[0]);
+
+        const type =
+            parts[1] as ExecutionEvent["type"];
+
+        const lineNumber =
+            Number(parts[2]);
+
+        const depth =
+            Number(parts[3]);
+
+        const method =
+            unescapeTrace(parts[4]);
+
+        const detail =
+            unescapeTrace(
+                parts.slice(5).join("|")
+            );
+
+        events.push({
+            sequence,
+            type,
+            line:
+                Number.isFinite(lineNumber)
+                    ? lineNumber
+                    : undefined,
+            method,
+            depth:
+                Number.isFinite(depth)
+                    ? depth
+                    : undefined,
+            data:
+                detail
+                    ? { detail }
+                    : undefined
+        });
+    }
+
+    return {
+        version: 1,
+        events
+    };
+}
+
+function unescapeTrace(
+    value: string
+): string {
+    return value
+        .replace(/\\\\/g, "\\")
+        .replace(/\\n/g, "\n")
+        .replace(/\\r/g, "\r")
+        .replace(/\\\|/g, "|");
 }
