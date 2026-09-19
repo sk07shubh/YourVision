@@ -225,4 +225,33 @@ assert(
     "call stack was not restored after method return"
 );
 
+const recursive = await runJava(source, {
+    method: "recursive",
+    arguments: ["4"]
+});
+
+assert(
+    recursive.kind === "OK",
+    "recursive state test did not execute successfully"
+);
+assert(
+    recursive.result === "10",
+    "recursive call returned the wrong result"
+);
+
+const recursiveStates = recursive.states ?? [];
+
+assert(
+    recursiveStates.some(
+        (state) =>
+            state.callStack.filter((method) => method === "recursive").length >= 2
+    ),
+    "recursive call stack did not capture nested recursion"
+);
+
+assert(
+    recursiveStates.at(-1)?.callStack.length === 0,
+    "call stack was not restored after recursion"
+);
+
 console.log("PASS: Java state integration");
