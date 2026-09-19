@@ -88,6 +88,24 @@ class Solution {
         return 1;
     }
 
+    public int indexedRead(int[] nums) {
+        int i = 1;
+        return nums[i];
+    }
+
+    public int postIndexedRead(int[] nums) {
+        int i = 0;
+        return nums[i++] + i;
+    }
+
+    public int methodIndexedRead(int[] nums) {
+        return nums[nextIndex()];
+    }
+
+    private int nextIndex() {
+        return 1;
+    }
+
     public int helper() {
         return doubleIt(5);
     }
@@ -278,6 +296,56 @@ assert(
 assert(
     (prints.states?.length ?? 0) > 0,
     "stdout/stderr execution did not produce trace states"
+);
+
+const indexedRead = await runJava(source, {
+    method: "indexedRead",
+    arguments: ["[4,8,15]"]
+});
+
+assert(
+    indexedRead.kind === "OK" && indexedRead.result === "8",
+    "simple indexed read state test returned the wrong result"
+);
+assert(
+    indexedRead.states?.some(
+        (state) => state.variables.i === 1
+    ) === true,
+    "simple indexed read did not preserve the index variable"
+);
+
+const postIndexedRead = await runJava(source, {
+    method: "postIndexedRead",
+    arguments: ["[4,8,15]"]
+});
+
+assert(
+    postIndexedRead.kind === "OK" && postIndexedRead.result === "5",
+    "post-increment indexed read state test returned the wrong result"
+);
+assert(
+    postIndexedRead.states?.some(
+        (state) => state.variables.i === 1
+    ) === true,
+    "post-increment indexed read did not preserve the updated index"
+);
+
+const methodIndexedRead = await runJava(source, {
+    method: "methodIndexedRead",
+    arguments: ["[4,8,15]"]
+});
+
+assert(
+    methodIndexedRead.kind === "OK" && methodIndexedRead.result === "8",
+    "method-call indexed read state test returned the wrong result"
+);
+assert(
+    methodIndexedRead.states?.some(
+        (state) =>
+            state.callStack.includes("methodIndexedRead") &&
+            state.callStack.includes("nextIndex")
+    ) === true,
+    "method-call indexed read did not preserve the nested call stack"
 );
 
 const helper = await runJava(source, { method: "helper" });
