@@ -22,7 +22,6 @@ type Case = {
 
 const source = `
 import java.util.*;
-import java.lang.reflect.Field;
 
 class Solution {
     public int zero() {
@@ -277,6 +276,10 @@ class Solution {
 
         BaseNode() {
         }
+
+        int getValue() {
+            return value;
+        }
     }
 
     static class ChildNode extends BaseNode {
@@ -285,13 +288,7 @@ class Solution {
     }
 
     public int inheritedField(ChildNode value) {
-        try {
-            Field field = BaseNode.class.getDeclaredField("value");
-            field.setAccessible(true);
-            return field.getInt(value);
-        } catch (ReflectiveOperationException ex) {
-            throw new IllegalStateException(ex);
-        }
+        return value.getValue();
     }
 
     public List<int[]> arrayCollectionResult() {
