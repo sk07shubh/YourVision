@@ -6,6 +6,7 @@ import os from "os";
 import { fileURLToPath } from "url";
 import type { ExecutionTrace, ExecutionEvent, TraceState } from "../trace/schema.js";
 import { buildStates } from "../trace/stateBuilder.js";
+import { enrichTrace } from "../trace/enrichTrace.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -421,8 +422,8 @@ function parseTrace(
             a.sequence - b.sequence
     );
 
-    return {
+    return enrichTrace({
         version: 1,
         events
-    };
+    });
 }
