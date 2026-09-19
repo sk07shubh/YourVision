@@ -17,10 +17,10 @@ export type ExecutionEventType =
 export interface ExecutionEvent {
     sequence: number;
     type: ExecutionEventType;
-    line?: number;
-    method?: string;
-    depth?: number;
-    data?: Record<string, unknown>;
+    line?: number | undefined;
+    method?: string | undefined;
+    depth?: number | undefined;
+    data?: Record<string, unknown> | undefined;
 }
 
 export interface ExecutionTrace {
