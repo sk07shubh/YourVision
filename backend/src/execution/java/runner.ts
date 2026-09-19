@@ -3,48 +3,297 @@ import { promisify } from "util";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
+import { fileURLToPath } from "url";
 
 const execFileAsync = promisify(execFile);
 
-export async function runJava(source: string) {
-    const tempDir = await fs.mkdtemp(
-        path.join(os.tmpdir(), "yourvision-")
+export interface JavaTestcase {
+    method: string;
+    arguments?: string[];
+}
+
+export interface JavaExecutionResult {
+    success: boolean;
+    kind:
+        | "OK"
+        | "VALIDATION_ERROR"
+        | "COMPILATION_ERROR"
+        | "RUNTIME_ERROR"
+        | "TIMEOUT"
+        | "HARNESS_ERROR";
+    result?: string;
+    stdout: string;
+    stderr: string;
+    errorType?: string;
+    message?: string;
+}
+
+const RUNTIME_FILE =
+    fileURLToPath(
+        new URL(
+            "./YourVisionRuntime.java",
+            import.meta.url
+        )
     );
 
-    const filePath = path.join(tempDir, "Main.java");
+const NO_ARGS = "__YV_NO_ARGS__";
 
-    await fs.writeFile(filePath, source);
+export async function runJava(
+    source: string,
+    testcase?: JavaTestcase
+): Promise<JavaExecutionResult> {
 
-    try {
-        // 1. Compile
-        await execFileAsync("javac", [filePath]);
-
-        // 2. Run
-        const { stdout, stderr } = await execFileAsync(
-            "java",
-            ["-cp", tempDir, "Main"],
-            {
-                timeout: 3000
-            }
-        );
-
-        return {
-            success: true,
-            stdout,
-            stderr
-        };
-
-    } catch (error: any) {
+    if (
+        !testcase ||
+        typeof testcase.method !== "string" ||
+        testcase.method.trim() === ""
+    ) {
         return {
             success: false,
-            stdout: error.stdout ?? "",
-            stderr: error.stderr ?? error.message
+            kind: "VALIDATION_ERROR",
+            stdout: "",
+            stderr: "",
+            message:
+                "testcase.method is required"
         };
+    }
+
+    if (
+        testcase.arguments !== undefined &&
+        !Array.isArray(testcase.arguments)
+    ) {
+        return {
+            success: false,
+            kind: "VALIDATION_ERROR",
+            stdout: "",
+            stderr: "",
+            message:
+                "testcase.arguments must be an array of strings"
+        };
+    }
+
+    const rawArguments =
+        testcase.arguments ?? [];
+
+    if (
+        rawArguments.some(
+            (value) =>
+                typeof value !== "string"
+        )
+    ) {
+        return {
+            success: false,
+            kind: "VALIDATION_ERROR",
+            stdout: "",
+            stderr: "",
+            message:
+                "every testcase argument must be a string"
+        };
+    }
+
+    const tempDir =
+        await fs.mkdtemp(
+            path.join(
+                os.tmpdir(),
+                "yourvision-"
+            )
+        );
+
+    const solutionPath =
+        path.join(
+            tempDir,
+            "Solution.java"
+        );
+
+    const runtimePath =
+        path.join(
+            tempDir,
+            "YourVisionRuntime.java"
+        );
+
+    try {
+        await fs.writeFile(
+            solutionPath,
+            source
+        );
+
+        await fs.copyFile(
+            RUNTIME_FILE,
+            runtimePath
+        );
+
+        try {
+            await execFileAsync(
+                "javac",
+                [
+                    "-g",
+                    "-d",
+                    tempDir,
+                    solutionPath,
+                    runtimePath
+                ],
+                {
+                    timeout: 5000,
+                    maxBuffer:
+                        1024 * 1024
+                }
+            );
+
+        } catch (error: any) {
+            return {
+                success: false,
+                kind:
+                    isTimeout(error)
+                        ? "TIMEOUT"
+                        : "COMPILATION_ERROR",
+                stdout:
+                    error.stdout ?? "",
+                stderr:
+                    error.stderr ??
+                    error.message ??
+                    "",
+                message:
+                    isTimeout(error)
+                        ? "Java compilation timed out"
+                        : "Java compilation failed"
+            };
+        }
+
+        const childArguments = [
+            "-cp",
+            tempDir,
+            "YourVisionRuntime",
+            "Solution",
+            testcase.method,
+            ...(
+                rawArguments.length === 0
+                    ? [NO_ARGS]
+                    : rawArguments
+            )
+        ];
+
+        try {
+            const {
+                stdout,
+                stderr
+            } =
+                await execFileAsync(
+                    "java",
+                    childArguments,
+                    {
+                        timeout: 3000,
+                        maxBuffer:
+                            1024 * 1024
+                    }
+                );
+
+            return {
+                success: true,
+                kind: "OK",
+                result:
+                    extractMarker(
+                        stdout,
+                        "__YV_RESULT__="
+                    ),
+                stdout,
+                stderr
+            };
+
+        } catch (error: any) {
+
+            if (isTimeout(error)) {
+                return {
+                    success: false,
+                    kind: "TIMEOUT",
+                    stdout:
+                        error.stdout ?? "",
+                    stderr:
+                        error.stderr ?? "",
+                    message:
+                        "Java execution exceeded 3000 ms"
+                };
+            }
+
+            const stdout =
+                error.stdout ?? "";
+
+            const stderr =
+                error.stderr ??
+                error.message ??
+                "";
+
+            const errorType =
+                extractMarker(
+                    stderr,
+                    "__YV_EXCEPTION_TYPE__="
+                );
+
+            const message =
+                extractMarker(
+                    stderr,
+                    "__YV_EXCEPTION_MESSAGE__="
+                );
+
+            return {
+                success: false,
+                kind:
+                    errorType
+                        ? "RUNTIME_ERROR"
+                        : "HARNESS_ERROR",
+                stdout,
+                stderr,
+                errorType:
+                    errorType || undefined,
+                message:
+                    message ||
+                    "Java execution failed"
+            };
+        }
 
     } finally {
-        await fs.rm(tempDir, {
-            recursive: true,
-            force: true
-        });
+        await fs.rm(
+            tempDir,
+            {
+                recursive: true,
+                force: true
+            }
+        );
     }
+}
+
+function extractMarker(
+    text: string,
+    marker: string
+): string {
+
+    const line =
+        text
+            .split(/\r?\n/)
+            .find(
+                (value) =>
+                    value.startsWith(
+                        marker
+                    )
+            );
+
+    if (!line) {
+        return "";
+    }
+
+    return line.slice(
+        marker.length
+    );
+}
+
+function isTimeout(
+    error: any
+): boolean {
+
+    return Boolean(
+        error?.killed ||
+        error?.code ===
+            "ETIMEDOUT" ||
+        error?.signal ===
+            "SIGTERM"
+    );
 }
