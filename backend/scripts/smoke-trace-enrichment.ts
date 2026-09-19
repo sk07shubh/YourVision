@@ -175,20 +175,20 @@ const accessTrace: ExecutionTrace = {
 const enrichedAccessTrace =
     enrichTrace(accessTrace);
 
-const accessEvent =
+const referenceEvent =
     enrichedAccessTrace.events.find(
         (event) =>
             event.type ===
-            "ARRAY_ACCESS"
+            "ARRAY_REFERENCE"
     );
 
 if (
-    !accessEvent ||
-    accessEvent.data?.array !== "nums" ||
-    accessEvent.data?.arrayId !== "12"
+    !referenceEvent ||
+    referenceEvent.data?.array !== "nums" ||
+    referenceEvent.data?.arrayId !== "12"
 ) {
     throw new Error(
-        "array access event was not normalized"
+        "array reference event was not normalized"
     );
 }
 
