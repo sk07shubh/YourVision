@@ -58,6 +58,8 @@ function deriveChanges(
         getVariables(current);
 
     const derived: ExecutionEvent[] = [];
+    const emittedObjectIds =
+        new Set<string>();
 
     for (
         const [name, currentValue] of
@@ -126,6 +128,70 @@ function deriveChanges(
                         changes,
                         values:
                             afterArray.values
+                    }
+                });
+            }
+
+            continue;
+        }
+
+        const beforeObject =
+            asObjectSnapshot(
+                previousValue
+            );
+
+        const afterObject =
+            asObjectSnapshot(
+                currentValue
+            );
+
+        if (
+            beforeObject &&
+            afterObject &&
+            beforeObject.$objectId ===
+                afterObject.$objectId
+        ) {
+            const changes:
+                Array<{
+                    fields: string[];
+                    before: unknown;
+                    after: unknown;
+                }> = [];
+
+            compareObjectFields(
+                beforeObject.fields,
+                afterObject.fields,
+                [],
+                changes
+            );
+
+            if (
+                changes.length > 0 &&
+                !emittedObjectIds.has(
+                    afterObject.$objectId
+                )
+            ) {
+                emittedObjectIds.add(
+                    afterObject.$objectId
+                );
+
+                derived.push({
+                    sequence: 0,
+                    type:
+                        "OBJECT_FIELD_WRITE",
+                    line:
+                        previous.line,
+                    method:
+                        previous.method,
+                    depth:
+                        previous.depth,
+                    data: {
+                        name,
+                        objectId:
+                            afterObject.$objectId,
+                        changes,
+                        value:
+                            currentValue
                     }
                 });
             }
@@ -284,6 +350,108 @@ function compareArrayValues(
             changes.push({
                 indices:
                     [...path, i],
+                before:
+                    beforeValue,
+                after:
+                    afterValue
+            });
+        }
+    }
+}
+
+function asObjectSnapshot(
+    value: unknown
+): {
+    $objectId: string;
+    fields: Record<string, unknown>;
+} | undefined {
+    if (
+        !value ||
+        typeof value !== "object" ||
+        Array.isArray(value)
+    ) {
+        return undefined;
+    }
+
+    const record =
+        value as SnapshotRecord;
+
+    if (
+        typeof record.$objectId !== "string" ||
+        !record.fields ||
+        typeof record.fields !== "object" ||
+        Array.isArray(record.fields)
+    ) {
+        return undefined;
+    }
+
+    return {
+        $objectId:
+            record.$objectId,
+        fields:
+            record.fields as
+                Record<string, unknown>
+    };
+}
+
+function compareObjectFields(
+    before: Record<string, unknown>,
+    after: Record<string, unknown>,
+    path: string[],
+    changes: Array<{
+        fields: string[];
+        before: unknown;
+        after: unknown;
+    }>
+): void {
+    const keys =
+        new Set([
+            ...Object.keys(before),
+            ...Object.keys(after)
+        ]);
+
+    for (const key of keys) {
+        const beforeValue =
+            before[key];
+
+        const afterValue =
+            after[key];
+
+        const beforeObject =
+            asObjectSnapshot(
+                beforeValue
+            );
+
+        const afterObject =
+            asObjectSnapshot(
+                afterValue
+            );
+
+        if (
+            beforeObject &&
+            afterObject &&
+            beforeObject.$objectId ===
+                afterObject.$objectId
+        ) {
+            compareObjectFields(
+                beforeObject.fields,
+                afterObject.fields,
+                [...path, key],
+                changes
+            );
+
+            continue;
+        }
+
+        if (
+            !sameSnapshot(
+                beforeValue,
+                afterValue
+            )
+        ) {
+            changes.push({
+                fields:
+                    [...path, key],
                 before:
                     beforeValue,
                 after:
