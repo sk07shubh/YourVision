@@ -100,15 +100,14 @@ if (states[2].variables.left !== 0) {
     throw new Error("variable update was not replayed");
 }
 
-if (
-    (states[3].arrays.nums as {
+const replayedNums =
+    states[3].arrays.nums as {
         values?: unknown[];
-    })?.values &&
-    JSON.stringify(
-        (states[3].arrays.nums as {
-            values?: unknown[];
-        }).values
-    ) !== JSON.stringify([2, 7, 11])
+    };
+
+if (
+    JSON.stringify(replayedNums.values) !==
+    JSON.stringify([2, 7, 11])
 ) {
     throw new Error("array state was not replayed");
 }
