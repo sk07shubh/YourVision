@@ -86,6 +86,35 @@ class Solution {
         return Arrays.asList(1, 2, 3);
     }
 
+    public int sumList(List<Integer> values) {
+        int total = 0;
+        for (Integer value : values) {
+            if (value != null) {
+                total += value;
+            }
+        }
+        return total;
+    }
+
+    public int sumQueue(Queue<Integer> values) {
+        int total = 0;
+        while (!values.isEmpty()) {
+            Integer value = values.remove();
+            if (value != null) {
+                total += value;
+            }
+        }
+        return total;
+    }
+
+    public int mapSize(Map<String, Integer> values) {
+        return values.size();
+    }
+
+    public int nestedListSize(List<List<Integer>> values) {
+        return values.get(0).size() + values.get(1).size();
+    }
+
     public List<Integer> linkedListResult() {
         return new LinkedList<>(Arrays.asList(3, 1, 2));
     }
@@ -275,6 +304,38 @@ const cases: Case[] = [
         method: "listResult",
         expectedKind: "OK",
         expectedResult: "{\"a\":1,\"b\":2}"
+    },
+    {
+        name: "list input parsing",
+        source,
+        method: "sumList",
+        args: ["[1,null,3]"],
+        expectedKind: "OK",
+        expectedResult: "4"
+    },
+    {
+        name: "queue input parsing",
+        source,
+        method: "sumQueue",
+        args: ["[1,2,3]"],
+        expectedKind: "OK",
+        expectedResult: "6"
+    },
+    {
+        name: "map input parsing",
+        source,
+        method: "mapSize",
+        args: ["{\"a\":1,\"b\":2}"],
+        expectedKind: "OK",
+        expectedResult: "2"
+    },
+    {
+        name: "nested collection input parsing",
+        source,
+        method: "nestedListSize",
+        args: ["[[1,2],[3,4,5]]"],
+        expectedKind: "OK",
+        expectedResult: "5"
     },
     {
         name: "linked list result formatting",
