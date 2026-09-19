@@ -951,42 +951,51 @@ public class YourVisionRuntime {
     private static String formatValue(
         Object value
     ) {
+        return formatValue(
+            value,
+            new IdentityHashMap<>()
+        );
+    }
+
+    private static String formatValue(
+        Object value,
+        IdentityHashMap<Object, Boolean> seen
+    ) {
         if (value == null) {
             return "null";
         }
 
-        Class<?> type =
-            value.getClass();
+        Class<?> type = value.getClass();
 
         if (type.isArray()) {
-            int length =
-                Array.getLength(value);
-
-            StringBuilder result =
-                new StringBuilder("[");
-
-            for (
-                int i = 0;
-                i < length;
-                i++
-            ) {
-                if (i > 0) {
-                    result.append(',');
-                }
-
-                result.append(
-                    formatValue(
-                        Array.get(
-                            value,
-                            i
-                        )
-                    )
-                );
+            if (seen.put(value, Boolean.TRUE) != null) {
+                return "\"<cycle>\"";
             }
 
-            return result
-                .append(']')
-                .toString();
+            try {
+                int length = Array.getLength(value);
+                StringBuilder result =
+                    new StringBuilder("[");
+
+                for (int i = 0; i < length; i++) {
+                    if (i > 0) {
+                        result.append(',');
+                    }
+
+                    result.append(
+                        formatValue(
+                            Array.get(value, i),
+                            seen
+                        )
+                    );
+                }
+
+                return result
+                    .append(']')
+                    .toString();
+            } finally {
+                seen.remove(value);
+            }
         }
 
         if (
@@ -994,10 +1003,8 @@ public class YourVisionRuntime {
             value instanceof Character
         ) {
             return
-                "\"" +
-                escapeJson(
-                    String.valueOf(value)
-                ) +
+                "\""\" +
+                escapeJson(String.valueOf(value)) +
                 "\"";
         }
 
@@ -1009,75 +1016,86 @@ public class YourVisionRuntime {
         }
 
         if (value instanceof Collection<?>) {
-            StringBuilder result =
-                new StringBuilder("[");
-
-            boolean first = true;
-
-            for (
-                Object item :
-                (Collection<?>) value
-            ) {
-                if (!first) {
-                    result.append(',');
-                }
-
-                first = false;
-
-                result.append(
-                    formatValue(item)
-                );
+            if (seen.put(value, Boolean.TRUE) != null) {
+                return "\"<cycle>\"";
             }
 
-            return result
-                .append(']')
-                .toString();
+            try {
+                StringBuilder result =
+                    new StringBuilder("[");
+
+                boolean first = true;
+
+                for (Object item : (Collection<?>) value) {
+                    if (!first) {
+                        result.append(',');
+                    }
+
+                    first = false;
+
+                    result.append(
+                        formatValue(item, seen)
+                    );
+                }
+
+                return result
+                    .append(']')
+                    .toString();
+            } finally {
+                seen.remove(value);
+            }
         }
 
         if (value instanceof Map<?, ?>) {
-            StringBuilder result =
-                new StringBuilder("{");
-
-            boolean first = true;
-
-            for (
-                Map.Entry<?, ?> entry :
-                ((Map<?, ?>) value)
-                    .entrySet()
-            ) {
-                if (!first) {
-                    result.append(',');
-                }
-
-                first = false;
-
-                result
-                    .append('"')
-                    .append(
-                        escapeJson(
-                            String.valueOf(
-                                entry.getKey()
-                            )
-                        )
-                    )
-                    .append("\":")
-                    .append(
-                        formatValue(
-                            entry.getValue()
-                        )
-                    );
+            if (seen.put(value, Boolean.TRUE) != null) {
+                return "\"<cycle>\"";
             }
 
-            return result
-                .append('}')
-                .toString();
+            try {
+                StringBuilder result =
+                    new StringBuilder("{");
+
+                boolean first = true;
+
+                for (
+                    Map.Entry<?, ?> entry :
+                    ((Map<?, ?>) value).entrySet()
+                ) {
+                    if (!first) {
+                        result.append(',');
+                    }
+
+                    first = false;
+
+                    result
+                        .append('"')
+                        .append(
+                            escapeJson(
+                                String.valueOf(
+                                    entry.getKey()
+                                )
+                            )
+                        )
+                        .append("\":")
+                        .append(
+                            formatValue(
+                                entry.getValue(),
+                                seen
+                            )
+                        );
+                }
+
+                return result
+                    .append('}')
+                    .toString();
+            } finally {
+                seen.remove(value);
+            }
         }
 
         return
-            "\"" +
-            escapeJson(
-                String.valueOf(value)
-            ) +
+            "\""\" +
+            escapeJson(String.valueOf(value)) +
             "\"";
     }
 
