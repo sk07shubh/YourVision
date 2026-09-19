@@ -489,6 +489,11 @@ public class YourVisionTracer {
                 );
 
                 access.put(
+                    "kind",
+                    "array-reference"
+                );
+
+                access.put(
                     "length",
                     array.length()
                 );
