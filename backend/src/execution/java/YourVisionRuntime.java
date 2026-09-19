@@ -3,6 +3,7 @@ import java.util.*;
 
 public class YourVisionRuntime {
     private static final String NO_ARGS = "__YV_NO_ARGS__";
+    private static long traceSequence = 0;
 
     public static void main(String[] args) throws Exception {
         if (args.length < 2) {
@@ -20,6 +21,8 @@ public class YourVisionRuntime {
                 rawArguments.add(args[i]);
             }
         }
+
+        emitEvent("PROGRAM_START", methodName, 0);
 
         Class<?> targetClass = Class.forName(className);
         MethodResolution resolution =
@@ -39,22 +42,43 @@ public class YourVisionRuntime {
         }
 
         try {
+            emitEvent(
+                "METHOD_ENTER",
+                method.getName(),
+                1
+            );
+
             Object result =
                 method.invoke(
                     instance,
                     resolution.arguments
                 );
 
+            emitEvent(
+                "METHOD_EXIT",
+                method.getName(),
+                1
+            );
+
             System.out.println(
                 "__YV_RESULT__=" +
                 formatValue(result)
             );
+
+            emitEvent("PROGRAM_END", method.getName(), 0);
 
         } catch (InvocationTargetException ex) {
             Throwable cause =
                 ex.getCause() == null
                     ? ex
                     : ex.getCause();
+
+            emitEvent(
+                "ERROR",
+                method.getName(),
+                1,
+                cause.getClass().getName()
+            );
 
             System.err.println(
                 "__YV_EXCEPTION_TYPE__=" +
@@ -69,6 +93,39 @@ public class YourVisionRuntime {
             cause.printStackTrace(System.err);
             System.exit(7);
         }
+    }
+
+    private static void emitEvent(
+        String type,
+        String method,
+        int depth
+    ) {
+        emitEvent(type, method, depth, "");
+    }
+
+    private static void emitEvent(
+        String type,
+        String method,
+        int depth,
+        String detail
+    ) {
+        traceSequence++;
+        System.out.println(
+            "__YV_EVENT__=" +
+            traceSequence + "|" +
+            type + "|" +
+            depth + "|" +
+            escapeTrace(method) + "|" +
+            escapeTrace(detail)
+        );
+    }
+
+    private static String escapeTrace(String value) {
+        return String.valueOf(value)
+            .replace("\\", "\\\\")
+            .replace("|", "\\|")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r");
     }
 
     private static MethodResolution resolveMethod(
