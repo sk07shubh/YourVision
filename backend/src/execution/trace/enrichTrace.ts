@@ -67,7 +67,13 @@ function deriveArrayAccessEvents(
         return [];
     }
 
-    return accesses.map(
+    return accesses
+        .filter(
+            (access) =>
+                access &&
+                typeof access === "object"
+        )
+        .map(
         (access) => ({
             sequence: 0,
             type: "ARRAY_ACCESS",
