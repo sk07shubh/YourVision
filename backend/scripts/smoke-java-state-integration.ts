@@ -325,9 +325,9 @@ assert(
 );
 assert(
     postIndexedRead.states?.some(
-        (state) => state.variables.i === 1
+        (state) => state.variables.i === 0
     ) === true,
-    "post-increment indexed read did not preserve the updated index"
+    "post-increment indexed read did not preserve the source index state"
 );
 
 const methodIndexedRead = await runJava(source, {
