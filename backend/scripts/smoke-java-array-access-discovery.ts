@@ -87,8 +87,8 @@ const expected = [
     ["READ", "nums[i]", "i"],
     ["READ", "nums[i++]", "i++"],
     ["READ", "nums[index()]", "index()"],
-    ["READ", "matrix[row]", "row"],
     ["READ", "matrix[row][col]", "col"],
+    ["READ", "matrix[row]", "row"],
     ["WRITE", "nums[i]", "i"],
     ["READ_WRITE", "nums[i]", "i"],
     ["READ_WRITE", "nums[i]", "i"]
