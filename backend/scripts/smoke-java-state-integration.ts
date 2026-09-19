@@ -85,6 +85,12 @@ class Solution {
         return nums[1] + nums[2];
     }
 
+    public int largeArray() {
+        int[] nums = new int[200];
+        nums[199] = 7;
+        return nums.length;
+    }
+
     public int mutateInput(int[] nums) {
         nums[0] = 9;
         return nums[0];
@@ -294,6 +300,30 @@ const arrayValues = snapshotField(nums, "values");
 assert(
     JSON.stringify(arrayValues) === "[1,9,4]",
     "array state did not preserve the final mutated values"
+);
+
+const largeArray = await runJava(source, {
+    method: "largeArray"
+});
+
+assert(
+    largeArray.kind === "OK" && largeArray.result === "200",
+    "large array state test did not execute successfully"
+);
+
+const largeArrayState = largeArray.states?.at(-1);
+const largeArraySnapshot = largeArrayState?.variables.nums;
+const largeArrayValues = snapshotField(largeArraySnapshot, "values");
+
+assert(
+    Array.isArray(largeArrayValues) &&
+    largeArrayValues.length === 128,
+    "large array snapshot did not enforce the item cap"
+);
+assert(
+    snapshotField(largeArraySnapshot, "truncated") === true &&
+    snapshotField(largeArraySnapshot, "length") === 200,
+    "large array snapshot did not preserve truncation metadata"
 );
 
 const inputArrayMutation = await runJava(source, {
