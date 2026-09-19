@@ -951,19 +951,14 @@ public class YourVisionRuntime {
     private static String formatValue(
         Object value
     ) {
-        return formatValue(
-            value,
-            new IdentityHashMap<>()
-        );
+        return formatValue(value, new IdentityHashMap<>());
     }
 
     private static String formatValue(
         Object value,
         IdentityHashMap<Object, Boolean> seen
     ) {
-        if (value == null) {
-            return "null";
-        }
+        if (value == null) return "null";
 
         Class<?> type = value.getClass();
 
@@ -974,44 +969,28 @@ public class YourVisionRuntime {
 
             try {
                 int length = Array.getLength(value);
-                StringBuilder result =
-                    new StringBuilder("[");
+                StringBuilder result = new StringBuilder("[");
 
                 for (int i = 0; i < length; i++) {
-                    if (i > 0) {
-                        result.append(',');
-                    }
-
+                    if (i > 0) result.append(',');
                     result.append(
-                        formatValue(
-                            Array.get(value, i),
-                            seen
-                        )
+                        formatValue(Array.get(value, i), seen)
                     );
                 }
 
-                return result
-                    .append(']')
-                    .toString();
+                return result.append(']').toString();
             } finally {
                 seen.remove(value);
             }
         }
 
-        if (
-            value instanceof String ||
-            value instanceof Character
-        ) {
-            return
-                "\""\" +
+        if (value instanceof String || value instanceof Character) {
+            return "\"" +
                 escapeJson(String.valueOf(value)) +
                 "\"";
         }
 
-        if (
-            value instanceof Number ||
-            value instanceof Boolean
-        ) {
+        if (value instanceof Number || value instanceof Boolean) {
             return String.valueOf(value);
         }
 
@@ -1021,26 +1000,16 @@ public class YourVisionRuntime {
             }
 
             try {
-                StringBuilder result =
-                    new StringBuilder("[");
-
+                StringBuilder result = new StringBuilder("[");
                 boolean first = true;
 
                 for (Object item : (Collection<?>) value) {
-                    if (!first) {
-                        result.append(',');
-                    }
-
+                    if (!first) result.append(',');
                     first = false;
-
-                    result.append(
-                        formatValue(item, seen)
-                    );
+                    result.append(formatValue(item, seen));
                 }
 
-                return result
-                    .append(']')
-                    .toString();
+                return result.append(']').toString();
             } finally {
                 seen.remove(value);
             }
@@ -1052,28 +1021,18 @@ public class YourVisionRuntime {
             }
 
             try {
-                StringBuilder result =
-                    new StringBuilder("{");
-
+                StringBuilder result = new StringBuilder("{");
                 boolean first = true;
 
-                for (
-                    Map.Entry<?, ?> entry :
-                    ((Map<?, ?>) value).entrySet()
-                ) {
-                    if (!first) {
-                        result.append(',');
-                    }
-
+                for (Map.Entry<?, ?> entry :
+                     ((Map<?, ?>) value).entrySet()) {
+                    if (!first) result.append(',');
                     first = false;
 
-                    result
-                        .append('"')
+                    result.append('"')
                         .append(
                             escapeJson(
-                                String.valueOf(
-                                    entry.getKey()
-                                )
+                                String.valueOf(entry.getKey())
                             )
                         )
                         .append("\":")
@@ -1085,16 +1044,13 @@ public class YourVisionRuntime {
                         );
                 }
 
-                return result
-                    .append('}')
-                    .toString();
+                return result.append('}').toString();
             } finally {
                 seen.remove(value);
             }
         }
 
-        return
-            "\""\" +
+        return "\"" +
             escapeJson(String.valueOf(value)) +
             "\"";
     }
