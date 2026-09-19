@@ -8,7 +8,8 @@
         "test": "echo \"Error: no test specified\" && exit 1",
         "dev": "tsx src/server.ts",
         "test:java-runtime": "tsx scripts/smoke-java-runtime.ts",
-        "test:trace-state": "tsx scripts/smoke-trace-state.ts"
+        "test:trace-state": "tsx scripts/smoke-trace-state.ts",
+        "test:trace-enrichment": "tsx scripts/smoke-trace-enrichment.ts"
     },
     "keywords": [],
     "author": "",
