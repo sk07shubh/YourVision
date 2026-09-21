@@ -1,3 +1,5 @@
 node_modules/
-.DS_Storegit add .
-git status
+.DS_Store
+extension/node_modules/
+extension/dist/
+extension/.vitest/

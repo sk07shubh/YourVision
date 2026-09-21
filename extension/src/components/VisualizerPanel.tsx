@@ -1,0 +1,123 @@
+import { useEffect, useMemo, useState } from 'react';
+import { useSession } from '../state/session';
+import { sessionStore } from '../state/store';
+import { displayValue, stableStringify, isPlainObject } from '../utils/value';
+import { highlightEditorLine, clearEditorExecutionMarker } from '../leetcode/editor-overlay';
+import type { TraceState } from '../types/trace';
+
+type Obj = Record<string, unknown>;
+
+function eventLabel(state?: TraceState): string {
+  const t = state?.lastEvent?.type;
+  if (!t) return state ? 'Execution state' : 'Ready';
+  return ({STEP:'Executed line',METHOD_ENTER:'Entered method',METHOD_EXIT:'Returned from method',ARRAY_WRITE:'Array updated',ARRAY_ACCESS:'Array accessed',ARRAY_REFERENCE:'Array referenced',OBJECT_FIELD_WRITE:'Object updated',OBJECT_CREATE:'Object created',VARIABLE_UPDATE:'Variable updated',ERROR:'Runtime error',TIMEOUT:'Execution timed out',TRACE_LIMIT:'Trace limit reached',PROGRAM_START:'Started',PROGRAM_END:'Finished'} as Record<string,string>)[t] ?? 'Execution state';
+}
+
+function Section({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
+  const [open,setOpen]=useState(true);
+  return <div className="yv-section"><button className="yv-section-head" onClick={()=>setOpen(x=>!x)}><span>{open?'▾':'▸'} {title}</span>{typeof count==='number'&&<span className="yv-count">{count}</span>}</button>{open&&<div className="yv-section-body">{children}</div>}</div>;
+}
+
+function Variables({ state, previous }: { state?: TraceState; previous?: TraceState }) {
+  const entries = Object.entries(state?.variables ?? {});
+  if (!entries.length) return <div className="yv-empty">No local variables yet.</div>;
+  return <div className="yv-vars">{entries.map(([name,value])=>{
+    const old=previous?.variables?.[name]; const changed=Boolean(previous) && stableStringify(old)!==stableStringify(value);
+    return <div className={`yv-var ${changed?'changed':''}`} key={name}><div className="yv-var-name">{name}</div><div className="yv-change">{changed&&<><span className="yv-old yv-code">{displayValue(old)}</span><span className="yv-arrow">→</span></>}<span className="yv-code">{displayValue(value)}</span></div></div>;
+  })}</div>;
+}
+
+function pointerLabels(state: TraceState | undefined, length: number): Map<number,string[]> {
+  const map = new Map<number,string[]>();
+  for (const [name,value] of Object.entries(state?.variables ?? {})) {
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value >= length) continue;
+    const list = map.get(value) ?? []; list.push(name); map.set(value,list);
+  }
+  return map;
+}
+
+function changedArrayIndices(state?: TraceState): Set<number> {
+  const set = new Set<number>();
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data)) return set;
+  const changes = data.changes;
+  if (!Array.isArray(changes)) return set;
+  for (const c of changes) {
+    if (!isPlainObject(c) || !Array.isArray(c.indices)) continue;
+    const i = c.indices[0]; if (typeof i === 'number') set.add(i);
+  }
+  return set;
+}
+
+function ArrayView({ value, state }: { value: unknown[]; state?: TraceState }) {
+  if (value.every(Array.isArray)) return <div className="yv-matrix">{value.map((row,r)=><div className="yv-array" key={r}>{(row as unknown[]).map((v,i)=><div className="yv-cell" key={i}><div className="yv-cell-value">{displayValue(v)}</div><div className="yv-cell-index">[{r},{i}]</div></div>)}</div>)}</div>;
+  const labels=pointerLabels(state,value.length); const changed=changedArrayIndices(state);
+  return <div className="yv-array">{value.map((v,i)=><div className="yv-cell" key={i}>{labels.has(i)&&<div className="yv-pointer">{labels.get(i)!.join(' · ')} ↓</div>}<div className={`yv-cell-value ${changed.has(i)?'yv-cell-changed':''}`}>{displayValue(v)}</div><div className="yv-cell-index">{i}</div></div>)}</div>;
+}
+
+function objectFields(value: Obj): Obj {
+  return isPlainObject(value.fields) ? value.fields : value;
+}
+function objectType(value: Obj): string { return typeof value.$type==='string'?value.$type:''; }
+function looksListNode(value: Obj): boolean { const f=objectFields(value); return /ListNode/i.test(objectType(value)) || ('next' in f && ('val' in f || 'value' in f)); }
+function looksTreeNode(value: Obj): boolean { const f=objectFields(value); return /TreeNode/i.test(objectType(value)) || (('left' in f || 'right' in f) && ('val' in f || 'value' in f)); }
+function resolveRef(value: unknown, objects: Record<string,unknown>): unknown {
+  if (!isPlainObject(value)) return value;
+  if (typeof value.$ref==='string') return objects[value.$ref] ?? value;
+  if (typeof value.$objectId==='string') return objects[value.$objectId] ?? value;
+  return value;
+}
+function nodeValue(value: Obj): unknown { const f=objectFields(value); return f.val ?? f.value ?? f.data ?? '?'; }
+
+function LinkedListView({ root, objects }: { root: Obj; objects: Record<string,unknown> }) {
+  const nodes: Array<{id:string;value:unknown}> = []; const seen=new Set<string>(); let cur: unknown=root;
+  for(let guard=0;guard<40;guard++){
+    cur=resolveRef(cur,objects); if(!isPlainObject(cur))break;
+    const id=String(cur.$objectId ?? `node-${guard}`); if(seen.has(id)){nodes.push({id:'cycle',value:'↻'});break;} seen.add(id);
+    nodes.push({id,value:nodeValue(cur)}); const f=objectFields(cur); if(f.next==null)break; cur=f.next;
+  }
+  return <div className="yv-linked">{nodes.map((n,i)=><div className="yv-linked-piece" key={`${n.id}-${i}`}><div className="yv-node">{displayValue(n.value)}</div>{i<nodes.length-1&&<div className="yv-edge">→</div>}</div>)}</div>;
+}
+
+function TreeNodeView({ value, objects, depth=0 }: { value: unknown; objects: Record<string,unknown>; depth?: number }) {
+  const resolved=resolveRef(value,objects); if(!isPlainObject(resolved) || depth>6)return null;
+  const f=objectFields(resolved); return <div className="yv-tree-node"><div className="yv-node">{displayValue(nodeValue(resolved))}</div>{(f.left!=null||f.right!=null)&&<div className="yv-tree-children"><div>{f.left!=null?<TreeNodeView value={f.left} objects={objects} depth={depth+1}/>:<span className="yv-null">null</span>}</div><div>{f.right!=null?<TreeNodeView value={f.right} objects={objects} depth={depth+1}/>:<span className="yv-null">null</span>}</div></div>}</div>;
+}
+
+function DataValue({ value, state }: { value: unknown; state?: TraceState }) {
+  if (isPlainObject(value) && Array.isArray(value.values)) return <><ArrayView value={value.values} state={state}/>{value.truncated===true&&<div className="yv-truncated">Showing first {value.values.length} of {String(value.length??'?')} items.</div>}</>;
+  if (Array.isArray(value)) return <ArrayView value={value} state={state}/>;
+  if (isPlainObject(value)) {
+    if (looksTreeNode(value)) return <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects??{}}/></div>;
+    if (looksListNode(value)) return <LinkedListView root={value} objects={state?.objects??{}}/>;
+    const fields = objectFields(value);
+    return <div className="yv-map">{Object.entries(fields).map(([k,v])=><div className="yv-map-row" key={k}><div className="yv-code">{k}</div><div className="yv-code">{displayValue(v)}</div></div>)}</div>;
+  }
+  return <div className="yv-code">{displayValue(value)}</div>;
+}
+
+function DataStructures({ state }: { state?: TraceState }) {
+  const arrays=Object.entries(state?.arrays??{});
+  const namedObjectIds=new Set<string>();
+  for(const v of Object.values(state?.variables??{})) if(isPlainObject(v)&&typeof v.$objectId==='string') namedObjectIds.add(v.$objectId);
+  const roots=Object.entries(state?.objects??{}).filter(([id])=>namedObjectIds.has(id));
+  const objectItems=roots.length?roots:Object.entries(state?.objects??{}).slice(0,12);
+  const items=[...arrays,...objectItems];
+  if(!items.length)return <div className="yv-empty">Structures appear here as your code creates or mutates them.</div>;
+  return <div className="yv-ds-list">{items.map(([name,value])=><div className="yv-ds" key={name}><div className="yv-ds-title">{name}</div><DataValue value={value} state={state}/></div>)}</div>;
+}
+
+export function VisualizerPanel(){
+  const s=useSession(); const current=s.states[s.index]; const prev=s.index>0?s.states[s.index-1]:undefined;
+  const sourceLines=useMemo(()=>s.source.split(/\r?\n/),[s.source]);
+  const line=current?.line; const statement=line?sourceLines[line-1]?.trim():'';
+  useEffect(()=>{highlightEditorLine(line);return()=>clearEditorExecutionMarker();},[line]);
+  useEffect(()=>{ if(!s.playing)return; const id=setInterval(()=>sessionStore.next(),650); return()=>clearInterval(id); },[s.playing,s.index,s.states.length]);
+  useEffect(()=>{ const onKey=(e:KeyboardEvent)=>{ if((e.target as HTMLElement)?.matches('input,textarea,[contenteditable=true]'))return; if(e.key==='ArrowRight'){e.preventDefault();sessionStore.next()} else if(e.key==='ArrowLeft'){e.preventDefault();sessionStore.prev()} else if(e.code==='Space'){e.preventDefault();sessionStore.togglePlay()} else if(e.key.toLowerCase()==='r'){e.preventDefault();sessionStore.restart()} }; window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[]);
+  const actual=s.response?.result; const tc=s.testcase; const finished=current?.lastEvent?.type==='PROGRAM_END' || (s.states.length>0&&s.index===s.states.length-1);
+  return <div className="yv-root"><div className="yv-scroll">
+    {tc&&<div className="yv-top"><div className="yv-title-row"><div className="yv-case">{tc.label}</div><span className={`yv-badge ${tc.source}`}>{tc.source}</span></div><div className="yv-inputs">{Object.keys(tc.inputs).length?Object.entries(tc.inputs).map(([k,v])=><div className="yv-input" key={k}><div className="yv-key">{k}</div><div className="yv-code">{v}</div></div>):<div className="yv-code">{tc.raw}</div>}</div><div className="yv-output-row"><div className="yv-output"><div className="yv-label">Expected</div><div className="yv-code">{tc.expected??'—'}</div></div><div className={`yv-output yv-actual ${finished&&s.response?.success?'good':''}`}><div className="yv-label">Actual</div><div className="yv-code">{finished&&actual!==undefined?displayValue(actual):'—'}</div></div></div></div>}
+    {s.loading&&<div className="yv-loading">Tracing your code…</div>}{s.error&&<div className="yv-error">{s.error}</div>}
+    {!s.loading&&<><Section title="Variables" count={Object.keys(current?.variables??{}).length}><Variables state={current} previous={prev}/></Section><Section title="Call Stack" count={current?.callStack?.length??0}>{current?.callStack?.length?<div className="yv-stack">{current.callStack.map((f:string,i:number)=><div className="yv-frame" key={`${f}-${i}`}>{f}</div>)}</div>:<div className="yv-empty">No active method calls.</div>}</Section><Section title="Data Structures" count={Object.keys(current?.arrays??{}).length+Object.keys(current?.objects??{}).length}><DataStructures state={current}/></Section></>}
+  </div><div className="yv-current"><div className="yv-current-head"><span>{eventLabel(current)}</span><span className="yv-line">{line?`Line ${line}`:'—'}</span></div><div className="yv-statement">{statement||'Select a testcase and press Visualize.'}</div><div className="yv-controls"><div className="yv-buttons"><button className="yv-btn" onClick={()=>sessionStore.restart()} disabled={!s.states.length}>↺ Restart</button><button className="yv-btn" onClick={()=>sessionStore.prev()} disabled={s.index<=0}>← Prev</button><button className="yv-btn primary" onClick={()=>sessionStore.togglePlay()} disabled={s.states.length<2}>{s.playing?'■ Stop':'▶ Play'}</button><button className="yv-btn" onClick={()=>sessionStore.next()} disabled={!s.states.length||s.index>=s.states.length-1}>Next →</button></div><div className="yv-step">{s.states.length?`${s.index+1} / ${s.states.length}`:'0 / 0'}</div></div></div></div>;
+}
