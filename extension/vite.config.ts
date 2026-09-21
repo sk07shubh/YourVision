@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+
+const extensionRoot = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
   plugins: [react()],
@@ -9,8 +12,8 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        content: resolve(__dirname, 'src/content/main.tsx'),
-        background: resolve(__dirname, 'src/background/service-worker.ts'),
+        content: resolve(extensionRoot, 'src/content/main.tsx'),
+        background: resolve(extensionRoot, 'src/background/service-worker.ts'),
       },
       output: {
         entryFileNames: '[name].js',
