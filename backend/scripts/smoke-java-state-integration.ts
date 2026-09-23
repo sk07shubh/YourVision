@@ -405,7 +405,7 @@ assert(
 );
 
 const arrayState = arrayMutation.states?.at(-1);
-const nums = arrayState?.variables.nums;
+const nums = arrayState?.arrays.nums;
 
 const arrayValues = snapshotField(nums, "values");
 
@@ -424,7 +424,7 @@ assert(
 );
 
 const largeArrayState = largeArray.states?.at(-1);
-const largeArraySnapshot = largeArrayState?.variables.nums;
+const largeArraySnapshot = largeArrayState?.arrays.nums;
 const largeArrayValues = snapshotField(largeArraySnapshot, "values");
 
 assert(
@@ -457,7 +457,7 @@ assert(
 );
 
 const inputArrayState = inputArrayMutation.states?.at(-1);
-const inputArray = inputArrayState?.variables.nums;
+const inputArray = inputArrayState?.arrays.nums;
 const inputArrayValues = snapshotField(inputArray, "values");
 
 assert(
@@ -634,31 +634,22 @@ assert(
 );
 
 const collectionState = collectionMutation.states?.at(-1);
-const values = collectionState?.variables.values;
-const valuesFields = snapshotField(values, "fields") as Record<string, unknown> | undefined;
+const values = collectionState?.dataStructures.values as
+    | Record<string, unknown>
+    | undefined;
 
 assert(
-    typeof valuesFields?.size === "number" && valuesFields.size === 2,
+    typeof values?.size === "number" && values.size === 2,
     "collection state did not preserve the final collection size"
 );
-assert(
-    typeof valuesFields?.elementData === "object" && valuesFields.elementData !== null,
-    "collection state did not preserve the backing array"
-);
 
-const collectionArray = valuesFields?.elementData;
-const collectionArrayValues = snapshotField(collectionArray, "values");
-
-const firstElement = Array.isArray(collectionArrayValues)
-    ? collectionArrayValues[0]
-    : undefined;
-const secondElement = Array.isArray(collectionArrayValues)
-    ? collectionArrayValues[1]
-    : undefined;
+const collectionValues = values?.values;
 
 assert(
-    snapshotField(snapshotField(firstElement, "fields"), "value") === 9 &&
-    snapshotField(snapshotField(secondElement, "fields"), "value") === 2,
+    Array.isArray(collectionValues) &&
+    collectionValues.length === 2 &&
+    collectionValues[0] === 9 &&
+    collectionValues[1] === 2,
     "collection state did not preserve mutated elements"
 );
 

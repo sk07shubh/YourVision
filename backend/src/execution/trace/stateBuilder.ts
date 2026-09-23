@@ -383,6 +383,7 @@ function collectSnapshots(
                     child,
                     variableName,
                     arrays,
+                    dataStructures,
                     objects,
                     false
                 );
