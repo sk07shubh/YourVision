@@ -46,6 +46,29 @@ function readInputValue(
   );
 }
 
+function fallbackResultInput(
+  panel: HTMLElement
+): string {
+  const text = clean(panel.textContent ?? '');
+  const match = text.match(/\bInput\b\s*([\s\S]*?)(?:\bOutput\b|\bExpected\b|$)/i);
+  return clean(match?.[1] ?? '');
+}
+
+function findResultPanel(
+  region: HTMLElement
+): HTMLElement | null {
+  let current: HTMLElement | null = region.parentElement;
+
+  for (let depth = 0; current && depth < 6; depth++, current = current.parentElement) {
+    const text = textOf(current);
+    if (/\bInput\b/i.test(text) && /\bOutput\b/i.test(text)) {
+      return current;
+    }
+  }
+
+  return null;
+}
+
 function pickRawInput(
   panel: HTMLElement,
   method: JavaMethod
@@ -57,7 +80,7 @@ function pickRawInput(
   ];
 
   if (inputs.length === 0) {
-    return '';
+    return fallbackResultInput(panel);
   }
 
   const assignments: string[] = [];
@@ -101,7 +124,8 @@ export function readSelectedTestcase(
   }
 
   const panel =
-    findTestcasePanel(region);
+    findTestcasePanel(region) ??
+    findResultPanel(region);
 
   if (!panel) {
     throw new Error(
