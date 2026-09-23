@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   findLeftTabList,
   findTestcaseRegion,
+  findTestResultContainers,
 } from './selectors';
 
 beforeEach(() => {
@@ -118,5 +119,21 @@ describe('LeetCode selectors', () => {
         '[data-e2e-locator="console-testcase-tag"]'
       ).length
     ).toBe(3);
+  });
+});
+
+describe('Test Result selectors', () => {
+  it('finds a visible result panel with case buttons', () => {
+    document.body.innerHTML = `
+      <section>
+        <div>Test Result</div>
+        <div>
+          <button>Case 1</button>
+          <button>Case 2</button>
+        </div>
+      </section>
+    `;
+
+    expect(findTestResultContainers()).toHaveLength(1);
   });
 });
