@@ -747,11 +747,41 @@ for (const test of cases) {
                 )
         );
 
+    let entryStateMatches = true;
+
+    if (test.name === "one dimensional array") {
+        const entry = result.trace?.events.find(
+            (event) =>
+                event.type === "METHOD_ENTER" &&
+                event.method === "sum"
+        );
+
+        const entryVariables = entry?.data?.variables;
+
+        entryStateMatches =
+            !!entry &&
+            !!entryVariables &&
+            typeof entryVariables === "object" &&
+            !Array.isArray(entryVariables) &&
+            !!(entryVariables as Record<string, unknown>).values;
+
+        if (
+            result.trace?.events.some(
+                (event) =>
+                    event.method === "<init>" ||
+                    event.method === "<clinit>"
+            )
+        ) {
+            entryStateMatches = false;
+        }
+    }
+
     if (
         kindMatches &&
         resultMatches &&
         errorMatches &&
-        traceMatches
+        traceMatches &&
+        entryStateMatches
     ) {
         console.log(
             "PASS:",
@@ -782,6 +812,7 @@ for (const test of cases) {
                 test.requiredTraceTypes,
             actualTraceTypes:
                 [...traceTypes],
+            entryStateMatches,
             stderr:
                 result.stderr
         }
