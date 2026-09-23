@@ -21,8 +21,6 @@ import com.sun.jdi.ThreadReference;
 import com.sun.jdi.Value;
 import com.sun.jdi.VirtualMachine;
 import com.sun.jdi.connect.LaunchingConnector;
-import com.sun.jdi.event.BreakpointEvent;
-import com.sun.jdi.event.ClassPrepareEvent;
 import com.sun.jdi.event.Event;
 import com.sun.jdi.event.EventSet;
 import com.sun.jdi.event.ExceptionEvent;
@@ -31,8 +29,6 @@ import com.sun.jdi.event.MethodExitEvent;
 import com.sun.jdi.event.StepEvent;
 import com.sun.jdi.event.VMDeathEvent;
 import com.sun.jdi.event.VMDisconnectEvent;
-import com.sun.jdi.request.BreakpointRequest;
-import com.sun.jdi.request.ClassPrepareRequest;
 import com.sun.jdi.request.EventRequest;
 import com.sun.jdi.request.EventRequestManager;
 import com.sun.jdi.request.ExceptionRequest;
@@ -134,28 +130,13 @@ public class YourVisionTracer {
             }
 
             for (Event event : events) {
-                if (event instanceof ClassPrepareEvent prepared) {
-                    installBreakpoints(
-                        manager,
-                        prepared.referenceType()
-                    );
-
-                } else if (event instanceof BreakpointEvent breakpoint) {
-                    enableLineStepping(
-                        manager,
-                        breakpoint.thread()
-                    );
-
-                    recordStep(
-                        breakpoint.location(),
-                        breakpoint.thread()
-                    );
-
-                } else if (event instanceof StepEvent step) {
-                    recordStep(
-                        step.location(),
-                        step.thread()
-                    );
+                if (event instanceof StepEvent step) {
+                    if (isTraceableUserMethod(step.location().method())) {
+                        recordStep(
+                            step.location(),
+                            step.thread()
+                        );
+                    }
 
                 } else if (event instanceof ExceptionEvent exception) {
                     if (isTraced(exception.location())) {
@@ -222,17 +203,35 @@ public class YourVisionTracer {
                     }
 
                 } else if (event instanceof MethodEntryEvent entry) {
-                    if (isTraced(entry.location())) {
+                    Method enteredMethod = entry.method();
+
+                    if (isTraceableUserMethod(enteredMethod)) {
+                        Map<String, Object> data =
+                            new LinkedHashMap<>();
+
+                        try {
+                            data.put(
+                                "variables",
+                                readLocals(entry.thread().frame(0))
+                            );
+                        } catch (Exception ignored) {
+                        }
+
                         emit(
                             "METHOD_ENTER",
                             entry.location(),
                             entry.thread(),
-                            Map.of()
+                            data
+                        );
+
+                        enableLineStepping(
+                            manager,
+                            entry.thread()
                         );
                     }
 
                 } else if (event instanceof MethodExitEvent exit) {
-                    if (isTraced(exit.location())) {
+                    if (isTraceableUserMethod(exit.method()) && isTraced(exit.location())) {
                         Map<String, Object> data =
                             new LinkedHashMap<>();
 
@@ -340,15 +339,6 @@ public class YourVisionTracer {
     private static void installRequests(
         EventRequestManager manager
     ) {
-        ClassPrepareRequest prepare =
-            manager.createClassPrepareRequest();
-
-        prepare.addClassFilter(tracedClass);
-        prepare.setSuspendPolicy(
-            EventRequest.SUSPEND_ALL
-        );
-        prepare.enable();
-
         MethodEntryRequest entry =
             manager.createMethodEntryRequest();
 
@@ -389,33 +379,17 @@ public class YourVisionTracer {
         death.enable();
     }
 
-    private static void installBreakpoints(
-        EventRequestManager manager,
-        ReferenceType type
+    private static boolean isTraceableUserMethod(
+        Method method
     ) {
-        for (Method method : type.methods()) {
-            try {
-                Location location =
-                    method.location();
-
-                if (location == null) {
-                    continue;
-                }
-
-                BreakpointRequest breakpoint =
-                    manager.createBreakpointRequest(
-                        location
-                    );
-
-                breakpoint.setSuspendPolicy(
-                    EventRequest.SUSPEND_EVENT_THREAD
-                );
-
-                breakpoint.enable();
-
-            } catch (Exception ignored) {
-                // Abstract/native/synthetic methods may not have code locations.
-            }
+        try {
+            return !method.isConstructor() &&
+                !method.isStaticInitializer() &&
+                !method.isNative() &&
+                !method.isAbstract() &&
+                method.declaringType().name().equals(tracedClass);
+        } catch (Exception ignored) {
+            return false;
         }
     }
 
