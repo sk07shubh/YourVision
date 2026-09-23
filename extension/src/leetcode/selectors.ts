@@ -107,11 +107,39 @@ export function findTestcaseRegion(): HTMLElement | null {
     ),
   ].filter(visible);
 
-  if (caseButtons.length === 0) {
-    return null;
+  if (caseButtons.length > 0) {
+    return caseButtons[0].parentElement;
   }
 
-  return caseButtons[0].parentElement;
+  const genericCase = [...document.querySelectorAll<HTMLButtonElement>('button')]
+    .filter(visible)
+    .find(button => /^case\s+\d+$/i.test((button.textContent ?? '').trim()));
+
+  return genericCase?.parentElement ?? null;
+}
+
+export function findTestResultContainers(): HTMLElement[] {
+  const containers = new Set<HTMLElement>();
+
+  for (const node of [...document.querySelectorAll<HTMLElement>('div,section')]) {
+    if (!visible(node)) continue;
+    const text = textOf(node);
+    if (text !== 'test result' && !text.startsWith('test result ')) continue;
+
+    let current: HTMLElement | null = node;
+    for (let depth = 0; current && depth < 5; depth++, current = current.parentElement) {
+      const hasCases =
+        current.querySelectorAll('[data-e2e-locator="console-testcase-tag"]').length > 0 ||
+        [...current.querySelectorAll('button')].some(button => /^case\s+\d+$/i.test((button.textContent ?? '').trim()));
+
+      if (hasCases) {
+        containers.add(current);
+        break;
+      }
+    }
+  }
+
+  return [...containers];
 }
 
 /**
