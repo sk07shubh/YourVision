@@ -373,27 +373,28 @@ function DataValue({ value, state, source }: { value: unknown; state?: TraceStat
   return <div className="yv-code">{displayValue(value)}</div>;
 }
 
-function DataStructures({ state }: { state?: TraceState }) {
+function isStructuralObject(value: unknown): value is Obj {
+  if (!isPlainObject(value)) return false;
+  const fields = objectFields(value);
+  const type = objectType(value);
+  return /ListNode|TreeNode/i.test(type) ||
+    ('next' in fields && ('val' in fields || 'value' in fields)) ||
+    (('left' in fields || 'right' in fields) && ('val' in fields || 'value' in fields));
+}
+
+function DataStructures({ state, source }: { state?: TraceState; source: string }) {
   const arrays = Object.entries(state?.arrays ?? {});
   const structures = Object.entries(state?.dataStructures ?? {});
   const namedObjectIds = new Set<string>();
 
   for (const value of Object.values(state?.variables ?? {})) {
-    if (
-      isPlainObject(value) &&
-      typeof value.$objectId === 'string'
-    ) {
+    if (isStructuralObject(value) && typeof value.$objectId === 'string') {
       namedObjectIds.add(value.$objectId);
     }
   }
 
-  const roots = Object.entries(state?.objects ?? {})
+  const objectItems = Object.entries(state?.objects ?? {})
     .filter(([id]) => namedObjectIds.has(id));
-
-  const objectItems =
-    roots.length
-      ? roots
-      : Object.entries(state?.objects ?? {}).slice(0, 12);
 
   const items = [
     ...arrays,
@@ -402,11 +403,7 @@ function DataStructures({ state }: { state?: TraceState }) {
   ];
 
   if (!items.length) {
-    return (
-      <div className="yv-empty">
-        Structures appear here as your code creates or mutates them.
-      </div>
-    );
+    return <div className="yv-empty">Structures appear here as your code creates or mutates them.</div>;
   }
 
   return (
