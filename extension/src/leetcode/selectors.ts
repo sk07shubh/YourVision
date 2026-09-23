@@ -1,86 +1,180 @@
 const textOf = (el: Element): string =>
-  (el.textContent ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+  (el.textContent ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
 
-const visible = (el: Element | null): el is HTMLElement => {
-  if (!(el instanceof HTMLElement)) return false;
-  const s = getComputedStyle(el);
-  return s.display !== 'none' && s.visibility !== 'hidden' && el.getBoundingClientRect().width > 0;
+const visible = (
+  el: Element | null
+): el is HTMLElement => {
+  if (!(el instanceof HTMLElement)) {
+    return false;
+  }
+
+  const style = getComputedStyle(el);
+
+  return (
+    style.display !== 'none' &&
+    style.visibility !== 'hidden' &&
+    el.getBoundingClientRect().width > 0
+  );
 };
 
 export function findProblemWorkspace(): HTMLElement | null {
-  return document.querySelector<HTMLElement>('[data-layout-path="/problems/[slug]/"]')
-    ?? document.querySelector<HTMLElement>('#qd-content')
-    ?? document.body;
+  return (
+    document.querySelector<HTMLElement>(
+      '#qd-content'
+    ) ??
+    document.body
+  );
 }
 
+/**
+ * Exact FlexLayout container holding:
+ * Description / Solutions / Editorial / Submissions.
+ */
 export function findLeftTabList(): HTMLElement | null {
-  const candidates = [...document.querySelectorAll<HTMLElement>('[role="tablist"]')];
+  const containers = [
+    ...document.querySelectorAll<HTMLElement>(
+      '.flexlayout__tabset_tabbar_inner_tab_container_top'
+    ),
+  ].filter(visible);
 
-  return candidates.find(el => {
-    const t = textOf(el);
-    return t.includes('description') && (t.includes('editorial') || t.includes('solutions'));
-  }) ?? candidates.find(el => {
-    const own = [...el.children].map(textOf);
-    return own.includes('description')
-      && (own.includes('editorial') || own.includes('solutions'))
-      && visible(el);
-  }) ?? [...document.querySelectorAll<HTMLElement>('div')].find(el => {
-    const own = [...el.children].map(textOf);
-    return own.includes('description')
-      && (own.includes('editorial') || own.includes('solutions'))
-      && visible(el);
-  }) ?? null;
-}
+  for (const container of containers) {
+    const tabs = [
+      ...container.querySelectorAll<HTMLElement>(
+        ':scope > .flexlayout__tab_button_top'
+      ),
+    ];
 
-export function findLeftContentHost(tabList: HTMLElement): HTMLElement | null {
-  let node: HTMLElement | null = tabList.parentElement;
-  for (let i = 0; node && i < 6; i++, node = node.parentElement) {
-    const tabPanels = [...node.querySelectorAll<HTMLElement>('[role="tabpanel"]')].filter(visible);
-    if (tabPanels.length) return tabPanels[0].parentElement ?? tabPanels[0];
+    const names = tabs.map(textOf);
 
-    const rect = node.getBoundingClientRect();
-    if (rect.height > 250 && rect.width > 250) {
-      const editorInside = node.querySelector('.monaco-editor');
-      if (!editorInside) return node;
+    if (
+      names.includes('description') &&
+      (
+        names.includes('solutions') ||
+        names.includes('editorial')
+      )
+    ) {
+      return container;
     }
   }
+
+  const description =
+    document.querySelector<HTMLElement>(
+      '[data-layout-path="/ts0/tb0"]'
+    );
+
+  if (!description) {
+    return null;
+  }
+
+  return description.closest<HTMLElement>(
+    '.flexlayout__tabset_tabbar_inner_tab_container_top'
+  );
+}
+
+/**
+ * Exact FlexLayout content container belonging to
+ * Description / Solutions / Editorial / Submissions.
+ */
+export function findLeftContentHost(
+  tabList: HTMLElement
+): HTMLElement | null {
+  const tabset =
+    tabList.closest<HTMLElement>(
+      '.flexlayout__tabset'
+    );
+
+  if (!tabset) {
+    return null;
+  }
+
+  return (
+    tabset.querySelector<HTMLElement>(
+      ':scope > .flexlayout__tabset_content'
+    ) ?? null
+  );
+}
+
+/**
+ * The row containing Case 1 / Case 2 / ... / +.
+ */
+export function findTestcaseRegion(): HTMLElement | null {
+  const caseButtons = [
+    ...document.querySelectorAll<HTMLElement>(
+      '[data-e2e-locator="console-testcase-tag"]'
+    ),
+  ].filter(visible);
+
+  if (caseButtons.length === 0) {
+    return null;
+  }
+
+  return caseButtons[0].parentElement;
+}
+
+/**
+ * Finds the complete testcase panel.
+ *
+ * The input fields are siblings of the testcase tab row,
+ * so they are NOT inside findTestcaseRegion().
+ */
+export function findTestcasePanel(
+  region: HTMLElement
+): HTMLElement | null {
+  let current: HTMLElement | null =
+    region;
+
+  for (
+    let depth = 0;
+    current && depth < 6;
+    depth++
+  ) {
+    if (
+      current.querySelector(
+        '[data-e2e-locator="console-testcase-input"]'
+      )
+    ) {
+      return current;
+    }
+
+    current = current.parentElement;
+  }
+
   return null;
 }
 
-export function findTestcaseRegion(): HTMLElement | null {
-  const all = [...document.querySelectorAll<HTMLElement>(
-    '[role="tablist"], [role="tabpanel"], section, div'
-  )].filter(visible);
+export function findActiveTestcaseTab(
+  region: HTMLElement
+): HTMLElement | null {
+  const tabs = [
+    ...region.querySelectorAll<HTMLElement>(
+      '[data-e2e-locator="console-testcase-tag"]'
+    ),
+  ].filter(visible);
 
-  const scored = all.map(el => {
-    const t = textOf(el);
-    let score = 0;
-
-    if (t.includes('testcase')) score += 5;
-    if (t.includes('test result')) score += 5;
-    if (/case\s*1/.test(t)) score += 3;
-    if (t.includes('run')) score += 1;
-    if (t.includes('submit')) score -= 2;
-
-    const r = el.getBoundingClientRect();
-    if (r.top > innerHeight * 0.45) score += 3;
-    if (r.height < 450) score += 2;
-
-    return { el, score, area: r.width * r.height };
-  }).filter(x => x.score >= 7)
-    .sort((a, b) => b.score - a.score || a.area - b.area);
-
-  return scored[0]?.el ?? null;
-}
-
-export function findActiveTestcaseTab(region: HTMLElement): HTMLElement | null {
-  const tabs = [...region.querySelectorAll<HTMLElement>('[role="tab"], button')].filter(visible);
-
-  return tabs.find(t =>
-    t.getAttribute('aria-selected') === 'true' || t.dataset.state === 'active'
-  ) ?? tabs.find(t => /case\s*\d+|testcase|custom/i.test(textOf(t))) ?? null;
+  return (
+    tabs.find(tab =>
+      tab.classList.contains('bg-fill-3') ||
+      tab.classList.contains('dark:bg-dark-fill-3')
+    ) ??
+    tabs.find(tab =>
+      tab.getAttribute(
+        'aria-selected'
+      ) === 'true'
+    ) ??
+    tabs[0] ??
+    null
+  );
 }
 
 export function findEditor(): HTMLElement | null {
-  return [...document.querySelectorAll<HTMLElement>('.monaco-editor')].find(visible) ?? null;
+  return (
+    [
+      ...document.querySelectorAll<HTMLElement>(
+        '.monaco-editor'
+      ),
+    ].find(visible) ?? null
+  );
 }

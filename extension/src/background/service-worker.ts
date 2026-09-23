@@ -38,11 +38,28 @@ chrome.runtime.onMessage.addListener((msg: ExtensionRequest | {type:'REVEAL_LINE
         sendResponse({ok:true}); return;
       }
       if (msg.type === 'RUN_VISUALIZATION') {
-        const res = await fetch('http://localhost:3000/visualize',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({source:msg.source,testcase:{method:msg.method,arguments:msg.arguments}})});
+        const res = await fetch('http://localhost:3000/visualize',{method:'POST',headers:{'content-type':'application/json'},body: JSON.stringify({
+    language: 'java',
+    source: msg.source,
+    testcase: {
+        method: msg.method,
+        arguments: msg.arguments
+    }
+})});
         const text = await res.text();
         let data: unknown; try { data=JSON.parse(text); } catch { throw new Error(`Backend returned ${res.status}: ${text.slice(0,300)}`); }
         if (!res.ok) throw new Error((data as {message?:string})?.message ?? `Backend returned ${res.status}`);
-        sendResponse({ok:true,data:data as VisualizationResponse} satisfies ExtensionResponse); return;
+        const responseData =
+    data as {
+        execution?: VisualizationResponse;
+    };
+
+sendResponse({
+    ok: true,
+    data:
+        responseData.execution ??
+        (data as VisualizationResponse)
+} satisfies ExtensionResponse); return;
       }
     } catch(e) { sendResponse({ok:false,error:e instanceof Error?e.message:String(e)} satisfies ExtensionResponse); }
   })();
