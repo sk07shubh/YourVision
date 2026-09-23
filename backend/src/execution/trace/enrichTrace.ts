@@ -16,26 +16,35 @@ export function enrichTrace(
 
     for (const event of trace.events) {
         if (event.type === "STEP") {
-            enriched.push(event);
+    if (previousStep) {
+        enriched.push(
+            ...deriveArrayReferenceEvents(
+                event
+            )
+        );
 
-            if (previousStep) {
-                enriched.push(
-                    ...deriveArrayReferenceEvents(
-                        event
-                    )
-                );
+        enriched.push(
+            ...deriveChanges(
+                previousStep,
+                event
+            )
+        );
+    }
 
-                enriched.push(
-                    ...deriveChanges(
-                        previousStep,
-                        event
-                    )
-                );
-            }
+    enriched.push(event);
 
-            previousStep = event;
-            continue;
-        }
+    if (previousStep) {
+        enriched.push(
+            ...deriveMapChanges(
+                previousStep,
+                event
+            )
+        );
+    }
+
+    previousStep = event;
+    continue;
+}
 
         enriched.push(event);
 
@@ -263,7 +272,60 @@ function deriveChanges(
 
     return derived;
 }
+function deriveMapChanges(
+    previous: ExecutionEvent,
+    current: ExecutionEvent
+): ExecutionEvent[] {
+    const before = getVariables(previous);
+    const after = getVariables(current);
 
+    const derived: ExecutionEvent[] = [];
+
+    for (const [name, currentValue] of Object.entries(after)) {
+        if (!(name in before)) {
+            continue;
+        }
+
+        const previousValue = before[name];
+
+        const beforeMap = asMapSnapshot(previousValue);
+        const afterMap = asMapSnapshot(currentValue);
+
+        if (
+            !beforeMap ||
+            !afterMap ||
+            beforeMap.$mapId !== afterMap.$mapId
+        ) {
+            continue;
+        }
+
+        const changes = compareMapEntries(
+            beforeMap.entries,
+            afterMap.entries
+        );
+
+        if (changes.length === 0) {
+            continue;
+        }
+
+        derived.push({
+            sequence: 0,
+            type: "MAP_WRITE",
+            line: current.line,
+            method: current.method,
+            depth: current.depth,
+            data: {
+                name,
+                mapId: afterMap.$mapId,
+                changes,
+                entries: afterMap.entries,
+                size: afterMap.size
+            }
+        });
+    }
+
+    return derived;
+}
 function variableUpdate(
     source: ExecutionEvent,
     name: string,
@@ -337,7 +399,71 @@ function asArraySnapshot(
             record.values
     };
 }
+function asMapSnapshot(
+    value: unknown
+): {
+    $mapId: string;
+    entries: Array<{
+        key: unknown;
+        value: unknown;
+    }>;
+    size?: number;
+} | undefined {
+    if (
+        !value ||
+        typeof value !== "object" ||
+        Array.isArray(value)
+    ) {
+        return undefined;
+    }
 
+    const record =
+        value as SnapshotRecord;
+
+    if (
+        typeof record.$mapId !== "string" ||
+        !Array.isArray(record.entries)
+    ) {
+        return undefined;
+    }
+
+    const entries =
+        record.entries.filter(
+            (
+                entry
+            ): entry is {
+                key: unknown;
+                value: unknown;
+            } =>
+                Boolean(entry) &&
+                typeof entry === "object" &&
+                !Array.isArray(entry) &&
+                "key" in entry &&
+                "value" in entry
+        );
+
+    const result: {
+        $mapId: string;
+        entries: Array<{
+            key: unknown;
+            value: unknown;
+        }>;
+        size?: number;
+    } = {
+        $mapId:
+            record.$mapId,
+        entries
+    };
+
+    if (
+        typeof record.size === "number"
+    ) {
+        result.size =
+            record.size;
+    }
+
+    return result;
+}
 function compareArrayValues(
     before: unknown[],
     after: unknown[],
@@ -404,7 +530,106 @@ function compareArrayValues(
         }
     }
 }
+function compareMapEntries(
+    before: Array<{
+        key: unknown;
+        value: unknown;
+    }>,
+    after: Array<{
+        key: unknown;
+        value: unknown;
+    }>
+): Array<{
+    kind:
+        | "insert"
+        | "update"
+        | "delete";
+    key: unknown;
+    before?: unknown;
+    after?: unknown;
+}> {
+    const changes: Array<{
+        kind:
+            | "insert"
+            | "update"
+            | "delete";
+        key: unknown;
+        before?: unknown;
+        after?: unknown;
+    }> = [];
 
+    const beforeMap =
+        new Map<string, {
+            key: unknown;
+            value: unknown;
+        }>();
+
+    const afterMap =
+        new Map<string, {
+            key: unknown;
+            value: unknown;
+        }>();
+
+    for (const entry of before) {
+        beforeMap.set(
+            stableSnapshotKey(entry.key),
+            entry
+        );
+    }
+
+    for (const entry of after) {
+        afterMap.set(
+            stableSnapshotKey(entry.key),
+            entry
+        );
+    }
+
+    for (const [key, entry] of afterMap) {
+        const previous =
+            beforeMap.get(key);
+
+        if (!previous) {
+            changes.push({
+                kind: "insert",
+                key: entry.key,
+                after: entry.value
+            });
+            continue;
+        }
+
+        if (
+            !sameSnapshot(
+                previous.value,
+                entry.value
+            )
+        ) {
+            changes.push({
+                kind: "update",
+                key: entry.key,
+                before: previous.value,
+                after: entry.value
+            });
+        }
+    }
+
+    for (const [key, entry] of beforeMap) {
+        if (!afterMap.has(key)) {
+            changes.push({
+                kind: "delete",
+                key: entry.key,
+                before: entry.value
+            });
+        }
+    }
+
+    return changes;
+}
+
+function stableSnapshotKey(
+    value: unknown
+): string {
+    return JSON.stringify(value);
+}
 function asObjectSnapshot(
     value: unknown
 ): {

@@ -18,12 +18,19 @@ function Section({ title, count, children }: { title: string; count?: number; ch
   return <div className="yv-section"><button className="yv-section-head" onClick={()=>setOpen(x=>!x)}><span>{open?'▾':'▸'} {title}</span>{typeof count==='number'&&<span className="yv-count">{count}</span>}</button>{open&&<div className="yv-section-body">{children}</div>}</div>;
 }
 
-function isArraySnapshot(value: unknown): value is Obj {
-  return (
-    isPlainObject(value) &&
-    typeof value.$arrayId === 'string' &&
-    Array.isArray(value.values)
-  );
+function isArraySnapshot(
+    value: unknown
+): value is Obj & {
+    $arrayId: string;
+    $type?: string;
+    values: unknown[];
+    length?: number;
+} {
+    return (
+        isPlainObject(value) &&
+        typeof value.$arrayId === 'string' &&
+        Array.isArray(value.values)
+    );
 }
 
 function isMapSnapshot(value: unknown): value is Obj & {
