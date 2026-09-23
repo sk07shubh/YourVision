@@ -126,7 +126,7 @@ function variableSummary(value: unknown): string {
 }
 
 function Variables({ state, previous }: { state?: TraceState; previous?: TraceState }) {
-  const entries = Object.entries(state?.variables ?? {});
+  const entries = Object.entries(state?.variables ?? {}).filter(([, value]) => !isStructuralObject(value));
   if (!entries.length) return <div className="yv-empty">No local variables yet.</div>;
 
   return (
@@ -158,9 +158,18 @@ function Variables({ state, previous }: { state?: TraceState; previous?: TraceSt
   );
 }
 
-function pointerLabels(state: TraceState | undefined, length: number): Map<number,string[]> {
+function arrayIndexVariableNames(source: string): Set<string> {
+  const names = new Set<string>();
+  for (const match of source.matchAll(/\[([^\]]+)\]/g)) {
+    for (const identifier of match[1].matchAll(/\b[A-Za-z_$][\w$]*\b/g)) names.add(identifier[0]);
+  }
+  return names;
+}
+
+function pointerLabels(state: TraceState | undefined, length: number, indexNames: Set<string>): Map<number,string[]> {
   const map = new Map<number,string[]>();
   for (const [name,value] of Object.entries(state?.variables ?? {})) {
+    if (!indexNames.has(name)) continue;
     if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value >= length) continue;
     const list = map.get(value) ?? []; list.push(name); map.set(value,list);
   }
