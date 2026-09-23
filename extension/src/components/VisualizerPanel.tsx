@@ -89,7 +89,7 @@ function CollectionView({
         <span>{type}</span>
         <span>{kind} · {value.size ?? value.values.length} items</span>
       </div>
-      <ArrayView value={value.values} state={state}/>
+      <ArrayView value={value.values} state={state} source={source}/>
     </div>
   );
 }
@@ -189,10 +189,10 @@ function changedArrayIndices(state?: TraceState): Set<number> {
   return set;
 }
 
-function ArrayView({ value, state }: { value: unknown[]; state?: TraceState }) {
+function ArrayView({ value, state, source }: { value: unknown[]; state?: TraceState; source?: string }) {
   if (value.every(Array.isArray)) return <div className="yv-matrix">{value.map((row,r)=><div className="yv-array" key={r}>{(row as unknown[]).map((v,i)=><div className="yv-cell" key={i}><div className="yv-cell-value">{displayValue(v)}</div><div className="yv-cell-index">[{r},{i}]</div></div>)}</div>)}</div>;
-  const labels=pointerLabels(state,value.length); const changed=changedArrayIndices(state);
-  return <div className="yv-array">{value.map((v,i)=><div className="yv-cell" key={i}>{labels.has(i)&&<div className="yv-pointer">{labels.get(i)!.join(' · ')} ↓</div>}<div className={`yv-cell-value ${changed.has(i)?'yv-cell-changed':''}`}>{displayValue(v)}</div><div className="yv-cell-index">{i}</div></div>)}</div>;
+  const labels=pointerLabels(state,value.length,arrayIndexVariableNames(source ?? '')); const changed=changedArrayIndices(state);
+  return <div className="yv-array">{value.map((v,i)=><div className="yv-cell" key={i}>{labels.has(i)&&<div className="yv-pointer">{labels.get(i)!.join(' · ')}</div>}<div className={`yv-cell-value ${changed.has(i)?'yv-cell-changed':''}`}>{displayValue(v)}</div><div className="yv-cell-index">{i}</div></div>)}</div>;
 }
 
 function mapChanges(state?: TraceState): Array<{
@@ -341,7 +341,7 @@ function TreeNodeView({ value, objects, depth=0 }: { value: unknown; objects: Re
   const f=objectFields(resolved); return <div className="yv-tree-node"><div className="yv-node">{displayValue(nodeValue(resolved))}</div>{(f.left!=null||f.right!=null)&&<div className="yv-tree-children"><div>{f.left!=null?<TreeNodeView value={f.left} objects={objects} depth={depth+1}/>:<span className="yv-null">null</span>}</div><div>{f.right!=null?<TreeNodeView value={f.right} objects={objects} depth={depth+1}/>:<span className="yv-null">null</span>}</div></div>}</div>;
 }
 
-function DataValue({ value, state }: { value: unknown; state?: TraceState }) {
+function DataValue({ value, state, source }: { value: unknown; state?: TraceState; source: string }) {
   if (isMapSnapshot(value)) {
     return <MapView value={value} state={state}/>;
   }
@@ -363,7 +363,7 @@ function DataValue({ value, state }: { value: unknown; state?: TraceState }) {
     );
   }
 
-  if (Array.isArray(value)) return <ArrayView value={value} state={state}/>;
+  if (Array.isArray(value)) return <ArrayView value={value} state={state} source={source}/>;
   if (isPlainObject(value)) {
     if (looksTreeNode(value)) return <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects??{}}/></div>;
     if (looksListNode(value)) return <LinkedListView root={value} objects={state?.objects??{}}/>;
@@ -414,7 +414,7 @@ function DataStructures({ state }: { state?: TraceState }) {
       {items.map(([name, value]) => (
         <div className="yv-ds" key={name}>
           <div className="yv-ds-title">{name}</div>
-          <DataValue value={value} state={state}/>
+          <DataValue value={value} state={state} source={source}/>
         </div>
       ))}
     </div>
