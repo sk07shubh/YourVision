@@ -37,14 +37,14 @@ const trace: ExecutionTrace = {
 };
 
 const states = buildStates(trace);
-assert(states.length === trace.events.length, "state count must match event count");
+assert(states.length === 5, "only checkpoint events should become replay states");
 assert(states[1]?.arrays.nums !== undefined, "STEP must hydrate named arrays");
-assert(states[2]?.arrays.nums !== undefined, "ARRAY_WRITE must preserve array state");
-assert(JSON.stringify(states[2]?.arrays.nums).includes("9"), "ARRAY_WRITE state did not contain updated value");
-assert(states[3]?.objects.o1 !== undefined, "OBJECT_FIELD_WRITE must preserve object identity");
-assert(states[4]?.callStack.join("/") === "solve/helper", "nested call stack replay is incorrect");
-assert(states[5]?.callStack.join("/") === "solve", "forward unwind replay is incorrect");
-assert(states[6]?.callStack.length === 0, "final call stack must be empty");
+assert(states[2]?.arrays.nums !== undefined, "folded ARRAY_WRITE must preserve array state");
+assert(JSON.stringify(states[2]?.arrays.nums).includes("9"), "folded ARRAY_WRITE state did not contain updated value");
+assert(states[2]?.objects.o1 !== undefined, "folded OBJECT_FIELD_WRITE must preserve object identity");
+assert(states[2]?.callStack.join("/") === "solve/helper", "nested call stack replay is incorrect");
+assert(states[3]?.callStack.join("/") === "solve", "forward unwind replay is incorrect");
+assert(states[4]?.callStack.length === 0, "final call stack must be empty");
 
 const replay = buildStates(trace);
 assert(JSON.stringify(states) === JSON.stringify(replay), "state replay is not deterministic");
