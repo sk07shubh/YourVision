@@ -7,7 +7,6 @@ export interface LeetCodeTestcase {
   raw: string;
   inputs: Record<string, string>;
   orderedArguments: string[];
-  expected?: string;
 }
 
 export interface JavaMethod {
