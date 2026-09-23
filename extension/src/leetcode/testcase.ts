@@ -61,7 +61,7 @@ export function detectSource(label: string, panelText: string): TestcaseSource {
   return 'unknown';
 }
 
-export function makeTestcase(raw: string, label: string, source: TestcaseSource, method: JavaMethod, expected?: string): LeetCodeTestcase {
+export function makeTestcase(raw: string, label: string, source: TestcaseSource, method: JavaMethod): LeetCodeTestcase {
   const inputs = parseAssignments(raw);
   return {
     id: `${source}:${label}:${raw}`,
@@ -70,6 +70,5 @@ export function makeTestcase(raw: string, label: string, source: TestcaseSource,
     raw,
     inputs,
     orderedArguments: orderArguments(inputs, method),
-    expected,
   };
 }
