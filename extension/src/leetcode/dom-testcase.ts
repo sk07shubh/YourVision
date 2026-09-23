@@ -86,45 +86,12 @@ function pickRawInput(
   return assignments.join('\n');
 }
 
-function pickExpected(
-  panel: HTMLElement
-): string | undefined {
-  const elements = [
-    ...panel.querySelectorAll<HTMLElement>(
-      '*'
-    ),
-  ];
-
-  for (const element of elements) {
-    const label =
-      textOf(element);
-
-    if (
-      !/^expected(?:\s+output)?\s*:?$/i.test(
-        label
-      )
-    ) {
-      continue;
-    }
-
-    const next =
-      element.nextElementSibling;
-
-    const value =
-      textOf(next);
-
-    if (value) {
-      return value;
-    }
-  }
-
-  return undefined;
-}
-
 export function readSelectedTestcase(
-  method: JavaMethod
+  method: JavaMethod,
+  preferredRegion?: HTMLElement
 ): LeetCodeTestcase {
   const region =
+    preferredRegion ??
     findTestcaseRegion();
 
   if (!region) {
@@ -174,7 +141,6 @@ export function readSelectedTestcase(
     raw,
     label,
     source,
-    method,
-    pickExpected(panel)
+    method
   );
 }
