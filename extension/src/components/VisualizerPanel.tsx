@@ -18,13 +18,88 @@ function Section({ title, count, children }: { title: string; count?: number; ch
   return <div className="yv-section"><button className="yv-section-head" onClick={()=>setOpen(x=>!x)}><span>{open?'▾':'▸'} {title}</span>{typeof count==='number'&&<span className="yv-count">{count}</span>}</button>{open&&<div className="yv-section-body">{children}</div>}</div>;
 }
 
+function isArraySnapshot(value: unknown): value is Obj {
+  return (
+    isPlainObject(value) &&
+    typeof value.$arrayId === 'string' &&
+    Array.isArray(value.values)
+  );
+}
+
+function isMapSnapshot(value: unknown): value is Obj & {
+  $mapId: string;
+  $type?: string;
+  entries: Array<{ key: unknown; value: unknown }>;
+} {
+  return (
+    isPlainObject(value) &&
+    typeof value.$mapId === 'string' &&
+    Array.isArray(value.entries)
+  );
+}
+
+function variableSummary(value: unknown): string {
+  if (isArraySnapshot(value)) {
+    const type =
+      typeof value.$type === 'string'
+        ? value.$type.split('.').pop() ?? 'Array'
+        : 'Array';
+
+    return `${type} · ${value.values.length} elements`;
+  }
+
+  if (isMapSnapshot(value)) {
+    const type =
+      typeof value.$type === 'string'
+        ? value.$type.split('.').pop() ?? 'Map'
+        : 'Map';
+
+    return `${type} · ${value.entries.length} entries`;
+  }
+
+  if (isPlainObject(value)) {
+    const type =
+      typeof value.$type === 'string'
+        ? value.$type.split('.').pop() ?? 'Object'
+        : 'Object';
+
+    return type;
+  }
+
+  return displayValue(value);
+}
+
 function Variables({ state, previous }: { state?: TraceState; previous?: TraceState }) {
   const entries = Object.entries(state?.variables ?? {});
   if (!entries.length) return <div className="yv-empty">No local variables yet.</div>;
-  return <div className="yv-vars">{entries.map(([name,value])=>{
-    const old=previous?.variables?.[name]; const changed=Boolean(previous) && stableStringify(old)!==stableStringify(value);
-    return <div className={`yv-var ${changed?'changed':''}`} key={name}><div className="yv-var-name">{name}</div><div className="yv-change">{changed&&<><span className="yv-old yv-code">{displayValue(old)}</span><span className="yv-arrow">→</span></>}<span className="yv-code">{displayValue(value)}</span></div></div>;
-  })}</div>;
+
+  return (
+    <div className="yv-vars">
+      {entries.map(([name, value]) => {
+        const old = previous?.variables?.[name];
+        const changed =
+          Boolean(previous) &&
+          stableStringify(old) !== stableStringify(value);
+
+        return (
+          <div className={`yv-var ${changed ? 'changed' : ''}`} key={name}>
+            <div className="yv-var-name">{name}</div>
+            <div className="yv-change">
+              {changed && (
+                <>
+                  <span className="yv-old yv-code">
+                    {variableSummary(old)}
+                  </span>
+                  <span className="yv-arrow">→</span>
+                </>
+              )}
+              <span className="yv-code">{variableSummary(value)}</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function pointerLabels(state: TraceState | undefined, length: number): Map<number,string[]> {
@@ -53,6 +128,123 @@ function ArrayView({ value, state }: { value: unknown[]; state?: TraceState }) {
   if (value.every(Array.isArray)) return <div className="yv-matrix">{value.map((row,r)=><div className="yv-array" key={r}>{(row as unknown[]).map((v,i)=><div className="yv-cell" key={i}><div className="yv-cell-value">{displayValue(v)}</div><div className="yv-cell-index">[{r},{i}]</div></div>)}</div>)}</div>;
   const labels=pointerLabels(state,value.length); const changed=changedArrayIndices(state);
   return <div className="yv-array">{value.map((v,i)=><div className="yv-cell" key={i}>{labels.has(i)&&<div className="yv-pointer">{labels.get(i)!.join(' · ')} ↓</div>}<div className={`yv-cell-value ${changed.has(i)?'yv-cell-changed':''}`}>{displayValue(v)}</div><div className="yv-cell-index">{i}</div></div>)}</div>;
+}
+
+function mapChanges(state?: TraceState): Array<{
+  kind: 'insert' | 'update' | 'delete';
+  key: unknown;
+  before?: unknown;
+  after?: unknown;
+}> {
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data) || !Array.isArray(data.changes)) return [];
+
+  return data.changes.filter(
+    (change): change is {
+      kind: 'insert' | 'update' | 'delete';
+      key: unknown;
+      before?: unknown;
+      after?: unknown;
+    } =>
+      isPlainObject(change) &&
+      (change.kind === 'insert' ||
+        change.kind === 'update' ||
+        change.kind === 'delete')
+  );
+}
+
+function MapView({
+  value,
+  state
+}: {
+  value: Obj & {
+    $mapId: string;
+    entries: Array<{ key: unknown; value: unknown }>;
+  };
+  state?: TraceState;
+}) {
+  const changes = mapChanges(state);
+
+  const findChange = (key: unknown) =>
+    changes.find(
+      change =>
+        stableStringify(change.key) ===
+        stableStringify(key)
+    );
+
+  const deleted = changes.filter(
+    change => change.kind === 'delete'
+  );
+
+  return (
+    <div className="yv-hashmap">
+      <div className="yv-map-meta">
+        <span>
+          {typeof value.$type === 'string'
+            ? value.$type.split('.').pop()
+            : 'Map'}
+        </span>
+        <span>{value.entries.length} entries</span>
+      </div>
+
+      <div className="yv-map-table">
+        <div className="yv-map-header">
+          <div>Key</div>
+          <div>Value</div>
+        </div>
+
+        {value.entries.map((entry, index) => {
+          const change = findChange(entry.key);
+
+          return (
+            <div
+              className={`yv-map-row ${change ? `yv-map-${change.kind}` : ''}`}
+              key={stableStringify(entry.key) || index}
+            >
+              <div className="yv-map-key yv-code">
+                {displayValue(entry.key)}
+              </div>
+
+              <div className="yv-map-value yv-code">
+                {change?.kind === 'update' ? (
+                  <>
+                    <span className="yv-old-value">
+                      {displayValue(change.before)}
+                    </span>
+                    <span className="yv-map-arrow">→</span>
+                    <span>{displayValue(entry.value)}</span>
+                  </>
+                ) : (
+                  <span>{displayValue(entry.value)}</span>
+                )}
+
+                {change?.kind === 'insert' && (
+                  <span className="yv-map-tag">NEW</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        {deleted.map((change, index) => (
+          <div
+            className="yv-map-row yv-map-delete"
+            key={`deleted-${stableStringify(change.key)}-${index}`}
+          >
+            <div className="yv-map-key yv-code">
+              {displayValue(change.key)}
+            </div>
+            <div className="yv-map-value yv-code">
+              <span className="yv-old-value">
+                {displayValue(change.before)}
+              </span>
+              <span className="yv-map-tag">REMOVED</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function objectFields(value: Obj): Obj {
@@ -85,7 +277,23 @@ function TreeNodeView({ value, objects, depth=0 }: { value: unknown; objects: Re
 }
 
 function DataValue({ value, state }: { value: unknown; state?: TraceState }) {
-  if (isPlainObject(value) && Array.isArray(value.values)) return <><ArrayView value={value.values} state={state}/>{value.truncated===true&&<div className="yv-truncated">Showing first {value.values.length} of {String(value.length??'?')} items.</div>}</>;
+  if (isMapSnapshot(value)) {
+    return <MapView value={value} state={state}/>;
+  }
+
+  if (isArraySnapshot(value)) {
+    return (
+      <>
+        <ArrayView value={value.values} state={state}/>
+        {value.truncated === true && (
+          <div className="yv-truncated">
+            Showing first {value.values.length} of {String(value.length ?? '?')} items.
+          </div>
+        )}
+      </>
+    );
+  }
+
   if (Array.isArray(value)) return <ArrayView value={value} state={state}/>;
   if (isPlainObject(value)) {
     if (looksTreeNode(value)) return <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects??{}}/></div>;

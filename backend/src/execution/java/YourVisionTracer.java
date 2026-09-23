@@ -677,6 +677,17 @@ public class YourVisionTracer {
         }
 
         if (value instanceof ObjectReference object) {
+            Object mapSnapshot =
+                snapshotMap(
+                    object,
+                    depth,
+                    activeObjects
+                );
+
+            if (mapSnapshot != null) {
+                return mapSnapshot;
+            }
+
             long id =
                 object.uniqueID();
 
@@ -762,6 +773,259 @@ public class YourVisionTracer {
         }
 
         return String.valueOf(value);
+    }
+
+    private static Object snapshotMap(
+        ObjectReference object,
+        int depth,
+        Set<Long> activeObjects
+    ) {
+        String type = object.referenceType().name();
+
+        if (!type.contains("HashMap") &&
+            !type.contains("Hashtable") &&
+            !type.contains("IdentityHashMap") &&
+            !type.contains("WeakHashMap") &&
+            !type.contains("ConcurrentHashMap") &&
+            !type.contains("TreeMap")) {
+            return null;
+        }
+
+        long id = object.uniqueID();
+
+        Map<String, Object> result =
+            new LinkedHashMap<>();
+
+        result.put("$mapId", String.valueOf(id));
+        result.put("$type", type);
+
+        if (!activeObjects.add(id)) {
+            result.put("$ref", String.valueOf(id));
+            return result;
+        }
+
+        try {
+            List<Map<String, Object>> entries =
+                new java.util.ArrayList<>();
+
+            Field sizeField = findField(
+                object,
+                "size"
+            );
+
+            if (sizeField != null) {
+                try {
+                    Value sizeValue =
+                        object.getValue(sizeField);
+
+                    if (sizeValue instanceof IntegerValue size) {
+                        result.put("size", size.intValue());
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+
+            Field tableField = findField(
+                object,
+                "table"
+            );
+
+            if (tableField != null) {
+                Value tableValue =
+                    object.getValue(tableField);
+
+                if (tableValue instanceof ArrayReference table) {
+                    int limit =
+                        Math.min(
+                            table.length(),
+                            MAX_ARRAY_ITEMS
+                        );
+
+                    for (int i = 0; i < limit; i++) {
+                        Value bucket =
+                            table.getValue(i);
+
+                        collectHashEntries(
+                            bucket,
+                            entries,
+                            depth,
+                            activeObjects
+                        );
+
+                        if (entries.size() >= MAX_FIELDS) {
+                            break;
+                        }
+                    }
+                }
+            } else {
+                Field rootField = findField(
+                    object,
+                    "root"
+                );
+
+                if (rootField != null) {
+                    collectTreeEntries(
+                        object.getValue(rootField),
+                        entries,
+                        depth,
+                        activeObjects
+                    );
+                }
+            }
+
+            result.put(
+                "entries",
+                entries
+            );
+
+            if (entries.size() >= MAX_FIELDS) {
+                result.put(
+                    "truncated",
+                    true
+                );
+            }
+
+            return result;
+        } catch (Exception ignored) {
+            return null;
+        } finally {
+            activeObjects.remove(id);
+        }
+    }
+
+    private static void collectHashEntries(
+        Value nodeValue,
+        List<Map<String, Object>> entries,
+        int depth,
+        Set<Long> activeObjects
+    ) {
+        Value current = nodeValue;
+        Set<Long> seen = new HashSet<>();
+
+        while (
+            current instanceof ObjectReference node &&
+            entries.size() < MAX_FIELDS &&
+            seen.add(node.uniqueID())
+        ) {
+            Value key =
+                fieldValue(node, "key");
+
+            Value value =
+                fieldValue(node, "value");
+
+            Map<String, Object> entry =
+                new LinkedHashMap<>();
+
+            entry.put(
+                "key",
+                snapshotValue(
+                    key,
+                    depth + 1,
+                    activeObjects
+                )
+            );
+
+            entry.put(
+                "value",
+                snapshotValue(
+                    value,
+                    depth + 1,
+                    activeObjects
+                )
+            );
+
+            entries.add(entry);
+
+            current =
+                fieldValue(node, "next");
+        }
+    }
+
+    private static void collectTreeEntries(
+        Value nodeValue,
+        List<Map<String, Object>> entries,
+        int depth,
+        Set<Long> activeObjects
+    ) {
+        if (!(nodeValue instanceof ObjectReference node) ||
+            entries.size() >= MAX_FIELDS) {
+            return;
+        }
+
+        collectTreeEntries(
+            fieldValue(node, "left"),
+            entries,
+            depth,
+            activeObjects
+        );
+
+        if (entries.size() >= MAX_FIELDS) {
+            return;
+        }
+
+        Map<String, Object> entry =
+            new LinkedHashMap<>();
+
+        entry.put(
+            "key",
+            snapshotValue(
+                fieldValue(node, "key"),
+                depth + 1,
+                activeObjects
+            )
+        );
+
+        entry.put(
+            "value",
+            snapshotValue(
+                fieldValue(node, "value"),
+                depth + 1,
+                activeObjects
+            )
+        );
+
+        entries.add(entry);
+
+        collectTreeEntries(
+            fieldValue(node, "right"),
+            entries,
+            depth,
+            activeObjects
+        );
+    }
+
+    private static Field findField(
+        ObjectReference object,
+        String name
+    ) {
+        try {
+            for (Field field :
+                object.referenceType().allFields()) {
+                if (name.equals(field.name())) {
+                    return field;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        return null;
+    }
+
+    private static Value fieldValue(
+        ObjectReference object,
+        String name
+    ) {
+        Field field = findField(object, name);
+
+        if (field == null) {
+            return null;
+        }
+
+        try {
+            return object.getValue(field);
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private static boolean isTraced(

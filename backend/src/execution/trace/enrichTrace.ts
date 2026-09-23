@@ -15,29 +15,30 @@ export function enrichTrace(
         ExecutionEvent | undefined;
 
     for (const event of trace.events) {
-        if (
-            event.type === "STEP" &&
-            previousStep
-        ) {
-            enriched.push(
-                ...deriveArrayReferenceEvents(
-                    event
-                )
-            );
+        if (event.type === "STEP") {
+            enriched.push(event);
 
-            enriched.push(
-                ...deriveChanges(
-                    previousStep,
-                    event
-                )
-            );
+            if (previousStep) {
+                enriched.push(
+                    ...deriveArrayReferenceEvents(
+                        event
+                    )
+                );
+
+                enriched.push(
+                    ...deriveChanges(
+                        previousStep,
+                        event
+                    )
+                );
+            }
+
+            previousStep = event;
+            continue;
         }
 
         enriched.push(event);
 
-        if (event.type === "STEP") {
-            previousStep = event;
-        }
     }
 
     return {

@@ -8,6 +8,7 @@ export type ExecutionEventType =
     | "ARRAY_WRITE"
     | "OBJECT_CREATE"
     | "OBJECT_FIELD_WRITE"
+    | "MAP_WRITE"
     | "METHOD_ENTER"
     | "METHOD_EXIT"
     | "ERROR"
