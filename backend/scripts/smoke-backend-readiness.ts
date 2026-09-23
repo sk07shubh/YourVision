@@ -223,7 +223,7 @@ assert(robber.result === "12", "house robber returned wrong result");
 const coins = await runJava(source, { method: "coinChange", arguments: ["[1,2,5]", "11"] });
 ok(coins, "coin change");
 assert(coins.result === "3", "coin change returned wrong result");
-assert(coins.states?.some((state) => state.variables.dp !== undefined) === true, "coin change DP state missing");
+assert(coins.states?.some((state) => state.arrays.dp !== undefined) === true, "coin change DP state missing");
 
 const paths = await runJava(source, { method: "uniquePaths", arguments: ["3", "7"] });
 ok(paths, "unique paths");
@@ -243,7 +243,7 @@ assert(memo.states?.at(-1)?.callStack.length === 0, "memoized DP call stack did 
 const hashDp = await runJava(source, { method: "dpHashMap", arguments: ["abbccc"] });
 ok(hashDp, "DP/hash map");
 assert(hashDp.result === "3", "DP/hash map returned wrong result");
-assert(hashDp.states?.some((state) => state.variables.dp !== undefined) === true, "HashMap DP state missing");
+assert(hashDp.states?.some((state) => state.dataStructures.dp !== undefined) === true, "HashMap DP state missing");
 
 const mutation = await runJava(source, { method: "replayMutation", arguments: ["[1,2,3,4]"] });
 ok(mutation, "mutation replay");
@@ -259,7 +259,7 @@ assert(nested.states?.some((state) => state.variables.i !== undefined && state.v
 const mixed = await runJava(source, { method: "mixedCollections", arguments: ["[1,2,2,3]"] });
 ok(mixed, "mixed collections");
 assert(mixed.result === "18", "mixed collection result mismatch");
-assert(mixed.states?.some((state) => state.variables.list !== undefined && state.variables.map !== undefined && state.variables.set !== undefined && state.variables.queue !== undefined) === true, "mixed collection state missing");
+assert(mixed.states?.some((state) => state.dataStructures.list !== undefined && state.dataStructures.map !== undefined && state.dataStructures.set !== undefined && state.dataStructures.queue !== undefined) === true, "mixed collection state missing");
 
 const nullResult = await runJava(source, { method: "binarySearch", arguments: ["[]", "3"] });
 ok(nullResult, "empty input");

@@ -49,16 +49,18 @@ assert(populated.kind === "OK", "data structure execution failed");
 
 const finalState = populated.states?.at(-1);
 const structures = finalState?.dataStructures ?? {};
+const arrays = finalState?.arrays ?? {};
 const variables = finalState?.variables ?? {};
 
 assert(!("nums" in variables), "array leaked into Variables");
 assert(!("map" in variables), "map leaked into Variables");
+assert("nums" in arrays, "array missing from Data Structures");
 
-for (const name of ["nums","map","set","stack","queue","list"]) {
+for (const name of ["map","set","stack","queue","list"]) {
     assert(name in structures, name + " missing from Data Structures");
 }
 
-const nums = structures.nums as Record<string, unknown>;
+const nums = arrays.nums as Record<string, unknown>;
 const map = structures.map as Record<string, unknown>;
 const set = structures.set as Record<string, unknown>;
 const stack = structures.stack as Record<string, unknown>;

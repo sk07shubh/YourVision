@@ -184,12 +184,12 @@ const bfs = await runJava(source, {
 });
 assert(bfs.kind === "OK" && bfs.result === "10", "BFS tree sum returned the wrong result");
 assert(traceTypes(bfs).has("OBJECT_FIELD_WRITE") || (bfs.states?.length ?? 0) > 0, "BFS did not produce usable object/queue state");
-assert(bfs.states?.some((state) => state.variables.queue !== undefined) === true, "BFS queue variable was not captured");
+assert(bfs.states?.some((state) => state.dataStructures.queue !== undefined) === true, "BFS queue variable was not captured");
 
 const graphBfs = await runJava(source, { method: "graphBfsCount" });
 assert(graphBfs.kind === "OK" && graphBfs.result === "4", "graph BFS returned the wrong reachable-node count");
 assert(hasCallStack(graphBfs, "graphBfsCount"), "graph BFS did not preserve its active method frame");
-assert(graphBfs.states?.some((state) => state.variables.queue !== undefined && state.variables.seen !== undefined) === true, "graph BFS queue/set state was not captured");
+assert(graphBfs.states?.some((state) => state.dataStructures.queue !== undefined && state.dataStructures.seen !== undefined) === true, "graph BFS queue/set state was not captured");
 
 const gridDfs = await runJava(source, { method: "gridDfsCount", arguments: ["[[1,1,0],[0,1,0],[1,0,1]]"] });
 assert(gridDfs.kind === "OK" && gridDfs.result === "3", "grid DFS returned the wrong island count");
@@ -211,10 +211,10 @@ assert(traceTypes(subsets).has("OBJECT_FIELD_WRITE") || (subsets.states?.length 
 const permutations = await runJava(source, { method: "permutationCount", arguments: ["[1,2,3]"] });
 assert(permutations.kind === "OK" && permutations.result === "6", "backtracking permutations returned the wrong count");
 assert(hasCallStack(permutations, "buildPermutations", "buildPermutations"), "permutation backtracking did not preserve recursive frames");
-assert(permutations.states?.some((state) => state.variables.used !== undefined) === true, "permutation boolean-array state was not captured");
+assert(permutations.states?.some((state) => state.arrays.used !== undefined) === true, "permutation boolean-array state was not captured");
 
 const mixed = await runJava(source, { method: "mixedStructureScore", arguments: ["[1,2,3,4]"] });
 assert(mixed.kind === "OK" && mixed.result === "10", "mixed array/object structure returned the wrong result");
-assert(mixed.states?.some((state) => state.variables.rows !== undefined) === true, "mixed collection/array structure was not captured");
+assert(mixed.states?.some((state) => state.dataStructures.rows !== undefined) === true, "mixed collection/array structure was not captured");
 
 console.log("PASS: LeetCode algorithms - nested loops, DFS, BFS, backtracking, mixed structures");
