@@ -677,6 +677,13 @@ public class YourVisionTracer {
         }
 
         if (value instanceof ObjectReference object) {
+            Object boxedPrimitive =
+                snapshotBoxedPrimitive(object);
+
+            if (boxedPrimitive != null) {
+                return boxedPrimitive;
+            }
+
             Object mapSnapshot =
                 snapshotMap(
                     object,
@@ -784,6 +791,41 @@ public class YourVisionTracer {
         }
 
         return String.valueOf(value);
+    }
+
+    private static Object snapshotBoxedPrimitive(
+        ObjectReference object
+    ) {
+        String type =
+            object.referenceType().name();
+
+        boolean wrapper =
+            type.equals("java.lang.Integer") ||
+            type.equals("java.lang.Long") ||
+            type.equals("java.lang.Short") ||
+            type.equals("java.lang.Byte") ||
+            type.equals("java.lang.Boolean") ||
+            type.equals("java.lang.Character") ||
+            type.equals("java.lang.Float") ||
+            type.equals("java.lang.Double");
+
+        if (!wrapper) {
+            return null;
+        }
+
+        Value value =
+            fieldValue(object, "value");
+
+        if (value instanceof BooleanValue v) return v.booleanValue();
+        if (value instanceof ByteValue v) return v.byteValue();
+        if (value instanceof ShortValue v) return v.shortValue();
+        if (value instanceof IntegerValue v) return v.intValue();
+        if (value instanceof LongValue v) return v.longValue();
+        if (value instanceof FloatValue v) return v.floatValue();
+        if (value instanceof DoubleValue v) return v.doubleValue();
+        if (value instanceof CharValue v) return String.valueOf(v.charValue());
+
+        return null;
     }
 
     private static Object snapshotMap(
@@ -962,6 +1004,18 @@ public class YourVisionTracer {
 
             Integer size =
                 readIntField(object, "size");
+
+            if (
+                size == null &&
+                (type.contains("Vector") ||
+                 type.contains("Stack"))
+            ) {
+                size =
+                    readIntField(
+                        object,
+                        "elementCount"
+                    );
+            }
 
             if (
                 type.contains("ArrayList") ||
