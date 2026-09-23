@@ -647,6 +647,35 @@ mount.style.boxSizing =
     mount
   );
 
+  const scrollStyle =
+    document.createElement('style');
+
+  scrollStyle.textContent =
+    '.yv-scroll{overflow-y:scroll;overflow-x:hidden;overscroll-behavior:contain;}';
+
+  shadow.appendChild(scrollStyle);
+
+  panelHost.addEventListener(
+    'wheel',
+    event => {
+      if (event.deltaY === 0) {
+        return;
+      }
+
+      const scroll =
+        shadow.querySelector<HTMLElement>('.yv-scroll');
+
+      if (!scroll) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      scroll.scrollTop += event.deltaY;
+    },
+    { passive: false }
+  );
+
   root =
     createRoot(mount);
 
