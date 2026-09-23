@@ -24,6 +24,10 @@ export function buildStates(
     for (const event of trace.events) {
         state = applyEvent(state, event);
 
+        if (!isCheckpointEvent(event)) {
+            continue;
+        }
+
         states.push({
             ...state,
             variables: { ...state.variables },
@@ -35,6 +39,19 @@ export function buildStates(
     }
 
     return states;
+}
+
+function isCheckpointEvent(event: ExecutionEvent): boolean {
+    return (
+        event.type === "PROGRAM_START" ||
+        event.type === "STEP" ||
+        event.type === "METHOD_ENTER" ||
+        event.type === "METHOD_EXIT" ||
+        event.type === "ERROR" ||
+        event.type === "TIMEOUT" ||
+        event.type === "TRACE_LIMIT" ||
+        event.type === "PROGRAM_END"
+    );
 }
 
 function applyEvent(
@@ -54,39 +71,10 @@ function applyEvent(
 
     switch (event.type) {
         case "STEP":
-            if (
-                data.variables &&
-                typeof data.variables === "object" &&
-                !Array.isArray(data.variables)
-            ) {
-                const variables =
-                    data.variables as Record<string, unknown>;
+            applyVariableSnapshot(next, data.variables);
 
-                const localVariables: Record<string, unknown> = {};
-
-                next.arrays = {};
-                next.dataStructures = {};
-                next.objects = {};
-
-                for (
-                    const [name, value] of
-                    Object.entries(variables)
-                ) {
-                    if (!isDataStructureSnapshot(value)) {
-                        localVariables[name] = value;
-                    }
-
-                    collectSnapshots(
-                        value,
-                        name,
-                        next.arrays,
-                        next.dataStructures,
-                        next.objects,
-                        true
-                    );
-                }
-
-                next.variables = localVariables;
+            if (typeof data.displayLine === "number") {
+                next.line = data.displayLine;
             }
             break;
 
@@ -207,6 +195,8 @@ function applyEvent(
                     event.method
                 ];
             }
+
+            applyVariableSnapshot(next, data.variables);
             break;
 
         case "METHOD_EXIT":
@@ -239,6 +229,39 @@ function applyEvent(
     return next;
 }
 
+
+function applyVariableSnapshot(
+    next: TraceState,
+    value: unknown
+): void {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return;
+    }
+
+    const variables = value as Record<string, unknown>;
+    const localVariables: Record<string, unknown> = {};
+
+    next.arrays = {};
+    next.dataStructures = {};
+    next.objects = {};
+
+    for (const [name, item] of Object.entries(variables)) {
+        if (!isDataStructureSnapshot(item)) {
+            localVariables[name] = item;
+        }
+
+        collectSnapshots(
+            item,
+            name,
+            next.arrays,
+            next.dataStructures,
+            next.objects,
+            true
+        );
+    }
+
+    next.variables = localVariables;
+}
 
 function collectSnapshots(
     value: unknown,
