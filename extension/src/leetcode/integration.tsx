@@ -18,6 +18,7 @@ import {
   findLeftContentHost,
   findLeftTabList,
   findTestcaseRegion,
+  findTestResultContainers,
 } from './selectors';
 
 import {
@@ -53,6 +54,8 @@ let tabDivider: HTMLElement | null =
 
 let visualizeButton:
   HTMLButtonElement | null = null;
+
+const resultVisualizeButtons = new Set<HTMLButtonElement>();
 
 let observer:
   MutationObserver | null = null;
@@ -706,7 +709,7 @@ mount.style.boxSizing =
   return true;
 }
 
-async function visualize() {
+async function visualize(region?: HTMLElement) {
   try {
     const source =
       await readUserSource();
@@ -716,7 +719,8 @@ async function visualize() {
 
     const testcase =
       readSelectedTestcase(
-        method
+        method,
+        region
       );
 
     sessionStore.begin(
@@ -772,106 +776,67 @@ function moveVisualizeToEnd(
   }
 }
 
-export function injectVisualizeButton():
-  boolean {
-  const region =
-    findTestcaseRegion();
-
-  if (!region) {
-    return false;
-  }
-
-  const existing =
-    document.querySelector<HTMLButtonElement>(
-      '[data-yourvision-visualize="true"]'
-    );
-
-  if (existing) {
-    visualizeButton =
-      existing;
-
-    moveVisualizeToEnd(
-      region
-    );
-
-    return true;
-  }
-
+function createVisualizeButton(region: HTMLElement, resultPanel = false): HTMLButtonElement | null {
   const nativeCases = [
-    ...region.querySelectorAll<HTMLButtonElement>(
-      '[data-e2e-locator="console-testcase-tag"]'
-    ),
+    ...region.querySelectorAll<HTMLButtonElement>('[data-e2e-locator="console-testcase-tag"]'),
+    ...[...region.querySelectorAll<HTMLButtonElement>('button')].filter(button => /^case\s+\d+$/i.test((button.textContent ?? '').trim()))
   ];
+  const template = nativeCases[nativeCases.length - 1];
+  if (!template) return null;
 
-  const template =
-    nativeCases[
-      nativeCases.length - 1
-    ];
+  const button = document.createElement('button');
+  button.dataset.yourvisionVisualize = 'true';
+  if (resultPanel) button.dataset.yourvisionResultVisualize = 'true';
+  button.type = 'button';
+  button.textContent = 'Visualize';
+  button.className = template.className;
+  button.classList.remove('bg-fill-3','dark:bg-dark-fill-3');
+  button.classList.add('bg-transparent','dark:bg-dark-transparent');
+  Object.assign(button.style,{color:'#ffa116',cursor:'pointer',flex:'0 0 auto',whiteSpace:'nowrap'});
 
-  if (!template) {
-    return false;
+  button.addEventListener('pointerdown',event=>event.stopPropagation());
+  button.addEventListener('click',event=>{
+    event.preventDefault();
+    event.stopPropagation();
+    void visualize(region);
+  });
+
+  region.appendChild(button);
+  return button;
+}
+
+export function injectVisualizeButton(): boolean {
+  const region = findTestcaseRegion();
+  if (!region) return false;
+
+  const existing = document.querySelector<HTMLButtonElement>('[data-yourvision-visualize="true"]:not([data-yourvision-result-visualize="true"])');
+  if (existing) {
+    visualizeButton = existing;
+    if (existing.parentElement !== region || region.lastElementChild !== existing) region.appendChild(existing);
+  } else {
+    visualizeButton = createVisualizeButton(region);
   }
 
-  visualizeButton =
-    document.createElement(
-      'button'
-    );
+  for (const panel of findTestResultContainers()) {
+    const resultRegion =
+      panel.querySelector<HTMLElement>('[data-yourvision-result-region="true"]') ??
+      panel.querySelector<HTMLElement>('[data-e2e-locator="console-testcase-tag"]')?.parentElement ??
+      [...panel.querySelectorAll<HTMLButtonElement>('button')].find(button => /^case\s+\d+$/i.test((button.textContent ?? '').trim()))?.parentElement;
 
-  visualizeButton.dataset
-    .yourvisionVisualize =
-    'true';
+    if (!resultRegion) continue;
+    resultRegion.dataset.yourvisionResultRegion = 'true';
 
-  visualizeButton.type =
-    'button';
-
-  visualizeButton.textContent =
-    'Visualize';
-
-  visualizeButton.className =
-    template.className;
-
-  visualizeButton.classList.remove(
-    'bg-fill-3',
-    'dark:bg-dark-fill-3'
-  );
-
-  visualizeButton.classList.add(
-    'bg-transparent',
-    'dark:bg-dark-transparent'
-  );
-
-  Object.assign(
-    visualizeButton.style,
-    {
-      color: '#ffa116',
-      cursor: 'pointer',
-      flex: '0 0 auto',
-      whiteSpace: 'nowrap',
+    const existingResult = resultRegion.querySelector<HTMLButtonElement>('[data-yourvision-result-visualize="true"]');
+    if (existingResult) {
+      resultVisualizeButtons.add(existingResult);
+      continue;
     }
-  );
 
-  visualizeButton.addEventListener(
-    'pointerdown',
-    event => {
-      event.stopPropagation();
-    }
-  );
+    const resultButton = createVisualizeButton(resultRegion,true);
+    if (resultButton) resultVisualizeButtons.add(resultButton);
+  }
 
-  visualizeButton.addEventListener(
-    'click',
-    event => {
-      event.preventDefault();
-      event.stopPropagation();
-
-      void visualize();
-    }
-  );
-
-  region.appendChild(
-    visualizeButton
-  );
-
-  return true;
+  return Boolean(visualizeButton);
 }
 
 function cleanup() {
@@ -882,6 +847,7 @@ function cleanup() {
   tabButton = null;
   tabDivider = null;
   visualizeButton = null;
+  resultVisualizeButtons.clear();
 
   yourVisionActive =
     false;
