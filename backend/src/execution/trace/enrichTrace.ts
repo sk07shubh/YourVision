@@ -16,35 +16,51 @@ export function enrichTrace(
 
     for (const event of trace.events) {
         if (event.type === "STEP") {
-    if (previousStep) {
-        enriched.push(
-            ...deriveArrayReferenceEvents(
-                event
-            )
-        );
+            if (previousStep) {
+                enriched.push(
+                    ...deriveArrayReferenceEvents(
+                        event
+                    )
+                );
 
-        enriched.push(
-            ...deriveChanges(
-                previousStep,
-                event
-            )
-        );
-    }
+                enriched.push(
+                    ...deriveChanges(
+                        previousStep,
+                        event
+                    )
+                );
+            }
 
-    enriched.push(event);
+            const displayLine =
+                previousStep &&
+                previousStep.method === event.method
+                    ? previousStep.line
+                    : event.line;
 
-    if (previousStep) {
-        enriched.push(
-            ...deriveMapChanges(
-                previousStep,
-                event
-            )
-        );
-    }
+            const stepEvent: ExecutionEvent = {
+                ...event,
+                data: {
+                    ...(event.data ?? {}),
+                    ...(typeof displayLine === "number"
+                        ? { displayLine }
+                        : {})
+                }
+            };
 
-    previousStep = event;
-    continue;
-}
+            enriched.push(stepEvent);
+
+            if (previousStep) {
+                enriched.push(
+                    ...deriveMapChanges(
+                        previousStep,
+                        event
+                    )
+                );
+            }
+
+            previousStep = event;
+            continue;
+        }
 
         enriched.push(event);
 
