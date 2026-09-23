@@ -54,6 +54,7 @@ if (
     JSON.stringify(types) !==
     JSON.stringify([
         "STEP",
+        "VARIABLE_UPDATE",
         "ARRAY_WRITE",
         "STEP"
     ])
