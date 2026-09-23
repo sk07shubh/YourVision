@@ -36,6 +36,7 @@ export interface TraceState {
     depth: number;
     variables: Record<string, unknown>;
     arrays: Record<string, unknown>;
+    dataStructures: Record<string, unknown>;
     objects: Record<string, unknown>;
     callStack: string[];
     lastEvent?: ExecutionEvent;

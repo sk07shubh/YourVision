@@ -688,6 +688,17 @@ public class YourVisionTracer {
                 return mapSnapshot;
             }
 
+            Object collectionSnapshot =
+                snapshotCollection(
+                    object,
+                    depth,
+                    activeObjects
+                );
+
+            if (collectionSnapshot != null) {
+                return collectionSnapshot;
+            }
+
             long id =
                 object.uniqueID();
 
@@ -891,6 +902,257 @@ public class YourVisionTracer {
         } finally {
             activeObjects.remove(id);
         }
+    }
+
+
+    private static Object snapshotCollection(
+        ObjectReference object,
+        int depth,
+        Set<Long> activeObjects
+    ) {
+        String type =
+            object.referenceType().name();
+
+        String kind = null;
+
+        if (
+            type.contains("ArrayList") ||
+            type.contains("Vector") ||
+            type.contains("Stack")
+        ) {
+            kind =
+                type.contains("Stack")
+                    ? "stack"
+                    : "list";
+        } else if (type.contains("ArrayDeque")) {
+            kind = "deque";
+        } else if (type.contains("PriorityQueue")) {
+            kind = "queue";
+        } else if (type.contains("LinkedList")) {
+            kind = "list";
+        } else if (
+            type.contains("HashSet") ||
+            type.contains("LinkedHashSet") ||
+            type.contains("TreeSet")
+        ) {
+            kind = "set";
+        }
+
+        if (kind == null) {
+            return null;
+        }
+
+        long id = object.uniqueID();
+
+        Map<String, Object> result =
+            new LinkedHashMap<>();
+
+        result.put("$collectionId", String.valueOf(id));
+        result.put("$type", type);
+        result.put("$kind", kind);
+
+        if (!activeObjects.add(id)) {
+            result.put("$ref", String.valueOf(id));
+            return result;
+        }
+
+        try {
+            List<Object> values =
+                new java.util.ArrayList<>();
+
+            Integer size =
+                readIntField(object, "size");
+
+            if (
+                type.contains("ArrayList") ||
+                type.contains("Vector") ||
+                type.contains("Stack")
+            ) {
+                Value dataValue =
+                    fieldValue(object, "elementData");
+
+                if (dataValue instanceof ArrayReference data) {
+                    int count =
+                        size == null
+                            ? data.length()
+                            : size;
+
+                    int limit =
+                        Math.min(
+                            count,
+                            Math.min(
+                                data.length(),
+                                MAX_ARRAY_ITEMS
+                            )
+                        );
+
+                    for (int i = 0; i < limit; i++) {
+                        values.add(
+                            snapshotValue(
+                                data.getValue(i),
+                                depth + 1,
+                                activeObjects
+                            )
+                        );
+                    }
+                }
+            } else if (type.contains("ArrayDeque")) {
+                Value elementsValue =
+                    fieldValue(object, "elements");
+
+                Integer head =
+                    readIntField(object, "head");
+
+                Integer tail =
+                    readIntField(object, "tail");
+
+                if (
+                    elementsValue instanceof ArrayReference elements &&
+                    head != null &&
+                    tail != null
+                ) {
+                    int capacity = elements.length();
+                    int count =
+                        size != null
+                            ? size
+                            : ((tail - head + capacity) % capacity);
+
+                    int limit =
+                        Math.min(
+                            count,
+                            MAX_ARRAY_ITEMS
+                        );
+
+                    for (int i = 0; i < limit; i++) {
+                        int index =
+                            (head + i) % capacity;
+
+                        values.add(
+                            snapshotValue(
+                                elements.getValue(index),
+                                depth + 1,
+                                activeObjects
+                            )
+                        );
+                    }
+                }
+            } else if (type.contains("PriorityQueue")) {
+                Value queueValue =
+                    fieldValue(object, "queue");
+
+                if (queueValue instanceof ArrayReference queue) {
+                    int count =
+                        size == null
+                            ? queue.length()
+                            : size;
+
+                    int limit =
+                        Math.min(
+                            count,
+                            Math.min(
+                                queue.length(),
+                                MAX_ARRAY_ITEMS
+                            )
+                        );
+
+                    for (int i = 0; i < limit; i++) {
+                        values.add(
+                            snapshotValue(
+                                queue.getValue(i),
+                                depth + 1,
+                                activeObjects
+                            )
+                        );
+                    }
+                }
+            } else if (type.contains("LinkedList")) {
+                Value current =
+                    fieldValue(object, "first");
+
+                int guard = 0;
+
+                while (
+                    current instanceof ObjectReference node &&
+                    guard < MAX_ARRAY_ITEMS
+                ) {
+                    values.add(
+                        snapshotValue(
+                            fieldValue(node, "item"),
+                            depth + 1,
+                            activeObjects
+                        )
+                    );
+
+                    current =
+                        fieldValue(node, "next");
+
+                    guard++;
+                }
+            } else {
+                Value backingValue =
+                    fieldValue(
+                        object,
+                        type.contains("TreeSet")
+                            ? "m"
+                            : "map"
+                    );
+
+                if (backingValue instanceof ObjectReference backing) {
+                    Object snapshot =
+                        snapshotMap(
+                            backing,
+                            depth + 1,
+                            activeObjects
+                        );
+
+                    if (snapshot instanceof Map<?, ?> mapSnapshot) {
+                        Object entriesValue =
+                            mapSnapshot.get("entries");
+
+                        if (entriesValue instanceof List<?> entries) {
+                            for (Object entryValue : entries) {
+                                if (entryValue instanceof Map<?, ?> entry) {
+                                    values.add(entry.get("key"));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            result.put("values", values);
+            result.put(
+                "size",
+                size != null
+                    ? size
+                    : values.size()
+            );
+
+            if (
+                size != null &&
+                size > values.size()
+            ) {
+                result.put("truncated", true);
+            }
+
+            return result;
+        } catch (Exception ignored) {
+            return null;
+        } finally {
+            activeObjects.remove(id);
+        }
+    }
+
+    private static Integer readIntField(
+        ObjectReference object,
+        String name
+    ) {
+        Value value =
+            fieldValue(object, name);
+
+        return value instanceof IntegerValue integer
+            ? integer.intValue()
+            : null;
     }
 
     private static void collectHashEntries(

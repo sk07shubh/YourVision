@@ -16,6 +16,7 @@ export function buildStates(
         depth: 0,
         variables: {},
         arrays: {},
+        dataStructures: {},
         objects: {},
         callStack: []
     };
@@ -27,6 +28,7 @@ export function buildStates(
             ...state,
             variables: { ...state.variables },
             arrays: { ...state.arrays },
+            dataStructures: { ...state.dataStructures },
             objects: { ...state.objects },
             callStack: [...state.callStack]
         });
@@ -60,25 +62,31 @@ function applyEvent(
                 const variables =
                     data.variables as Record<string, unknown>;
 
-                next.variables = {
-                    ...variables
-                };
+                const localVariables: Record<string, unknown> = {};
 
                 next.arrays = {};
+                next.dataStructures = {};
                 next.objects = {};
 
                 for (
                     const [name, value] of
                     Object.entries(variables)
                 ) {
+                    if (!isDataStructureSnapshot(value)) {
+                        localVariables[name] = value;
+                    }
+
                     collectSnapshots(
                         value,
                         name,
                         next.arrays,
+                        next.dataStructures,
                         next.objects,
                         true
                     );
                 }
+
+                next.variables = localVariables;
             }
             break;
 
@@ -118,12 +126,50 @@ function applyEvent(
                     ...next.arrays,
                     [data.name]: {
                         ...currentRecord,
+                        $arrayId:
+                            typeof data.objectId === "string"
+                                ? data.objectId
+                                : currentRecord.$arrayId,
                         objectId:
                             typeof data.objectId === "string"
                                 ? data.objectId
                                 : currentRecord.objectId,
-                        values:
-                            [...data.values],
+                        values: [...data.values],
+                        changes:
+                            Array.isArray(data.changes)
+                                ? data.changes
+                                : undefined
+                    }
+                };
+            }
+            break;
+
+        case "MAP_WRITE":
+            if (
+                typeof data.name === "string" &&
+                typeof data.mapId === "string" &&
+                Array.isArray(data.entries)
+            ) {
+                const current =
+                    next.dataStructures[data.name];
+
+                const currentRecord =
+                    current &&
+                    typeof current === "object" &&
+                    !Array.isArray(current)
+                        ? current as Record<string, unknown>
+                        : {};
+
+                next.dataStructures = {
+                    ...next.dataStructures,
+                    [data.name]: {
+                        ...currentRecord,
+                        $mapId: data.mapId,
+                        entries: data.entries,
+                        size:
+                            typeof data.size === "number"
+                                ? data.size
+                                : currentRecord.size,
                         changes:
                             Array.isArray(data.changes)
                                 ? data.changes
@@ -198,6 +244,7 @@ function collectSnapshots(
     value: unknown,
     variableName: string,
     arrays: Record<string, unknown>,
+    dataStructures: Record<string, unknown>,
     objects: Record<string, unknown>,
     registerNamedArray: boolean
 ): void {
@@ -214,6 +261,7 @@ function collectSnapshots(
                 item,
                 variableName,
                 arrays,
+                dataStructures,
                 objects,
                 false
             );
@@ -234,16 +282,9 @@ function collectSnapshots(
             Array.isArray(record.values)
         ) {
             arrays[variableName] = {
+                ...record,
                 objectId:
-                    record.$arrayId,
-                type:
-                    record.$type,
-                values:
-                    record.values,
-                truncated:
-                    record.truncated === true,
-                length:
-                    record.length
+                    record.$arrayId
             };
         }
 
@@ -253,9 +294,65 @@ function collectSnapshots(
                 item,
                 variableName,
                 arrays,
+                dataStructures,
                 objects,
                 false
             );
+            }
+        }
+
+        return;
+    }
+
+    if (
+        typeof record.$mapId === "string" ||
+        typeof record.$collectionId === "string"
+    ) {
+        if (registerNamedArray) {
+            dataStructures[variableName] = value;
+        }
+
+        if (Array.isArray(record.values)) {
+            for (const item of record.values) {
+                collectSnapshots(
+                    item,
+                    variableName,
+                    arrays,
+                    dataStructures,
+                    objects,
+                    false
+                );
+            }
+        }
+
+        if (Array.isArray(record.entries)) {
+            for (const entry of record.entries) {
+                if (
+                    entry &&
+                    typeof entry === "object" &&
+                    !Array.isArray(entry)
+                ) {
+                    const entryRecord =
+                        entry as Record<string, unknown>;
+
+                    collectSnapshots(
+                        entryRecord.key,
+                        variableName,
+                        arrays,
+                        dataStructures,
+                        objects,
+                        false
+                    );
+
+                    collectSnapshots(
+                        entryRecord.value,
+                        variableName,
+                        arrays,
+                        dataStructures,
+                        objects,
+                        false
+                    );
+                }
             }
         }
 
@@ -300,8 +397,31 @@ function collectSnapshots(
             child,
             variableName,
             arrays,
+            dataStructures,
             objects,
             false
         );
     }
+}
+
+
+function isDataStructureSnapshot(
+    value: unknown
+): boolean {
+    if (
+        !value ||
+        typeof value !== "object" ||
+        Array.isArray(value)
+    ) {
+        return false;
+    }
+
+    const record =
+        value as Record<string, unknown>;
+
+    return (
+        typeof record.$arrayId === "string" ||
+        typeof record.$mapId === "string" ||
+        typeof record.$collectionId === "string"
+    );
 }

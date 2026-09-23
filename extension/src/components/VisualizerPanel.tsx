@@ -10,7 +10,7 @@ type Obj = Record<string, unknown>;
 function eventLabel(state?: TraceState): string {
   const t = state?.lastEvent?.type;
   if (!t) return state ? 'Execution state' : 'Ready';
-  return ({STEP:'Executed line',METHOD_ENTER:'Entered method',METHOD_EXIT:'Returned from method',ARRAY_WRITE:'Array updated',ARRAY_ACCESS:'Array accessed',ARRAY_REFERENCE:'Array referenced',OBJECT_FIELD_WRITE:'Object updated',OBJECT_CREATE:'Object created',VARIABLE_UPDATE:'Variable updated',ERROR:'Runtime error',TIMEOUT:'Execution timed out',TRACE_LIMIT:'Trace limit reached',PROGRAM_START:'Started',PROGRAM_END:'Finished'} as Record<string,string>)[t] ?? 'Execution state';
+  return ({STEP:'Executed line',METHOD_ENTER:'Entered method',METHOD_EXIT:'Returned from method',ARRAY_WRITE:'Array updated',ARRAY_ACCESS:'Array accessed',ARRAY_REFERENCE:'Array referenced',OBJECT_FIELD_WRITE:'Object updated',OBJECT_CREATE:'Object created',VARIABLE_UPDATE:'Variable updated',MAP_WRITE:'Map updated',ERROR:'Runtime error',TIMEOUT:'Execution timed out',TRACE_LIMIT:'Trace limit reached',PROGRAM_START:'Started',PROGRAM_END:'Finished'} as Record<string,string>)[t] ?? 'Execution state';
 }
 
 function Section({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
@@ -42,6 +42,55 @@ function isMapSnapshot(value: unknown): value is Obj & {
     isPlainObject(value) &&
     typeof value.$mapId === 'string' &&
     Array.isArray(value.entries)
+  );
+}
+
+
+function isCollectionSnapshot(value: unknown): value is Obj & {
+  $collectionId: string;
+  $type?: string;
+  $kind?: string;
+  values: unknown[];
+  size?: number;
+} {
+  return (
+    isPlainObject(value) &&
+    typeof value.$collectionId === 'string' &&
+    Array.isArray(value.values)
+  );
+}
+
+function CollectionView({
+  value,
+  state
+}: {
+  value: Obj & {
+    $collectionId: string;
+    $type?: string;
+    $kind?: string;
+    values: unknown[];
+    size?: number;
+  };
+  state?: TraceState;
+}) {
+  const type =
+    typeof value.$type === 'string'
+      ? value.$type.split('.').pop() ?? 'Collection'
+      : 'Collection';
+
+  const kind =
+    typeof value.$kind === 'string'
+      ? value.$kind
+      : 'collection';
+
+  return (
+    <div className="yv-hashmap">
+      <div className="yv-map-meta">
+        <span>{type}</span>
+        <span>{kind} · {value.size ?? value.values.length} items</span>
+      </div>
+      <ArrayView value={value.values} state={state}/>
+    </div>
   );
 }
 
@@ -288,6 +337,10 @@ function DataValue({ value, state }: { value: unknown; state?: TraceState }) {
     return <MapView value={value} state={state}/>;
   }
 
+  if (isCollectionSnapshot(value)) {
+    return <CollectionView value={value} state={state}/>;
+  }
+
   if (isArraySnapshot(value)) {
     return (
       <>
@@ -312,14 +365,51 @@ function DataValue({ value, state }: { value: unknown; state?: TraceState }) {
 }
 
 function DataStructures({ state }: { state?: TraceState }) {
-  const arrays=Object.entries(state?.arrays??{});
-  const namedObjectIds=new Set<string>();
-  for(const v of Object.values(state?.variables??{})) if(isPlainObject(v)&&typeof v.$objectId==='string') namedObjectIds.add(v.$objectId);
-  const roots=Object.entries(state?.objects??{}).filter(([id])=>namedObjectIds.has(id));
-  const objectItems=roots.length?roots:Object.entries(state?.objects??{}).slice(0,12);
-  const items=[...arrays,...objectItems];
-  if(!items.length)return <div className="yv-empty">Structures appear here as your code creates or mutates them.</div>;
-  return <div className="yv-ds-list">{items.map(([name,value])=><div className="yv-ds" key={name}><div className="yv-ds-title">{name}</div><DataValue value={value} state={state}/></div>)}</div>;
+  const arrays = Object.entries(state?.arrays ?? {});
+  const structures = Object.entries(state?.dataStructures ?? {});
+  const namedObjectIds = new Set<string>();
+
+  for (const value of Object.values(state?.variables ?? {})) {
+    if (
+      isPlainObject(value) &&
+      typeof value.$objectId === 'string'
+    ) {
+      namedObjectIds.add(value.$objectId);
+    }
+  }
+
+  const roots = Object.entries(state?.objects ?? {})
+    .filter(([id]) => namedObjectIds.has(id));
+
+  const objectItems =
+    roots.length
+      ? roots
+      : Object.entries(state?.objects ?? {}).slice(0, 12);
+
+  const items = [
+    ...arrays,
+    ...structures,
+    ...objectItems
+  ];
+
+  if (!items.length) {
+    return (
+      <div className="yv-empty">
+        Structures appear here as your code creates or mutates them.
+      </div>
+    );
+  }
+
+  return (
+    <div className="yv-ds-list">
+      {items.map(([name, value]) => (
+        <div className="yv-ds" key={name}>
+          <div className="yv-ds-title">{name}</div>
+          <DataValue value={value} state={state}/>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function VisualizerPanel(){
@@ -333,6 +423,6 @@ export function VisualizerPanel(){
   return <div className="yv-root"><div className="yv-scroll">
     {tc&&<div className="yv-top"><div className="yv-title-row"><div className="yv-case">{tc.label}</div><span className={`yv-badge ${tc.source}`}>{tc.source}</span></div><div className="yv-inputs">{Object.keys(tc.inputs).length?Object.entries(tc.inputs).map(([k,v])=><div className="yv-input" key={k}><div className="yv-key">{k}</div><div className="yv-code">{v}</div></div>):<div className="yv-code">{tc.raw}</div>}</div><div className="yv-output-row"><div className="yv-output"><div className="yv-label">Expected</div><div className="yv-code">{tc.expected??'—'}</div></div><div className={`yv-output yv-actual ${finished&&s.response?.success?'good':''}`}><div className="yv-label">Actual</div><div className="yv-code">{finished&&actual!==undefined?displayValue(actual):'—'}</div></div></div></div>}
     {s.loading&&<div className="yv-loading">Tracing your code…</div>}{s.error&&<div className="yv-error">{s.error}</div>}
-    {!s.loading&&<><Section title="Variables" count={Object.keys(current?.variables??{}).length}><Variables state={current} previous={prev}/></Section><Section title="Call Stack" count={current?.callStack?.length??0}>{current?.callStack?.length?<div className="yv-stack">{current.callStack.map((f:string,i:number)=><div className="yv-frame" key={`${f}-${i}`}>{f}</div>)}</div>:<div className="yv-empty">No active method calls.</div>}</Section><Section title="Data Structures" count={Object.keys(current?.arrays??{}).length+Object.keys(current?.objects??{}).length}><DataStructures state={current}/></Section></>}
+    {!s.loading&&<><Section title="Variables" count={Object.keys(current?.variables??{}).length}><Variables state={current} previous={prev}/></Section><Section title="Call Stack" count={current?.callStack?.length??0}>{current?.callStack?.length?<div className="yv-stack">{current.callStack.map((f:string,i:number)=><div className="yv-frame" key={`${f}-${i}`}>{f}</div>)}</div>:<div className="yv-empty">No active method calls.</div>}</Section><Section title="Data Structures" count={Object.keys(current?.arrays??{}).length+Object.keys(current?.dataStructures??{}).length+Object.keys(current?.objects??{}).length}><DataStructures state={current}/></Section></>}
   </div><div className="yv-current"><div className="yv-current-head"><span>{eventLabel(current)}</span><span className="yv-line">{line?`Line ${line}`:'—'}</span></div><div className="yv-statement">{statement||'Select a testcase and press Visualize.'}</div><div className="yv-controls"><div className="yv-buttons"><button className="yv-btn" onClick={()=>sessionStore.restart()} disabled={!s.states.length}>↺ Restart</button><button className="yv-btn" onClick={()=>sessionStore.prev()} disabled={s.index<=0}>← Prev</button><button className="yv-btn primary" onClick={()=>sessionStore.togglePlay()} disabled={s.states.length<2}>{s.playing?'■ Stop':'▶ Play'}</button><button className="yv-btn" onClick={()=>sessionStore.next()} disabled={!s.states.length||s.index>=s.states.length-1}>Next →</button></div><div className="yv-step">{s.states.length?`${s.index+1} / ${s.states.length}`:'0 / 0'}</div></div></div></div>;
 }

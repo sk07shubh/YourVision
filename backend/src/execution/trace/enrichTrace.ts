@@ -121,13 +121,15 @@ function deriveChanges(
         Object.entries(after)
     ) {
         if (!(name in before)) {
-            derived.push(
-                variableUpdate(
-                    previous,
-                    name,
-                    currentValue
-                )
-            );
+            if (!isDataStructureSnapshot(currentValue)) {
+                derived.push(
+                    variableUpdate(
+                        previous,
+                        name,
+                        currentValue
+                    )
+                );
+            }
 
             continue;
         }
@@ -258,7 +260,8 @@ function deriveChanges(
             !sameSnapshot(
                 previousValue,
                 currentValue
-            )
+            ) &&
+            !isDataStructureSnapshot(currentValue)
         ) {
             derived.push(
                 variableUpdate(
@@ -739,5 +742,27 @@ function sameSnapshot(
     return (
         JSON.stringify(left) ===
         JSON.stringify(right)
+    );
+}
+
+
+function isDataStructureSnapshot(
+    value: unknown
+): boolean {
+    if (
+        !value ||
+        typeof value !== "object" ||
+        Array.isArray(value)
+    ) {
+        return false;
+    }
+
+    const record =
+        value as SnapshotRecord;
+
+    return (
+        typeof record.$arrayId === "string" ||
+        typeof record.$mapId === "string" ||
+        typeof record.$collectionId === "string"
     );
 }
