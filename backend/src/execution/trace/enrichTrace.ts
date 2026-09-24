@@ -69,16 +69,6 @@ export function enrichTrace(
                 displayLine = pendingReturnLine;
                 pendingReturnMethod = undefined;
                 pendingReturnLine = undefined;
-            } else if (
-                previousExecutable?.type === "METHOD_ENTER" &&
-                previousExecutable.method === event.method
-            ) {
-                displayLine = previousExecutable.line;
-            } else if (
-                previousExecutable?.type === "STEP" &&
-                previousExecutable.method === event.method
-            ) {
-                displayLine = previousExecutable.line;
             }
 
             const stepEvent: ExecutionEvent = {
