@@ -42,6 +42,9 @@ export function enrichTrace(trace: ExecutionTrace): ExecutionTrace {
         if (event.type === "METHOD_ENTER") {
             methodEntries.push(event);
             previousStep = undefined;
+            // The first STEP inside this method describes the state at the
+            // method-entry boundary, so keep the declaration line visible.
+            pendingResumeLine = event.line;
             enriched.push(event);
             continue;
         }
