@@ -204,6 +204,8 @@ function applyEvent(
             break;
 
         case "METHOD_EXIT":
+            next.line = previous.line;
+            next.method = previous.method;
             next.callStack =
                 previous.callStack.length > 0
                     ? previous.callStack.slice(

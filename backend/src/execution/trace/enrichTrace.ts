@@ -8,6 +8,7 @@ type SnapshotRecord = Record<string, unknown>;
 export function enrichTrace(trace: ExecutionTrace): ExecutionTrace {
     const enriched: ExecutionEvent[] = [];
     let previousStep: ExecutionEvent | undefined;
+    let pendingResumeLine: number | undefined;
     const methodEntries: ExecutionEvent[] = [];
 
     for (const event of trace.events) {
@@ -16,10 +17,23 @@ export function enrichTrace(trace: ExecutionTrace): ExecutionTrace {
                 enriched.push(...deriveArrayReferenceEvents(event));
                 enriched.push(...deriveChanges(previousStep, event));
                 enriched.push(...deriveMapChanges(previousStep, event));
+                event = {
+                    ...event,
+                    data: {
+                        ...(event.data ?? {}),
+                        displayLine: previousStep.line
+                    }
+                };
+            } else if (pendingResumeLine !== undefined) {
+                event = {
+                    ...event,
+                    data: {
+                        ...(event.data ?? {}),
+                        displayLine: pendingResumeLine
+                    }
+                };
+                pendingResumeLine = undefined;
             }
-
-            // JDI StepEvent points at the source location that is about to
-            // execute. Keep that line and its variables together.
             enriched.push(event);
             previousStep = event;
             continue;
@@ -38,6 +52,10 @@ export function enrichTrace(trace: ExecutionTrace): ExecutionTrace {
             if (previousStep && previousStep.method === event.method) {
                 derived.push(...deriveChanges(previousStep, event));
                 derived.push(...deriveMapChanges(previousStep, event));
+            }
+
+            if (typeof event.data?.callerLine === "number") {
+                pendingResumeLine = event.data.callerLine as number;
             }
 
             // A method can return before STEP_LINE gives us a second
@@ -91,6 +109,7 @@ export function enrichTrace(trace: ExecutionTrace): ExecutionTrace {
             event.type === "TRACE_LIMIT"
         ) {
             previousStep = undefined;
+            pendingResumeLine = undefined;
         }
 
         enriched.push(event);

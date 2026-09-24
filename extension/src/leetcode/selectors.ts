@@ -119,29 +119,22 @@ export function findTestcaseRegion(): HTMLElement | null {
 }
 
 export function findTestResultContainers(): HTMLElement[] {
-  const containers = new Set<HTMLElement>();
-
-  for (const node of [...document.querySelectorAll<HTMLElement>('div,section')]) {
-    if (!visible(node)) continue;
+  const candidates = [...document.querySelectorAll<HTMLElement>('div,section,article')].filter(visible);
+  const matches: HTMLElement[] = [];
+  for (const node of candidates) {
     const text = textOf(node);
-    if (text !== 'test result' && !text.startsWith('test result ')) continue;
-
-    let current: HTMLElement | null = node;
-    for (let depth = 0; current && depth < 5; depth++, current = current.parentElement) {
-      const hasCases =
-        current.querySelectorAll('[data-e2e-locator="console-testcase-tag"]').length > 0 ||
-        [...current.querySelectorAll('button')].some(button => /^case\s+\d+$/i.test((button.textContent ?? '').trim()));
-
-      if (hasCases) {
-        containers.add(current);
-        break;
-      }
-    }
+    if (!/\btest result\b/i.test(text)) continue;
+    const hasInputOutput = /\binput\b/i.test(text) && /\boutput\b/i.test(text);
+    const hasCase = node.querySelector('[data-e2e-locator="console-testcase-tag"]') !== null ||
+      [...node.querySelectorAll('button')].some(button => /^case\s+\d+$/i.test((button.textContent ?? '').trim()));
+    if (!hasInputOutput && !hasCase) continue;
+    const parent = node.parentElement;
+    const parentText = parent ? textOf(parent) : '';
+    if (parent && /\btest result\b/i.test(parentText) && /\binput\b/i.test(parentText) && /\boutput\b/i.test(parentText)) continue;
+    matches.push(node);
   }
-
-  return [...containers];
+  return matches;
 }
-
 /**
  * Finds the complete testcase panel.
  *

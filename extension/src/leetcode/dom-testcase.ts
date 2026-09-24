@@ -57,7 +57,7 @@ function fallbackResultInput(
 function findResultPanel(
   region: HTMLElement
 ): HTMLElement | null {
-  let current: HTMLElement | null = region.parentElement;
+  let current: HTMLElement | null = region;
 
   for (let depth = 0; current && depth < 6; depth++, current = current.parentElement) {
     const text = textOf(current);

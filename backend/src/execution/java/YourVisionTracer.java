@@ -219,14 +219,6 @@ public class YourVisionTracer {
 
                         Location methodLocation = entry.location();
 
-                        try {
-                            Location declaredLocation = enteredMethod.location();
-                            if (declaredLocation != null) {
-                                methodLocation = declaredLocation;
-                            }
-                        } catch (Exception ignored) {
-                        }
-
                         emit(
                             "METHOD_ENTER",
                             methodLocation,
