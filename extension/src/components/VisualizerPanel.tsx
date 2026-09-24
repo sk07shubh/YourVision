@@ -62,7 +62,8 @@ function isCollectionSnapshot(value: unknown): value is Obj & {
 
 function CollectionView({
   value,
-  state
+  state,
+  source
 }: {
   value: Obj & {
     $collectionId: string;
@@ -72,6 +73,7 @@ function CollectionView({
     size?: number;
   };
   state?: TraceState;
+  source: string;
 }) {
   const type =
     typeof value.$type === 'string'
@@ -347,13 +349,13 @@ function DataValue({ value, state, source }: { value: unknown; state?: TraceStat
   }
 
   if (isCollectionSnapshot(value)) {
-    return <CollectionView value={value} state={state}/>;
+    return <CollectionView value={value} state={state} source={source}/>;
   }
 
   if (isArraySnapshot(value)) {
     return (
       <>
-        <ArrayView value={value.values} state={state}/>
+        <ArrayView value={value.values} state={state} source={source}/>
         {value.truncated === true && (
           <div className="yv-truncated">
             Showing first {value.values.length} of {String(value.length ?? '?')} items.
@@ -427,7 +429,7 @@ export function VisualizerPanel(){
   useEffect(()=>{ const onKey=(e:KeyboardEvent)=>{ if(!sessionStore.get().open)return; const target=e.target as HTMLElement|null; if(target?.matches('input,textarea,[contenteditable=true]'))return; if(e.key==='ArrowRight'||e.key==='ArrowLeft'||e.code==='Space'||e.key.toLowerCase()==='r'){e.preventDefault();e.stopPropagation(); if(e.key==='ArrowRight')sessionStore.next(); else if(e.key==='ArrowLeft')sessionStore.prev(); else if(e.code==='Space')sessionStore.togglePlay(); else sessionStore.restart(); } }; window.addEventListener('keydown',onKey,true);return()=>window.removeEventListener('keydown',onKey,true)},[]);
   const output=s.response?.result; const tc=s.testcase; const finished=current?.lastEvent?.type==='PROGRAM_END' || (s.states.length>0&&s.index===s.states.length-1);
   return <div className="yv-root"><div className="yv-scroll">
-    {tc&&<div className="yv-top"><div className="yv-title-row"><div className="yv-case">{tc.label}</div></div><div className="yv-inputs">{Object.keys(tc.inputs).length?Object.entries(tc.inputs).map(([k,v])=><div className="yv-input" key={k}><div className="yv-key">{k}</div><div className="yv-code">{v}</div></div>):<div className="yv-code">{tc.raw}</div>}</div><div className="yv-output-row"><div className={`yv-output yv-actual ${finished&&s.response?.success?'good':''}`}><div className="yv-label">Output</div><div className="yv-code">{finished&&output!==undefined?displayValue(output):'—'}</div></div></div></div>}
+    {tc&&<div className="yv-top"><div className="yv-title-row"><div className="yv-case">{tc.label}</div>{tc.source==='custom'&&<span className="yv-case-kind">Custom</span>}{tc.source==='failed'&&<span className="yv-case-kind">Failed testcase</span>}</div><div className="yv-inputs">{Object.keys(tc.inputs).length?Object.entries(tc.inputs).map(([k,v])=><div className="yv-input" key={k}><div className="yv-key">{k}</div><div className="yv-code">{v}</div></div>):<div className="yv-code">{tc.raw}</div>}</div><div className="yv-output-row"><div className={`yv-output yv-actual ${finished&&s.response?.success?'good':''}`}><div className="yv-label">Output</div><div className="yv-code">{finished&&output!==undefined?displayValue(output):'—'}</div></div></div></div>}
     {s.loading&&<div className="yv-loading">Tracing your code…</div>}{s.error&&<div className="yv-error">{s.error}</div>}
     {!s.loading&&<><Section title="Variables" count={Object.keys(current?.variables??{}).length}><Variables state={current} previous={prev}/></Section><Section title="Call Stack" count={current?.callStack?.length??0}>{current?.callStack?.length?<div className="yv-stack">{current.callStack.map((f:string,i:number)=><div className="yv-frame" key={`${f}-${i}`}>{f}</div>)}</div>:<div className="yv-empty">No active method calls.</div>}</Section><Section title="Data Structures"><DataStructures state={current} source={s.source}/></Section></>}
   </div><div className="yv-current"><div className="yv-current-head"><span>{eventLabel(current)}</span><span className="yv-line">{line?`Line ${line}`:'—'}</span></div><div className="yv-statement">{statement||'Select a testcase and press Visualize.'}</div><div className="yv-controls"><div className="yv-buttons"><button className="yv-btn" onClick={()=>sessionStore.restart()} disabled={!s.states.length}>↺ Restart</button><button className="yv-btn" onClick={()=>sessionStore.prev()} disabled={s.index<=0}>← Prev</button><button className="yv-btn primary" onClick={()=>sessionStore.togglePlay()} disabled={s.states.length<2}>{s.playing?'■ Stop':'▶ Play'}</button><button className="yv-btn" onClick={()=>sessionStore.next()} disabled={!s.states.length||s.index>=s.states.length-1}>Next →</button></div></div></div></div>;
