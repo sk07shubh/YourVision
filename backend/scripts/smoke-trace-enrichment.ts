@@ -104,7 +104,7 @@ const writeState =
         (state) =>
             state.lastEvent?.type ===
             "STEP" &&
-            state.line === 5
+            state.line === 4
     );
 
 const nums =
@@ -180,20 +180,20 @@ const lineSemanticsTrace: ExecutionTrace = {
 const lineSemantics = enrichTrace(lineSemanticsTrace);
 const firstStep = lineSemantics.events.find(event => event.type === "STEP");
 
-if (firstStep?.data?.displayLine !== undefined) {
-    throw new Error("STEP must not be shifted to the previous source line");
+if (firstStep?.data?.displayLine !== 2) {
+    throw new Error("first STEP did not map to the method-entry boundary");
 }
 
 const lineStates = buildStates(lineSemantics).filter(state => state.lastEvent?.type === "STEP");
 
 if (
-    lineStates[0]?.line !== 3 ||
+    lineStates[0]?.line !== 2 ||
     lineStates[0]?.variables?.target !== 9 ||
     lineStates[0]?.variables?.i !== 0 ||
-    lineStates[1]?.line !== 4 ||
+    lineStates[1]?.line !== 3 ||
     lineStates[1]?.variables?.i !== 1
 ) {
-    throw new Error("execution state does not align with the line about to execute");
+    throw new Error("execution state does not align with the line that just completed");
 }
 
 console.log("PASS: execution line semantics");
@@ -351,7 +351,7 @@ const objectWriteState =
         (state) =>
             state.lastEvent?.type ===
             "STEP" &&
-            state.line === 11
+            state.line === 10
     );
 
 if (!objectWriteState?.objects["90"]) {
