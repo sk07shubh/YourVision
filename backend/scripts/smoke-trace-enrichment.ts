@@ -207,7 +207,11 @@ if (
 }
 
 const lineStates =
-    buildStates(lineSemantics);
+    buildStates(lineSemantics).filter(
+        (state) =>
+            state.lastEvent?.type ===
+            "STEP"
+    );
 
 if (
     lineStates[0]?.line !== 2 ||
