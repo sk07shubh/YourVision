@@ -104,7 +104,10 @@ const writeState =
         (state) =>
             state.lastEvent?.type ===
             "STEP" &&
-            state.line === 4
+            state.line === 4 &&
+            JSON.stringify(
+                (state.arrays.nums as { values?: unknown[] } | undefined)?.values
+            ) === "[9,2,3]"
     );
 
 const nums =

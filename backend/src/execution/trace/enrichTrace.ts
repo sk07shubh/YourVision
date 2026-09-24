@@ -378,9 +378,9 @@ function deriveMapChanges(
         derived.push({
             sequence: 0,
             type: "MAP_WRITE",
-            line: current.line,
-            method: current.method,
-            depth: current.depth,
+            line: previous.line,
+            method: previous.method,
+            depth: previous.depth,
             data: {
                 name,
                 mapId: afterMap.$mapId,

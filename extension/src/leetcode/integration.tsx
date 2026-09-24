@@ -323,6 +323,10 @@ function activateTab() {
   sessionStore.set({
     open: true,
   });
+
+  getPanelHost()?.focus({
+    preventScroll: true,
+  });
 }
 
 function deactivateTab() {
@@ -590,6 +594,13 @@ if (descriptionTab && solutionsTab) {
     document.createElement(
       'div'
     );
+
+  panelHost.tabIndex = -1;
+  panelHost.setAttribute(
+    'aria-label',
+    'YourVision Visualizer'
+  );
+  panelHost.style.outline = 'none';
 
   panelHost.dataset
     .yourvisionHost =
