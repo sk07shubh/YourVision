@@ -781,8 +781,7 @@ function createVisualizeButton(region: HTMLElement, resultPanel = false): HTMLBu
     ...region.querySelectorAll<HTMLButtonElement>('[data-e2e-locator="console-testcase-tag"]'),
     ...[...region.querySelectorAll<HTMLButtonElement>('button')].filter(button => /^case\s+\d+$/i.test((button.textContent ?? '').trim()))
   ];
-  const template = nativeCases[nativeCases.length - 1];
-  if (!template) return null;
+  const template = nativeCases[nativeCases.length - 1] ?? region.querySelector<HTMLButtonElement>('button');
 
   const button = document.createElement('button');
   button.dataset.yourvisionVisualize = 'true';
