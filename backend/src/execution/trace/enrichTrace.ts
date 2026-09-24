@@ -11,7 +11,7 @@ export function enrichTrace(trace: ExecutionTrace): ExecutionTrace {
     let pendingResumeLine: number | undefined;
     const methodEntries: ExecutionEvent[] = [];
 
-    for (const event of trace.events) {
+    for (let event of trace.events) {
         if (event.type === "STEP") {
             if (previousStep && previousStep.method === event.method) {
                 enriched.push(...deriveArrayReferenceEvents(event));
