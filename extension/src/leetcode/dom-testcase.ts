@@ -50,7 +50,7 @@ function fallbackResultInput(
   panel: HTMLElement
 ): string {
   const text = clean(panel.textContent ?? '');
-  const match = text.match(/\bInput\b\s*([\s\S]*?)(?:(?:\bOutput\b|$)|(?:\bOutput\b|$)|$)/i);
+  const match = text.match(/\bInput\b\s*([\s\S]*?)\bOutput\b/i);
   return clean(match?.[1] ?? '');
 }
 
@@ -61,7 +61,7 @@ function findResultPanel(
 
   for (let depth = 0; current && depth < 6; depth++, current = current.parentElement) {
     const text = textOf(current);
-    if (/\bInput\b/i.test(text) && /(?:\bOutput\b|$)/i.test(text)) {
+    if (/\bInput\b/i.test(text) && /\bOutput\b/i.test(text)) {
       return current;
     }
   }
