@@ -91,7 +91,7 @@ function CollectionView({
         <span>{type}</span>
         <span>{kind} · {value.size ?? value.values.length} items</span>
       </div>
-      <ArrayView value={value.values} state={state} source={source}/>
+      <ArrayView value={value.values} state={state} source={source} arrayName={name}/>
     </div>
   );
 }
@@ -160,9 +160,11 @@ function Variables({ state, previous }: { state?: TraceState; previous?: TraceSt
   );
 }
 
-function arrayIndexVariableNames(source: string): Set<string> {
+function arrayIndexVariableNames(source: string, arrayName?: string): Set<string> {
   const names = new Set<string>();
-  for (const match of source.matchAll(/\[([^\]]+)\]/g)) {
+  if (!arrayName) return names;
+  const pattern = new RegExp(arrayName + '\\s*\\[([^\\]]+)\\]', 'g');
+  for (const match of source.matchAll(pattern)) {
     for (const identifier of match[1].matchAll(/\b[A-Za-z_$][\w$]*\b/g)) names.add(identifier[0]);
   }
   return names;
@@ -191,9 +193,9 @@ function changedArrayIndices(state?: TraceState): Set<number> {
   return set;
 }
 
-function ArrayView({ value, state, source }: { value: unknown[]; state?: TraceState; source?: string }) {
+function ArrayView({ value, state, source, arrayName }: { value: unknown[]; state?: TraceState; source?: string; arrayName?: string }) {
   if (value.every(Array.isArray)) return <div className="yv-matrix">{value.map((row,r)=><div className="yv-array" key={r}>{(row as unknown[]).map((v,i)=><div className="yv-cell" key={i}><div className="yv-cell-value">{displayValue(v)}</div><div className="yv-cell-index">[{r},{i}]</div></div>)}</div>)}</div>;
-  const labels=pointerLabels(state,value.length,arrayIndexVariableNames(source ?? '')); const changed=changedArrayIndices(state);
+  const labels=pointerLabels(state,value.length,arrayIndexVariableNames(source ?? '', arrayName)); const changed=changedArrayIndices(state);
   return <div className="yv-array">{value.map((v,i)=><div className="yv-cell" key={i}>{labels.has(i)&&<div className="yv-pointer">{labels.get(i)!.join(' · ')}</div>}<div className={`yv-cell-value ${changed.has(i)?'yv-cell-changed':''}`}>{displayValue(v)}</div><div className="yv-cell-index">{i}</div></div>)}</div>;
 }
 
@@ -343,7 +345,7 @@ function TreeNodeView({ value, objects, depth=0 }: { value: unknown; objects: Re
   const f=objectFields(resolved); return <div className="yv-tree-node"><div className="yv-node">{displayValue(nodeValue(resolved))}</div>{(f.left!=null||f.right!=null)&&<div className="yv-tree-children"><div>{f.left!=null?<TreeNodeView value={f.left} objects={objects} depth={depth+1}/>:<span className="yv-null">null</span>}</div><div>{f.right!=null?<TreeNodeView value={f.right} objects={objects} depth={depth+1}/>:<span className="yv-null">null</span>}</div></div>}</div>;
 }
 
-function DataValue({ value, state, source }: { value: unknown; state?: TraceState; source: string }) {
+function DataValue({ value, state, source, name }: { value: unknown; state?: TraceState; source: string; name?: string }) {
   if (isMapSnapshot(value)) {
     return <MapView value={value} state={state}/>;
   }
@@ -365,7 +367,7 @@ function DataValue({ value, state, source }: { value: unknown; state?: TraceStat
     );
   }
 
-  if (Array.isArray(value)) return <ArrayView value={value} state={state} source={source}/>;
+  if (Array.isArray(value)) return <ArrayView value={value} state={state} source={source} arrayName={name}/>;
   if (isPlainObject(value)) {
     if (looksTreeNode(value)) return <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects??{}}/></div>;
     if (looksListNode(value)) return <LinkedListView root={value} objects={state?.objects??{}}/>;
@@ -413,7 +415,7 @@ function DataStructures({ state, source }: { state?: TraceState; source: string 
       {items.map(([name, value]) => (
         <div className="yv-ds" key={name}>
           <div className="yv-ds-title">{name}</div>
-          <DataValue value={value} state={state} source={source}/>
+          <DataValue value={value} state={state} source={source} name={name}/>
         </div>
       ))}
     </div>
@@ -426,11 +428,11 @@ export function VisualizerPanel(){
   const line=current?.line; const statement=line?sourceLines[line-1]?.trim():'';
   useEffect(()=>{highlightEditorLine(line);return()=>clearEditorExecutionMarker();},[line]);
   useEffect(()=>{ if(!s.playing)return; const id=setInterval(()=>sessionStore.next(),650); return()=>clearInterval(id); },[s.playing,s.index,s.states.length]);
-  useEffect(()=>{ const onKey=(e:KeyboardEvent)=>{ if(!sessionStore.get().open)return; const target=e.target as HTMLElement|null; if(target?.matches('input,textarea,[contenteditable=true]'))return; if(e.key==='ArrowRight'||e.key==='ArrowLeft'||e.code==='Space'||e.key.toLowerCase()==='r'){e.preventDefault();e.stopImmediatePropagation(); if(e.key==='ArrowRight')sessionStore.next(); else if(e.key==='ArrowLeft')sessionStore.prev(); else if(e.code==='Space')sessionStore.togglePlay(); else sessionStore.restart(); } }; window.addEventListener('keydown',onKey,true);return()=>window.removeEventListener('keydown',onKey,true)},[]);
+  useEffect(()=>{ const onKey=(e:KeyboardEvent)=>{ if(!sessionStore.get().open)return; const target=e.target as HTMLElement|null; if(target?.matches('input,textarea,[contenteditable=true]'))return; const handled=e.key==='ArrowRight'||e.key==='ArrowLeft'||e.code==='Space'||e.key.toLowerCase()==='r'; if(!handled)return; e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); const active=document.activeElement?.shadowRoot?.activeElement as HTMLElement|null; if(active?.matches('button'))active.blur(); if(e.key==='ArrowRight')sessionStore.next(); else if(e.key==='ArrowLeft')sessionStore.prev(); else if(e.code==='Space')sessionStore.togglePlay(); else sessionStore.restart(); }; window.addEventListener('keydown',onKey,true);return()=>window.removeEventListener('keydown',onKey,true)},[]);
   const output=s.response?.result; const tc=s.testcase; const finished=current?.lastEvent?.type==='PROGRAM_END' || (s.states.length>0&&s.index===s.states.length-1);
   return <div className="yv-root"><div className="yv-scroll">
     {tc&&<div className="yv-top"><div className="yv-title-row"><div className="yv-case">{tc.label}</div>{tc.source==='custom'&&<span className="yv-case-kind">Custom</span>}{tc.source==='failed'&&<span className="yv-case-kind">Failed testcase</span>}</div><div className="yv-inputs">{Object.keys(tc.inputs).length?Object.entries(tc.inputs).map(([k,v])=><div className="yv-input" key={k}><div className="yv-key">{k}</div><div className="yv-code">{v}</div></div>):<div className="yv-code">{tc.raw}</div>}</div><div className="yv-output-row"><div className={`yv-output yv-actual ${finished&&s.response?.success?'good':''}`}><div className="yv-label">Output</div><div className="yv-code">{finished&&output!==undefined?displayValue(output):'—'}</div></div></div></div>}
     {s.loading&&<div className="yv-loading">Tracing your code…</div>}{s.error&&<div className="yv-error">{s.error}</div>}
-    {!s.loading&&<><Section title="Variables"><Variables state={current} previous={prev}/></Section><Section title="Call Stack">{current?.callStack?.length?<div className="yv-stack">{current.callStack.map((f:string,i:number)=><div className="yv-frame" key={`${f}-${i}`}>{f}</div>)}</div>:<div className="yv-empty">No active method calls.</div>}</Section><Section title="Data Structures"><DataStructures state={current} source={s.source}/></Section></>}
-  </div><div className="yv-current"><div className="yv-current-head"><span>{eventLabel(current)}</span><span className="yv-line">{line?`Line ${line}`:'—'}</span></div><div className="yv-statement">{statement||'Select a testcase and press Visualize.'}</div><div className="yv-controls"><div className="yv-buttons"><button className="yv-btn" onClick={()=>sessionStore.restart()} disabled={!s.states.length}>↺ Restart</button><button className="yv-btn" onClick={()=>sessionStore.prev()} disabled={s.index<=0}>← Prev</button><button className="yv-btn primary" onClick={()=>sessionStore.togglePlay()} disabled={s.states.length<2}>{s.playing?'■ Stop':'▶ Play'}</button><button className="yv-btn" onClick={()=>sessionStore.next()} disabled={!s.states.length||s.index>=s.states.length-1}>Next →</button></div></div></div></div>;
+    {!s.loading&&<><Section title="Variables"><Variables state={current} previous={prev}/></Section><Section title="Call Stack">{current?.callStack?.length?<div className="yv-stack">{current.callStack.map((f:string,i:number)=><div className="yv-frame" key={`${f}-${i}`}>{f}</div>)}</div>:<div className="yv-empty">No active method calls.</div>}</Section><Section title="Data Structures"><DataStructures state={current} source={statement}/></Section></>}
+  </div><div className="yv-current"><div className="yv-current-head"><span>{eventLabel(current)}</span></div><div className="yv-statement">{statement||'Select a testcase and press Visualize.'}</div><div className="yv-controls"><div className="yv-buttons"><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.restart()} disabled={!s.states.length}>↺ Restart</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.prev()} disabled={s.index<=0}>← Prev</button><button className="yv-btn primary" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.togglePlay()} disabled={s.states.length<2}>{s.playing?'■ Stop':'▶ Play'}</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.next()} disabled={!s.states.length||s.index>=s.states.length-1}>Next →</button></div></div></div></div>;
 }

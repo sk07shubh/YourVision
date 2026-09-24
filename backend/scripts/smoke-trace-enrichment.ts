@@ -104,7 +104,7 @@ const writeState =
         (state) =>
             state.lastEvent?.type ===
             "STEP" &&
-            state.line === 4
+            state.line === 5
     );
 
 const nums =
@@ -141,11 +141,7 @@ const lineSemanticsTrace: ExecutionTrace = {
             depth: 1,
             data: {
                 variables: {
-                    nums: {
-                        $arrayId: "55",
-                        $type: "int[]",
-                        values: [2, 7, 11]
-                    },
+                    nums: { $arrayId: "55", $type: "int[]", values: [2, 7, 11] },
                     target: 9
                 }
             }
@@ -158,11 +154,7 @@ const lineSemanticsTrace: ExecutionTrace = {
             depth: 1,
             data: {
                 variables: {
-                    nums: {
-                        $arrayId: "55",
-                        $type: "int[]",
-                        values: [2, 7, 11]
-                    },
+                    nums: { $arrayId: "55", $type: "int[]", values: [2, 7, 11] },
                     target: 9,
                     i: 0
                 }
@@ -176,11 +168,7 @@ const lineSemanticsTrace: ExecutionTrace = {
             depth: 1,
             data: {
                 variables: {
-                    nums: {
-                        $arrayId: "55",
-                        $type: "int[]",
-                        values: [2, 7, 11]
-                    },
+                    nums: { $arrayId: "55", $type: "int[]", values: [2, 7, 11] },
                     target: 9,
                     i: 1
                 }
@@ -189,45 +177,26 @@ const lineSemanticsTrace: ExecutionTrace = {
     ]
 };
 
-const lineSemantics =
-    enrichTrace(lineSemanticsTrace);
+const lineSemantics = enrichTrace(lineSemanticsTrace);
+const firstStep = lineSemantics.events.find(event => event.type === "STEP");
 
-const firstStep =
-    lineSemantics.events.find(
-        (event) =>
-            event.type === "STEP"
-    );
-
-if (
-    firstStep?.data?.displayLine !== 2
-) {
-    throw new Error(
-        "first method step did not map to method-entry line"
-    );
+if (firstStep?.data?.displayLine !== undefined) {
+    throw new Error("STEP must not be shifted to the previous source line");
 }
 
-const lineStates =
-    buildStates(lineSemantics).filter(
-        (state) =>
-            state.lastEvent?.type ===
-            "STEP"
-    );
+const lineStates = buildStates(lineSemantics).filter(state => state.lastEvent?.type === "STEP");
 
 if (
-    lineStates[0]?.line !== 2 ||
+    lineStates[0]?.line !== 3 ||
     lineStates[0]?.variables?.target !== 9 ||
-    lineStates[1]?.line !== 3 ||
+    lineStates[0]?.variables?.i !== 0 ||
+    lineStates[1]?.line !== 4 ||
     lineStates[1]?.variables?.i !== 1
 ) {
-    throw new Error(
-        "execution state does not align with completed source line"
-    );
+    throw new Error("execution state does not align with the line about to execute");
 }
 
-console.log(
-    "PASS: execution line semantics"
-);
-
+console.log("PASS: execution line semantics");
 
 const accessTrace: ExecutionTrace = {
     version: 1,
@@ -381,14 +350,13 @@ const objectWriteState =
     objectStates.find(
         (state) =>
             state.lastEvent?.type ===
-            "OBJECT_FIELD_WRITE"
+            "STEP" &&
+            state.line === 11
     );
 
-if (
-    !objectWriteState?.objects["90"]
-) {
+if (!objectWriteState?.objects["90"]) {
     throw new Error(
-        "object mutation was not replayed"
+        "object mutation was not replayed into the next visible STEP state"
     );
 }
 

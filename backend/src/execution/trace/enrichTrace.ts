@@ -3,107 +3,94 @@ import type {
     ExecutionTrace
 } from "./schema.js";
 
-type SnapshotRecord =
-    Record<string, unknown>;
+type SnapshotRecord = Record<string, unknown>;
 
-export function enrichTrace(
-    trace: ExecutionTrace
-): ExecutionTrace {
+export function enrichTrace(trace: ExecutionTrace): ExecutionTrace {
     const enriched: ExecutionEvent[] = [];
-
-    let previousExecutable: ExecutionEvent | undefined;
-    const callSites: ExecutionEvent[] = [];
-
-    let pendingReturnLine: number | undefined;
-    let pendingReturnMethod: string | undefined;
+    let previousStep: ExecutionEvent | undefined;
+    const methodEntries: ExecutionEvent[] = [];
 
     for (const event of trace.events) {
-        if (event.type === "METHOD_ENTER") {
-            if (
-                previousExecutable?.type === "STEP" &&
-                previousExecutable.method !== event.method
-            ) {
-                callSites.push(previousExecutable);
+        if (event.type === "STEP") {
+            if (previousStep && previousStep.method === event.method) {
+                enriched.push(...deriveArrayReferenceEvents(event));
+                enriched.push(...deriveChanges(previousStep, event));
+                enriched.push(...deriveMapChanges(previousStep, event));
             }
 
+            // JDI StepEvent points at the source location that is about to
+            // execute. Keep that line and its variables together.
             enriched.push(event);
-            previousExecutable = event;
+            previousStep = event;
+            continue;
+        }
+
+        if (event.type === "METHOD_ENTER") {
+            methodEntries.push(event);
+            previousStep = undefined;
+            enriched.push(event);
             continue;
         }
 
         if (event.type === "METHOD_EXIT") {
-            enriched.push(event);
+            const derived: ExecutionEvent[] = [];
 
-            const callSite = callSites.pop();
-            if (callSite) {
-                pendingReturnLine = callSite.line;
-                pendingReturnMethod = callSite.method;
+            if (previousStep && previousStep.method === event.method) {
+                derived.push(...deriveChanges(previousStep, event));
+                derived.push(...deriveMapChanges(previousStep, event));
             }
 
-            previousExecutable = event;
+            // A method can return before STEP_LINE gives us a second
+            // checkpoint. Compare the final frame against method entry so
+            // mutations to arguments are still visible.
+            const entry = methodEntries.pop();
+            if (entry && entry.method === event.method) {
+                const entryDerived = [
+                    ...deriveChanges(entry, event),
+                    ...deriveMapChanges(entry, event)
+                ];
+
+                const existing = new Set(
+                    derived.map(item =>
+                        JSON.stringify({
+                            type: item.type,
+                            data: item.data
+                        })
+                    )
+                );
+
+                for (const item of entryDerived) {
+                    const key = JSON.stringify({
+                        type: item.type,
+                        data: item.data
+                    });
+
+                    if (
+                        (
+                            item.type === "OBJECT_FIELD_WRITE" ||
+                            item.type === "ARRAY_WRITE" ||
+                            item.type === "MAP_WRITE"
+                        ) &&
+                        !existing.has(key)
+                    ) {
+                        derived.push(item);
+                        existing.add(key);
+                    }
+                }
+            }
+
+            enriched.push(...derived);
+            previousStep = undefined;
+            enriched.push(event);
             continue;
         }
 
-        if (event.type === "STEP") {
-            if (previousExecutable?.type === "STEP") {
-                enriched.push(
-                    ...deriveArrayReferenceEvents(
-                        event
-                    )
-                );
-
-                enriched.push(
-                    ...deriveChanges(
-                        previousExecutable,
-                        event
-                    )
-                );
-            }
-
-            let displayLine = event.line;
-
-            if (
-                pendingReturnMethod === event.method &&
-                typeof pendingReturnLine === "number"
-            ) {
-                displayLine = pendingReturnLine;
-                pendingReturnMethod = undefined;
-                pendingReturnLine = undefined;
-            } else if (
-                previousExecutable?.type === "METHOD_ENTER" &&
-                previousExecutable.method === event.method
-            ) {
-                displayLine = previousExecutable.line;
-            } else if (
-                previousExecutable?.type === "STEP" &&
-                previousExecutable.method === event.method
-            ) {
-                displayLine = previousExecutable.line;
-            }
-
-            const stepEvent: ExecutionEvent = {
-                ...event,
-                data: {
-                    ...(event.data ?? {}),
-                    ...(typeof displayLine === "number"
-                        ? { displayLine }
-                        : {})
-                }
-            };
-
-            enriched.push(stepEvent);
-
-            if (previousExecutable?.type === "STEP") {
-                enriched.push(
-                    ...deriveMapChanges(
-                        previousExecutable,
-                        event
-                    )
-                );
-            }
-
-            previousExecutable = event;
-            continue;
+        if (
+            event.type === "ERROR" ||
+            event.type === "TIMEOUT" ||
+            event.type === "TRACE_LIMIT"
+        ) {
+            previousStep = undefined;
         }
 
         enriched.push(event);
@@ -111,14 +98,10 @@ export function enrichTrace(
 
     return {
         version: 1,
-        events:
-            enriched.map(
-                (event, index) => ({
-                    ...event,
-                    sequence:
-                        index + 1
-                })
-            )
+        events: enriched.map((event, index) => ({
+            ...event,
+            sequence: index + 1
+        }))
     };
 }
 

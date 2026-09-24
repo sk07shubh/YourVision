@@ -28,14 +28,20 @@ export function buildStates(
             continue;
         }
 
-        states.push({
+        const snapshot: TraceState = {
             ...state,
             variables: { ...state.variables },
             arrays: { ...state.arrays },
             dataStructures: { ...state.dataStructures },
             objects: { ...state.objects },
             callStack: [...state.callStack]
-        });
+        };
+
+        const previous = states[states.length - 1];
+
+        if (!previous || !sameVisibleState(previous, snapshot)) {
+            states.push(snapshot);
+        }
     }
 
     return states;
@@ -44,6 +50,8 @@ export function buildStates(
 function isCheckpointEvent(event: ExecutionEvent): boolean {
     return (
         event.type === "STEP" ||
+        event.type === "METHOD_ENTER" ||
+        event.type === "METHOD_EXIT" ||
         event.type === "ERROR" ||
         event.type === "TIMEOUT" ||
         event.type === "TRACE_LIMIT"
@@ -203,6 +211,21 @@ function applyEvent(
                         -1
                     )
                     : [];
+
+            if (typeof data.callerLine === "number") {
+                next.line = data.callerLine;
+            }
+
+            if (typeof data.callerMethod === "string") {
+                next.method = data.callerMethod;
+            }
+
+            if (data.callerVariables) {
+                applyVariableSnapshot(
+                    next,
+                    data.callerVariables
+                );
+            }
             break;
 
         case "ERROR":
@@ -443,5 +466,20 @@ function isDataStructureSnapshot(
         typeof record.$arrayId === "string" ||
         typeof record.$mapId === "string" ||
         typeof record.$collectionId === "string"
+    );
+}
+
+
+function sameVisibleState(left: TraceState, right: TraceState): boolean {
+    return (
+        left.line === right.line &&
+        left.method === right.method &&
+        left.depth === right.depth &&
+        JSON.stringify(left.variables) === JSON.stringify(right.variables) &&
+        JSON.stringify(left.arrays) === JSON.stringify(right.arrays) &&
+        JSON.stringify(left.dataStructures) === JSON.stringify(right.dataStructures) &&
+        JSON.stringify(left.objects) === JSON.stringify(right.objects) &&
+        JSON.stringify(left.callStack) === JSON.stringify(right.callStack) &&
+        JSON.stringify(left.error) === JSON.stringify(right.error)
     );
 }

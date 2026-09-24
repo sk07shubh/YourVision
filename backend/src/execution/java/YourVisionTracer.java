@@ -72,7 +72,7 @@ public class YourVisionTracer {
         tracedClass = args[2];
 
         String[] programArgs =
-            Arrays.copyOfRange(args, 3, args.length);
+            Arrays.copyOfRange(args, 2, args.length);
 
         LaunchingConnector connector =
             Bootstrap.virtualMachineManager()
@@ -217,9 +217,19 @@ public class YourVisionTracer {
                         } catch (Exception ignored) {
                         }
 
+                        Location methodLocation = entry.location();
+
+                        try {
+                            Location declaredLocation = enteredMethod.location();
+                            if (declaredLocation != null) {
+                                methodLocation = declaredLocation;
+                            }
+                        } catch (Exception ignored) {
+                        }
+
                         emit(
                             "METHOD_ENTER",
-                            entry.location(),
+                            methodLocation,
                             entry.thread(),
                             data
                         );
@@ -248,6 +258,38 @@ public class YourVisionTracer {
                                         new HashSet<>()
                                     )
                                 );
+                            }
+
+                            // Capture the final local-variable snapshot as
+                            // well, so mutations made on the last source line
+                            // can still be derived before the frame disappears.
+                            data.put(
+                                "variables",
+                                readVisibleLocals(
+                                    exit.thread().frame(0)
+                                )
+                            );
+
+                            // Capture the caller's resume location and locals
+                            // while the thread is still suspended.
+                            if (exit.thread().frameCount() > 1) {
+                                StackFrame caller =
+                                    exit.thread().frame(1);
+
+                                if (isTraced(caller.location())) {
+                                    data.put(
+                                        "callerLine",
+                                        caller.location().lineNumber()
+                                    );
+                                    data.put(
+                                        "callerMethod",
+                                        caller.location().method().name()
+                                    );
+                                    data.put(
+                                        "callerVariables",
+                                        readLocals(caller)
+                                    );
+                                }
                             }
                         } catch (Exception ignored) {
                         }
@@ -518,7 +560,7 @@ public class YourVisionTracer {
         return accesses;
     }
 
-    private static Map<String, Object> readLocals(
+    private static Map<String, Object> readVisibleLocals(
         StackFrame frame
     ) {
         Map<String, Object> variables =
@@ -538,7 +580,39 @@ public class YourVisionTracer {
                     )
                 );
             }
+        } catch (Exception ignored) {
+        }
 
+        return variables;
+    }
+
+    private static Map<String, Object> readLocals(
+        StackFrame frame
+    ) {
+        Map<String, Object> variables =
+            new LinkedHashMap<>();
+
+        try {
+            for (
+                LocalVariable variable :
+                frame.visibleVariables()
+            ) {
+                try {
+                    variables.put(
+                        variable.name(),
+                        snapshotValue(
+                            frame.getValue(variable),
+                            0,
+                            new HashSet<>()
+                        )
+                    );
+                } catch (Exception ignored) {
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        try {
             ObjectReference thisObject =
                 frame.thisObject();
 
@@ -552,7 +626,6 @@ public class YourVisionTracer {
                     )
                 );
             }
-
         } catch (Exception ignored) {
         }
 

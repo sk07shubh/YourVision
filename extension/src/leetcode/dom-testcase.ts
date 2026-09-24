@@ -137,9 +137,16 @@ export function readSelectedTestcase(
   const active =
     findActiveTestcaseTab(region);
 
+  const activeLabel =
+    textOf(active);
+
+  // LeetCode may call its built-in testcase tab "Default".
+  // YourVision does not need a redundant Default badge.
   const label =
-    textOf(active) ||
-    'Selected testcase';
+    /^default$/i.test(activeLabel)
+      ? 'Testcase'
+      : activeLabel ||
+        'Selected testcase';
 
   const panelText =
     textOf(panel);
