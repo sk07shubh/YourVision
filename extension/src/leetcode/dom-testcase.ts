@@ -46,6 +46,29 @@ function readInputValue(
   );
 }
 
+function fallbackResultInput(
+  panel: HTMLElement
+): string {
+  const text = clean(panel.textContent ?? '');
+  const match = text.match(/\bInput\b\s*([\s\S]*?)\bOutput\b/i);
+  return clean(match?.[1] ?? '');
+}
+
+function findResultPanel(
+  region: HTMLElement
+): HTMLElement | null {
+  let current: HTMLElement | null = region.parentElement;
+
+  for (let depth = 0; current && depth < 6; depth++, current = current.parentElement) {
+    const text = textOf(current);
+    if (/\bInput\b/i.test(text) && /\bOutput\b/i.test(text)) {
+      return current;
+    }
+  }
+
+  return null;
+}
+
 function pickRawInput(
   panel: HTMLElement,
   method: JavaMethod
@@ -57,7 +80,7 @@ function pickRawInput(
   ];
 
   if (inputs.length === 0) {
-    return '';
+    return fallbackResultInput(panel);
   }
 
   const assignments: string[] = [];
@@ -86,45 +109,12 @@ function pickRawInput(
   return assignments.join('\n');
 }
 
-function pickExpected(
-  panel: HTMLElement
-): string | undefined {
-  const elements = [
-    ...panel.querySelectorAll<HTMLElement>(
-      '*'
-    ),
-  ];
-
-  for (const element of elements) {
-    const label =
-      textOf(element);
-
-    if (
-      !/^expected(?:\s+output)?\s*:?$/i.test(
-        label
-      )
-    ) {
-      continue;
-    }
-
-    const next =
-      element.nextElementSibling;
-
-    const value =
-      textOf(next);
-
-    if (value) {
-      return value;
-    }
-  }
-
-  return undefined;
-}
-
 export function readSelectedTestcase(
-  method: JavaMethod
+  method: JavaMethod,
+  preferredRegion?: HTMLElement
 ): LeetCodeTestcase {
   const region =
+    preferredRegion ??
     findTestcaseRegion();
 
   if (!region) {
@@ -134,7 +124,9 @@ export function readSelectedTestcase(
   }
 
   const panel =
-    findTestcasePanel(region);
+    region.dataset.yourvisionResultRegion === 'true'
+      ? findResultPanel(region) ?? findTestcasePanel(region)
+      : findTestcasePanel(region) ?? findResultPanel(region);
 
   if (!panel) {
     throw new Error(
@@ -174,7 +166,6 @@ export function readSelectedTestcase(
     raw,
     label,
     source,
-    method,
-    pickExpected(panel)
+    method
   );
-}
+}(?:\bOutput\b|$)

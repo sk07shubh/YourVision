@@ -103,7 +103,8 @@ const writeState =
     states.find(
         (state) =>
             state.lastEvent?.type ===
-            "ARRAY_WRITE"
+            "STEP" &&
+            state.line === 4
     );
 
 const nums =
@@ -126,6 +127,105 @@ if (
 
 console.log(
     "PASS: trace enrichment"
+);
+
+
+const lineSemanticsTrace: ExecutionTrace = {
+    version: 1,
+    events: [
+        {
+            sequence: 1,
+            type: "METHOD_ENTER",
+            line: 2,
+            method: "sum",
+            depth: 1,
+            data: {
+                variables: {
+                    nums: {
+                        $arrayId: "55",
+                        $type: "int[]",
+                        values: [2, 7, 11]
+                    },
+                    target: 9
+                }
+            }
+        },
+        {
+            sequence: 2,
+            type: "STEP",
+            line: 3,
+            method: "sum",
+            depth: 1,
+            data: {
+                variables: {
+                    nums: {
+                        $arrayId: "55",
+                        $type: "int[]",
+                        values: [2, 7, 11]
+                    },
+                    target: 9,
+                    i: 0
+                }
+            }
+        },
+        {
+            sequence: 3,
+            type: "STEP",
+            line: 4,
+            method: "sum",
+            depth: 1,
+            data: {
+                variables: {
+                    nums: {
+                        $arrayId: "55",
+                        $type: "int[]",
+                        values: [2, 7, 11]
+                    },
+                    target: 9,
+                    i: 1
+                }
+            }
+        }
+    ]
+};
+
+const lineSemantics =
+    enrichTrace(lineSemanticsTrace);
+
+const firstStep =
+    lineSemantics.events.find(
+        (event) =>
+            event.type === "STEP"
+    );
+
+if (
+    firstStep?.data?.displayLine !== 2
+) {
+    throw new Error(
+        "first method step did not map to method-entry line"
+    );
+}
+
+const lineStates =
+    buildStates(lineSemantics).filter(
+        (state) =>
+            state.lastEvent?.type ===
+            "STEP"
+    );
+
+if (
+    lineStates[0]?.line !== 2 ||
+    lineStates[0]?.variables?.target !== 9 ||
+    lineStates[1]?.line !== 3 ||
+    lineStates[1]?.variables?.i !== 1
+) {
+    throw new Error(
+        "execution state does not align with completed source line"
+    );
+}
+
+console.log(
+    "PASS: execution line semantics"
 );
 
 

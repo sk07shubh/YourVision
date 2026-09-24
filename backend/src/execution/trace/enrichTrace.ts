@@ -11,43 +11,102 @@ export function enrichTrace(
 ): ExecutionTrace {
     const enriched: ExecutionEvent[] = [];
 
-    let previousStep:
-        ExecutionEvent | undefined;
+    let previousExecutable: ExecutionEvent | undefined;
+    const callSites: ExecutionEvent[] = [];
+
+    let pendingReturnLine: number | undefined;
+    let pendingReturnMethod: string | undefined;
 
     for (const event of trace.events) {
+        if (event.type === "METHOD_ENTER") {
+            if (
+                previousExecutable?.type === "STEP" &&
+                previousExecutable.method !== event.method
+            ) {
+                callSites.push(previousExecutable);
+            }
+
+            enriched.push(event);
+            previousExecutable = event;
+            continue;
+        }
+
+        if (event.type === "METHOD_EXIT") {
+            enriched.push(event);
+
+            const callSite = callSites.pop();
+            if (callSite) {
+                pendingReturnLine = callSite.line;
+                pendingReturnMethod = callSite.method;
+            }
+
+            previousExecutable = event;
+            continue;
+        }
+
         if (event.type === "STEP") {
-    if (previousStep) {
-        enriched.push(
-            ...deriveArrayReferenceEvents(
-                event
-            )
-        );
+            if (previousExecutable?.type === "STEP") {
+                enriched.push(
+                    ...deriveArrayReferenceEvents(
+                        event
+                    )
+                );
 
-        enriched.push(
-            ...deriveChanges(
-                previousStep,
-                event
-            )
-        );
-    }
+                enriched.push(
+                    ...deriveChanges(
+                        previousExecutable,
+                        event
+                    )
+                );
+            }
 
-    enriched.push(event);
+            let displayLine = event.line;
 
-    if (previousStep) {
-        enriched.push(
-            ...deriveMapChanges(
-                previousStep,
-                event
-            )
-        );
-    }
+            if (
+                pendingReturnMethod === event.method &&
+                typeof pendingReturnLine === "number"
+            ) {
+                displayLine = pendingReturnLine;
+                pendingReturnMethod = undefined;
+                pendingReturnLine = undefined;
+            } else if (
+                previousExecutable?.type === "METHOD_ENTER" &&
+                previousExecutable.method === event.method
+            ) {
+                displayLine = previousExecutable.line;
+            } else if (
+                previousExecutable?.type === "STEP" &&
+                previousExecutable.method === event.method
+            ) {
+                displayLine = previousExecutable.line;
+            }
 
-    previousStep = event;
-    continue;
-}
+            const stepEvent: ExecutionEvent = {
+                ...event,
+                data: {
+                    ...(event.data ?? {}),
+                    ...(typeof displayLine === "number"
+                        ? { displayLine }
+                        : {})
+                }
+            };
+
+            enriched.push(stepEvent);
+
+            if (previousExecutable?.type === "STEP") {
+                enriched.push(
+                    ...deriveMapChanges(
+                        previousExecutable,
+                        event
+                    )
+                );
+            }
+
+            previousExecutable = event;
+            continue;
+        }
 
         enriched.push(event);
-
     }
 
     return {

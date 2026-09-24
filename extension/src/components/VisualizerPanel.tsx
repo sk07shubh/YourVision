@@ -62,7 +62,8 @@ function isCollectionSnapshot(value: unknown): value is Obj & {
 
 function CollectionView({
   value,
-  state
+  state,
+  source
 }: {
   value: Obj & {
     $collectionId: string;
@@ -72,6 +73,7 @@ function CollectionView({
     size?: number;
   };
   state?: TraceState;
+  source: string;
 }) {
   const type =
     typeof value.$type === 'string'
@@ -89,7 +91,7 @@ function CollectionView({
         <span>{type}</span>
         <span>{kind} · {value.size ?? value.values.length} items</span>
       </div>
-      <ArrayView value={value.values} state={state}/>
+      <ArrayView value={value.values} state={state} source={source}/>
     </div>
   );
 }
@@ -126,7 +128,7 @@ function variableSummary(value: unknown): string {
 }
 
 function Variables({ state, previous }: { state?: TraceState; previous?: TraceState }) {
-  const entries = Object.entries(state?.variables ?? {});
+  const entries = Object.entries(state?.variables ?? {}).filter(([, value]) => !isStructuralObject(value));
   if (!entries.length) return <div className="yv-empty">No local variables yet.</div>;
 
   return (
@@ -158,9 +160,18 @@ function Variables({ state, previous }: { state?: TraceState; previous?: TraceSt
   );
 }
 
-function pointerLabels(state: TraceState | undefined, length: number): Map<number,string[]> {
+function arrayIndexVariableNames(source: string): Set<string> {
+  const names = new Set<string>();
+  for (const match of source.matchAll(/\[([^\]]+)\]/g)) {
+    for (const identifier of match[1].matchAll(/\b[A-Za-z_$][\w$]*\b/g)) names.add(identifier[0]);
+  }
+  return names;
+}
+
+function pointerLabels(state: TraceState | undefined, length: number, indexNames: Set<string>): Map<number,string[]> {
   const map = new Map<number,string[]>();
   for (const [name,value] of Object.entries(state?.variables ?? {})) {
+    if (!indexNames.has(name)) continue;
     if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value >= length) continue;
     const list = map.get(value) ?? []; list.push(name); map.set(value,list);
   }
@@ -180,10 +191,10 @@ function changedArrayIndices(state?: TraceState): Set<number> {
   return set;
 }
 
-function ArrayView({ value, state }: { value: unknown[]; state?: TraceState }) {
+function ArrayView({ value, state, source }: { value: unknown[]; state?: TraceState; source?: string }) {
   if (value.every(Array.isArray)) return <div className="yv-matrix">{value.map((row,r)=><div className="yv-array" key={r}>{(row as unknown[]).map((v,i)=><div className="yv-cell" key={i}><div className="yv-cell-value">{displayValue(v)}</div><div className="yv-cell-index">[{r},{i}]</div></div>)}</div>)}</div>;
-  const labels=pointerLabels(state,value.length); const changed=changedArrayIndices(state);
-  return <div className="yv-array">{value.map((v,i)=><div className="yv-cell" key={i}>{labels.has(i)&&<div className="yv-pointer">{labels.get(i)!.join(' · ')} ↓</div>}<div className={`yv-cell-value ${changed.has(i)?'yv-cell-changed':''}`}>{displayValue(v)}</div><div className="yv-cell-index">{i}</div></div>)}</div>;
+  const labels=pointerLabels(state,value.length,arrayIndexVariableNames(source ?? '')); const changed=changedArrayIndices(state);
+  return <div className="yv-array">{value.map((v,i)=><div className="yv-cell" key={i}>{labels.has(i)&&<div className="yv-pointer">{labels.get(i)!.join(' · ')}</div>}<div className={`yv-cell-value ${changed.has(i)?'yv-cell-changed':''}`}>{displayValue(v)}</div><div className="yv-cell-index">{i}</div></div>)}</div>;
 }
 
 function mapChanges(state?: TraceState): Array<{
@@ -332,19 +343,19 @@ function TreeNodeView({ value, objects, depth=0 }: { value: unknown; objects: Re
   const f=objectFields(resolved); return <div className="yv-tree-node"><div className="yv-node">{displayValue(nodeValue(resolved))}</div>{(f.left!=null||f.right!=null)&&<div className="yv-tree-children"><div>{f.left!=null?<TreeNodeView value={f.left} objects={objects} depth={depth+1}/>:<span className="yv-null">null</span>}</div><div>{f.right!=null?<TreeNodeView value={f.right} objects={objects} depth={depth+1}/>:<span className="yv-null">null</span>}</div></div>}</div>;
 }
 
-function DataValue({ value, state }: { value: unknown; state?: TraceState }) {
+function DataValue({ value, state, source }: { value: unknown; state?: TraceState; source: string }) {
   if (isMapSnapshot(value)) {
     return <MapView value={value} state={state}/>;
   }
 
   if (isCollectionSnapshot(value)) {
-    return <CollectionView value={value} state={state}/>;
+    return <CollectionView value={value} state={state} source={source}/>;
   }
 
   if (isArraySnapshot(value)) {
     return (
       <>
-        <ArrayView value={value.values} state={state}/>
+        <ArrayView value={value.values} state={state} source={source}/>
         {value.truncated === true && (
           <div className="yv-truncated">
             Showing first {value.values.length} of {String(value.length ?? '?')} items.
@@ -354,7 +365,7 @@ function DataValue({ value, state }: { value: unknown; state?: TraceState }) {
     );
   }
 
-  if (Array.isArray(value)) return <ArrayView value={value} state={state}/>;
+  if (Array.isArray(value)) return <ArrayView value={value} state={state} source={source}/>;
   if (isPlainObject(value)) {
     if (looksTreeNode(value)) return <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects??{}}/></div>;
     if (looksListNode(value)) return <LinkedListView root={value} objects={state?.objects??{}}/>;
@@ -364,27 +375,28 @@ function DataValue({ value, state }: { value: unknown; state?: TraceState }) {
   return <div className="yv-code">{displayValue(value)}</div>;
 }
 
-function DataStructures({ state }: { state?: TraceState }) {
+function isStructuralObject(value: unknown): value is Obj {
+  if (!isPlainObject(value)) return false;
+  const fields = objectFields(value);
+  const type = objectType(value);
+  return /ListNode|TreeNode/i.test(type) ||
+    ('next' in fields && ('val' in fields || 'value' in fields)) ||
+    (('left' in fields || 'right' in fields) && ('val' in fields || 'value' in fields));
+}
+
+function DataStructures({ state, source }: { state?: TraceState; source: string }) {
   const arrays = Object.entries(state?.arrays ?? {});
   const structures = Object.entries(state?.dataStructures ?? {});
   const namedObjectIds = new Set<string>();
 
   for (const value of Object.values(state?.variables ?? {})) {
-    if (
-      isPlainObject(value) &&
-      typeof value.$objectId === 'string'
-    ) {
+    if (isStructuralObject(value) && typeof value.$objectId === 'string') {
       namedObjectIds.add(value.$objectId);
     }
   }
 
-  const roots = Object.entries(state?.objects ?? {})
+  const objectItems = Object.entries(state?.objects ?? {})
     .filter(([id]) => namedObjectIds.has(id));
-
-  const objectItems =
-    roots.length
-      ? roots
-      : Object.entries(state?.objects ?? {}).slice(0, 12);
 
   const items = [
     ...arrays,
@@ -393,11 +405,7 @@ function DataStructures({ state }: { state?: TraceState }) {
   ];
 
   if (!items.length) {
-    return (
-      <div className="yv-empty">
-        Structures appear here as your code creates or mutates them.
-      </div>
-    );
+    return <div className="yv-empty">Structures appear here as your code creates or mutates them.</div>;
   }
 
   return (
@@ -405,7 +413,7 @@ function DataStructures({ state }: { state?: TraceState }) {
       {items.map(([name, value]) => (
         <div className="yv-ds" key={name}>
           <div className="yv-ds-title">{name}</div>
-          <DataValue value={value} state={state}/>
+          <DataValue value={value} state={state} source={source}/>
         </div>
       ))}
     </div>
@@ -418,11 +426,11 @@ export function VisualizerPanel(){
   const line=current?.line; const statement=line?sourceLines[line-1]?.trim():'';
   useEffect(()=>{highlightEditorLine(line);return()=>clearEditorExecutionMarker();},[line]);
   useEffect(()=>{ if(!s.playing)return; const id=setInterval(()=>sessionStore.next(),650); return()=>clearInterval(id); },[s.playing,s.index,s.states.length]);
-  useEffect(()=>{ const onKey=(e:KeyboardEvent)=>{ if((e.target as HTMLElement)?.matches('input,textarea,[contenteditable=true]'))return; if(e.key==='ArrowRight'){e.preventDefault();sessionStore.next()} else if(e.key==='ArrowLeft'){e.preventDefault();sessionStore.prev()} else if(e.code==='Space'){e.preventDefault();sessionStore.togglePlay()} else if(e.key.toLowerCase()==='r'){e.preventDefault();sessionStore.restart()} }; window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[]);
-  const actual=s.response?.result; const tc=s.testcase; const finished=current?.lastEvent?.type==='PROGRAM_END' || (s.states.length>0&&s.index===s.states.length-1);
+  useEffect(()=>{ const onKey=(e:KeyboardEvent)=>{ if(!sessionStore.get().open)return; const target=e.target as HTMLElement|null; if(target?.matches('input,textarea,[contenteditable=true]'))return; if(e.key==='ArrowRight'||e.key==='ArrowLeft'||e.code==='Space'||e.key.toLowerCase()==='r'){e.preventDefault();e.stopImmediatePropagation(); if(e.key==='ArrowRight')sessionStore.next(); else if(e.key==='ArrowLeft')sessionStore.prev(); else if(e.code==='Space')sessionStore.togglePlay(); else sessionStore.restart(); } }; window.addEventListener('keydown',onKey,true);return()=>window.removeEventListener('keydown',onKey,true)},[]);
+  const output=s.response?.result; const tc=s.testcase; const finished=current?.lastEvent?.type==='PROGRAM_END' || (s.states.length>0&&s.index===s.states.length-1);
   return <div className="yv-root"><div className="yv-scroll">
-    {tc&&<div className="yv-top"><div className="yv-title-row"><div className="yv-case">{tc.label}</div><span className={`yv-badge ${tc.source}`}>{tc.source}</span></div><div className="yv-inputs">{Object.keys(tc.inputs).length?Object.entries(tc.inputs).map(([k,v])=><div className="yv-input" key={k}><div className="yv-key">{k}</div><div className="yv-code">{v}</div></div>):<div className="yv-code">{tc.raw}</div>}</div><div className="yv-output-row"><div className="yv-output"><div className="yv-label">Expected</div><div className="yv-code">{tc.expected??'—'}</div></div><div className={`yv-output yv-actual ${finished&&s.response?.success?'good':''}`}><div className="yv-label">Actual</div><div className="yv-code">{finished&&actual!==undefined?displayValue(actual):'—'}</div></div></div></div>}
+    {tc&&<div className="yv-top"><div className="yv-title-row"><div className="yv-case">{tc.label}</div>{tc.source==='custom'&&<span className="yv-case-kind">Custom</span>}{tc.source==='failed'&&<span className="yv-case-kind">Failed testcase</span>}</div><div className="yv-inputs">{Object.keys(tc.inputs).length?Object.entries(tc.inputs).map(([k,v])=><div className="yv-input" key={k}><div className="yv-key">{k}</div><div className="yv-code">{v}</div></div>):<div className="yv-code">{tc.raw}</div>}</div><div className="yv-output-row"><div className={`yv-output yv-actual ${finished&&s.response?.success?'good':''}`}><div className="yv-label">Output</div><div className="yv-code">{finished&&output!==undefined?displayValue(output):'—'}</div></div></div></div>}
     {s.loading&&<div className="yv-loading">Tracing your code…</div>}{s.error&&<div className="yv-error">{s.error}</div>}
-    {!s.loading&&<><Section title="Variables" count={Object.keys(current?.variables??{}).length}><Variables state={current} previous={prev}/></Section><Section title="Call Stack" count={current?.callStack?.length??0}>{current?.callStack?.length?<div className="yv-stack">{current.callStack.map((f:string,i:number)=><div className="yv-frame" key={`${f}-${i}`}>{f}</div>)}</div>:<div className="yv-empty">No active method calls.</div>}</Section><Section title="Data Structures" count={Object.keys(current?.arrays??{}).length+Object.keys(current?.dataStructures??{}).length+Object.keys(current?.objects??{}).length}><DataStructures state={current}/></Section></>}
-  </div><div className="yv-current"><div className="yv-current-head"><span>{eventLabel(current)}</span><span className="yv-line">{line?`Line ${line}`:'—'}</span></div><div className="yv-statement">{statement||'Select a testcase and press Visualize.'}</div><div className="yv-controls"><div className="yv-buttons"><button className="yv-btn" onClick={()=>sessionStore.restart()} disabled={!s.states.length}>↺ Restart</button><button className="yv-btn" onClick={()=>sessionStore.prev()} disabled={s.index<=0}>← Prev</button><button className="yv-btn primary" onClick={()=>sessionStore.togglePlay()} disabled={s.states.length<2}>{s.playing?'■ Stop':'▶ Play'}</button><button className="yv-btn" onClick={()=>sessionStore.next()} disabled={!s.states.length||s.index>=s.states.length-1}>Next →</button></div><div className="yv-step">{s.states.length?`${s.index+1} / ${s.states.length}`:'0 / 0'}</div></div></div></div>;
+    {!s.loading&&<><Section title="Variables"><Variables state={current} previous={prev}/></Section><Section title="Call Stack">{current?.callStack?.length?<div className="yv-stack">{current.callStack.map((f:string,i:number)=><div className="yv-frame" key={`${f}-${i}`}>{f}</div>)}</div>:<div className="yv-empty">No active method calls.</div>}</Section><Section title="Data Structures"><DataStructures state={current} source={s.source}/></Section></>}
+  </div><div className="yv-current"><div className="yv-current-head"><span>{eventLabel(current)}</span><span className="yv-line">{line?`Line ${line}`:'—'}</span></div><div className="yv-statement">{statement||'Select a testcase and press Visualize.'}</div><div className="yv-controls"><div className="yv-buttons"><button className="yv-btn" onClick={()=>sessionStore.restart()} disabled={!s.states.length}>↺ Restart</button><button className="yv-btn" onClick={()=>sessionStore.prev()} disabled={s.index<=0}>← Prev</button><button className="yv-btn primary" onClick={()=>sessionStore.togglePlay()} disabled={s.states.length<2}>{s.playing?'■ Stop':'▶ Play'}</button><button className="yv-btn" onClick={()=>sessionStore.next()} disabled={!s.states.length||s.index>=s.states.length-1}>Next →</button></div></div></div></div>;
 }
