@@ -43,7 +43,6 @@ export function buildStates(
 
 function isCheckpointEvent(event: ExecutionEvent): boolean {
     return (
-        event.type === "PROGRAM_START" ||
         event.type === "STEP" ||
         event.type === "ERROR" ||
         event.type === "TIMEOUT" ||
