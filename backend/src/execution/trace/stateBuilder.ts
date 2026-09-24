@@ -68,10 +68,7 @@ function applyEvent(
     switch (event.type) {
         case "STEP":
             applyVariableSnapshot(next, data.variables);
-
-            if (typeof data.displayLine === "number") {
-                next.line = data.displayLine;
-            }
+            next.line = event.line;
             break;
 
         case "ARRAY_REFERENCE":
@@ -193,6 +190,7 @@ function applyEvent(
             }
 
             applyVariableSnapshot(next, data.variables);
+            next.line = event.line;
             break;
 
         case "METHOD_EXIT":
@@ -203,6 +201,11 @@ function applyEvent(
                         -1
                     )
                     : [];
+
+            next.line =
+                typeof data.displayLine === "number"
+                    ? data.displayLine
+                    : event.line;
             break;
 
         case "ERROR":
