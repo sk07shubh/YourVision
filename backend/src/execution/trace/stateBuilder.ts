@@ -46,8 +46,7 @@ function isCheckpointEvent(event: ExecutionEvent): boolean {
         event.type === "STEP" ||
         event.type === "ERROR" ||
         event.type === "TIMEOUT" ||
-        event.type === "TRACE_LIMIT" ||
-        event.type === "PROGRAM_END"
+        event.type === "TRACE_LIMIT"
     );
 }
 
