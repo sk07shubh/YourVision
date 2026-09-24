@@ -252,6 +252,20 @@ public class YourVisionTracer {
                         } catch (Exception ignored) {
                         }
 
+                        int returnLine = exit.location().lineNumber();
+
+                        try {
+                            for (Location candidate : exit.method().allLineLocations()) {
+                                returnLine = Math.max(
+                                    returnLine,
+                                    candidate.lineNumber()
+                                );
+                            }
+                        } catch (Exception ignored) {
+                        }
+
+                        data.put("displayLine", returnLine);
+
                         emit(
                             "METHOD_EXIT",
                             exit.location(),
