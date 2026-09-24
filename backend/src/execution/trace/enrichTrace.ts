@@ -11,25 +11,41 @@ export function enrichTrace(
 ): ExecutionTrace {
     const enriched: ExecutionEvent[] = [];
 
-    let previousStep: ExecutionEvent | undefined;
+    let previousExecutable: ExecutionEvent | undefined;
     const callSites: ExecutionEvent[] = [];
+
+    let pendingReturnLine: number | undefined;
+    let pendingReturnMethod: string | undefined;
 
     for (const event of trace.events) {
         if (event.type === "METHOD_ENTER") {
-            if (previousStep) {
-                callSites.push(previousStep);
+            if (
+                previousExecutable?.type === "STEP" &&
+                previousExecutable.method !== event.method
+            ) {
+                callSites.push(previousExecutable);
             }
+
             enriched.push(event);
+            previousExecutable = event;
             continue;
         }
 
         if (event.type === "METHOD_EXIT") {
             enriched.push(event);
+
+            const callSite = callSites.pop();
+            if (callSite) {
+                pendingReturnLine = callSite.line;
+                pendingReturnMethod = callSite.method;
+            }
+
+            previousExecutable = event;
             continue;
         }
 
         if (event.type === "STEP") {
-            if (previousStep) {
+            if (previousExecutable?.type === "STEP") {
                 enriched.push(
                     ...deriveArrayReferenceEvents(
                         event
@@ -38,7 +54,7 @@ export function enrichTrace(
 
                 enriched.push(
                     ...deriveChanges(
-                        previousStep,
+                        previousExecutable,
                         event
                     )
                 );
@@ -46,22 +62,23 @@ export function enrichTrace(
 
             let displayLine = event.line;
 
-            if (callSites.length > 0 && previousStep?.method !== event.method) {
-                const callSite = callSites[callSites.length - 1];
-                if (callSite.method === event.method) {
-                    displayLine = callSite.line;
-                }
-            }
-
-            if (previousStep && previousStep.method === event.method) {
-                displayLine = previousStep.line;
-            }
-
-            if (previousStep && previousStep.method !== event.method && callSites.length > 0) {
-                const callSite = callSites[callSites.length - 1];
-                if (callSite.method !== event.method) {
-                    displayLine = callSite.line;
-                }
+            if (
+                pendingReturnMethod === event.method &&
+                typeof pendingReturnLine === "number"
+            ) {
+                displayLine = pendingReturnLine;
+                pendingReturnMethod = undefined;
+                pendingReturnLine = undefined;
+            } else if (
+                previousExecutable?.type === "METHOD_ENTER" &&
+                previousExecutable.method === event.method
+            ) {
+                displayLine = previousExecutable.line;
+            } else if (
+                previousExecutable?.type === "STEP" &&
+                previousExecutable.method === event.method
+            ) {
+                displayLine = previousExecutable.line;
             }
 
             const stepEvent: ExecutionEvent = {
@@ -76,21 +93,16 @@ export function enrichTrace(
 
             enriched.push(stepEvent);
 
-            if (previousStep) {
+            if (previousExecutable?.type === "STEP") {
                 enriched.push(
                     ...deriveMapChanges(
-                        previousStep,
+                        previousExecutable,
                         event
                     )
                 );
             }
 
-            previousStep = event;
-            continue;
-        }
-
-        if (event.type === "PROGRAM_END" || event.type === "ERROR" || event.type === "TIMEOUT" || event.type === "TRACE_LIMIT") {
-            enriched.push(event);
+            previousExecutable = event;
             continue;
         }
 
