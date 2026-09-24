@@ -553,20 +553,6 @@ public class YourVisionTracer {
                 );
             }
 
-            ObjectReference thisObject =
-                frame.thisObject();
-
-            if (thisObject != null) {
-                variables.put(
-                    "this",
-                    snapshotValue(
-                        thisObject,
-                        0,
-                        new HashSet<>()
-                    )
-                );
-            }
-
         } catch (Exception ignored) {
         }
 
