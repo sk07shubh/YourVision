@@ -176,11 +176,19 @@ export function findTestcasePanel(
 export function findActiveTestcaseTab(
   region: HTMLElement
 ): HTMLElement | null {
-  const tabs = [
+  const taggedTabs = [
     ...region.querySelectorAll<HTMLElement>(
       '[data-e2e-locator="console-testcase-tag"]'
     ),
   ].filter(visible);
+
+  const tabs = taggedTabs.length > 0
+    ? taggedTabs
+    : [...region.querySelectorAll<HTMLButtonElement>('button')]
+        .filter(button =>
+          visible(button) &&
+          /^case\s+\d+$/i.test((button.textContent ?? '').trim())
+        );
 
   return (
     tabs.find(tab =>
@@ -188,9 +196,7 @@ export function findActiveTestcaseTab(
       tab.classList.contains('dark:bg-dark-fill-3')
     ) ??
     tabs.find(tab =>
-      tab.getAttribute(
-        'aria-selected'
-      ) === 'true'
+      tab.getAttribute('aria-selected') === 'true'
     ) ??
     tabs[0] ??
     null
