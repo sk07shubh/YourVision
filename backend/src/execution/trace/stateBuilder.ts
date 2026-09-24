@@ -204,7 +204,10 @@ function applyEvent(
             break;
 
         case "METHOD_EXIT":
-            next.line = previous.line;
+            // A MethodExitEvent is located at the last executed source
+            // location. For a top-level return this is the return statement.
+            // When a caller exists, callerLine is the correct resume point.
+            next.line = event.line ?? previous.line;
             next.method = previous.method;
             next.callStack =
                 previous.callStack.length > 0

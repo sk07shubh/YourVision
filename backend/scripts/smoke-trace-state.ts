@@ -96,6 +96,59 @@ if (stateAt(states, 0).variables.target !== 9) throw new Error("method-entry arg
 if (stateAt(states, 0).arrays.nums === undefined) throw new Error("method-entry array argument was not hydrated");
 if (stateAt(states, 1).variables.left !== undefined) throw new Error("non-checkpoint variable update created a replay state");
 if (stateAt(states, 2).line !== 5 || stateAt(states, 2).method !== "twoSum") throw new Error("method return did not restore the caller location");
+
+const returnTrace: ExecutionTrace = {
+    version: 1,
+    events: [
+        {
+            sequence: 1,
+            type: "METHOD_ENTER",
+            line: 2,
+            method: "maxArea",
+            depth: 1,
+            data: {
+                variables: {
+                    height: { $arrayId: "77", $type: "int[]", values: [1, 8, 6] }
+                }
+            }
+        },
+        {
+            sequence: 2,
+            type: "STEP",
+            line: 7,
+            method: "maxArea",
+            depth: 1,
+            data: {
+                variables: {
+                    height: { $arrayId: "77", $type: "int[]", values: [1, 8, 6] },
+                    a: 2,
+                    b: 2
+                }
+            }
+        },
+        {
+            sequence: 3,
+            type: "METHOD_EXIT",
+            line: 8,
+            method: "maxArea",
+            depth: 1,
+            data: {
+                returnValue: 8,
+                variables: {
+                    height: { $arrayId: "77", $type: "int[]", values: [1, 8, 6] },
+                    a: 2,
+                    b: 2
+                }
+            }
+        }
+    ]
+};
+
+const returnStates = buildStates(returnTrace);
+if (returnStates.length !== 3 || stateAt(returnStates, 2).line !== 8) {
+    throw new Error("top-level method return did not preserve the return statement line");
+}
+
 if (stateAt(states, 2).variables.left !== 0) throw new Error("caller variables were not restored on method return");
 if (stateAt(states, 3).error?.type !== "IndexOutOfBoundsException") throw new Error("error state was not replayed");
 if (stateAt(states, 4).variables.left !== 1) throw new Error("STEP variables were not hydrated");

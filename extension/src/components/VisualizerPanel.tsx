@@ -182,6 +182,29 @@ function pointerLabels(state: TraceState | undefined, length: number, indexNames
   return map;
 }
 
+function methodDeclarationLine(
+  sourceLines: string[],
+  methodName: string | undefined,
+  fallbackLine: number | undefined
+): number | undefined {
+  if (!fallbackLine || !methodName) return fallbackLine;
+
+  const pattern = new RegExp('\\b' + methodName + '\\s*\\(');
+
+  for (let index = Math.min(fallbackLine - 1, sourceLines.length - 1); index >= 0; index--) {
+    const trimmed = sourceLines[index].trim();
+    if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) {
+      continue;
+    }
+
+    if (pattern.test(trimmed)) {
+      return index + 1;
+    }
+  }
+
+  return fallbackLine;
+}
+
 function changedArrayIndices(state?: TraceState): Set<number> {
   const set = new Set<number>();
   const data = state?.lastEvent?.data;
@@ -427,7 +450,11 @@ function DataStructures({ state, source }: { state?: TraceState; source: string 
 export function VisualizerPanel(){
   const s=useSession(); const current=s.states[s.index]; const prev=s.index>0?s.states[s.index-1]:undefined;
   const sourceLines=useMemo(()=>s.source.split(/\r?\n/),[s.source]);
-  const line=current?.line; const statement=line?sourceLines[line-1]?.trim():'';
+  const line =
+    current?.lastEvent?.type === 'METHOD_ENTER'
+      ? methodDeclarationLine(sourceLines, current.method, current.line)
+      : current?.line;
+  const statement=line?sourceLines[line-1]?.trim():'';
   useEffect(()=>{highlightEditorLine(line);return()=>clearEditorExecutionMarker();},[line]);
   useEffect(()=>{ if(!s.playing)return; const id=setInterval(()=>sessionStore.next(),650); return()=>clearInterval(id); },[s.playing,s.index,s.states.length]);
   useEffect(()=>{ const onKey=(e:KeyboardEvent)=>{ if(!sessionStore.get().open)return; const target=e.target as HTMLElement|null; if(target?.matches('input,textarea,[contenteditable=true]'))return; const handled=e.key==='ArrowRight'||e.key==='ArrowLeft'||e.code==='Space'||e.key.toLowerCase()==='r'; if(!handled)return; e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); const active=document.activeElement?.shadowRoot?.activeElement as HTMLElement|null; if(active?.matches('button'))active.blur(); if(e.key==='ArrowRight')sessionStore.next(); else if(e.key==='ArrowLeft')sessionStore.prev(); else if(e.code==='Space')sessionStore.togglePlay(); else sessionStore.restart(); }; window.addEventListener('keydown',onKey,true);return()=>window.removeEventListener('keydown',onKey,true)},[]);

@@ -175,4 +175,3 @@ export function readSelectedTestcase(
     source,
     method
   );
-}(?:\bOutput\b|$)
