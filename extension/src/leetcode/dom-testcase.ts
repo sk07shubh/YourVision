@@ -124,8 +124,9 @@ export function readSelectedTestcase(
   }
 
   const panel =
-    findTestcasePanel(region) ??
-    findResultPanel(region);
+    region.dataset.yourvisionResultRegion === 'true'
+      ? findResultPanel(region) ?? findTestcasePanel(region)
+      : findTestcasePanel(region) ?? findResultPanel(region);
 
   if (!panel) {
     throw new Error(
