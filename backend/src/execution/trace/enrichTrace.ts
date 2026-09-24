@@ -11,10 +11,23 @@ export function enrichTrace(
 ): ExecutionTrace {
     const enriched: ExecutionEvent[] = [];
 
-    let previousStep:
-        ExecutionEvent | undefined;
+    let previousStep: ExecutionEvent | undefined;
+    const callSites: ExecutionEvent[] = [];
 
     for (const event of trace.events) {
+        if (event.type === "METHOD_ENTER") {
+            if (previousStep) {
+                callSites.push(previousStep);
+            }
+            enriched.push(event);
+            continue;
+        }
+
+        if (event.type === "METHOD_EXIT") {
+            enriched.push(event);
+            continue;
+        }
+
         if (event.type === "STEP") {
             if (previousStep) {
                 enriched.push(
@@ -31,11 +44,25 @@ export function enrichTrace(
                 );
             }
 
-            const displayLine =
-                previousStep &&
-                previousStep.method === event.method
-                    ? previousStep.line
-                    : event.line;
+            let displayLine = event.line;
+
+            if (callSites.length > 0 && previousStep?.method !== event.method) {
+                const callSite = callSites[callSites.length - 1];
+                if (callSite.method === event.method) {
+                    displayLine = callSite.line;
+                }
+            }
+
+            if (previousStep && previousStep.method === event.method) {
+                displayLine = previousStep.line;
+            }
+
+            if (previousStep && previousStep.method !== event.method && callSites.length > 0) {
+                const callSite = callSites[callSites.length - 1];
+                if (callSite.method !== event.method) {
+                    displayLine = callSite.line;
+                }
+            }
 
             const stepEvent: ExecutionEvent = {
                 ...event,
@@ -62,8 +89,12 @@ export function enrichTrace(
             continue;
         }
 
-        enriched.push(event);
+        if (event.type === "PROGRAM_END" || event.type === "ERROR" || event.type === "TIMEOUT" || event.type === "TRACE_LIMIT") {
+            enriched.push(event);
+            continue;
+        }
 
+        enriched.push(event);
     }
 
     return {
