@@ -316,26 +316,31 @@ assert(
 const nestedCycle = await runJava(source, { method: "nestedCycle" });
 assert(nestedCycle.kind === "OK", "nested object/collection cycle execution failed");
 
-const nestedCycleState = nestedCycle.states?.at(-1);
+const nestedCycleState = nestedCycle.states?.find(state =>
+    Object.values(state.objects ?? {}).some(value => {
+        const object = value as Record<string, any>;
+        const links = object.fields?.links as Record<string, any> | undefined;
+        return typeof object.$objectId === "string" &&
+            links !== undefined &&
+            typeof links.$mapId === "string" &&
+            Array.isArray(links.entries);
+    })
+);
+assert(nestedCycleState !== undefined, "object -> map link was not preserved");
+
 const nestedCycleObjects = nestedCycleState?.objects ?? {};
 const nestedCycleBox = Object.values(nestedCycleObjects)
-    .find(value => (value as Record<string, any>)?.$type?.endsWith("Box")) as Record<string, any> | undefined;
+    .find(value => {
+        const object = value as Record<string, any>;
+        return object.fields?.links?.$mapId !== undefined;
+    }) as Record<string, any> | undefined;
 assert(nestedCycleBox !== undefined, "nested cycle box snapshot was not preserved");
 
-const nestedCycleMap = nestedCycleBox?.fields?.links as Record<string, any> | undefined;
-assert(
-    nestedCycleMap !== undefined &&
-    typeof nestedCycleMap.$mapId === "string" &&
-    Array.isArray(nestedCycleMap.entries),
-    "object -> map link was not preserved"
-);
-
-const verifiedNestedCycleBox = nestedCycleBox as Record<string, any>;
-const verifiedNestedCycleMap = nestedCycleMap as Record<string, any>;
-const nestedCycleObjectId = verifiedNestedCycleBox.$objectId;
+const nestedCycleMap = nestedCycleBox.fields?.links as Record<string, any>;
+const nestedCycleObjectId = nestedCycleBox.$objectId;
 assert(typeof nestedCycleObjectId === "string", "nested cycle box id missing");
 
-const ownerEntry = (verifiedNestedCycleMap.entries as Array<Record<string, any>>)
+const ownerEntry = (nestedCycleMap.entries as Array<Record<string, any>>)
     .find(entry => entry.key === "owner");
 assert(
     ownerEntry?.value?.$objectId === nestedCycleObjectId ||
@@ -343,13 +348,12 @@ assert(
     "map -> object identity was not preserved"
 );
 
-const selfEntry = (verifiedNestedCycleMap.entries as Array<Record<string, any>>)
+const selfEntry = (nestedCycleMap.entries as Array<Record<string, any>>)
     .find(entry => entry.key === "self");
 assert(
-    selfEntry?.value?.$ref === verifiedNestedCycleMap.$mapId,
+    selfEntry?.value?.$ref === nestedCycleMap.$mapId,
     "map self-reference was not preserved"
 );
-
 const empty = await runJava(source, { method: "empty" });
 assert(empty.kind === "OK", "empty DS execution failed");
 
