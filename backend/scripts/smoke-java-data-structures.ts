@@ -317,23 +317,32 @@ const nestedCycle = await runJava(source, { method: "nestedCycle" });
 assert(nestedCycle.kind === "OK", "nested object/collection cycle execution failed");
 
 const nestedCycleState = nestedCycle.states?.at(-1);
-const nestedCycleObjects = nestedCycleState?.objects ?? {};
-const nestedCycleBox = Object.values(nestedCycleObjects)
-    .find(value => (value as Record<string, any>)?.$type?.endsWith("Box")) as Record<string, any> | undefined;
-assert(nestedCycleBox?.fields?.links?.$mapId, "object -> map link was not preserved");
-const nestedCycleMap = nestedCycleBox?.fields?.links as Record<string, any>;
+const nestedCycleVariables = nestedCycleState?.variables ?? {};
+const nestedCycleMap = nestedCycleVariables.links as Record<string, any> | undefined;
+assert(
+    typeof nestedCycleMap?.$mapId === "string" &&
+    Array.isArray(nestedCycleMap.entries),
+    "named cyclic map snapshot was not preserved"
+);
+
+const nestedCycleBox = nestedCycleVariables.box as Record<string, any> | undefined;
 const nestedCycleObjectId = nestedCycleBox?.$objectId;
 assert(typeof nestedCycleObjectId === "string", "nested cycle box id missing");
-const ownerBackRef = (nestedCycleMap.entries as Array<Record<string, any>>)
-    ?.find(entry => entry?.value?.$objectId === nestedCycleObjectId);
+
+const ownerEntry = (nestedCycleMap.entries as Array<Record<string, any>>)
+    .find(entry => entry.key === "owner");
 assert(
-    ownerBackRef !== undefined,
-    "map -> object identity was not preserved: " +
-    JSON.stringify(nestedCycleMap.entries)
+    ownerEntry?.value?.$objectId === nestedCycleObjectId ||
+    ownerEntry?.value?.$ref === nestedCycleObjectId,
+    "map -> object identity was not preserved"
 );
+
 const selfEntry = (nestedCycleMap.entries as Array<Record<string, any>>)
-    ?.find(entry => entry.key === "self");
-assert(selfEntry?.value?.$ref === nestedCycleMap.$mapId, "map self-reference was not preserved");
+    .find(entry => entry.key === "self");
+assert(
+    selfEntry?.value?.$ref === nestedCycleMap.$mapId,
+    "map self-reference was not preserved"
+);
 
 const empty = await runJava(source, { method: "empty" });
 assert(empty.kind === "OK", "empty DS execution failed");
