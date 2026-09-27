@@ -474,7 +474,85 @@ function ReturnValueView({
 }
 
 
-function DataValue({ value, state, source, name }: { value: unknown; state?: TraceState; source: string; name?: string }) {
+function ObjectView({
+  value,
+  state,
+  source,
+  depth = 0,
+  seen = new Set<string>()
+}: {
+  value: Obj;
+  state?: TraceState;
+  source: string;
+  depth?: number;
+  seen?: Set<string>;
+}) {
+  const objectId =
+    typeof value.$objectId === 'string'
+      ? value.$objectId
+      : undefined;
+
+  if (objectId && seen.has(objectId)) {
+    return <div className="yv-code">↻ {objectId}</div>;
+  }
+
+  if (depth >= 6) {
+    return <div className="yv-code">…</div>;
+  }
+
+  const nextSeen = new Set(seen);
+  if (objectId) {
+    nextSeen.add(objectId);
+  }
+
+  const fields = objectFields(value);
+  const entries = Object.entries(fields);
+
+  if (!entries.length) {
+    return (
+      <div className="yv-code">
+        {objectType(value) || 'Object'}
+        {objectId ? ` · ${objectId}` : ''}
+      </div>
+    );
+  }
+
+  return (
+    <div className="yv-object">
+      {entries.map(([key, fieldValue]) => (
+        <div className="yv-object-field" key={key}>
+          <div className="yv-code yv-object-key">{key}</div>
+          <div className="yv-object-value">
+            <DataValue
+              value={fieldValue}
+              state={state}
+              source={source}
+              name={key}
+              depth={depth + 1}
+              seen={nextSeen}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DataValue({
+  value,
+  state,
+  source,
+  name,
+  depth = 0,
+  seen = new Set<string>()
+}: {
+  value: unknown;
+  state?: TraceState;
+  source: string;
+  name?: string;
+  depth?: number;
+  seen?: Set<string>;
+}) {
   if (isMapSnapshot(value)) {
     return <MapView value={value} state={state}/>;
   }
@@ -500,8 +578,10 @@ function DataValue({ value, state, source, name }: { value: unknown; state?: Tra
   if (isPlainObject(value)) {
     if (looksTreeNode(value)) return <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects??{}}/></div>;
     if (looksListNode(value)) return <LinkedListView root={value} objects={state?.objects??{}} variables={state?.variables??{}}/>;
-    const fields = objectFields(value);
-    return <div className="yv-map">{Object.entries(fields).map(([k,v])=><div className="yv-map-row" key={k}><div className="yv-code">{k}</div><div className="yv-code">{displayValue(v)}</div></div>)}</div>;
+    const resolved = resolveRef(value, state?.objects ?? {});
+    if (isPlainObject(resolved)) {
+      return <ObjectView value={resolved} state={state} source={source} depth={depth} seen={seen}/>;
+    }
   }
   return <div className="yv-code">{displayValue(value)}</div>;
 }
@@ -521,7 +601,7 @@ function DataStructures({ state, source }: { state?: TraceState; source: string 
   const namedObjectIds = new Map<string, string[]>();
 
   for (const [name, value] of Object.entries(state?.variables ?? {})) {
-    if (isStructuralObject(value) && typeof value.$objectId === 'string') {
+    if (isPlainObject(value) && typeof value.$objectId === 'string') {
       const names = namedObjectIds.get(value.$objectId) ?? [];
       names.push(name);
       namedObjectIds.set(value.$objectId, names);

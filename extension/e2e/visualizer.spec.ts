@@ -168,6 +168,144 @@ for (const flow of [
 }
 
 
+test('Chrome extension renders ordinary object fields, nested arrays, and aliases', async () => {
+  const objectSource = [
+    'class Solution {',
+    '  public int inspect() {',
+    '    Box a = new Box();',
+    '    Box b = a;',
+    '    a.grid = new int[][]{{1,2},{3,4}};',
+    '    a.child = new Box();',
+    '    a.child.value = 7;',
+    '    return b.child.value;',
+    '  }',
+    '}',
+  ].join('\\n');
+
+  activeResponse = {
+    success: true,
+    kind: 'OK',
+    result: '7',
+    states: [
+      {
+        sequence: 1, line: 2, method: 'inspect', depth: 1,
+        variables: {
+          a: { $objectId: 'box1', $type: 'Box', fields: {} },
+          b: { $objectId: 'box1', $type: 'Box', fields: {} },
+        },
+        arrays: {}, dataStructures: {},
+        objects: { box1: { $objectId: 'box1', $type: 'Box', fields: {} } },
+        callStack: ['inspect'],
+        lastEvent: { type: 'METHOD_ENTER', line: 2, method: 'inspect' },
+      },
+      {
+        sequence: 2, line: 7, method: 'inspect', depth: 1,
+        variables: {
+          a: {
+            $objectId: 'box1', $type: 'Box',
+            fields: {
+              grid: {
+                $arrayId: 'grid1', $type: 'int[][]',
+                values: [
+                  { $arrayId: 'row1', $type: 'int[]', values: [1, 2] },
+                  { $arrayId: 'row2', $type: 'int[]', values: [3, 4] },
+                ],
+              },
+              child: { $ref: 'box2' },
+            },
+          },
+          b: { $objectId: 'box1', $type: 'Box', fields: {} },
+        },
+        arrays: {}, dataStructures: {},
+        objects: {
+          box1: {
+            $objectId: 'box1', $type: 'Box',
+            fields: {
+              grid: {
+                $arrayId: 'grid1', $type: 'int[][]',
+                values: [
+                  { $arrayId: 'row1', $type: 'int[]', values: [1, 2] },
+                  { $arrayId: 'row2', $type: 'int[]', values: [3, 4] },
+                ],
+              },
+              child: { $ref: 'box2' },
+            },
+          },
+          box2: {
+            $objectId: 'box2', $type: 'Box',
+            fields: { value: 7 },
+          },
+        },
+        callStack: ['inspect'],
+        lastEvent: { type: 'OBJECT_FIELD_WRITE', line: 7, method: 'inspect' },
+      },
+      {
+        sequence: 3, line: 8, method: 'inspect', depth: 0,
+        variables: {
+          a: {
+            $objectId: 'box1', $type: 'Box',
+            fields: {
+              grid: {
+                $arrayId: 'grid1', $type: 'int[][]',
+                values: [
+                  { $arrayId: 'row1', $type: 'int[]', values: [1, 2] },
+                  { $arrayId: 'row2', $type: 'int[]', values: [3, 4] },
+                ],
+              },
+              child: { $ref: 'box2' },
+            },
+          },
+          b: { $objectId: 'box1', $type: 'Box', fields: {} },
+        },
+        arrays: {}, dataStructures: {},
+        objects: {
+          box1: {
+            $objectId: 'box1', $type: 'Box',
+            fields: {
+              grid: {
+                $arrayId: 'grid1', $type: 'int[][]',
+                values: [
+                  { $arrayId: 'row1', $type: 'int[]', values: [1, 2] },
+                  { $arrayId: 'row2', $type: 'int[]', values: [3, 4] },
+                ],
+              },
+              child: { $ref: 'box2' },
+            },
+          },
+          box2: {
+            $objectId: 'box2', $type: 'Box',
+            fields: { value: 7 },
+          },
+        },
+        callStack: [],
+        lastEvent: { type: 'PROGRAM_END', line: 8, method: 'inspect', data: { returnValue: 7 } },
+      },
+    ],
+  };
+
+  const { context, page, profile } = await launchPage('default', objectSource);
+  try {
+    await page.locator('[data-yourvision-tab="true"]').click();
+    await page.locator('[data-yourvision-visualize="true"]').click();
+
+    const host = page.locator('[data-yourvision-host="true"]');
+    const structures = host.locator('.yv-section').filter({ hasText: 'Data Structures' });
+    await expect(structures.locator('.yv-ds-title')).toContainText('a / b');
+
+    await host.getByRole('button', { name: 'Next →' }).click();
+    await expect(structures.locator('.yv-ds-title')).toContainText('a / b');
+    await expect(structures).toContainText('grid');
+    await expect(structures).toContainText('1');
+    await expect(structures).toContainText('4');
+    await expect(structures).toContainText('child');
+    await expect(structures).toContainText('7');
+    await expect(structures.locator('.yv-object')).toHaveCount(2);
+  } finally {
+    await context.close();
+    await rm(profile, { recursive: true, force: true });
+  }
+});
+
 test('Chrome extension renders returned ListNode identity and reachable chain', async () => {
   const listSource = [
     'class Solution {',
