@@ -8,6 +8,8 @@ import type { ExecutionTrace, ExecutionEvent, TraceState } from "../trace/schema
 import { buildStates } from "../trace/stateBuilder.js";
 import { enrichTrace } from "../trace/enrichTrace.js";
 
+const MAX_TRACE_EVENTS = 5000;
+
 const execFileAsync = promisify(execFile);
 
 export interface JavaTestcase {
@@ -333,19 +335,28 @@ await fs.writeFile(
                 const trace =
                     parseTrace(stdout, source);
 
-                const lastSequence =
-                    trace.events.at(-1)
-                        ?.sequence ?? 0;
+                if (
+                    !trace.events.some(
+                        (event) => event.type === "TRACE_LIMIT"
+                    )
+                ) {
+                    const lastSequence =
+                        trace.events.at(-1)?.sequence ?? 0;
+                    const timeoutEvent: ExecutionEvent = {
+                        sequence: lastSequence + 1,
+                        type: "TIMEOUT",
+                        data: {
+                            message:
+                                "Java execution exceeded 3000 ms"
+                        }
+                    };
 
-                trace.events.push({
-                    sequence:
-                        lastSequence + 1,
-                    type: "TIMEOUT",
-                    data: {
-                        message:
-                            "Java execution exceeded 3000 ms"
+                    if (trace.events.length >= MAX_TRACE_EVENTS) {
+                        trace.events[MAX_TRACE_EVENTS - 1] = timeoutEvent;
+                    } else {
+                        trace.events.push(timeoutEvent);
                     }
-                });
+                }
 
                 return {
                     success: false,
@@ -494,10 +505,42 @@ function parseTrace(
 
     attachMethodDisplayLines(events, source);
 
-    return enrichTrace({
+    const enriched = enrichTrace({
         version: 1,
         events
     });
+
+    if (enriched.events.length <= MAX_TRACE_EVENTS) {
+        return enriched;
+    }
+
+    const existingLimit = enriched.events.findIndex(
+        event => event.type === "TRACE_LIMIT"
+    );
+    const boundedEvents = enriched.events.slice(
+        0,
+        Math.min(
+            MAX_TRACE_EVENTS,
+            existingLimit >= 0
+                ? existingLimit + 1
+                : MAX_TRACE_EVENTS - 1
+        )
+    );
+
+    if (existingLimit < 0) {
+        boundedEvents.push({
+            sequence: boundedEvents.length + 1,
+            type: "TRACE_LIMIT",
+            data: {
+                maxEvents: MAX_TRACE_EVENTS
+            }
+        });
+    }
+
+    return {
+        version: 1,
+        events: boundedEvents
+    };
 }
 
 function attachMethodDisplayLines(

@@ -21,6 +21,7 @@ import com.sun.jdi.ThreadReference;
 import com.sun.jdi.Value;
 import com.sun.jdi.VirtualMachine;
 import com.sun.jdi.connect.LaunchingConnector;
+import com.sun.jdi.event.BreakpointEvent;
 import com.sun.jdi.event.Event;
 import com.sun.jdi.event.EventSet;
 import com.sun.jdi.event.ExceptionEvent;
@@ -29,6 +30,7 @@ import com.sun.jdi.event.MethodExitEvent;
 import com.sun.jdi.event.StepEvent;
 import com.sun.jdi.event.VMDeathEvent;
 import com.sun.jdi.event.VMDisconnectEvent;
+import com.sun.jdi.request.BreakpointRequest;
 import com.sun.jdi.request.EventRequest;
 import com.sun.jdi.request.EventRequestManager;
 import com.sun.jdi.request.ExceptionRequest;
@@ -62,6 +64,8 @@ public class YourVisionTracer {
     private static String tracedClass = "";
     private static String solutionSourcePath = "";
     private static final Set<Long> steppedThreads = new HashSet<>();
+    private static final Set<String> installedLoopBreakpoints =
+        new HashSet<>();
 
     public static void main(String[] args) throws Exception {
         if (args.length < 3) {
@@ -134,12 +138,32 @@ public class YourVisionTracer {
                 continue;
             }
 
+            Set<String> recordedStepLocations = new HashSet<>();
             for (Event event : events) {
                 if (event instanceof StepEvent step) {
                     if (isTraceableUserMethod(step.location().method())) {
-                        recordStep(
+                        if (recordedStepLocations.add(stepLocationKey(
                             step.location(),
                             step.thread()
+                        ))) {
+                            recordStep(
+                                step.location(),
+                                step.thread()
+                            );
+                        }
+                    }
+
+                } else if (event instanceof BreakpointEvent breakpoint) {
+                    if (
+                        isTraceableUserMethod(breakpoint.location().method()) &&
+                        recordedStepLocations.add(stepLocationKey(
+                            breakpoint.location(),
+                            breakpoint.thread()
+                        ))
+                    ) {
+                        recordStep(
+                            breakpoint.location(),
+                            breakpoint.thread()
                         );
                     }
 
@@ -211,6 +235,11 @@ public class YourVisionTracer {
                     Method enteredMethod = entry.method();
 
                     if (isTraceableUserMethod(enteredMethod)) {
+                        installSameLineLoopBreakpoints(
+                            manager,
+                            enteredMethod
+                        );
+
                         Map<String, Object> data =
                             new LinkedHashMap<>();
 
@@ -468,6 +497,232 @@ public class YourVisionTracer {
 
         } catch (Exception ignored) {
         }
+    }
+
+    private static void installSameLineLoopBreakpoints(
+        EventRequestManager manager,
+        Method method
+    ) {
+        String methodKey =
+            method.declaringType().name() + ":" +
+            method.name() + method.signature();
+
+        if (!installedLoopBreakpoints.add(methodKey)) {
+            return;
+        }
+
+        try {
+            byte[] code = method.bytecodes();
+            Set<Integer> targetIndices =
+                sameLineBackwardBranchTargets(method, code);
+
+            for (int targetIndex : targetIndices) {
+                Location target =
+                    method.locationOfCodeIndex(targetIndex);
+
+                BreakpointRequest breakpoint =
+                    manager.createBreakpointRequest(target);
+                breakpoint.setSuspendPolicy(
+                    EventRequest.SUSPEND_EVENT_THREAD
+                );
+                breakpoint.enable();
+            }
+        } catch (Exception ignored) {
+            // Ordinary line changes remain traceable if the VM cannot expose
+            // bytecodes or install these locations.
+        }
+    }
+
+    private static Set<Integer> sameLineBackwardBranchTargets(
+        Method method,
+        byte[] code
+    ) {
+        Set<Integer> targets = new HashSet<>();
+
+        for (int index = 0; index < code.length;) {
+            int opcode = code[index] & 0xff;
+
+            if (isShortBranch(opcode) && index + 2 < code.length) {
+                int offset = (short) readUnsignedShort(code, index + 1);
+                addSameLineBackwardTarget(
+                    method,
+                    targets,
+                    index,
+                    index + offset
+                );
+            } else if (
+                (opcode == 0xc8 || opcode == 0xc9) &&
+                index + 4 < code.length
+            ) {
+                addSameLineBackwardTarget(
+                    method,
+                    targets,
+                    index,
+                    index + readInt(code, index + 1)
+                );
+            } else if (opcode == 0xaa || opcode == 0xab) {
+                int cursor = (index + 4) & ~3;
+                if (cursor + 4 > code.length) {
+                    break;
+                }
+
+                addSameLineBackwardTarget(
+                    method,
+                    targets,
+                    index,
+                    index + readInt(code, cursor)
+                );
+
+                if (opcode == 0xaa) {
+                    if (cursor + 12 > code.length) {
+                        break;
+                    }
+                    int low = readInt(code, cursor + 4);
+                    int high = readInt(code, cursor + 8);
+                    long count = (long) high - low + 1;
+                    if (count < 0 || count > (code.length - cursor - 12) / 4) {
+                        break;
+                    }
+                    for (int item = 0; item < count; item++) {
+                        addSameLineBackwardTarget(
+                            method,
+                            targets,
+                            index,
+                            index + readInt(code, cursor + 12 + item * 4)
+                        );
+                    }
+                    index = cursor + 12 + (int) count * 4;
+                    continue;
+                }
+
+                int pairs = readInt(code, cursor + 4);
+                if (pairs < 0 || pairs > (code.length - cursor - 8) / 8) {
+                    break;
+                }
+                for (int item = 0; item < pairs; item++) {
+                    addSameLineBackwardTarget(
+                        method,
+                        targets,
+                        index,
+                        index + readInt(code, cursor + 12 + item * 8)
+                    );
+                }
+                index = cursor + 8 + pairs * 8;
+                continue;
+            }
+
+            int length = instructionLength(opcode, code, index);
+            if (length <= 0 || index + length > code.length) {
+                break;
+            }
+            index += length;
+        }
+
+        return targets;
+    }
+
+    private static void addSameLineBackwardTarget(
+        Method method,
+        Set<Integer> targets,
+        int branchIndex,
+        int targetIndex
+    ) {
+        if (targetIndex < 0 || targetIndex >= branchIndex) {
+            return;
+        }
+
+        try {
+            Location branch =
+                method.locationOfCodeIndex(branchIndex);
+            Location target =
+                method.locationOfCodeIndex(targetIndex);
+            int line = target.lineNumber();
+
+            if (line > 0 && line == branch.lineNumber()) {
+                targets.add(targetIndex);
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static boolean isShortBranch(int opcode) {
+        return
+            (opcode >= 0x99 && opcode <= 0xa8) ||
+            opcode == 0xc6 ||
+            opcode == 0xc7;
+    }
+
+    private static int instructionLength(
+        int opcode,
+        byte[] code,
+        int index
+    ) {
+        if (opcode == 0x10 || opcode == 0x12 ||
+            (opcode >= 0x15 && opcode <= 0x19) ||
+            (opcode >= 0x36 && opcode <= 0x3a) ||
+            opcode == 0xa9 || opcode == 0xbc) {
+            return 2;
+        }
+        if (opcode == 0x11 || opcode == 0x13 || opcode == 0x14 ||
+            opcode == 0x84 || (opcode >= 0x99 && opcode <= 0xa8) ||
+            (opcode >= 0xb2 && opcode <= 0xb8) || opcode == 0xbb ||
+            opcode == 0xbd || opcode == 0xc0 || opcode == 0xc1 ||
+            opcode == 0xc6 || opcode == 0xc7) {
+            return 3;
+        }
+        if (opcode == 0xb9 || opcode == 0xba ||
+            opcode == 0xc8 || opcode == 0xc9) {
+            return 5;
+        }
+        if (opcode == 0xc5) {
+            return 4;
+        }
+        if (opcode == 0xc4) {
+            if (index + 1 >= code.length) {
+                return -1;
+            }
+            return (code[index + 1] & 0xff) == 0x84 ? 6 : 4;
+        }
+        if (opcode == 0xaa || opcode == 0xab) {
+            int cursor = (index + 4) & ~3;
+            if (cursor + 8 > code.length) {
+                return -1;
+            }
+            if (opcode == 0xaa) {
+                if (cursor + 12 > code.length) {
+                    return -1;
+                }
+                long count = (long) readInt(code, cursor + 8) -
+                    readInt(code, cursor + 4) + 1;
+                return count < 0 || count > (code.length - cursor - 12) / 4
+                    ? -1
+                    : cursor + 12 + (int) count * 4 - index;
+            }
+            int pairs = readInt(code, cursor + 4);
+            return pairs < 0 || pairs > (code.length - cursor - 8) / 8
+                ? -1
+                : cursor + 8 + pairs * 8 - index;
+        }
+        return 1;
+    }
+
+    private static int readUnsignedShort(byte[] code, int index) {
+        return ((code[index] & 0xff) << 8) | (code[index + 1] & 0xff);
+    }
+
+    private static int readInt(byte[] code, int index) {
+        return ((code[index] & 0xff) << 24) |
+            ((code[index + 1] & 0xff) << 16) |
+            ((code[index + 2] & 0xff) << 8) |
+            (code[index + 3] & 0xff);
+    }
+
+    private static String stepLocationKey(
+        Location location,
+        ThreadReference thread
+    ) {
+        return thread.uniqueID() + ":" + location.method().name() +
+            location.method().signature() + ":" + location.codeIndex();
     }
 
     private static int findMethodDeclarationLine(

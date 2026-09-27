@@ -54,5 +54,9 @@ const timeout = await runJava(source, { method: "boundedLoop" });
 assert(timeout.kind === "TIMEOUT", "unbounded execution was not contained: " + timeout.kind);
 assert(timeout.success === false, "timeout must not report success");
 assert(timeout.message !== undefined && timeout.message.length > 0, "timeout must expose a useful message");
+assert(
+    (timeout.trace?.events.length ?? 0) <= 5000,
+    "expanded trace exceeded the 5,000-event safety limit"
+);
 
 console.log("PASS: Java safety - large snapshots, deep objects, execution timeout");
