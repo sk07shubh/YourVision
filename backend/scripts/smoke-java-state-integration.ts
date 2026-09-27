@@ -537,8 +537,8 @@ assert(
 );
 
 const matrixAliasState = matrixAliasing.states?.at(-1);
-const matrixA = matrixAliasState?.variables.a;
-const matrixB = matrixAliasState?.variables.b;
+const matrixA = matrixAliasState?.arrays.a;
+const matrixB = matrixAliasState?.arrays.b;
 
 assert(
     snapshotField(matrixA, "$arrayId") ===
