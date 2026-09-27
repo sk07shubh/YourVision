@@ -49,12 +49,17 @@ const TRACER_FILE =
             import.meta.url
         )
     );
-const TYPES_FILE = path.join(
-    process.cwd(),
-    "src",
-    "execution",
-    "java",
-    "LeetCodeTypes.java"
+const LIST_NODE_FILE = fileURLToPath(
+    new URL(
+        "./LeetCodeListNode.java",
+        import.meta.url
+    )
+);
+const TREE_NODE_FILE = fileURLToPath(
+    new URL(
+        "./LeetCodeTreeNode.java",
+        import.meta.url
+    )
 );
 function prepareJavaSource(source: string): string {
     const standardImport =
@@ -68,7 +73,10 @@ function prepareJavaSource(source: string): string {
         return source;
     }
 
-    return `${standardImport}\n\n${source}`;
+    // Keep the user's source line numbers unchanged. JDI reports lines from
+    // the compiled Solution.java, so adding an import on its own line would
+    // shift every executable line and break editor highlighting.
+    return `${standardImport} ${source}`;
 }
 export async function runJava(
     source: string,
@@ -106,9 +114,6 @@ export async function runJava(
 
     const rawArguments =
         testcase.arguments ?? [];
-    console.log("=== TESTCASE ===");
-console.log(testcase);
-console.log("================");
 
     if (
         rawArguments.some(
@@ -151,14 +156,9 @@ console.log("================");
             tempDir,
             "YourVisionTracer.java"
         );
-    const typesPath = path.join(
-  tempDir,
-  "LeetCodeTypes.java"
-);
-
     try {
        const preparedSource =
-    prepareJavaSource(source);
+            prepareJavaSource(source);
 
 await fs.writeFile(
     solutionPath,
@@ -174,38 +174,50 @@ await fs.writeFile(
             TRACER_FILE,
             tracerPath
         );
-        await fs.copyFile(
-    TYPES_FILE,
-    typesPath
-);
+        const declaresListNode =
+            /\bclass\s+ListNode\b/.test(preparedSource);
+        const declaresTreeNode =
+            /\bclass\s+TreeNode\b/.test(preparedSource);
+
+        if (!declaresListNode) {
+            await fs.copyFile(
+                LIST_NODE_FILE,
+                path.join(tempDir, "LeetCodeListNode.java")
+            );
+        }
+
+        if (!declaresTreeNode) {
+            await fs.copyFile(
+                TREE_NODE_FILE,
+                path.join(tempDir, "LeetCodeTreeNode.java")
+            );
+        }
         try {
             await execFileAsync(
-    "javac",
-    [
-        "--add-modules",
-        "jdk.jdi",
-        "-g",
-        "-d",
-        tempDir,
-        solutionPath,
-        typesPath,
-        runtimePath,
-        tracerPath
-    ],
+                "javac",
+                [
+                    "--add-modules",
+                    "jdk.jdi",
+                    "-g",
+                    "-d",
+                    tempDir,
+                    solutionPath,
+                    ...(declaresListNode
+                        ? []
+                        : [path.join(tempDir, "LeetCodeListNode.java")]),
+                    ...(declaresTreeNode
+                        ? []
+                        : [path.join(tempDir, "LeetCodeTreeNode.java")]),
+                    runtimePath,
+                    tracerPath
+                ],
                 {
-                    timeout: 5000,
+                    timeout: 10000,
                     maxBuffer:
                         1024 * 1024
                 }
             );
-
         } catch (error: any) {
-            console.log("=== JAVA EXECUTION ERROR ===");
-console.log(error);
-console.log("============================");
-            console.log("=== JAVAC STDERR ===");
-console.log(error.stderr ?? error.message ?? "");
-console.log("====================");
             return {
                 success: false,
                 kind:
@@ -258,17 +270,11 @@ console.log("====================");
                     "java",
                     childArguments,
                     {
-                        timeout: 3000,
+                        timeout: 5000,
                         maxBuffer:
                             1024 * 1024
                     }
                 );
-                console.log("=== JAVA STDOUT ===");
-console.log(stdout);
-console.log("=== JAVA STDERR ===");
-console.log(stderr);
-console.log("===================");
-
             const trace =
                 parseTrace(stdout);
 

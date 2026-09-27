@@ -193,6 +193,10 @@ function applyEvent(
             break;
 
         case "METHOD_ENTER":
+            if (typeof data.displayLine === "number") {
+                next.line = data.displayLine;
+            }
+
             if (event.method) {
                 next.callStack = [
                     ...previous.callStack,

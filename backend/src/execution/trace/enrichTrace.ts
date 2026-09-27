@@ -44,7 +44,10 @@ export function enrichTrace(trace: ExecutionTrace): ExecutionTrace {
             previousStep = undefined;
             // The first STEP inside this method describes the state at the
             // method-entry boundary, so keep the declaration line visible.
-            pendingResumeLine = event.line;
+            pendingResumeLine =
+                typeof event.data?.displayLine === "number"
+                    ? event.data.displayLine as number
+                    : event.line;
             enriched.push(event);
             continue;
         }

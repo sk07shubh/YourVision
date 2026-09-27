@@ -41,6 +41,8 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -58,6 +60,7 @@ public class YourVisionTracer {
 
     private static long sequence = 0;
     private static String tracedClass = "";
+    private static String solutionSourcePath = "";
     private static final Set<Long> steppedThreads = new HashSet<>();
 
     public static void main(String[] args) throws Exception {
@@ -70,6 +73,8 @@ public class YourVisionTracer {
         String classpath = args[0];
         String mainClass = args[1];
         tracedClass = args[2];
+        solutionSourcePath =
+            Path.of(classpath, "Solution.java").toString();
 
         String[] programArgs =
             Arrays.copyOfRange(args, 2, args.length);
@@ -218,6 +223,15 @@ public class YourVisionTracer {
                         }
 
                         Location methodLocation = entry.location();
+                        int declarationLine =
+                            findMethodDeclarationLine(
+                                methodLocation,
+                                methodLocation.method()
+                            );
+                        data.put(
+                            "displayLine",
+                            declarationLine
+                        );
 
                         emit(
                             "METHOD_ENTER",
@@ -454,6 +468,49 @@ public class YourVisionTracer {
 
         } catch (Exception ignored) {
         }
+    }
+
+    private static int findMethodDeclarationLine(
+        Location location,
+        Method method
+    ) {
+        int fallback =
+            location == null
+                ? 0
+                : location.lineNumber();
+
+        if (solutionSourcePath.isEmpty()) {
+            return fallback;
+        }
+
+        try {
+            List<String> lines =
+                Files.readAllLines(
+                    Path.of(solutionSourcePath),
+                    StandardCharsets.UTF_8
+                );
+
+            int limit =
+                Math.min(
+                    Math.max(fallback - 1, 0),
+                    lines.size()
+                );
+
+            String methodName = method.name();
+            String pattern =
+                "\\b" +
+                java.util.regex.Pattern.quote(methodName) +
+                "\\s*\\(";
+
+            for (int index = limit - 1; index >= 0; index--) {
+                if (lines.get(index).matches(".*" + pattern + ".*")) {
+                    return index + 1;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        return fallback;
     }
 
     private static void recordStep(
@@ -1008,7 +1065,7 @@ public class YourVisionTracer {
         } else if (type.contains("ArrayDeque")) {
             kind = "deque";
         } else if (type.contains("PriorityQueue")) {
-            kind = "queue";
+            kind = "priorityQueue";
         } else if (type.contains("LinkedList")) {
             kind = "list";
         } else if (

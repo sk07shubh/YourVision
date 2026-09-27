@@ -87,11 +87,86 @@ function CollectionView({
       ? value.$kind
       : 'collection';
 
+  const itemCount = value.size ?? value.values.length;
+
+  if (kind === 'stack') {
+    return (
+      <div className="yv-collection">
+        <div className="yv-collection-meta">
+          <span>{type}</span>
+          <span>TOP · {itemCount} items</span>
+        </div>
+        <div className="yv-stack-view">
+          {[...value.values].reverse().map((item, index) => (
+            <div className="yv-stack-cell" key={index}>
+              <span className="yv-stack-position">{index === 0 ? 'TOP' : ''}</span>
+              <span className="yv-code">{displayValue(item)}</span>
+            </div>
+          ))}
+          {!value.values.length && <div className="yv-empty">Empty stack</div>}
+        </div>
+      </div>
+    );
+  }
+
+  if (kind === 'queue' || kind === 'deque') {
+    return (
+      <div className="yv-collection">
+        <div className="yv-collection-meta">
+          <span>{type}</span>
+          <span>{kind === 'deque' ? 'FRONT ↔ REAR' : 'FRONT → REAR'} · {itemCount} items</span>
+        </div>
+        <div className="yv-queue-view">
+          <div className="yv-queue-end">FRONT</div>
+          {value.values.map((item, index) => (
+            <div className="yv-queue-cell" key={index}>
+              <span className="yv-code">{displayValue(item)}</span>
+            </div>
+          ))}
+          <div className="yv-queue-end">REAR</div>
+          {!value.values.length && <div className="yv-empty">Empty queue</div>}
+        </div>
+      </div>
+    );
+  }
+
+  if (kind === 'priorityQueue') {
+    return (
+      <div className="yv-collection">
+        <div className="yv-collection-meta">
+          <span>{type}</span>
+          <span>MIN-HEAP · {itemCount} items</span>
+        </div>
+        <div className="yv-heap-tree">
+          {(() => {
+            const levels: unknown[][] = [];
+            value.values.forEach((item, index) => {
+              const level = Math.floor(Math.log2(index + 1));
+              (levels[level] ??= []).push(item);
+            });
+            return levels.map((items, level) => (
+              <div className="yv-heap-level" key={level}>
+                {items.map((item, index) => (
+                  <div className="yv-heap-node-wrap" key={`${level}-${index}`}>
+                    <div className="yv-heap-node">{displayValue(item)}</div>
+                    <div className="yv-cell-index">[{(2 ** level) - 1 + index}]</div>
+                  </div>
+                ))}
+              </div>
+            ));
+          })()}
+        </div>
+        <div className="yv-code yv-heap-note">Heap tree · root is index 0</div>
+        <ArrayView value={value.values} state={state} source={source} arrayName={name}/>
+      </div>
+    );
+  }
+
   return (
-    <div className="yv-hashmap">
-      <div className="yv-map-meta">
+    <div className="yv-collection">
+      <div className="yv-collection-meta">
         <span>{type}</span>
-        <span>{kind} · {value.size ?? value.values.length} items</span>
+        <span>{kind} · {itemCount} items</span>
       </div>
       <ArrayView value={value.values} state={state} source={source} arrayName={name}/>
     </div>
@@ -180,29 +255,6 @@ function pointerLabels(state: TraceState | undefined, length: number, indexNames
     const list = map.get(value) ?? []; list.push(name); map.set(value,list);
   }
   return map;
-}
-
-function methodDeclarationLine(
-  sourceLines: string[],
-  methodName: string | undefined,
-  fallbackLine: number | undefined
-): number | undefined {
-  if (!fallbackLine || !methodName) return fallbackLine;
-
-  const pattern = new RegExp('\\b' + methodName + '\\s*\\(');
-
-  for (let index = Math.min(fallbackLine - 1, sourceLines.length - 1); index >= 0; index--) {
-    const trimmed = sourceLines[index].trim();
-    if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) {
-      continue;
-    }
-
-    if (pattern.test(trimmed)) {
-      return index + 1;
-    }
-  }
-
-  return fallbackLine;
 }
 
 function changedArrayIndices(state?: TraceState): Set<number> {
@@ -355,20 +407,72 @@ function resolveRef(value: unknown, objects: Record<string,unknown>): unknown {
 }
 function nodeValue(value: Obj): unknown { const f=objectFields(value); return f.val ?? f.value ?? f.data ?? '?'; }
 
-function LinkedListView({ root, objects }: { root: Obj; objects: Record<string,unknown> }) {
+function LinkedListView({
+  root,
+  objects,
+  variables = {}
+}: {
+  root: Obj;
+  objects: Record<string, unknown>;
+  variables?: Record<string, unknown>;
+}) {
+  const pointerNames = new Map<string, string[]>();
+  for (const [name, value] of Object.entries(variables)) {
+    if (isPlainObject(value) && typeof value.$objectId === 'string') {
+      const names = pointerNames.get(value.$objectId) ?? [];
+      names.push(name);
+      pointerNames.set(value.$objectId, names);
+    }
+  }
+
   const nodes: Array<{id:string;value:unknown}> = []; const seen=new Set<string>(); let cur: unknown=root;
   for(let guard=0;guard<40;guard++){
     cur=resolveRef(cur,objects); if(!isPlainObject(cur))break;
     const id=String(cur.$objectId ?? `node-${guard}`); if(seen.has(id)){nodes.push({id:'cycle',value:'↻'});break;} seen.add(id);
     nodes.push({id,value:nodeValue(cur)}); const f=objectFields(cur); if(f.next==null)break; cur=f.next;
   }
-  return <div className="yv-linked">{nodes.map((n,i)=><div className="yv-linked-piece" key={`${n.id}-${i}`}><div className="yv-node">{displayValue(n.value)}</div>{i<nodes.length-1&&<div className="yv-edge">→</div>}</div>)}</div>;
+  return <div className="yv-linked">{nodes.map((n,i)=><div className="yv-linked-piece" key={`${n.id}-${i}`}>
+    {pointerNames.get(n.id)?.map(name => <div className="yv-node-pointer" key={name}>{name}</div>)}
+    <div className="yv-node">{displayValue(n.value)}</div>{i<nodes.length-1&&<div className="yv-edge">→</div>}
+  </div>)}</div>;
 }
 
 function TreeNodeView({ value, objects, depth=0 }: { value: unknown; objects: Record<string,unknown>; depth?: number }) {
   const resolved=resolveRef(value,objects); if(!isPlainObject(resolved) || depth>6)return null;
   const f=objectFields(resolved); return <div className="yv-tree-node"><div className="yv-node">{displayValue(nodeValue(resolved))}</div>{(f.left!=null||f.right!=null)&&<div className="yv-tree-children"><div>{f.left!=null?<TreeNodeView value={f.left} objects={objects} depth={depth+1}/>:<span className="yv-null">null</span>}</div><div>{f.right!=null?<TreeNodeView value={f.right} objects={objects} depth={depth+1}/>:<span className="yv-null">null</span>}</div></div>}</div>;
 }
+function ReturnValueView({
+  text,
+  value,
+  state
+}: {
+  text: string;
+  value: unknown;
+  state?: TraceState;
+}) {
+  if (isPlainObject(value) && looksListNode(value)) {
+    return (
+      <div className="yv-return-object">
+        <div className="yv-return-reference yv-code">{text}</div>
+        <div className="yv-return-caption">Returned node and reachable chain</div>
+        <LinkedListView root={value} objects={state?.objects ?? {}} variables={state?.variables ?? {}} />
+      </div>
+    );
+  }
+
+  if (isPlainObject(value) && looksTreeNode(value)) {
+    return (
+      <div className="yv-return-object">
+        <div className="yv-return-reference yv-code">{text}</div>
+        <div className="yv-return-caption">Returned root and reachable tree</div>
+        <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects ?? {}} /></div>
+      </div>
+    );
+  }
+
+  return <div className="yv-code">{text}</div>;
+}
+
 
 function DataValue({ value, state, source, name }: { value: unknown; state?: TraceState; source: string; name?: string }) {
   if (isMapSnapshot(value)) {
@@ -395,7 +499,7 @@ function DataValue({ value, state, source, name }: { value: unknown; state?: Tra
   if (Array.isArray(value)) return <ArrayView value={value} state={state} source={source} arrayName={name}/>;
   if (isPlainObject(value)) {
     if (looksTreeNode(value)) return <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects??{}}/></div>;
-    if (looksListNode(value)) return <LinkedListView root={value} objects={state?.objects??{}}/>;
+    if (looksListNode(value)) return <LinkedListView root={value} objects={state?.objects??{}} variables={state?.variables??{}}/>;
     const fields = objectFields(value);
     return <div className="yv-map">{Object.entries(fields).map(([k,v])=><div className="yv-map-row" key={k}><div className="yv-code">{k}</div><div className="yv-code">{displayValue(v)}</div></div>)}</div>;
   }
@@ -414,11 +518,13 @@ function isStructuralObject(value: unknown): value is Obj {
 function DataStructures({ state, source }: { state?: TraceState; source: string }) {
   const arrays = Object.entries(state?.arrays ?? {});
   const structures = Object.entries(state?.dataStructures ?? {});
-  const namedObjectIds = new Set<string>();
+  const namedObjectIds = new Map<string, string[]>();
 
-  for (const value of Object.values(state?.variables ?? {})) {
+  for (const [name, value] of Object.entries(state?.variables ?? {})) {
     if (isStructuralObject(value) && typeof value.$objectId === 'string') {
-      namedObjectIds.add(value.$objectId);
+      const names = namedObjectIds.get(value.$objectId) ?? [];
+      names.push(name);
+      namedObjectIds.set(value.$objectId, names);
     }
   }
 
@@ -437,12 +543,16 @@ function DataStructures({ state, source }: { state?: TraceState; source: string 
 
   return (
     <div className="yv-ds-list">
-      {items.map(([name, value]) => (
-        <div className="yv-ds" key={name}>
-          <div className="yv-ds-title">{name}</div>
-          <DataValue value={value} state={state} source={source} name={name}/>
-        </div>
-      ))}
+      {items.map(([name, value]) => {
+        const objectNames = namedObjectIds.get(name);
+        const title = objectNames?.join(' / ') ?? name;
+        return (
+          <div className="yv-ds" key={name}>
+            <div className="yv-ds-title">{title}</div>
+            <DataValue value={value} state={state} source={source} name={title}/>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -450,18 +560,15 @@ function DataStructures({ state, source }: { state?: TraceState; source: string 
 export function VisualizerPanel(){
   const s=useSession(); const current=s.states[s.index]; const prev=s.index>0?s.states[s.index-1]:undefined;
   const sourceLines=useMemo(()=>s.source.split(/\r?\n/),[s.source]);
-  const line =
-    current?.lastEvent?.type === 'METHOD_ENTER'
-      ? methodDeclarationLine(sourceLines, current.method, current.line)
-      : current?.line;
+  const line = current?.line;
   const statement=line?sourceLines[line-1]?.trim():'';
   useEffect(()=>{highlightEditorLine(line);return()=>clearEditorExecutionMarker();},[line]);
   useEffect(()=>{ if(!s.playing)return; const id=setInterval(()=>sessionStore.next(),650); return()=>clearInterval(id); },[s.playing,s.index,s.states.length]);
   useEffect(()=>{ const onKey=(e:KeyboardEvent)=>{ if(!sessionStore.get().open)return; const target=e.target as HTMLElement|null; if(target?.matches('input,textarea,[contenteditable=true]'))return; const handled=e.key==='ArrowRight'||e.key==='ArrowLeft'||e.code==='Space'||e.key.toLowerCase()==='r'; if(!handled)return; e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); const active=document.activeElement?.shadowRoot?.activeElement as HTMLElement|null; if(active?.matches('button'))active.blur(); if(e.key==='ArrowRight')sessionStore.next(); else if(e.key==='ArrowLeft')sessionStore.prev(); else if(e.code==='Space')sessionStore.togglePlay(); else sessionStore.restart(); }; window.addEventListener('keydown',onKey,true);return()=>window.removeEventListener('keydown',onKey,true)},[]);
   const output=s.response?.result; const tc=s.testcase; const finished=current?.lastEvent?.type==='PROGRAM_END' || (s.states.length>0&&s.index===s.states.length-1);
   return <div className="yv-root"><div className="yv-scroll">
-    {tc&&<div className="yv-top"><div className="yv-title-row"><div className="yv-case">{tc.label}</div>{tc.source==='custom'&&<span className="yv-case-kind">Custom</span>}{tc.source==='failed'&&<span className="yv-case-kind">Failed testcase</span>}</div><div className="yv-inputs">{Object.keys(tc.inputs).length?Object.entries(tc.inputs).map(([k,v])=><div className="yv-input" key={k}><div className="yv-key">{k}</div><div className="yv-code">{v}</div></div>):<div className="yv-code">{tc.raw}</div>}</div><div className="yv-output-row"><div className={`yv-output ${finished&&s.response?.success?'good':''}`}><div className="yv-label">Output</div><div className="yv-code">{finished&&output!==undefined?displayValue(output):'—'}</div></div></div></div>}
+    {tc&&<div className="yv-top"><div className="yv-title-row"><div className="yv-case">{tc.label}</div>{tc.source==='custom'&&<span className="yv-case-kind">Custom</span>}{tc.source==='failed'&&<span className="yv-case-kind">Failed testcase</span>}</div><div className="yv-inputs">{Object.keys(tc.inputs).length?Object.entries(tc.inputs).map(([k,v])=><div className="yv-input" key={k}><div className="yv-key">{k}</div><div className="yv-code">{v}</div></div>):<div className="yv-code">{tc.raw}</div>}</div><div className="yv-output-row"><div className={`yv-output ${finished&&s.response?.success?'good':''}`}><div className="yv-label">Output</div>{finished&&output!==undefined?<ReturnValueView text={displayValue(output)} value={current?.lastEvent?.data?.returnValue} state={current}/>:<div className="yv-code">—</div>}</div></div></div>}
     {s.loading&&<div className="yv-loading">Tracing your code…</div>}{s.error&&<div className="yv-error">{s.error}</div>}
-    {!s.loading&&<><Section title="Variables"><Variables state={current} previous={prev}/></Section><Section title="Call Stack">{current?.callStack?.length?<div className="yv-stack">{current.callStack.map((f:string,i:number)=><div className="yv-frame" key={`${f}-${i}`}>{f}</div>)}</div>:<div className="yv-empty">No active method calls.</div>}</Section><Section title="Data Structures"><DataStructures state={current} source={s.source}/></Section></>}
+    {!s.loading&&<><Section title="Variables"><Variables state={current} previous={prev}/></Section><Section title="Call Stack">{current?.callStack?.length?<div className="yv-stack-wrap"><div className="yv-stack-label">TOP</div><div className="yv-stack">{current.callStack.map((f:string,i:number)=><div className="yv-frame" key={`${f}-${i}`}>{f}</div>)}</div><div className="yv-stack-label bottom">BOTTOM</div></div>:<div className="yv-empty">No active method calls.</div>}</Section><Section title="Data Structures"><DataStructures state={current} source={s.source}/></Section></>}
   </div><div className="yv-current"><div className="yv-current-head"><span>{eventLabel(current)}</span></div><div className="yv-statement">{statement||'Select a testcase and press Visualize.'}</div><div className="yv-controls"><div className="yv-buttons"><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.restart()} disabled={!s.states.length}>↺ Restart</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.prev()} disabled={s.index<=0}>← Prev</button><button className="yv-btn primary" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.togglePlay()} disabled={s.states.length<2}>{s.playing?'■ Stop':'▶ Play'}</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.next()} disabled={!s.states.length||s.index>=s.states.length-1}>Next →</button></div></div></div></div>;
 }
