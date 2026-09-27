@@ -325,7 +325,7 @@ assert(nestedCycleBox !== undefined, "nested cycle box snapshot was not preserve
 const nestedCycleMap = nestedCycleBox?.fields?.links as Record<string, any> | undefined;
 assert(
     nestedCycleMap !== undefined &&
-    typeof verifiedNestedCycleMap.$mapId === "string" &&
+    typeof nestedCycleMap.$mapId === "string" &&
     Array.isArray(nestedCycleMap.entries),
     "object -> map link was not preserved"
 );
@@ -343,10 +343,10 @@ assert(
     "map -> object identity was not preserved"
 );
 
-const selfEntry = (nestedCycleMap.entries as Array<Record<string, any>>)
+const selfEntry = (verifiedNestedCycleMap.entries as Array<Record<string, any>>)
     .find(entry => entry.key === "self");
 assert(
-    selfEntry?.value?.$ref === nestedCycleMap.$mapId,
+    selfEntry?.value?.$ref === verifiedNestedCycleMap.$mapId,
     "map self-reference was not preserved"
 );
 
