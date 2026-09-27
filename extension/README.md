@@ -16,3 +16,12 @@ npm run test
 npm run build
 ```
 Then load `extension/dist` as an unpacked extension in Chrome.
+
+## Browser regression tests
+The Playwright suite loads the built extension into Chromium, serves a LeetCode-shaped page at the matching URL, and uses a deterministic local visualization response. It verifies the extension tab, the default/custom/failed testcase flows, keyboard stepping, output, and the source editor line highlight.
+
+```bash
+npm run test:e2e
+```
+
+This command builds the extension before launching Chromium. In CI, install the browser with `npx playwright install --with-deps chromium` and run under `xvfb-run`.

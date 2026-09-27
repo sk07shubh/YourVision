@@ -3,3 +3,5 @@ node_modules/
 extension/node_modules/
 extension/dist/
 extension/.vitest/
+extension/playwright-report/
+extension/test-results/
