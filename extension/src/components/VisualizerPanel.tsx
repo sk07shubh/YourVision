@@ -474,7 +474,6 @@ function ReturnValueView({
 }
 
 
-
 function DataValue({ value, state, source, name }: { value: unknown; state?: TraceState; source: string; name?: string }) {
   if (isMapSnapshot(value)) {
     return <MapView value={value} state={state}/>;
