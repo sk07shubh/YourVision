@@ -198,8 +198,8 @@ test('Chrome extension renders returned ListNode identity and reachable chain', 
     await page.locator('[data-yourvision-tab="true"]').click();
     await page.locator('[data-yourvision-visualize="true"]').click();
     const host = page.locator('[data-yourvision-host="true"]');
-    await page.keyboard.press('ArrowRight');
-    await page.keyboard.press('ArrowRight');
+    await host.getByRole('button', { name: 'Next →' }).click();
+    await host.getByRole('button', { name: 'Next →' }).click();
 
     const output = host.locator('.yv-output');
     await expect(output).toContainText('ListNode@102');
@@ -242,7 +242,7 @@ test('Chrome extension renders returned TreeNode identity and reachable tree', a
     await page.locator('[data-yourvision-tab="true"]').click();
     await page.locator('[data-yourvision-visualize="true"]').click();
     const host = page.locator('[data-yourvision-host="true"]');
-    await page.keyboard.press('ArrowRight');
+    await host.getByRole('button', { name: 'Next →' }).click();
 
     const output = host.locator('.yv-output');
     await expect(output).toContainText('TreeNode@201');
