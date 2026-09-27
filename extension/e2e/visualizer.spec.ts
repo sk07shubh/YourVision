@@ -204,7 +204,7 @@ test('Chrome extension renders returned ListNode identity and reachable chain', 
     const output = host.locator('.yv-output');
     await expect(output).toContainText('ListNode@102');
     await expect(output).toContainText('Returned node and reachable chain');
-    await expect(output.locator('.yv-node')).allTextContents().resolves.toEqual(['3', '4', '5']);
+    expect(await output.locator('.yv-node').allTextContents()).toEqual(['3', '4', '5']);
     await expect(output.locator('.yv-linked-piece')).toHaveCount(3);
   } finally {
     await context.close();
@@ -247,7 +247,7 @@ test('Chrome extension renders returned TreeNode identity and reachable tree', a
     const output = host.locator('.yv-output');
     await expect(output).toContainText('TreeNode@201');
     await expect(output).toContainText('Returned root and reachable tree');
-    await expect(output.locator('.yv-tree .yv-node')).allTextContents().resolves.toEqual(['1', '2', '3', '4']);
+    expect(await output.locator('.yv-tree .yv-node').allTextContents()).toEqual(['1', '2', '3', '4']);
   } finally {
     await context.close();
     await rm(profile, { recursive: true, force: true });
