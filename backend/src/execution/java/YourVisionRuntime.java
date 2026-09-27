@@ -389,6 +389,13 @@ public class YourVisionRuntime {
                 80
             );
         }
+if (isListNodeType(type)) {
+    return parseListNode(text, type);
+}
+
+if (isTreeNodeType(type)) {
+    return parseTreeNode(text, type);
+}
 
         if (type.isArray()) {
             if (
@@ -1321,6 +1328,261 @@ public class YourVisionRuntime {
             this.method = method;
             this.arguments = arguments;
             this.score = score;
+        }
+    }
+        private static boolean isListNodeType(Class<?> type) {
+        return "ListNode".equals(type.getSimpleName());
+    }
+
+    private static boolean isTreeNodeType(Class<?> type) {
+        return "TreeNode".equals(type.getSimpleName());
+    }
+
+    private static ParseResult parseListNode(
+        String text,
+        Class<?> type
+    ) {
+        if (!text.startsWith("[") || !text.endsWith("]")) {
+            throw new IllegalArgumentException(
+                "ListNode input must use [..] syntax"
+            );
+        }
+
+        List<String> parts =
+            splitTopLevel(
+                text.substring(
+                    1,
+                    text.length() - 1
+                )
+            );
+
+        if (
+            parts.size() == 1 &&
+            parts.get(0).trim().isEmpty()
+        ) {
+            return new ParseResult(
+                null,
+                130
+            );
+        }
+
+        Object head = null;
+        Object tail = null;
+
+        try {
+            Constructor<?> constructor =
+                type.getDeclaredConstructor();
+
+            constructor.setAccessible(true);
+
+            Field valField =
+                findField(type, "val");
+
+            Field nextField =
+                findField(type, "next");
+
+            if (valField == null || nextField == null) {
+                throw new IllegalArgumentException(
+                    "ListNode must contain val and next fields"
+                );
+
+            }
+
+            valField.setAccessible(true);
+            nextField.setAccessible(true);
+
+            for (String part : parts) {
+                String valueText = part.trim();
+
+                if ("null".equals(valueText)) {
+                    break;
+                }
+
+                Object node =
+                    constructor.newInstance();
+
+                ParseResult value =
+                    parseValue(
+                        valueText,
+                        valField.getType()
+                    );
+
+                valField.set(node, value.value);
+
+                if (head == null) {
+                    head = node;
+                } else {
+                    nextField.set(tail, node);
+                }
+
+                tail = node;
+            }
+
+            return new ParseResult(
+                head,
+                150 + parts.size()
+            );
+
+        } catch (IllegalArgumentException ex) {
+            throw ex;
+
+        } catch (Exception ex) {
+            throw new IllegalArgumentException(
+                "could not construct ListNode input",
+                ex
+            );
+        }
+    }
+
+    private static ParseResult parseTreeNode(
+        String text,
+        Class<?> type
+    ) {
+        if (!text.startsWith("[") || !text.endsWith("]")) {
+            throw new IllegalArgumentException(
+                "TreeNode input must use [..] syntax"
+            );
+        }
+
+        List<String> parts =
+            splitTopLevel(
+                text.substring(
+                    1,
+                    text.length() - 1
+                )
+            );
+
+        if (
+            parts.isEmpty() ||
+            (
+                parts.size() == 1 &&
+                parts.get(0).trim().isEmpty()
+            )
+        ) {
+            return new ParseResult(
+                null,
+                130
+            );
+        }
+
+        try {
+            Constructor<?> constructor =
+                type.getDeclaredConstructor();
+
+            constructor.setAccessible(true);
+
+            Field valField =
+                findField(type, "val");
+
+            Field leftField =
+                findField(type, "left");
+
+            Field rightField =
+                findField(type, "right");
+
+            if (
+                valField == null ||
+                leftField == null ||
+                rightField == null
+            ) {
+                throw new IllegalArgumentException(
+                    "TreeNode must contain val, left, and right fields"
+                );
+            }
+
+            valField.setAccessible(true);
+            leftField.setAccessible(true);
+            rightField.setAccessible(true);
+
+            String rootText =
+                parts.get(0).trim();
+
+            if ("null".equals(rootText)) {
+                return new ParseResult(
+                    null,
+                    130
+                );
+            }
+
+            Object root =
+                constructor.newInstance();
+
+            ParseResult rootValue =
+                parseValue(
+                    rootText,
+                    valField.getType()
+                );
+
+            valField.set(root, rootValue.value);
+
+            Queue<Object> queue =
+                new ArrayDeque<>();
+
+            queue.add(root);
+
+            int index = 1;
+
+            while (
+                !queue.isEmpty() &&
+                index < parts.size()
+            ) {
+                Object parent =
+                    queue.remove();
+
+                String leftText =
+                    parts.get(index++).trim();
+
+                if (!"null".equals(leftText)) {
+                    Object left =
+                        constructor.newInstance();
+
+                    ParseResult value =
+                        parseValue(
+                            leftText,
+                            valField.getType()
+                        );
+
+                    valField.set(left, value.value);
+                    leftField.set(parent, left);
+                    queue.add(left);
+                }
+
+                if (index >= parts.size()) {
+                    break;
+                }
+
+                String rightText =
+                    parts.get(index++).trim();
+
+                if (!"null".equals(rightText)) {
+                    Object right =
+                        constructor.newInstance();
+
+                    ParseResult value =
+                        parseValue(
+                            rightText,
+                            valField.getType()
+                        );
+
+                    valField.set(right, value.value);
+                    rightField.set(parent, right);
+                    queue.add(right);
+                }
+            }
+
+            return new ParseResult(
+                root,
+                150 + parts.size()
+            );
+
+        } catch (IllegalArgumentException ex) {
+            throw ex;
+
+        } catch (Exception ex) {
+            throw new IllegalArgumentException(
+                "could not construct TreeNode input",
+                ex
+            );
         }
     }
 }

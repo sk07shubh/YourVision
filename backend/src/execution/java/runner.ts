@@ -49,7 +49,27 @@ const TRACER_FILE =
             import.meta.url
         )
     );
+const TYPES_FILE = path.join(
+    process.cwd(),
+    "src",
+    "execution",
+    "java",
+    "LeetCodeTypes.java"
+);
+function prepareJavaSource(source: string): string {
+    const standardImport =
+        "import java.util.*;";
 
+    if (
+        /^\s*import\s+java\.util\.\*;/m.test(
+            source
+        )
+    ) {
+        return source;
+    }
+
+    return `${standardImport}\n\n${source}`;
+}
 export async function runJava(
     source: string,
     testcase?: JavaTestcase
@@ -86,6 +106,9 @@ export async function runJava(
 
     const rawArguments =
         testcase.arguments ?? [];
+    console.log("=== TESTCASE ===");
+console.log(testcase);
+console.log("================");
 
     if (
         rawArguments.some(
@@ -128,12 +151,19 @@ export async function runJava(
             tempDir,
             "YourVisionTracer.java"
         );
+    const typesPath = path.join(
+  tempDir,
+  "LeetCodeTypes.java"
+);
 
     try {
-        await fs.writeFile(
-            solutionPath,
-            source
-        );
+       const preparedSource =
+    prepareJavaSource(source);
+
+await fs.writeFile(
+    solutionPath,
+    preparedSource
+);
 
         await fs.copyFile(
             RUNTIME_FILE,
@@ -144,20 +174,24 @@ export async function runJava(
             TRACER_FILE,
             tracerPath
         );
-
+        await fs.copyFile(
+    TYPES_FILE,
+    typesPath
+);
         try {
             await execFileAsync(
-                "javac",
-                [
-                    "--add-modules",
-                    "jdk.jdi",
-                    "-g",
-                    "-d",
-                    tempDir,
-                    solutionPath,
-                    runtimePath,
-                    tracerPath
-                ],
+    "javac",
+    [
+        "--add-modules",
+        "jdk.jdi",
+        "-g",
+        "-d",
+        tempDir,
+        solutionPath,
+        typesPath,
+        runtimePath,
+        tracerPath
+    ],
                 {
                     timeout: 5000,
                     maxBuffer:
@@ -166,6 +200,12 @@ export async function runJava(
             );
 
         } catch (error: any) {
+            console.log("=== JAVA EXECUTION ERROR ===");
+console.log(error);
+console.log("============================");
+            console.log("=== JAVAC STDERR ===");
+console.log(error.stderr ?? error.message ?? "");
+console.log("====================");
             return {
                 success: false,
                 kind:
@@ -223,6 +263,11 @@ export async function runJava(
                             1024 * 1024
                     }
                 );
+                console.log("=== JAVA STDOUT ===");
+console.log(stdout);
+console.log("=== JAVA STDERR ===");
+console.log(stderr);
+console.log("===================");
 
             const trace =
                 parseTrace(stdout);
