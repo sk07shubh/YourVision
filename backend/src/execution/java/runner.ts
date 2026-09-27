@@ -284,7 +284,7 @@ await fs.writeFile(
                     {
                         timeout: 5000,
                         maxBuffer:
-                            1024 * 1024
+                            8 * 1024 * 1024
                     }
                 );
             const trace =
@@ -458,7 +458,7 @@ function isTimeout(
         error?.killed ||
         error?.code ===
             "ETIMEDOUT" ||
-        error?.code ===
+        Number(error?.code) ===
             124 ||
         error?.signal ===
             "SIGTERM"
