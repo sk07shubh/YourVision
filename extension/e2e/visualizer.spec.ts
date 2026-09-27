@@ -453,6 +453,83 @@ test('Chrome extension renders nested objects across collection views', async ()
   }
 });
 
+test('Chrome extension groups aliased arrays and collections by identity', async () => {
+  const aliasSource = [
+    'class Solution {',
+    '  public int inspect() {',
+    '    return 1;',
+    '  }',
+    '}',
+  ].join('\\n');
+
+  const sharedArray = {
+    $arrayId: 'array1',
+    $type: 'int[]',
+    values: [1, 2]
+  };
+  const sharedMap = {
+    $mapId: 'map1',
+    $type: 'java.util.HashMap',
+    entries: [{ key: 'x', value: 1 }]
+  };
+  const sharedList = {
+    $collectionId: 'list1',
+    $type: 'java.util.ArrayList',
+    $kind: 'list',
+    values: [3],
+    size: 1
+  };
+
+  activeResponse = {
+    success: true,
+    kind: 'OK',
+    result: '1',
+    states: [{
+      sequence: 1,
+      line: 2,
+      method: 'inspect',
+      depth: 1,
+      variables: {
+        firstArray: sharedArray,
+        secondArray: sharedArray,
+        firstMap: sharedMap,
+        secondMap: sharedMap,
+        firstList: sharedList,
+        secondList: sharedList
+      },
+      arrays: {
+        firstArray: sharedArray,
+        secondArray: sharedArray
+      },
+      dataStructures: {
+        firstMap: sharedMap,
+        secondMap: sharedMap,
+        firstList: sharedList,
+        secondList: sharedList
+      },
+      objects: {},
+      callStack: ['inspect'],
+      lastEvent: { type: 'METHOD_ENTER', line: 2, method: 'inspect' }
+    }]
+  };
+
+  const { context, page, profile } = await launchPage('default', aliasSource);
+  try {
+    await page.locator('[data-yourvision-tab="true"]').click();
+    await page.locator('[data-yourvision-visualize="true"]').click();
+
+    const host = page.locator('[data-yourvision-host="true"]');
+    const structures = host.locator('.yv-section').filter({ hasText: 'Data Structures' });
+    await expect(structures.locator('.yv-ds-title')).toContainText('firstArray / secondArray');
+    await expect(structures.locator('.yv-ds-title')).toContainText('firstMap / secondMap');
+    await expect(structures.locator('.yv-ds-title')).toContainText('firstList / secondList');
+    await expect(structures.locator('.yv-ds')).toHaveCount(3);
+  } finally {
+    await context.close();
+    await rm(profile, { recursive: true, force: true });
+  }
+});
+
 test('Chrome extension preserves historical nested map values after object mutation', async () => {
   const mapSource = [
     'class Solution {',

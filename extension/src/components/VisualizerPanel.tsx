@@ -627,8 +627,6 @@ function isStructuralObject(value: unknown): value is Obj {
 }
 
 function DataStructures({ state, source }: { state?: TraceState; source: string }) {
-  const arrays = Object.entries(state?.arrays ?? {});
-  const structures = Object.entries(state?.dataStructures ?? {});
   const namedObjectIds = new Map<string, string[]>();
 
   for (const [name, value] of Object.entries(state?.variables ?? {})) {
@@ -639,14 +637,43 @@ function DataStructures({ state, source }: { state?: TraceState; source: string 
     }
   }
 
-  const objectItems = Object.entries(state?.objects ?? {})
-    .filter(([id]) => namedObjectIds.has(id));
+  const grouped = new Map<string, { names: string[]; value: unknown }>();
 
-  const items = [
-    ...arrays,
-    ...structures,
-    ...objectItems
-  ];
+  for (const [name, value] of Object.entries(state?.arrays ?? {})) {
+    const id = isPlainObject(value) && typeof value.$arrayId === 'string'
+      ? value.$arrayId
+      : name;
+    const item = grouped.get(`array:${id}`);
+    if (item) {
+      item.names.push(name);
+    } else {
+      grouped.set(`array:${id}`, { names: [name], value });
+    }
+  }
+
+  for (const [name, value] of Object.entries(state?.dataStructures ?? {})) {
+    const record = isPlainObject(value) ? value : {};
+    const id =
+      typeof record.$mapId === 'string'
+        ? `map:${record.$mapId}`
+        : typeof record.$collectionId === 'string'
+          ? `collection:${record.$collectionId}`
+          : `structure:${name}`;
+    const item = grouped.get(id);
+    if (item) {
+      item.names.push(name);
+    } else {
+      grouped.set(id, { names: [name], value });
+    }
+  }
+
+  for (const [id, value] of Object.entries(state?.objects ?? {})) {
+    const names = namedObjectIds.get(id);
+    if (!names?.length) continue;
+    grouped.set(`object:${id}`, { names, value });
+  }
+
+  const items = [...grouped.values()];
 
   if (!items.length) {
     return <div className="yv-empty">Structures appear here as your code creates or mutates them.</div>;
@@ -654,11 +681,10 @@ function DataStructures({ state, source }: { state?: TraceState; source: string 
 
   return (
     <div className="yv-ds-list">
-      {items.map(([name, value]) => {
-        const objectNames = namedObjectIds.get(name);
-        const title = objectNames?.join(' / ') ?? name;
+      {items.map(({ names, value }) => {
+        const title = [...new Set(names)].join(' / ');
         return (
-          <div className="yv-ds" key={name}>
+          <div className="yv-ds" key={title}>
             <div className="yv-ds-title">{title}</div>
             <DataValue value={value} state={state} source={source} name={title}/>
           </div>
