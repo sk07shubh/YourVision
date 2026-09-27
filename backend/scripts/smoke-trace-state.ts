@@ -149,6 +149,45 @@ if (returnStates.length !== 3 || stateAt(returnStates, 2).line !== 8) {
     throw new Error("top-level method return did not preserve the return statement line");
 }
 
+const repeatedStepTrace: ExecutionTrace = {
+    version: 1,
+    events: [
+        {
+            sequence: 1,
+            type: "METHOD_ENTER",
+            line: 4,
+            method: "spin",
+            depth: 1,
+            data: { displayLine: 4, variables: { ready: true } }
+        },
+        {
+            sequence: 2,
+            type: "STEP",
+            line: 5,
+            method: "spin",
+            depth: 1,
+            data: { variables: { ready: true } }
+        },
+        {
+            sequence: 3,
+            type: "STEP",
+            line: 5,
+            method: "spin",
+            depth: 1,
+            data: { variables: { ready: true } }
+        }
+    ]
+};
+
+const repeatedStepStates = buildStates(repeatedStepTrace);
+if (
+    repeatedStepStates.length !== 3 ||
+    stateAt(repeatedStepStates, 1).sequence !== 2 ||
+    stateAt(repeatedStepStates, 2).sequence !== 3
+) {
+    throw new Error("repeated runtime checkpoints at the same source line were deduplicated");
+}
+
 if (stateAt(states, 2).variables.left !== 0) throw new Error("caller variables were not restored on method return");
 if (stateAt(states, 3).error?.type !== "IndexOutOfBoundsException") throw new Error("error state was not replayed");
 if (stateAt(states, 4).variables.left !== 1) throw new Error("STEP variables were not hydrated");

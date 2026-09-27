@@ -38,8 +38,16 @@ export function buildStates(
         };
 
         const previous = states[states.length - 1];
+        const sameVisible = previous !== undefined &&
+            sameVisibleState(previous, snapshot);
 
-        if (!previous || !sameVisibleState(previous, snapshot)) {
+        // Adjacent STEP events at the same visible location can be separate
+        // loop executions even if no displayed value changed. Preserve them.
+        // Other identical checkpoint pairs can be duplicate boundary snapshots,
+        // such as METHOD_EXIT followed by its caller-resume STEP.
+        const repeatedStep = previous?.lastEvent?.type === "STEP" &&
+            event.type === "STEP";
+        if (!sameVisible || repeatedStep) {
             states.push(snapshot);
         }
     }
@@ -55,6 +63,20 @@ function isCheckpointEvent(event: ExecutionEvent): boolean {
         event.type === "ERROR" ||
         event.type === "TIMEOUT" ||
         event.type === "TRACE_LIMIT"
+    );
+}
+
+function sameVisibleState(left: TraceState, right: TraceState): boolean {
+    return (
+        left.line === right.line &&
+        left.method === right.method &&
+        left.depth === right.depth &&
+        JSON.stringify(left.variables) === JSON.stringify(right.variables) &&
+        JSON.stringify(left.arrays) === JSON.stringify(right.arrays) &&
+        JSON.stringify(left.dataStructures) === JSON.stringify(right.dataStructures) &&
+        JSON.stringify(left.objects) === JSON.stringify(right.objects) &&
+        JSON.stringify(left.callStack) === JSON.stringify(right.callStack) &&
+        JSON.stringify(left.error) === JSON.stringify(right.error)
     );
 }
 
@@ -475,20 +497,5 @@ function isDataStructureSnapshot(
         typeof record.$arrayId === "string" ||
         typeof record.$mapId === "string" ||
         typeof record.$collectionId === "string"
-    );
-}
-
-
-function sameVisibleState(left: TraceState, right: TraceState): boolean {
-    return (
-        left.line === right.line &&
-        left.method === right.method &&
-        left.depth === right.depth &&
-        JSON.stringify(left.variables) === JSON.stringify(right.variables) &&
-        JSON.stringify(left.arrays) === JSON.stringify(right.arrays) &&
-        JSON.stringify(left.dataStructures) === JSON.stringify(right.dataStructures) &&
-        JSON.stringify(left.objects) === JSON.stringify(right.objects) &&
-        JSON.stringify(left.callStack) === JSON.stringify(right.callStack) &&
-        JSON.stringify(left.error) === JSON.stringify(right.error)
     );
 }
