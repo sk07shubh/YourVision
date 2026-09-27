@@ -1,5 +1,8 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
 const execFileAsync = promisify(execFile);
 
@@ -39,27 +42,32 @@ class Solution {
 const encoded =
     Buffer.from(source, "utf8").toString("base64");
 
-await execFileAsync(
-    "javac",
-    [
-        "--add-modules",
-        "jdk.compiler",
-        "src/execution/java/YourVisionSourceProbe.java"
-    ]
-);
+const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "yourvision-source-probe-"));
 
-const result =
+try {
     await execFileAsync(
-        "java",
+        "javac",
         [
             "--add-modules",
             "jdk.compiler",
-            "-cp",
-            "src/execution/java",
-            "YourVisionSourceProbe",
-            encoded
+            "-d",
+            outputDir,
+            "src/execution/java/YourVisionSourceProbe.java"
         ]
     );
+
+    const result =
+        await execFileAsync(
+            "java",
+            [
+                "--add-modules",
+                "jdk.compiler",
+                "-cp",
+                outputDir,
+                "YourVisionSourceProbe",
+                encoded
+            ]
+        );
 
 const lines =
     result.stdout
@@ -119,3 +127,6 @@ if (
 console.log(
     `PASS: discovered ${records.length} array access nodes with semantic classification`
 );
+} finally {
+    await fs.rm(outputDir, { recursive: true, force: true });
+}

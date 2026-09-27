@@ -76,6 +76,16 @@ function prepareJavaSource(source: string): string {
     // Keep the user's source line numbers unchanged. JDI reports lines from
     // the compiled Solution.java, so adding an import on its own line would
     // shift every executable line and break editor highlighting.
+    const packageDeclaration =
+        /(^[ \t]*package[ \t]+[\w.]+[ \t]*;)/m;
+
+    if (packageDeclaration.test(source)) {
+        return source.replace(
+            packageDeclaration,
+            `$1 ${standardImport}`
+        );
+    }
+
     return `${standardImport} ${source}`;
 }
 export async function runJava(
@@ -276,7 +286,7 @@ await fs.writeFile(
                     }
                 );
             const trace =
-                parseTrace(stdout);
+                parseTrace(stdout, source);
 
             const traceLimited =
                 trace.events.some(
@@ -321,7 +331,7 @@ await fs.writeFile(
                     error.stdout ?? "";
 
                 const trace =
-                    parseTrace(stdout);
+                    parseTrace(stdout, source);
 
                 const lastSequence =
                     trace.events.at(-1)
@@ -372,7 +382,7 @@ await fs.writeFile(
                 );
 
             const trace =
-                parseTrace(stdout);
+                    parseTrace(stdout, source);
 
             return {
                 success: false,
@@ -444,7 +454,8 @@ function isTimeout(
 
 
 function parseTrace(
-    stdout: string
+    stdout: string,
+    source: string
 ): ExecutionTrace {
     const events: ExecutionEvent[] = [];
 
@@ -481,8 +492,79 @@ function parseTrace(
             a.sequence - b.sequence
     );
 
+    attachMethodDisplayLines(events, source);
+
     return enrichTrace({
         version: 1,
         events
     });
+}
+
+function attachMethodDisplayLines(
+    events: ExecutionEvent[],
+    source: string
+): void {
+    const candidates = methodDeclarationLines(source);
+
+    for (const event of events) {
+        if (
+            event.type !== "METHOD_ENTER" ||
+            !event.method ||
+            typeof event.line !== "number" ||
+            event.line < 1
+        ) {
+            continue;
+        }
+
+        const eventLine = event.line;
+        const declarations = candidates.get(event.method);
+        const declaration = declarations
+            ?.filter(line => line <= eventLine)
+            .at(-1);
+
+        if (declaration !== undefined) {
+            event.data = {
+                ...(event.data ?? {}),
+                displayLine: declaration
+            };
+        }
+    }
+}
+
+function methodDeclarationLines(source: string): Map<string, number[]> {
+    const lines = new Map<string, number[]>();
+    const methodCall = /\b([A-Za-z_$][\w$]*)\s*\(/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = methodCall.exec(source)) !== null) {
+        const name = match[1];
+        if (!name) continue;
+
+        let prefix = source.slice(0, match.index);
+        const boundary = Math.max(
+            prefix.lastIndexOf("{"),
+            prefix.lastIndexOf("}"),
+            prefix.lastIndexOf(";")
+        );
+        prefix = prefix.slice(boundary + 1)
+            .replace(/\/\*[\s\S]*?\*\//g, "")
+            .replace(/\/\/.*$/gm, "")
+            .replace(/@[^\s(]+(?:\([^)]*\))?\s*/g, "")
+            .trim();
+
+        if (/^(return|throw|new|if|while|switch|catch|synchronized)\b/.test(prefix)) {
+            continue;
+        }
+
+        const declarationPrefix =
+            /^(?:(?:public|protected|private|static|final|abstract|synchronized|native|default|strictfp)\s+)*(?:<[^>]+>\s*)?[\w$.[\]<>?,]+$/;
+        if (!declarationPrefix.test(prefix)) continue;
+
+        const line = source.slice(0, match.index).split(/\r?\n/).length;
+        const existing = lines.get(name) ?? [];
+        existing.push(line);
+        lines.set(name, existing);
+    }
+
+    return lines;
 }

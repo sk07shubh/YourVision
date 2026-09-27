@@ -1346,9 +1346,13 @@ if (isTreeNodeType(type)) {
         String text,
         Class<?> type
     ) {
+        if (text.startsWith("{") && text.endsWith("}")) {
+            return parseObject(text, type);
+        }
+
         if (!text.startsWith("[") || !text.endsWith("]")) {
             throw new IllegalArgumentException(
-                "ListNode input must use [..] syntax"
+                "ListNode input must use [..] or object syntax"
             );
         }
 
@@ -1442,9 +1446,13 @@ if (isTreeNodeType(type)) {
         String text,
         Class<?> type
     ) {
+        if (text.startsWith("{") && text.endsWith("}")) {
+            return parseObject(text, type);
+        }
+
         if (!text.startsWith("[") || !text.endsWith("]")) {
             throw new IllegalArgumentException(
-                "TreeNode input must use [..] syntax"
+                "TreeNode input must use [..] or object syntax"
             );
         }
 

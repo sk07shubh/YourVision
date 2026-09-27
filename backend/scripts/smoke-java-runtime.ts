@@ -18,6 +18,8 @@ type Case = {
     expectedResult?: string;
     expectedErrorType?: string;
     requiredTraceTypes?: string[];
+    expectedEntryLine?: number;
+    expectedReturnLine?: number;
 };
 
 const source = `
@@ -301,6 +303,16 @@ class Solution {
 `;
 
 const cases: Case[] = [
+    {
+        name: "source lines stay stable without injected imports",
+        source: "class Solution {\n    public int add(int a, int b) {\n        int sum = a + b;\n        return sum;\n    }\n}",
+        method: "add",
+        args: ["2", "3"],
+        expectedKind: "OK",
+        expectedResult: "5",
+        expectedEntryLine: 2,
+        expectedReturnLine: 4
+    },
     {
         name: "zero arguments",
         source,
@@ -747,11 +759,22 @@ for (const test of cases) {
                 )
         );
 
+    const entryLineMatches =
+        test.expectedEntryLine === undefined ||
+        result.trace?.events.find(event => event.type === "METHOD_ENTER")?.data?.displayLine === test.expectedEntryLine &&
+        result.states?.[0]?.line === test.expectedEntryLine;
+
+    const returnLineMatches =
+        test.expectedReturnLine === undefined ||
+        result.trace?.events.find(event => event.type === "METHOD_EXIT")?.line === test.expectedReturnLine;
+
     if (
         kindMatches &&
         resultMatches &&
         errorMatches &&
-        traceMatches
+        traceMatches &&
+        entryLineMatches &&
+        returnLineMatches
     ) {
         console.log(
             "PASS:",
@@ -782,6 +805,10 @@ for (const test of cases) {
                 test.requiredTraceTypes,
             actualTraceTypes:
                 [...traceTypes],
+            expectedEntryLine: test.expectedEntryLine,
+            actualEntryLine: result.trace?.events.find(event => event.type === "METHOD_ENTER")?.data?.displayLine,
+            expectedReturnLine: test.expectedReturnLine,
+            actualReturnLine: result.trace?.events.find(event => event.type === "METHOD_EXIT")?.line,
             stderr:
                 result.stderr
         }

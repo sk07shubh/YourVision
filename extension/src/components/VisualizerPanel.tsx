@@ -559,8 +559,8 @@ function DataStructures({ state, source }: { state?: TraceState; source: string 
 
 export function VisualizerPanel(){
   const s=useSession(); const current=s.states[s.index]; const prev=s.index>0?s.states[s.index-1]:undefined;
-  const sourceLines=useMemo(()=>s.source.split(/\r?\n/),[s.source]);
   const line = current?.line;
+  const sourceLines=useMemo(()=>s.source.split(/\r?\n/),[s.source]);
   const statement=line?sourceLines[line-1]?.trim():'';
   useEffect(()=>{highlightEditorLine(line);return()=>clearEditorExecutionMarker();},[line]);
   useEffect(()=>{ if(!s.playing)return; const id=setInterval(()=>sessionStore.next(),650); return()=>clearInterval(id); },[s.playing,s.index,s.states.length]);
