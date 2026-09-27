@@ -72,6 +72,33 @@ class Solution {
         return values.length;
     }
 
+    public int aliases() {
+        int[] firstArray = {1, 2};
+        int[] secondArray = firstArray;
+
+        HashMap<String, Integer> firstMap = new HashMap<>();
+        firstMap.put("x", 1);
+        HashMap<String, Integer> secondMap = firstMap;
+
+        ArrayList<Integer> firstList = new ArrayList<>();
+        firstList.add(3);
+        ArrayList<Integer> secondList = firstList;
+
+        firstArray[0] = 9;
+        secondMap.put("y", 2);
+        secondList.add(4);
+
+        return secondArray[0] + secondMap.size() + secondList.size();
+    }
+
+    public int nestedCycle() {
+        Box box = new Box(21);
+        HashMap<String, Object> links = new HashMap<>();
+        links.put("owner", box);
+        links.put("self", links);
+        return box.value + links.size();
+    }
+
     public int empty() {
         HashMap<Integer, Integer> map = new HashMap<>();
         HashSet<Integer> set = new HashSet<>();
@@ -158,6 +185,47 @@ assert(cyclicArray.kind === "OK", "cyclic array execution failed");
 const cyclicArrayState = cyclicArray.states?.at(-1);
 const cyclicArraySnapshot = cyclicArrayState?.arrays?.values as Record<string, any>;
 assert(cyclicArraySnapshot?.values?.[0]?.$ref === cyclicArraySnapshot?.$arrayId, "self-referencing array was not represented as a structural ref");
+
+const aliases = await runJava(source, { method: "aliases" });
+assert(aliases.kind === "OK", "aliased data structure execution failed");
+
+const aliasesState = aliases.states?.at(-1);
+const aliasVariables = aliasesState?.variables ?? {};
+const aliasArrays = aliasesState?.arrays ?? {};
+const aliasStructures = aliasesState?.dataStructures ?? {};
+
+const firstArray = aliasVariables.firstArray as Record<string, any> | undefined;
+const secondArray = aliasVariables.secondArray as Record<string, any> | undefined;
+assert(firstArray?.$arrayId === secondArray?.$arrayId, "array aliases lost identity");
+assert((aliasArrays.firstArray as Record<string, any> | undefined)?.$arrayId === (aliasArrays.secondArray as Record<string, any> | undefined)?.$arrayId, "array aliases were not registered under the same id");
+
+const firstMap = aliasVariables.firstMap as Record<string, any> | undefined;
+const secondMap = aliasVariables.secondMap as Record<string, any> | undefined;
+assert(firstMap?.$mapId === secondMap?.$mapId, "map aliases lost identity");
+assert((aliasStructures.firstMap as Record<string, any> | undefined)?.$mapId === (aliasStructures.secondMap as Record<string, any> | undefined)?.$mapId, "map aliases were not registered under the same id");
+
+const firstList = aliasVariables.firstList as Record<string, any> | undefined;
+const secondList = aliasVariables.secondList as Record<string, any> | undefined;
+assert(firstList?.$collectionId === secondList?.$collectionId, "collection aliases lost identity");
+assert((aliasStructures.firstList as Record<string, any> | undefined)?.$collectionId === (aliasStructures.secondList as Record<string, any> | undefined)?.$collectionId, "collection aliases were not registered under the same id");
+
+const nestedCycle = await runJava(source, { method: "nestedCycle" });
+assert(nestedCycle.kind === "OK", "nested object/collection cycle execution failed");
+
+const nestedCycleState = nestedCycle.states?.at(-1);
+const nestedCycleObjects = nestedCycleState?.objects ?? {};
+const nestedCycleBox = Object.values(nestedCycleObjects)
+    .find(value => (value as Record<string, any>)?.$type?.endsWith("Box")) as Record<string, any> | undefined;
+assert(nestedCycleBox?.fields?.links?.$mapId, "object -> map link was not preserved");
+const nestedCycleMap = nestedCycleBox?.fields?.links as Record<string, any>;
+const ownerEntry = (nestedCycleMap.entries as Array<Record<string, any>>)
+    ?.find(entry => entry.key === "owner");
+const nestedCycleObjectId = nestedCycleBox?.$objectId;
+assert(typeof nestedCycleObjectId === "string", "nested cycle box id missing");
+assert(ownerEntry?.value?.$ref === nestedCycleObjectId, "map -> object back-reference was not preserved");
+const selfEntry = (nestedCycleMap.entries as Array<Record<string, any>>)
+    ?.find(entry => entry.key === "self");
+assert(selfEntry?.value?.$ref === nestedCycleMap.$mapId, "map self-reference was not preserved");
 
 const empty = await runJava(source, { method: "empty" });
 assert(empty.kind === "OK", "empty DS execution failed");
