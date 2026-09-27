@@ -339,7 +339,7 @@ assert(
     "map -> object identity was not preserved"
 );
 
-const selfEntry = (nestedCycleMap.entries as Array<Record<string, any>>)
+const selfEntry = (verifiedNestedCycleMap.entries as Array<Record<string, any>>)
     .find(entry => entry.key === "self");
 assert(
     selfEntry?.value?.$ref === verifiedNestedCycleMap.$mapId,
