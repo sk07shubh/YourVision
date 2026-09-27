@@ -179,7 +179,7 @@ test('Chrome extension navigates real repeated-line checkpoints through return a
     const statement = host.locator('.yv-statement');
     const next = host.getByRole('button', { name: 'Next →' });
     const previous = host.getByRole('button', { name: '← Prev' });
-    const visits = host.locator('.yv-var').filter({ has: host.locator('.yv-var-name', { hasText: 'visits' }) });
+    const visits = host.locator('.yv-var').filter({ hasText: /^visits/ });
     const loopStates = states
       .map((state, index) => ({ state, index }))
       .filter(({ state }) => state.method === 'helper' && state.lastEvent?.type === 'STEP' && state.lastEvent.line === 9);
