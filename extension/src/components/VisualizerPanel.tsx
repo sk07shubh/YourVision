@@ -120,7 +120,7 @@ function CollectionView({
           <div className="yv-queue-end">FRONT</div>
           {value.values.map((item, index) => (
             <div className="yv-queue-cell" key={index}>
-              <span className="yv-code">{displayValue(item)}</span>
+              <DataValue value={item} state={state} source={source} depth={1}/>
             </div>
           ))}
           <div className="yv-queue-end">REAR</div>
@@ -148,7 +148,7 @@ function CollectionView({
               <div className="yv-heap-level" key={level}>
                 {items.map((item, index) => (
                   <div className="yv-heap-node-wrap" key={`${level}-${index}`}>
-                    <div className="yv-heap-node">{displayValue(item)}</div>
+                    <div className="yv-heap-node"><DataValue value={item} state={state} source={source} depth={1}/></div>
                     <div className="yv-cell-index">[{(2 ** level) - 1 + index}]</div>
                   </div>
                 ))}
@@ -271,9 +271,9 @@ function changedArrayIndices(state?: TraceState): Set<number> {
 }
 
 function ArrayView({ value, state, source, arrayName }: { value: unknown[]; state?: TraceState; source?: string; arrayName?: string }) {
-  if (value.every(Array.isArray)) return <div className="yv-matrix">{value.map((row,r)=><div className="yv-array" key={r}>{(row as unknown[]).map((v,i)=><div className="yv-cell" key={i}><div className="yv-cell-value">{displayValue(v)}</div><div className="yv-cell-index">[{r},{i}]</div></div>)}</div>)}</div>;
+  if (value.every(Array.isArray)) return <div className="yv-matrix">{value.map((row,r)=><div className="yv-array" key={r}>{(row as unknown[]).map((v,i)=><div className="yv-cell" key={i}><div className="yv-cell-value"><DataValue value={v} state={state} source={source ?? ''} depth={1}/></div><div className="yv-cell-index">[{r},{i}]</div></div>)}</div>)}</div>;
   const labels=pointerLabels(state,value.length,arrayIndexVariableNames(source ?? '', arrayName)); const changed=changedArrayIndices(state);
-  return <div className="yv-array">{value.map((v,i)=><div className="yv-cell" key={i}>{labels.has(i)&&<div className="yv-pointer">{labels.get(i)!.join(' · ')}</div>}<div className={`yv-cell-value ${changed.has(i)?'yv-cell-changed':''}`}>{displayValue(v)}</div><div className="yv-cell-index">{i}</div></div>)}</div>;
+  return <div className="yv-array">{value.map((v,i)=><div className="yv-cell" key={i}>{labels.has(i)&&<div className="yv-pointer">{labels.get(i)!.join(' · ')}</div>}<div className={`yv-cell-value ${changed.has(i)?'yv-cell-changed':''}`}><DataValue value={v} state={state} source={source ?? ''} name={arrayName} depth={1}/></div><div className="yv-cell-index">{i}</div></div>)}</div>;
 }
 
 function mapChanges(state?: TraceState): Array<{
@@ -357,13 +357,13 @@ function MapView({
                 {change?.kind === 'update' ? (
                   <>
                     <span className="yv-old-value">
-                      {displayValue(change.before)}
+                      <DataValue value={change.before} state={state} source={source} depth={1}/>
                     </span>
                     <span className="yv-map-arrow">→</span>
                     <DataValue value={entry.value} state={state} source={source} depth={1}/>
                   </>
                 ) : (
-                  <span>{displayValue(entry.value)}</span>
+                  <DataValue value={entry.value} state={state} source={source} depth={1}/>
                 )}
 
                 {change?.kind === 'insert' && (
@@ -379,12 +379,12 @@ function MapView({
             className="yv-map-row yv-map-delete"
             key={`deleted-${stableStringify(change.key)}-${index}`}
           >
-            <div className="yv-map-key yv-code">
-              {displayValue(change.key)}
+            <div className="yv-map-key">
+              <DataValue value={change.key} state={state} source={source} depth={1}/>
             </div>
-            <div className="yv-map-value yv-code">
+            <div className="yv-map-value">
               <span className="yv-old-value">
-                {displayValue(change.before)}
+                <DataValue value={change.before} state={state} source={source} depth={1}/>
               </span>
               <span className="yv-map-tag">REMOVED</span>
             </div>

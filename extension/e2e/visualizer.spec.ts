@@ -357,6 +357,102 @@ test('Chrome extension expands nested objects inside maps and collections', asyn
 });
 
 
+test('Chrome extension renders nested objects across collection views', async () => {
+  const nestedSource = [
+    'class Solution {',
+    '  public int inspect() {',
+    '    return 1;',
+    '  }',
+    '}',
+  ].join('\\n');
+
+  const box = (id: string, value: number) => ({
+    $objectId: id,
+    $type: 'Box',
+    fields: { value }
+  });
+
+  activeResponse = {
+    success: true,
+    kind: 'OK',
+    result: '1',
+    states: [{
+      sequence: 1,
+      line: 2,
+      method: 'inspect',
+      depth: 1,
+      variables: {},
+      arrays: {
+        items: {
+          $arrayId: 'arr1',
+          $type: 'Box[]',
+          values: [box('box1', 11), box('box2', 22)]
+        }
+      },
+      dataStructures: {
+        queue: {
+          $collectionId: 'queue1',
+          $type: 'java.util.ArrayDeque',
+          $kind: 'queue',
+          values: [box('box3', 33)],
+          size: 1
+        },
+        heap: {
+          $collectionId: 'heap1',
+          $type: 'java.util.PriorityQueue',
+          $kind: 'priorityQueue',
+          values: [box('box4', 44)],
+          size: 1
+        },
+        stack: {
+          $collectionId: 'stack1',
+          $type: 'java.util.Stack',
+          $kind: 'stack',
+          values: [box('box5', 55)],
+          size: 1
+        },
+        set: {
+          $collectionId: 'set1',
+          $type: 'java.util.HashSet',
+          $kind: 'set',
+          values: [box('box6', 66)],
+          size: 1
+        }
+      },
+      objects: {
+        box1: box('box1', 11),
+        box2: box('box2', 22),
+        box3: box('box3', 33),
+        box4: box('box4', 44),
+        box5: box('box5', 55),
+        box6: box('box6', 66)
+      },
+      callStack: ['inspect'],
+      lastEvent: { type: 'METHOD_ENTER', line: 2, method: 'inspect' }
+    }]
+  };
+
+  const { context, page, profile } = await launchPage('default', nestedSource);
+  try {
+    await page.locator('[data-yourvision-tab="true"]').click();
+    await page.locator('[data-yourvision-visualize="true"]').click();
+    const host = page.locator('[data-yourvision-host="true"]');
+    const structures = host.locator('.yv-section').filter({ hasText: 'Data Structures' });
+    await expect(structures).toContainText('items');
+    await expect(structures).toContainText('ArrayDeque');
+    await expect(structures).toContainText('PriorityQueue');
+    await expect(structures).toContainText('Stack');
+    await expect(structures).toContainText('HashSet');
+    for (const value of ['11', '22', '33', '44', '55', '66']) {
+      await expect(structures).toContainText(value);
+    }
+    await expect(structures.locator('.yv-object')).toHaveCount(6);
+  } finally {
+    await context.close();
+    await rm(profile, { recursive: true, force: true });
+  }
+});
+
 test('Chrome extension renders returned ListNode identity and reachable chain', async () => {
   const listSource = [
     'class Solution {',

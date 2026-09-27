@@ -8,6 +8,11 @@ const source = `
 import java.util.*;
 
 class Solution {
+    static class Box {
+        int value;
+        Box(int value) { this.value = value; }
+    }
+
     public int structures() {
         int[] nums = {2, 7, 11};
         HashMap<Integer, Integer> map = new HashMap<>();
@@ -35,6 +40,18 @@ class Solution {
 
         return nums[0] + map.get(3) + set.size() +
             stack.peek() + queue.peek() + priorityQueue.peek() + list.get(1);
+    }
+
+    public int nested() {
+        Box box1 = new Box(42);
+        Box box2 = new Box(7);
+        HashMap<String, Box> map = new HashMap<>();
+        map.put("first", box1);
+        ArrayList<Box> list = new ArrayList<>();
+        list.add(box2);
+        Queue<Box> queue = new ArrayDeque<>();
+        queue.add(box1);
+        return map.get("first").value + list.get(0).value + queue.peek().value;
     }
 
     public int empty() {
@@ -82,6 +99,26 @@ assert(JSON.stringify(queue.values) === "[8,12]", "queue values incorrect");
 assert(priorityQueue.$kind === "priorityQueue", "priority queue kind is incorrect");
 assert(JSON.stringify(priorityQueue.values) === "[1,2,5,9]", "priority queue heap snapshot incorrect");
 assert(JSON.stringify(list.values) === "[3,4]", "list values incorrect");
+
+const nested = await runJava(source, { method: "nested" });
+assert(nested.kind === "OK", "nested data structure execution failed");
+
+const nestedState = nested.states?.at(-1);
+const nestedStructures = nestedState?.dataStructures ?? {};
+const nestedMap = nestedStructures.map as Record<string, unknown>;
+const nestedList = nestedStructures.list as Record<string, unknown>;
+const nestedQueue = nestedStructures.queue as Record<string, unknown>;
+
+assert(Array.isArray(nestedMap.entries), "nested map entries missing");
+const nestedMapEntry = (nestedMap.entries as Array<Record<string, unknown>>)[0];
+const nestedMapValue = nestedMapEntry?.value as Record<string, unknown>;
+assert(nestedMapValue?.fields?.value === 42, "nested map object field missing");
+
+const nestedListValue = (nestedList.values as Array<Record<string, unknown>>)[0];
+assert(nestedListValue?.fields?.value === 7, "nested list object field missing");
+
+const nestedQueueValue = (nestedQueue.values as Array<Record<string, unknown>>)[0];
+assert(nestedQueueValue?.fields?.value === 42, "nested queue object field missing");
 
 const empty = await runJava(source, { method: "empty" });
 assert(empty.kind === "OK", "empty DS execution failed");
