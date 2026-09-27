@@ -318,9 +318,10 @@ assert(nestedCycle.kind === "OK", "nested object/collection cycle execution fail
 
 const nestedCycleState = nestedCycle.states?.at(-1);
 const nestedCycleVariables = nestedCycleState?.variables ?? {};
-const nestedCycleMap = nestedCycleVariables.links as Record<string, any>;
+const nestedCycleMap = nestedCycleVariables.links as Record<string, any> | undefined;
 assert(
-    typeof nestedCycleMap?.$mapId === "string" &&
+    nestedCycleMap !== undefined &&
+    typeof nestedCycleMap.$mapId === "string" &&
     Array.isArray(nestedCycleMap.entries),
     "named cyclic map snapshot was not preserved"
 );
