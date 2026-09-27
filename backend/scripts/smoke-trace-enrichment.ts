@@ -199,6 +199,37 @@ if (
     throw new Error("execution state does not align with the line that just completed");
 }
 
+const declarationTrace: ExecutionTrace = {
+    version: 1,
+    events: [
+        {
+            sequence: 1,
+            type: "METHOD_ENTER",
+            line: 5,
+            method: "twoSum",
+            depth: 1,
+            data: {
+                displayLine: 2,
+                variables: { target: 9 }
+            }
+        },
+        {
+            sequence: 2,
+            type: "STEP",
+            line: 6,
+            method: "twoSum",
+            depth: 1,
+            data: { variables: { target: 9, n: 4 } }
+        }
+    ]
+};
+
+const declarationEnriched = enrichTrace(declarationTrace);
+const declarationStates = buildStates(declarationEnriched);
+if (declarationStates[0]?.line !== 2 || declarationStates[1]?.line !== 2) {
+    throw new Error("method declaration display line was not preserved through replay");
+}
+
 console.log("PASS: execution line semantics");
 
 const accessTrace: ExecutionTrace = {
