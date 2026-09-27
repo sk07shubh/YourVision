@@ -270,10 +270,12 @@ const returnedMapExit = returnedMap.states?.find(
 );
 const returnedMapValue = returnedMapExit?.lastEvent?.data?.returnValue as Record<string, any> | undefined;
 assert(
-    returnedMapValue?.$mapId && Array.isArray(returnedMapValue.entries),
+    returnedMapValue !== undefined &&
+    typeof returnedMapValue.$mapId === "string" &&
+    Array.isArray(returnedMapValue.entries),
     "returned map snapshot was not preserved"
 );
-const returnedMapBox = (returnedMapValue.entries as Array<Record<string, any>>)
+const returnedMapBox = (returnedMapValue?.entries as Array<Record<string, any>>)
     .find(entry => entry.key === "box")?.value as Record<string, any> | undefined;
 assert(returnedMapBox?.fields?.value === 17, "returned map nested object was not preserved");
 
@@ -284,11 +286,13 @@ const returnedListExit = returnedList.states?.find(
 );
 const returnedListValue = returnedListExit?.lastEvent?.data?.returnValue as Record<string, any> | undefined;
 assert(
-    returnedListValue?.$collectionId && Array.isArray(returnedListValue.values),
+    returnedListValue !== undefined &&
+    typeof returnedListValue.$collectionId === "string" &&
+    Array.isArray(returnedListValue.values),
     "returned collection snapshot was not preserved"
 );
 assert(
-    (returnedListValue.values as Array<Record<string, any>>)[0]?.fields?.value === 23,
+    (returnedListValue?.values as Array<Record<string, any>>)[0]?.fields?.value === 23,
     "returned collection nested object was not preserved"
 );
 
