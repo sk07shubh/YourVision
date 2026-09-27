@@ -254,6 +254,157 @@ test('Chrome extension renders returned TreeNode identity and reachable tree', a
   }
 });
 
+
+test('Chrome extension preserves the throwing line and runtime error message', async () => {
+  const errorSource = [
+    'class Solution {',
+    '  public int solve() {',
+    '    return throwHelper();',
+    '  }',
+    '  private int throwHelper() {',
+    '    throw new IllegalArgumentException("nested bad input");',
+    '  }',
+    '}',
+  ].join('\\n');
+
+  activeResponse = {
+    success: false,
+    kind: 'RUNTIME_ERROR',
+    errorType: 'java.lang.IllegalArgumentException',
+    message: 'nested bad input',
+    states: [
+      {
+        sequence: 1,
+        line: 2,
+        method: 'solve',
+        depth: 1,
+        variables: {},
+        arrays: {},
+        dataStructures: {},
+        objects: {},
+        callStack: ['solve'],
+        lastEvent: { type: 'METHOD_ENTER', line: 2, method: 'solve' },
+      },
+      {
+        sequence: 2,
+        line: 3,
+        method: 'solve',
+        depth: 1,
+        variables: {},
+        arrays: {},
+        dataStructures: {},
+        objects: {},
+        callStack: ['solve'],
+        lastEvent: { type: 'STEP', line: 3, method: 'solve' },
+      },
+      {
+        sequence: 3,
+        line: 6,
+        method: 'throwHelper',
+        depth: 2,
+        variables: {},
+        arrays: {},
+        dataStructures: {},
+        objects: {},
+        callStack: ['solve', 'throwHelper'],
+        lastEvent: { type: 'ERROR', line: 6, method: 'throwHelper', data: { type: 'java.lang.IllegalArgumentException', message: 'nested bad input' } },
+        error: { type: 'java.lang.IllegalArgumentException', message: 'nested bad input' },
+      },
+    ],
+  };
+
+  received.length = 0;
+  const { context, page, profile } = await launchPage('default', errorSource);
+  try {
+    await page.locator('[data-yourvision-tab="true"]').click();
+    await page.locator('[data-yourvision-visualize="true"]').click();
+    const host = page.locator('[data-yourvision-host="true"]');
+    const error = host.locator('.yv-error');
+
+    await expect(error).toContainText('nested bad input');
+    await expect(host.locator('.yv-statement')).toContainText('throw new IllegalArgumentException');
+    await expect(page.locator('.monaco-editor .view-line[data-line="6"]')).toHaveCSS(
+      'box-shadow',
+      'rgb(255, 161, 22) 2px 0px 0px 0px inset',
+    );
+
+    await host.getByRole('button', { name: '← Prev' }).click();
+    await expect(host.locator('.yv-statement')).toContainText('return throwHelper();');
+    await expect(page.locator('.monaco-editor .view-line[data-line="3"]')).toHaveCSS(
+      'box-shadow',
+      'rgb(255, 161, 22) 2px 0px 0px 0px inset',
+    );
+  } finally {
+    await context.close();
+    await rm(profile, { recursive: true, force: true });
+  }
+});
+
+test('Chrome extension renders trace-limit timeout as a failed execution', async () => {
+  const timeoutSource = [
+    'class Solution {',
+    '  public int solve() {',
+    '    int i = 0;',
+    '    while (true) {',
+    '      i++;',
+    '    }',
+    '  }',
+    '}',
+  ].join('\\n');
+
+  activeResponse = {
+    success: false,
+    kind: 'TIMEOUT',
+    message: 'Java execution exceeded trace event limit',
+    states: [
+      {
+        sequence: 1,
+        line: 2,
+        method: 'solve',
+        depth: 1,
+        variables: { i: 0 },
+        arrays: {},
+        dataStructures: {},
+        objects: {},
+        callStack: ['solve'],
+        lastEvent: { type: 'METHOD_ENTER', line: 2, method: 'solve' },
+      },
+      {
+        sequence: 2,
+        line: 5,
+        method: 'solve',
+        depth: 1,
+        variables: { i: 4999 },
+        arrays: {},
+        dataStructures: {},
+        objects: {},
+        callStack: ['solve'],
+        lastEvent: { type: 'TRACE_LIMIT', line: 5, method: 'solve', data: { maxEvents: 5000 } },
+      },
+    ],
+  };
+
+  received.length = 0;
+  const { context, page, profile } = await launchPage('default', timeoutSource);
+  try {
+    await page.locator('[data-yourvision-tab="true"]').click();
+    await page.locator('[data-yourvision-visualize="true"]').click();
+    const host = page.locator('[data-yourvision-host="true"]');
+
+    await expect(host.locator('.yv-error')).toContainText('Java execution exceeded trace event limit');
+    await expect(host.locator('.yv-current-head')).toContainText('Trace limit reached');
+    await expect(host.locator('.yv-statement')).toContainText('i++;');
+    await expect(page.locator('.monaco-editor .view-line[data-line="5"]')).toHaveCSS(
+      'box-shadow',
+      'rgb(255, 161, 22) 2px 0px 0px 0px inset',
+    );
+    await expect(host.locator('.yv-output .yv-code')).toContainText('—');
+  } finally {
+    await context.close();
+    await rm(profile, { recursive: true, force: true });
+  }
+});
+
 test('Chrome extension navigates real repeated-line checkpoints through return and caller resume', async () => {
   const states = sameLineLoopStates();
   activeResponse = { success: true, kind: 'OK', result: '4', states };
