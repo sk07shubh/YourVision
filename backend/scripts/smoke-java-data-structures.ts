@@ -111,13 +111,13 @@ const nestedQueue = nestedStructures.queue as Record<string, unknown>;
 
 assert(Array.isArray(nestedMap.entries), "nested map entries missing");
 const nestedMapEntry = (nestedMap.entries as Array<Record<string, unknown>>)[0];
-const nestedMapValue = nestedMapEntry?.value as Record<string, unknown>;
+const nestedMapValue = nestedMapEntry?.value as Record<string, any>;
 assert(nestedMapValue?.fields?.value === 42, "nested map object field missing");
 
-const nestedListValue = (nestedList.values as Array<Record<string, unknown>>)[0];
+const nestedListValue = (nestedList.values as Array<Record<string, any>>)[0];
 assert(nestedListValue?.fields?.value === 7, "nested list object field missing");
 
-const nestedQueueValue = (nestedQueue.values as Array<Record<string, unknown>>)[0];
+const nestedQueueValue = (nestedQueue.values as Array<Record<string, any>>)[0];
 assert(nestedQueueValue?.fields?.value === 42, "nested queue object field missing");
 
 const empty = await runJava(source, { method: "empty" });

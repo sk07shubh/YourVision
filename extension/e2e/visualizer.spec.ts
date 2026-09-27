@@ -299,7 +299,7 @@ test('Chrome extension renders ordinary object fields, nested arrays, and aliase
     await expect(structures).toContainText('4');
     await expect(structures).toContainText('child');
     await expect(structures).toContainText('7');
-    await expect(structures.locator('.yv-object')).toHaveCount(2);
+    await expect(structures.locator('.yv-object')).toHaveCount(3);
   } finally {
     await context.close();
     await rm(profile, { recursive: true, force: true });
@@ -446,7 +446,7 @@ test('Chrome extension renders nested objects across collection views', async ()
     for (const value of ['11', '22', '33', '44', '55', '66']) {
       await expect(structures).toContainText(value);
     }
-    await expect(structures.locator('.yv-object')).toHaveCount(6);
+    await expect(structures.locator('.yv-object')).toHaveCount(7);
   } finally {
     await context.close();
     await rm(profile, { recursive: true, force: true });
