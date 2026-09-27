@@ -223,8 +223,8 @@ const nestedCycleMap = nestedCycleBox?.fields?.links as Record<string, any>;
 const nestedCycleObjectId = nestedCycleBox?.$objectId;
 assert(typeof nestedCycleObjectId === "string", "nested cycle box id missing");
 const ownerBackRef = (nestedCycleMap.entries as Array<Record<string, any>>)
-    ?.find(entry => entry?.value?.$ref === nestedCycleObjectId);
-assert(ownerBackRef !== undefined, "map -> object back-reference was not preserved");
+    ?.find(entry => entry?.value?.$objectId === nestedCycleObjectId);
+assert(ownerBackRef !== undefined, "map -> object identity was not preserved");
 const selfEntry = (nestedCycleMap.entries as Array<Record<string, any>>)
     ?.find(entry => entry.key === "self");
 assert(selfEntry?.value?.$ref === nestedCycleMap.$mapId, "map self-reference was not preserved");
