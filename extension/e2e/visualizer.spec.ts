@@ -453,6 +453,214 @@ test('Chrome extension renders nested objects across collection views', async ()
   }
 });
 
+test('Chrome extension preserves historical nested map values after object mutation', async () => {
+  const mapSource = [
+    'class Solution {',
+    '  public int inspect() {',
+    '    return 2;',
+    '  }',
+    '}',
+  ].join('\\n');
+
+  const oldBox = { $objectId: '501', $type: 'Box', fields: { value: 1 } };
+  const newBox = { $objectId: '501', $type: 'Box', fields: { value: 2 } };
+
+  activeResponse = {
+    success: true,
+    kind: 'OK',
+    result: '2',
+    states: [{
+      sequence: 1,
+      line: 3,
+      method: 'inspect',
+      depth: 0,
+      variables: {
+        map: {
+          $mapId: 'map501',
+          $type: 'java.util.HashMap',
+          entries: [{ key: 'box', value: newBox }]
+        }
+      },
+      arrays: {},
+      dataStructures: {
+        map: {
+          $mapId: 'map501',
+          $type: 'java.util.HashMap',
+          entries: [{ key: 'box', value: newBox }]
+        }
+      },
+      objects: { '501': newBox },
+      callStack: [],
+      lastEvent: {
+        type: 'MAP_WRITE',
+        line: 3,
+        method: 'inspect',
+        data: {
+          name: 'map',
+          mapId: 'map501',
+          entries: [{ key: 'box', value: newBox }],
+          changes: [{
+            kind: 'update',
+            key: 'box',
+            before: oldBox,
+            after: newBox
+          }]
+        }
+      }
+    }]
+  };
+
+  received.length = 0;
+  const { context, page, profile } = await launchPage('default', mapSource);
+  try {
+    await page.locator('[data-yourvision-tab="true"]').click();
+    await page.locator('[data-yourvision-visualize="true"]').click();
+
+    const host = page.locator('[data-yourvision-host="true"]');
+    const structures = host.locator('.yv-section').filter({ hasText: 'Data Structures' });
+    const oldValue = structures.locator('.yv-old-value');
+    await expect(oldValue).toContainText('1');
+    await expect(structures.locator('.yv-map-value')).toContainText('2');
+  } finally {
+    await context.close();
+    await rm(profile, { recursive: true, force: true });
+  }
+});
+
+test('Chrome extension safely renders cyclic nested objects and collections', async () => {
+  const cycleSource = [
+    'class Solution {',
+    '  public Box inspect(Box root) {',
+    '    return root;',
+    '  }',
+    '}',
+  ].join('\\n');
+
+  const box = (id: string) => ({
+    $objectId: id,
+    $type: 'Box',
+    fields: {
+      value: 42,
+      self: { $ref: id },
+      lookup: {
+        $mapId: 'map1',
+        $type: 'java.util.HashMap',
+        entries: [
+          { key: 'selfObject', value: { $ref: id } },
+          { key: 'selfMap', value: { $mapId: 'map1', $type: 'java.util.HashMap', $ref: 'map1' } }
+        ]
+      },
+      children: {
+        $collectionId: 'list1',
+        $type: 'java.util.ArrayList',
+        $kind: 'list',
+        values: [
+          { $ref: id },
+          { $collectionId: 'list1', $type: 'java.util.ArrayList', $kind: 'list', $ref: 'list1' }
+        ],
+        size: 2
+      }
+    }
+  });
+
+  activeResponse = {
+    success: true,
+    kind: 'OK',
+    result: 'Box@301',
+    states: [{
+      sequence: 1,
+      line: 2,
+      method: 'inspect',
+      depth: 1,
+      variables: { root: box('301') },
+      arrays: {},
+      dataStructures: {},
+      objects: { '301': box('301') },
+      callStack: ['inspect'],
+      lastEvent: { type: 'METHOD_ENTER', line: 2, method: 'inspect' }
+    }]
+  };
+
+  received.length = 0;
+  const { context, page, profile } = await launchPage('default', cycleSource);
+  try {
+    await page.locator('[data-yourvision-tab="true"]').click();
+    await page.locator('[data-yourvision-visualize="true"]').click();
+
+    const host = page.locator('[data-yourvision-host="true"]');
+    const structures = host.locator('.yv-section').filter({ hasText: 'Data Structures' });
+    await expect(structures).toContainText('root');
+    await expect(structures).toContainText('42');
+    await expect(structures).toContainText('↻ 301');
+    await expect(structures).toContainText('↻ map1');
+    await expect(structures).toContainText('↻ list1');
+    await expect(structures.locator('.yv-hashmap')).toHaveCount(1);
+    await expect(structures.locator('.yv-collection')).toHaveCount(1);
+    await expect(structures.locator('.yv-object')).toHaveCount(1);
+  } finally {
+    await context.close();
+    await rm(profile, { recursive: true, force: true });
+  }
+});
+
+test('Chrome extension renders returned ordinary object values', async () => {
+  const objectSource = [
+    'class Solution {',
+    '  public Box build() {',
+    '    return new Box();',
+    '  }',
+    '}',
+  ].join('\\n');
+
+  const returnedBox = {
+    $objectId: '401',
+    $type: 'Box',
+    fields: {
+      value: 99,
+      label: 'done'
+    }
+  };
+
+  activeResponse = {
+    success: true,
+    kind: 'OK',
+    result: 'Box@401',
+    states: [{
+      sequence: 1,
+      line: 3,
+      method: 'build',
+      depth: 0,
+      variables: {},
+      arrays: {},
+      dataStructures: {},
+      objects: { '401': returnedBox },
+      callStack: [],
+      lastEvent: {
+        type: 'PROGRAM_END',
+        line: 3,
+        method: 'build',
+        data: { returnValue: { $objectId: '401', $type: 'Box' } }
+      }
+    }]
+  };
+
+  received.length = 0;
+  const { context, page, profile } = await launchPage('default', objectSource);
+  try {
+    await page.locator('[data-yourvision-tab="true"]').click();
+    await page.locator('[data-yourvision-visualize="true"]').click();
+
+    const output = page.locator('[data-yourvision-host="true"] .yv-output');
+    await expect(output).toContainText('Box@401');
+    await expect(output).toContainText('Returned value');
+    await expect(output).toContainText('99');
+    await expect(output).toContainText('done');
+  } finally {
+    await context.close();
+    await rm(profile, { recursive: true });
+  }
+});
+
 test('Chrome extension renders returned ListNode identity and reachable chain', async () => {
   const listSource = [
     'class Solution {',

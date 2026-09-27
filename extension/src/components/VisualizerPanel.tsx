@@ -64,7 +64,9 @@ function CollectionView({
   value,
   state,
   source,
-  name
+  name,
+  depth = 0,
+  seen = new Set<string>()
 }: {
   value: Obj & {
     $collectionId: string;
@@ -76,6 +78,8 @@ function CollectionView({
   state?: TraceState;
   source: string;
   name?: string;
+  depth?: number;
+  seen?: Set<string>;
 }) {
   const type =
     typeof value.$type === 'string'
@@ -100,7 +104,7 @@ function CollectionView({
           {[...value.values].reverse().map((item, index) => (
             <div className="yv-stack-cell" key={index}>
               <span className="yv-stack-position">{index === 0 ? 'TOP' : ''}</span>
-              <DataValue value={item} state={state} source={source} depth={1}/>
+              <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
             </div>
           ))}
           {!value.values.length && <div className="yv-empty">Empty stack</div>}
@@ -120,7 +124,7 @@ function CollectionView({
           <div className="yv-queue-end">FRONT</div>
           {value.values.map((item, index) => (
             <div className="yv-queue-cell" key={index}>
-              <DataValue value={item} state={state} source={source} depth={1}/>
+              <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
             </div>
           ))}
           <div className="yv-queue-end">REAR</div>
@@ -148,7 +152,7 @@ function CollectionView({
               <div className="yv-heap-level" key={level}>
                 {items.map((item, index) => (
                   <div className="yv-heap-node-wrap" key={`${level}-${index}`}>
-                    <div className="yv-heap-node"><DataValue value={item} state={state} source={source} depth={1}/></div>
+                    <div className="yv-heap-node"><DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/></div>
                     <div className="yv-cell-index">[{(2 ** level) - 1 + index}]</div>
                   </div>
                 ))}
@@ -157,7 +161,7 @@ function CollectionView({
           })()}
         </div>
         <div className="yv-code yv-heap-note">Heap tree · root is index 0</div>
-        <ArrayView value={value.values} state={state} source={source} arrayName={name}/>
+        <ArrayView value={value.values} state={state} source={source} arrayName={name} depth={depth} seen={seen}/>
       </div>
     );
   }
@@ -168,7 +172,7 @@ function CollectionView({
         <span>{type}</span>
         <span>{kind} · {itemCount} items</span>
       </div>
-      <ArrayView value={value.values} state={state} source={source} arrayName={name}/>
+      <ArrayView value={value.values} state={state} source={source} arrayName={name} depth={depth} seen={seen}/>
     </div>
   );
 }
@@ -270,10 +274,10 @@ function changedArrayIndices(state?: TraceState): Set<number> {
   return set;
 }
 
-function ArrayView({ value, state, source, arrayName }: { value: unknown[]; state?: TraceState; source?: string; arrayName?: string }) {
-  if (value.every(Array.isArray)) return <div className="yv-matrix">{value.map((row,r)=><div className="yv-array" key={r}>{(row as unknown[]).map((v,i)=><div className="yv-cell" key={i}><div className="yv-cell-value"><DataValue value={v} state={state} source={source ?? ''} depth={1}/></div><div className="yv-cell-index">[{r},{i}]</div></div>)}</div>)}</div>;
+function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<string>() }: { value: unknown[]; state?: TraceState; source?: string; arrayName?: string; depth?: number; seen?: Set<string> }) {
+  if (value.every(Array.isArray)) return <div className="yv-matrix">{value.map((row,r)=><div className="yv-array" key={r}>{(row as unknown[]).map((v,i)=><div className="yv-cell" key={i}><div className="yv-cell-value"><DataValue value={v} state={state} source={source ?? ''} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">[{r},{i}]</div></div>)}</div>)}</div>;
   const labels=pointerLabels(state,value.length,arrayIndexVariableNames(source ?? '', arrayName)); const changed=changedArrayIndices(state);
-  return <div className="yv-array">{value.map((v,i)=><div className="yv-cell" key={i}>{labels.has(i)&&<div className="yv-pointer">{labels.get(i)!.join(' · ')}</div>}<div className={`yv-cell-value ${changed.has(i)?'yv-cell-changed':''}`}><DataValue value={v} state={state} source={source ?? ''} name={arrayName} depth={1}/></div><div className="yv-cell-index">{i}</div></div>)}</div>;
+  return <div className="yv-array">{value.map((v,i)=><div className="yv-cell" key={i}>{labels.has(i)&&<div className="yv-pointer">{labels.get(i)!.join(' · ')}</div>}<div className={`yv-cell-value ${changed.has(i)?'yv-cell-changed':''}`}><DataValue value={v} state={state} source={source ?? ''} name={arrayName} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">{i}</div></div>)}</div>;
 }
 
 function mapChanges(state?: TraceState): Array<{
@@ -302,7 +306,9 @@ function mapChanges(state?: TraceState): Array<{
 function MapView({
   value,
   state,
-  source
+  source,
+  depth = 0,
+  seen = new Set<string>()
 }: {
   value: Obj & {
     $mapId: string;
@@ -310,6 +316,8 @@ function MapView({
   };
   state?: TraceState;
   source: string;
+  depth?: number;
+  seen?: Set<string>;
 }) {
   const changes = mapChanges(state);
 
@@ -350,20 +358,20 @@ function MapView({
               key={stableStringify(entry.key) || index}
             >
               <div className="yv-map-key">
-                <DataValue value={entry.key} state={state} source={source} depth={1}/>
+                <DataValue value={entry.key} state={state} source={source} depth={depth + 1} seen={seen}/>
               </div>
 
               <div className="yv-map-value">
                 {change?.kind === 'update' ? (
                   <>
                     <span className="yv-old-value">
-                      <DataValue value={change.before} state={state} source={source} depth={1}/>
+                      <DataValue value={change.before} state={state} source={source} depth={depth + 1} seen={seen} resolveObjects={false}/>
                     </span>
                     <span className="yv-map-arrow">→</span>
-                    <DataValue value={entry.value} state={state} source={source} depth={1}/>
+                    <DataValue value={entry.value} state={state} source={source} depth={depth + 1} seen={seen}/>
                   </>
                 ) : (
-                  <DataValue value={entry.value} state={state} source={source} depth={1}/>
+                  <DataValue value={entry.value} state={state} source={source} depth={depth + 1} seen={seen}/>
                 )}
 
                 {change?.kind === 'insert' && (
@@ -380,11 +388,11 @@ function MapView({
             key={`deleted-${stableStringify(change.key)}-${index}`}
           >
             <div className="yv-map-key">
-              <DataValue value={change.key} state={state} source={source} depth={1}/>
+              <DataValue value={change.key} state={state} source={source} depth={depth + 1} seen={seen}/>
             </div>
             <div className="yv-map-value">
               <span className="yv-old-value">
-                <DataValue value={change.before} state={state} source={source} depth={1}/>
+                <DataValue value={change.before} state={state} source={source} depth={depth + 1} seen={seen} resolveObjects={false}/>
               </span>
               <span className="yv-map-tag">REMOVED</span>
             </div>
@@ -472,6 +480,16 @@ function ReturnValueView({
     );
   }
 
+  if (isPlainObject(value) || Array.isArray(value)) {
+    return (
+      <div className="yv-return-object">
+        <div className="yv-return-reference yv-code">{text}</div>
+        <div className="yv-return-caption">Returned value</div>
+        <DataValue value={value} state={state} source="" />
+      </div>
+    );
+  }
+
   return <div className="yv-code">{text}</div>;
 }
 
@@ -546,7 +564,8 @@ function DataValue({
   source,
   name,
   depth = 0,
-  seen = new Set<string>()
+  seen = new Set<string>(),
+  resolveObjects = true
 }: {
   value: unknown;
   state?: TraceState;
@@ -554,13 +573,23 @@ function DataValue({
   name?: string;
   depth?: number;
   seen?: Set<string>;
+  resolveObjects?: boolean;
 }) {
+  if (isPlainObject(value) && typeof value.$ref === 'string' &&
+      (typeof value.$arrayId === 'string' || typeof value.$mapId === 'string' || typeof value.$collectionId === 'string')) {
+    return <div className="yv-code">↻ {value.$ref}</div>;
+  }
+
+  if (depth >= 6) {
+    return <div className="yv-code">…</div>;
+  }
+
   if (isMapSnapshot(value)) {
-    return <MapView value={value} state={state} source={source}/>;
+    return <MapView value={value} state={state} source={source} depth={depth} seen={seen}/>;
   }
 
   if (isCollectionSnapshot(value)) {
-    return <CollectionView value={value} state={state} source={source} name={name}/>;
+    return <CollectionView value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>;
   }
 
   if (isArraySnapshot(value)) {
@@ -576,11 +605,11 @@ function DataValue({
     );
   }
 
-  if (Array.isArray(value)) return <ArrayView value={value} state={state} source={source} arrayName={name}/>;
+  if (Array.isArray(value)) return <ArrayView value={value} state={state} source={source} arrayName={name} depth={depth} seen={seen}/>;
   if (isPlainObject(value)) {
     if (looksTreeNode(value)) return <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects??{}}/></div>;
     if (looksListNode(value)) return <LinkedListView root={value} objects={state?.objects??{}} variables={state?.variables??{}}/>;
-    const resolved = resolveRef(value, state?.objects ?? {});
+    const resolved = resolveObjects ? resolveRef(value, state?.objects ?? {}) : value;
     if (isPlainObject(resolved)) {
       return <ObjectView value={resolved} state={state} source={source} depth={depth} seen={seen}/>;
     }

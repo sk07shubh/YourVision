@@ -10,6 +10,7 @@ import java.util.*;
 class Solution {
     static class Box {
         int value;
+        Box self;
         Box(int value) { this.value = value; }
     }
 
@@ -52,6 +53,17 @@ class Solution {
         Queue<Box> queue = new ArrayDeque<>();
         queue.add(box1);
         return map.get("first").value + list.get(0).value + queue.peek().value;
+    }
+
+    public int cyclic() {
+        Box box = new Box(13);
+        box.self = box;
+        Box alias = box;
+        HashMap<String, Box> map = new HashMap<>();
+        map.put("self", box);
+        ArrayList<Box> list = new ArrayList<>();
+        list.add(box);
+        return alias.value + map.get("self").value + list.get(0).value;
     }
 
     public int empty() {
@@ -119,6 +131,21 @@ assert(nestedListValue?.fields?.value === 7, "nested list object field missing")
 
 const nestedQueueValue = (nestedQueue.values as Array<Record<string, any>>)[0];
 assert(nestedQueueValue?.fields?.value === 42, "nested queue object field missing");
+
+const cyclic = await runJava(source, { method: "cyclic" });
+assert(cyclic.kind === "OK", "cyclic data structure execution failed");
+
+const cyclicState = cyclic.states?.at(-1);
+const cyclicStructures = cyclicState?.dataStructures ?? {};
+const cyclicMap = cyclicStructures.map as Record<string, any>;
+const cyclicList = cyclicStructures.list as Record<string, any>;
+const cyclicMapEntry = (cyclicMap.entries as Array<Record<string, any>>)[0];
+const cyclicObject = cyclicMapEntry?.value as Record<string, any>;
+const cyclicObjectId = cyclicObject?.$objectId;
+assert(typeof cyclicObjectId === "string", "cyclic object id missing");
+assert(cyclicObject?.fields?.self?.$ref === cyclicObjectId, "cyclic self reference was not preserved");
+assert((cyclicList.values as Array<Record<string, any>>)[0]?.$objectId === cyclicObjectId, "aliased collection object identity was not preserved");
+assert((cyclicState?.variables?.alias as Record<string, any>)?.$objectId === cyclicObjectId, "aliased object variable identity was not preserved");
 
 const empty = await runJava(source, { method: "empty" });
 assert(empty.kind === "OK", "empty DS execution failed");
