@@ -326,11 +326,12 @@ assert(
     "named cyclic map snapshot was not preserved"
 );
 
+const verifiedNestedCycleMap = nestedCycleMap as Record<string, any>;
 const nestedCycleBox = nestedCycleVariables.box as Record<string, any> | undefined;
 const nestedCycleObjectId = nestedCycleBox?.$objectId;
 assert(typeof nestedCycleObjectId === "string", "nested cycle box id missing");
 
-const ownerEntry = (nestedCycleMap.entries as Array<Record<string, any>>)
+const ownerEntry = (verifiedNestedCycleMap.entries as Array<Record<string, any>>)
     .find(entry => entry.key === "owner");
 assert(
     ownerEntry?.value?.$objectId === nestedCycleObjectId ||
@@ -341,7 +342,7 @@ assert(
 const selfEntry = (nestedCycleMap.entries as Array<Record<string, any>>)
     .find(entry => entry.key === "self");
 assert(
-    selfEntry?.value?.$ref === nestedCycleMap.$mapId,
+    selfEntry?.value?.$ref === verifiedNestedCycleMap.$mapId,
     "map self-reference was not preserved"
 );
 
