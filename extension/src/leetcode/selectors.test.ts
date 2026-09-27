@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   findLeftTabList,
+  findTestResultContainers,
   findTestcaseRegion,
 } from './selectors';
 
@@ -118,5 +119,27 @@ describe('LeetCode selectors', () => {
         '[data-e2e-locator="console-testcase-tag"]'
       ).length
     ).toBe(3);
+  });
+
+  it('finds the smallest nested failed-result panel for testcase actions', () => {
+    document.body.innerHTML = `
+      <section>
+        <div class="result-panel">
+          <h2>Test Result</h2>
+          <div class="result-details">
+            <div>Wrong Answer — Use Testcase</div>
+            <div>Input <code>nums = [1,2]</code> Output <code>3</code></div>
+            <div class="result-cases">
+              <button data-e2e-locator="console-testcase-tag">Case 1</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    `;
+
+    const containers = findTestResultContainers();
+
+    expect(containers).toHaveLength(1);
+    expect(containers[0]?.classList.contains('result-panel')).toBe(true);
   });
 });

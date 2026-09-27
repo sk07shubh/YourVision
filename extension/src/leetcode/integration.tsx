@@ -59,6 +59,7 @@ const resultVisualizeButtons = new Set<HTMLButtonElement>();
 
 let observer:
   MutationObserver | null = null;
+let hrefPollingInterval: number | null = null;
 
 let yourVisionActive = false;
 let originalHostOverflow = '';
@@ -879,6 +880,16 @@ originalHostPosition = '';
     );
 }
 
+export function uninstallLeetCodeIntegration() {
+  observer?.disconnect();
+  observer = null;
+  if (hrefPollingInterval !== null) {
+    window.clearInterval(hrefPollingInterval);
+    hrefPollingInterval = null;
+  }
+  cleanup();
+}
+
 export function installLeetCodeIntegration() {
   const attempt = () => {
     injectYourVisionTab();
@@ -922,7 +933,11 @@ export function installLeetCodeIntegration() {
   let lastHref =
     location.href;
 
-  setInterval(
+  if (hrefPollingInterval !== null) {
+    window.clearInterval(hrefPollingInterval);
+  }
+
+  hrefPollingInterval = window.setInterval(
     () => {
       if (
         location.href ===

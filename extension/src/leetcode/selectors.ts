@@ -120,20 +120,27 @@ export function findTestcaseRegion(): HTMLElement | null {
 
 export function findTestResultContainers(): HTMLElement[] {
   const candidates = [...document.querySelectorAll<HTMLElement>('div,section,article')].filter(visible);
-  const matches: HTMLElement[] = [];
-  for (const node of candidates) {
-    const text = textOf(node);
-    if (!/\btest result\b/i.test(text)) continue;
+  const qualifies = (node: HTMLElement) => {
+    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+    const textParts: string[] = [];
+    while (walker.nextNode()) textParts.push(walker.currentNode.textContent ?? '');
+    const text = textParts.join(' ').replace(/\s+/g, ' ').trim().toLowerCase();
+    if (!/\btest result\b/i.test(text)) return false;
     const hasInputOutput = /\binput\b/i.test(text) && /\boutput\b/i.test(text);
     const hasCase = node.querySelector('[data-e2e-locator="console-testcase-tag"]') !== null ||
       [...node.querySelectorAll('button')].some(button => /^case\s+\d+$/i.test((button.textContent ?? '').trim()));
-    if (!hasInputOutput && !hasCase) continue;
-    const parent = node.parentElement;
-    const parentText = parent ? textOf(parent) : '';
-    if (parent && /\btest result\b/i.test(parentText) && /\binput\b/i.test(parentText) && /\boutput\b/i.test(parentText)) continue;
-    matches.push(node);
-  }
-  return matches;
+    return hasInputOutput && hasCase;
+  };
+
+  const matching = candidates.filter(qualifies);
+  const matchingSet = new Set(matching);
+
+  // Ancestors repeat all descendant text, so checking the parent's text
+  // incorrectly rejects every valid panel. Keep the smallest matching panel.
+  return matching.filter(node =>
+    ![...node.querySelectorAll<HTMLElement>('div,section,article')]
+      .some(descendant => matchingSet.has(descendant))
+  );
 }
 /**
  * Finds the complete testcase panel.
