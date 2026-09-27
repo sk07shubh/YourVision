@@ -322,18 +322,20 @@ const nestedCycleBox = Object.values(nestedCycleObjects)
     .find(value => (value as Record<string, any>)?.$type?.endsWith("Box")) as Record<string, any> | undefined;
 assert(nestedCycleBox !== undefined, "nested cycle box snapshot was not preserved");
 
-const nestedCycleMap = nestedCycleBox.fields?.links as Record<string, any> | undefined;
+const nestedCycleMap = nestedCycleBox?.fields?.links as Record<string, any> | undefined;
 assert(
     nestedCycleMap !== undefined &&
-    typeof nestedCycleMap.$mapId === "string" &&
+    typeof verifiedNestedCycleMap.$mapId === "string" &&
     Array.isArray(nestedCycleMap.entries),
     "object -> map link was not preserved"
 );
 
-const nestedCycleObjectId = nestedCycleBox.$objectId;
+const verifiedNestedCycleBox = nestedCycleBox as Record<string, any>;
+const verifiedNestedCycleMap = nestedCycleMap as Record<string, any>;
+const nestedCycleObjectId = verifiedNestedCycleBox.$objectId;
 assert(typeof nestedCycleObjectId === "string", "nested cycle box id missing");
 
-const ownerEntry = (nestedCycleMap.entries as Array<Record<string, any>>)
+const ownerEntry = (verifiedNestedCycleMap.entries as Array<Record<string, any>>)
     .find(entry => entry.key === "owner");
 assert(
     ownerEntry?.value?.$objectId === nestedCycleObjectId ||
