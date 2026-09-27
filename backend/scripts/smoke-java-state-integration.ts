@@ -41,6 +41,11 @@ class Solution {
         }
     }
 
+    static class MatrixBox {
+        int[][] grid;
+        Node child;
+    }
+
     public int locals() {
         int x = 1;
         x = 2;
@@ -166,6 +171,28 @@ class Solution {
         nums[1] = 9;
         nums[2]++;
         return nums[1] + nums[2];
+    }
+
+    public int matrixMutation() {
+        int[][] grid = {{1, 2}, {3, 4}};
+        grid[1][0] = 9;
+        return grid[1][0] + grid[0][1];
+    }
+
+    public int matrixObjectMutation() {
+        MatrixBox box = new MatrixBox();
+        box.grid = new int[][]{{1, 2}, {3, 4}};
+        box.child = new Node(5);
+        box.grid[0][1] = 8;
+        box.child.value = 7;
+        return box.grid[0][1] + box.child.value;
+    }
+
+    public int matrixAliasing() {
+        int[][] a = {{1, 2}, {3, 4}};
+        int[][] b = a;
+        b[0][0] = 7;
+        return a[0][0];
     }
 
     public int largeArray() {
@@ -412,6 +439,129 @@ const arrayValues = snapshotField(nums, "values");
 assert(
     JSON.stringify(arrayValues) === "[1,9,4]",
     "array state did not preserve the final mutated values"
+);
+
+const matrixMutation = await runJava(source, {
+    method: "matrixMutation"
+});
+
+assert(
+    matrixMutation.kind === "OK" && matrixMutation.result === "13",
+    "nested array mutation did not execute successfully"
+);
+assert(
+    traceTypes(matrixMutation).has("ARRAY_WRITE"),
+    "nested array mutation did not emit ARRAY_WRITE"
+);
+
+const matrixState = matrixMutation.states?.at(-1);
+const matrix = matrixState?.arrays.grid;
+const matrixValues = snapshotField(matrix, "values");
+
+assert(
+    Array.isArray(matrixValues) &&
+    matrixValues.length === 2 &&
+    typeof matrixValues[0] === "object" &&
+    matrixValues[0] !== null &&
+    !Array.isArray(matrixValues[0]) &&
+    typeof (matrixValues[0] as Record<string, unknown>).$arrayId === "string" &&
+    typeof matrixValues[1] === "object" &&
+    matrixValues[1] !== null &&
+    !Array.isArray(matrixValues[1]) &&
+    typeof (matrixValues[1] as Record<string, unknown>).$arrayId === "string",
+    "nested array snapshot did not preserve row arrays"
+);
+
+const matrixRow0 = matrixValues[0] as Record<string, unknown>;
+const matrixRow1 = matrixValues[1] as Record<string, unknown>;
+
+assert(
+    JSON.stringify(matrixRow0.values) === "[1,2]" &&
+    JSON.stringify(matrixRow1.values) === "[9,4]",
+    "nested array snapshot did not preserve mutated matrix values"
+);
+
+const matrixObjectMutation = await runJava(source, {
+    method: "matrixObjectMutation"
+});
+
+assert(
+    matrixObjectMutation.kind === "OK" &&
+    matrixObjectMutation.result === "15",
+    "object containing nested arrays did not execute successfully"
+);
+
+const matrixObjectState = matrixObjectMutation.states?.at(-1);
+const matrixBox = matrixObjectState?.variables.box;
+const matrixBoxFields = snapshotField(matrixBox, "fields");
+const objectGrid = snapshotField(matrixBoxFields, "grid");
+const objectGridValues = snapshotField(objectGrid, "values");
+const objectChild = snapshotField(matrixBoxFields, "child");
+const objectChildFields = snapshotField(objectChild, "fields");
+
+assert(
+    Array.isArray(objectGridValues) &&
+    typeof objectGridValues[0] === "object" &&
+    objectGridValues[0] !== null &&
+    !Array.isArray(objectGridValues[0]) &&
+    typeof (objectGridValues[0] as Record<string, unknown>).$arrayId === "string" &&
+    typeof objectGridValues[1] === "object" &&
+    objectGridValues[1] !== null &&
+    !Array.isArray(objectGridValues[1]) &&
+    typeof (objectGridValues[1] as Record<string, unknown>).$arrayId === "string",
+    "nested array inside object state was not preserved"
+);
+assert(
+    JSON.stringify(
+        snapshotField(objectGridValues[0], "values")
+    ) === "[1,8]" &&
+    JSON.stringify(
+        snapshotField(objectGridValues[1], "values")
+    ) === "[3,4]",
+    "nested array inside object did not preserve its mutation"
+);
+assert(
+    snapshotField(objectChildFields, "value") === 7,
+    "nested object field did not preserve its mutation"
+);
+
+const matrixAliasing = await runJava(source, {
+    method: "matrixAliasing"
+});
+
+assert(
+    matrixAliasing.kind === "OK" &&
+    matrixAliasing.result === "7",
+    "nested array aliasing did not execute successfully"
+);
+
+const matrixAliasState = matrixAliasing.states?.at(-1);
+const matrixA = matrixAliasState?.variables.a;
+const matrixB = matrixAliasState?.variables.b;
+
+assert(
+    snapshotField(matrixA, "$arrayId") ===
+        snapshotField(matrixB, "$arrayId"),
+    "nested array aliases did not preserve the same outer array identity"
+);
+
+const matrixAValues = snapshotField(matrixA, "values");
+const matrixBValues = snapshotField(matrixB, "values");
+
+assert(
+    JSON.stringify(
+        snapshotField(matrixAValues?.[0], "values")
+    ) ===
+        JSON.stringify(
+            snapshotField(matrixBValues?.[0], "values")
+        ),
+    "nested array aliases did not preserve the same nested row values"
+);
+assert(
+    JSON.stringify(
+        snapshotField(matrixAValues?.[0], "values")
+    ) === "[7,2]",
+    "nested array alias mutation was not preserved"
 );
 
 const largeArray = await runJava(source, {
