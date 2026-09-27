@@ -101,6 +101,35 @@ class Solution {
         return box.value + links.size();
     }
 
+    public int[] returnedArray() {
+        return new int[]{4, 5, 6};
+    }
+
+    public HashMap<String, Object> returnedMap() {
+        HashMap<String, Object> result = new HashMap<>();
+        Box box = new Box(17);
+        result.put("box", box);
+        result.put("answer", 42);
+        return result;
+    }
+
+    public ArrayList<Object> returnedList() {
+        ArrayList<Object> result = new ArrayList<>();
+        result.add(new Box(23));
+        result.add("done");
+        return result;
+    }
+
+    public int mutateNested() {
+        Box box = new Box(1);
+        HashMap<String, Object> map = new HashMap<>();
+        map.put("box", box);
+        ArrayList<Box> list = new ArrayList<>();
+        list.add(box);
+        box.value = 9;
+        return ((Box) map.get("box")).value + list.get(0).value;
+    }
+
     public int empty() {
         HashMap<Integer, Integer> map = new HashMap<>();
         HashSet<Integer> set = new HashSet<>();
@@ -196,20 +225,89 @@ const aliasVariables = aliasesState?.variables ?? {};
 const aliasArrays = aliasesState?.arrays ?? {};
 const aliasStructures = aliasesState?.dataStructures ?? {};
 
-const firstArray = aliasVariables.firstArray as Record<string, any> | undefined;
-const secondArray = aliasVariables.secondArray as Record<string, any> | undefined;
+const firstArray = aliasArrays.firstArray as Record<string, any> | undefined;
+const secondArray = aliasArrays.secondArray as Record<string, any> | undefined;
 assert(firstArray?.$arrayId === secondArray?.$arrayId, "array aliases lost identity");
-assert((aliasArrays.firstArray as Record<string, any> | undefined)?.$arrayId === (aliasArrays.secondArray as Record<string, any> | undefined)?.$arrayId, "array aliases were not registered under the same id");
+assert(
+    firstArray?.values?.[0] === 9 &&
+    secondArray?.values?.[0] === 9,
+    "array alias mutation was not reflected in both snapshots"
+);
 
-const firstMap = aliasVariables.firstMap as Record<string, any> | undefined;
-const secondMap = aliasVariables.secondMap as Record<string, any> | undefined;
+const firstMap = aliasStructures.firstMap as Record<string, any> | undefined;
+const secondMap = aliasStructures.secondMap as Record<string, any> | undefined;
 assert(firstMap?.$mapId === secondMap?.$mapId, "map aliases lost identity");
-assert((aliasStructures.firstMap as Record<string, any> | undefined)?.$mapId === (aliasStructures.secondMap as Record<string, any> | undefined)?.$mapId, "map aliases were not registered under the same id");
+assert(
+    firstMap?.entries?.some((entry: any) => entry.key === "y" && entry.value === 2) &&
+    secondMap?.entries?.some((entry: any) => entry.key === "y" && entry.value === 2),
+    "map alias mutation was not reflected in both snapshots"
+);
 
-const firstList = aliasVariables.firstList as Record<string, any> | undefined;
-const secondList = aliasVariables.secondList as Record<string, any> | undefined;
+const firstList = aliasStructures.firstList as Record<string, any> | undefined;
+const secondList = aliasStructures.secondList as Record<string, any> | undefined;
 assert(firstList?.$collectionId === secondList?.$collectionId, "collection aliases lost identity");
-assert((aliasStructures.firstList as Record<string, any> | undefined)?.$collectionId === (aliasStructures.secondList as Record<string, any> | undefined)?.$collectionId, "collection aliases were not registered under the same id");
+assert(
+    JSON.stringify(firstList?.values) === "[3,4]" &&
+    JSON.stringify(secondList?.values) === "[3,4]",
+    "collection alias mutation was not reflected in both snapshots"
+);
+
+const returnedArray = await runJava(source, { method: "returnedArray" });
+assert(returnedArray.kind === "OK", "returned array execution failed");
+const returnedArrayExit = returnedArray.states?.find(
+    state => state.lastEvent?.type === "METHOD_EXIT"
+);
+const returnedArrayValue = returnedArrayExit?.lastEvent?.data?.returnValue as Record<string, any> | undefined;
+assert(
+    JSON.stringify(returnedArrayValue?.values) === "[4,5,6]",
+    "returned array snapshot was not preserved"
+);
+
+const returnedMap = await runJava(source, { method: "returnedMap" });
+assert(returnedMap.kind === "OK", "returned map execution failed");
+const returnedMapExit = returnedMap.states?.find(
+    state => state.lastEvent?.type === "METHOD_EXIT"
+);
+const returnedMapValue = returnedMapExit?.lastEvent?.data?.returnValue as Record<string, any> | undefined;
+assert(
+    returnedMapValue?.$mapId && Array.isArray(returnedMapValue.entries),
+    "returned map snapshot was not preserved"
+);
+const returnedMapBox = (returnedMapValue.entries as Array<Record<string, any>>)
+    .find(entry => entry.key === "box")?.value as Record<string, any> | undefined;
+assert(returnedMapBox?.fields?.value === 17, "returned map nested object was not preserved");
+
+const returnedList = await runJava(source, { method: "returnedList" });
+assert(returnedList.kind === "OK", "returned list execution failed");
+const returnedListExit = returnedList.states?.find(
+    state => state.lastEvent?.type === "METHOD_EXIT"
+);
+const returnedListValue = returnedListExit?.lastEvent?.data?.returnValue as Record<string, any> | undefined;
+assert(
+    returnedListValue?.$collectionId && Array.isArray(returnedListValue.values),
+    "returned collection snapshot was not preserved"
+);
+assert(
+    (returnedListValue.values as Array<Record<string, any>>)[0]?.fields?.value === 23,
+    "returned collection nested object was not preserved"
+);
+
+const mutated = await runJava(source, { method: "mutateNested" });
+assert(mutated.kind === "OK", "nested mutation execution failed");
+const mutationState = mutated.states?.find(
+    state => (state.variables?.box as Record<string, any> | undefined)?.fields?.value === 9
+);
+const mutationBox = mutationState?.variables?.box as Record<string, any> | undefined;
+assert(mutationBox?.fields?.value === 9, "nested object mutation was not reflected in the step snapshot");
+const mutationMap = mutationState?.dataStructures?.map as Record<string, any> | undefined;
+const mutationMapBox = (mutationMap?.entries as Array<Record<string, any>> | undefined)
+    ?.find(entry => entry.key === "box")?.value as Record<string, any> | undefined;
+assert(mutationMapBox?.fields?.value === 9, "map nested object mutation was not reflected");
+const mutationList = mutationState?.dataStructures?.list as Record<string, any> | undefined;
+assert(
+    (mutationList?.values as Array<Record<string, any>> | undefined)?.[0]?.fields?.value === 9,
+    "collection nested object mutation was not reflected"
+);
 
 const nestedCycle = await runJava(source, { method: "nestedCycle" });
 assert(nestedCycle.kind === "OK", "nested object/collection cycle execution failed");
