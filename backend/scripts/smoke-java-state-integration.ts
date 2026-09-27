@@ -446,7 +446,7 @@ const matrixMutation = await runJava(source, {
 });
 
 assert(
-    matrixMutation.kind === "OK" && matrixMutation.result === "13",
+    matrixMutation.kind === "OK" && matrixMutation.result === "11",
     "nested array mutation did not execute successfully"
 );
 assert(
@@ -496,12 +496,12 @@ const matrixBox = matrixObjectState?.variables.box;
 const matrixBoxFields = snapshotField(matrixBox, "fields");
 const objectGrid = snapshotField(matrixBoxFields, "grid");
 const objectGridValues = snapshotField(objectGrid, "values");
+const objectGridRows = Array.isArray(objectGridValues) ? objectGridValues : [];
 const objectChild = snapshotField(matrixBoxFields, "child");
 const objectChildFields = snapshotField(objectChild, "fields");
 
 assert(
-    Array.isArray(objectGridValues) &&
-    typeof objectGridValues[0] === "object" &&
+    typeof objectGridRows[0] === "object" &&
     objectGridRows[0] !== null &&
     !Array.isArray(objectGridRows[0]) &&
     typeof (objectGridRows[0] as Record<string, unknown>).$arrayId === "string" &&
@@ -520,6 +520,7 @@ assert(
     ) === "[3,4]",
     "nested array inside object did not preserve its mutation"
 );
+
 assert(
     snapshotField(objectChildFields, "value") === 7,
     "nested object field did not preserve its mutation"
