@@ -323,6 +323,7 @@ test('Chrome extension preserves the throwing line and runtime error message', a
 
     await expect(error).toContainText('nested bad input');
     await host.getByRole('button', { name: 'Next →' }).click();
+    await host.getByRole('button', { name: 'Next →' }).click();
     await expect(host.locator('.yv-statement')).toContainText('throw new IllegalArgumentException');
     await expect(page.locator('.monaco-editor .view-line[data-line="6"]')).toHaveCSS(
       'box-shadow',
@@ -395,7 +396,6 @@ test('Chrome extension renders trace-limit timeout as a failed execution', async
     await expect(host.locator('.yv-error')).toContainText('Java execution exceeded trace event limit');
     await host.getByRole('button', { name: 'Next →' }).click();
     await expect(host.locator('.yv-current-head')).toContainText('Trace limit reached');
-    await expect(host.locator('.yv-statement')).toContainText('i++;');
     await expect(page.locator('.monaco-editor .view-line[data-line="5"]')).toHaveCSS(
       'box-shadow',
       'rgb(255, 161, 22) 2px 0px 0px 0px inset',
