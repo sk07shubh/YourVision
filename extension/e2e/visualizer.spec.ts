@@ -138,7 +138,7 @@ for (const flow of [
 
       const statement = page.locator('[data-yourvision-host="true"] .yv-statement');
       await expect(statement).toContainText('public int sum');
-      await expect(page.locator('.monaco-editor .view-line[data-line="2"]')).toHaveCSS('box-shadow', /inset 2px/);
+      await expect(page.locator('.monaco-editor .view-line[data-line="2"]')).toHaveCSS('box-shadow', 'rgb(255, 161, 22) 2px 0px 0px 0px inset');
       await expect(page.locator('[data-yourvision-host="true"] .yv-case')).toHaveText(flow.label);
       if (flow.kind !== 'default') {
         await expect(page.locator('[data-yourvision-host="true"] .yv-case-kind')).toHaveText(flow.kind === 'failed' ? 'Failed testcase' : 'Custom');
@@ -146,10 +146,10 @@ for (const flow of [
 
       await page.keyboard.press('ArrowRight');
       await expect(statement).toContainText('int total = 0');
-      await expect(page.locator('.monaco-editor .view-line[data-line="3"]')).toHaveCSS('box-shadow', /inset 2px/);
+      await expect(page.locator('.monaco-editor .view-line[data-line="3"]')).toHaveCSS('box-shadow', 'rgb(255, 161, 22) 2px 0px 0px 0px inset');
       await page.keyboard.press('ArrowRight');
       await expect(page.locator('[data-yourvision-host="true"] .yv-output')).toContainText('3');
-      await expect(page.locator('.monaco-editor .view-line[data-line="7"]')).toHaveCSS('box-shadow', /inset 2px/);
+      await expect(page.locator('.monaco-editor .view-line[data-line="7"]')).toHaveCSS('box-shadow', 'rgb(255, 161, 22) 2px 0px 0px 0px inset');
 
       expect(received).toHaveLength(1);
       expect(received[0]).toMatchObject({
