@@ -319,7 +319,7 @@ assert(nestedCycle.kind === "OK", "nested object/collection cycle execution fail
 const nestedCycleState = nestedCycle.states?.find(state =>
     Object.values(state.objects ?? {}).some(value => {
         const object = value as Record<string, any>;
-        const links = object.fields?.links as Record<string, any> | undefined;
+        const links = object.fields?.links as Record<string, any> | null | undefined;
         return typeof object.$objectId === "string" &&
             links !== undefined &&
             typeof links.$mapId === "string" &&
