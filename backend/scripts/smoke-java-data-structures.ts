@@ -11,6 +11,7 @@ class Solution {
     static class Box {
         int value;
         Box self;
+        HashMap<String, Object> links;
         Box(int value) { this.value = value; }
     }
 
@@ -96,6 +97,7 @@ class Solution {
         HashMap<String, Object> links = new HashMap<>();
         links.put("owner", box);
         links.put("self", links);
+        box.links = links;
         return box.value + links.size();
     }
 
