@@ -100,7 +100,7 @@ function CollectionView({
           {[...value.values].reverse().map((item, index) => (
             <div className="yv-stack-cell" key={index}>
               <span className="yv-stack-position">{index === 0 ? 'TOP' : ''}</span>
-              <span className="yv-code">{displayValue(item)}</span>
+              <DataValue value={item} state={state} source={source} depth={1}/>
             </div>
           ))}
           {!value.values.length && <div className="yv-empty">Empty stack</div>}
@@ -301,13 +301,15 @@ function mapChanges(state?: TraceState): Array<{
 
 function MapView({
   value,
-  state
+  state,
+  source
 }: {
   value: Obj & {
     $mapId: string;
     entries: Array<{ key: unknown; value: unknown }>;
   };
   state?: TraceState;
+  source: string;
 }) {
   const changes = mapChanges(state);
 
@@ -347,18 +349,18 @@ function MapView({
               className={`yv-map-row ${change ? `yv-map-${change.kind}` : ''}`}
               key={stableStringify(entry.key) || index}
             >
-              <div className="yv-map-key yv-code">
-                {displayValue(entry.key)}
+              <div className="yv-map-key">
+                <DataValue value={entry.key} state={state} source={source} depth={1}/>
               </div>
 
-              <div className="yv-map-value yv-code">
+              <div className="yv-map-value">
                 {change?.kind === 'update' ? (
                   <>
                     <span className="yv-old-value">
                       {displayValue(change.before)}
                     </span>
                     <span className="yv-map-arrow">→</span>
-                    <span>{displayValue(entry.value)}</span>
+                    <DataValue value={entry.value} state={state} source={source} depth={1}/>
                   </>
                 ) : (
                   <span>{displayValue(entry.value)}</span>
@@ -554,7 +556,7 @@ function DataValue({
   seen?: Set<string>;
 }) {
   if (isMapSnapshot(value)) {
-    return <MapView value={value} state={state}/>;
+    return <MapView value={value} state={state} source={source}/>;
   }
 
   if (isCollectionSnapshot(value)) {

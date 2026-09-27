@@ -305,6 +305,57 @@ test('Chrome extension renders ordinary object fields, nested arrays, and aliase
     await rm(profile, { recursive: true, force: true });
   }
 });
+test('Chrome extension expands nested objects inside maps and collections', async () => {
+  const nestedSource = [
+    'class Solution {',
+    '  public int inspect() {',
+    '    return 1;',
+    '  }',
+    '}',
+  ].join('\\n');
+  activeResponse = {
+    success: true, kind: 'OK', result: '1',
+    states: [{
+      sequence: 1, line: 2, method: 'inspect', depth: 1,
+      variables: {
+        map: { $mapId: 'map1', $type: 'java.util.HashMap', entries: [{
+          key: 'box', value: { $objectId: 'box1', $type: 'Box', fields: { value: 42, child: { $ref: 'box2' } } }
+        }]},
+        list: { $collectionId: 'list1', $type: 'java.util.ArrayList', $kind: 'list',
+          values: [{ $objectId: 'box2', $type: 'Box', fields: { value: 7 } }], size: 1 }
+      },
+      arrays: {},
+      dataStructures: {
+        map: { $mapId: 'map1', $type: 'java.util.HashMap', entries: [{
+          key: 'box', value: { $objectId: 'box1', $type: 'Box', fields: { value: 42, child: { $ref: 'box2' } } }
+        }]},
+        list: { $collectionId: 'list1', $type: 'java.util.ArrayList', $kind: 'list',
+          values: [{ $objectId: 'box2', $type: 'Box', fields: { value: 7 } }], size: 1 }
+      },
+      objects: {
+        box1: { $objectId: 'box1', $type: 'Box', fields: { value: 42, child: { $ref: 'box2' } } },
+        box2: { $objectId: 'box2', $type: 'Box', fields: { value: 7 } }
+      },
+      callStack: ['inspect'], lastEvent: { type: 'METHOD_ENTER', line: 2, method: 'inspect' }
+    }],
+  };
+  const { context, page, profile } = await launchPage('default', nestedSource);
+  try {
+    await page.locator('[data-yourvision-tab="true"]').click();
+    await page.locator('[data-yourvision-visualize="true"]').click();
+    const host = page.locator('[data-yourvision-host="true"]');
+    const structures = host.locator('.yv-section').filter({ hasText: 'Data Structures' });
+    await expect(structures).toContainText('HashMap');
+    await expect(structures).toContainText('ArrayList');
+    await expect(structures).toContainText('42');
+    await expect(structures).toContainText('7');
+    await expect(structures.locator('.yv-object')).toHaveCount(2);
+  } finally {
+    await context.close();
+    await rm(profile, { recursive: true, force: true });
+  }
+});
+
 
 test('Chrome extension renders returned ListNode identity and reachable chain', async () => {
   const listSource = [
