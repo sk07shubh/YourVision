@@ -498,9 +498,9 @@ public class YourVisionTracer {
 
             String methodName = method.name();
             String pattern =
-                "\\\\b" +
+                "\\b" +
                 java.util.regex.Pattern.quote(methodName) +
-                "\\\\s*\\\\(";
+                "\\s*\\(";
 
             for (int index = limit - 1; index >= 0; index--) {
                 if (lines.get(index).matches(".*" + pattern + ".*")) {
