@@ -167,6 +167,93 @@ for (const flow of [
   });
 }
 
+
+test('Chrome extension renders returned ListNode identity and reachable chain', async () => {
+  const listSource = [
+    'class Solution {',
+    '  public ListNode middleNode(ListNode head) {',
+    '    return head.next;',
+    '  }',
+    '}',
+  ].join('\\n');
+
+  activeResponse = {
+    success: true,
+    kind: 'OK',
+    result: 'ListNode@102',
+    states: [
+      { sequence: 1, line: 2, method: 'middleNode', depth: 1, variables: { head: { $objectId: '101', $type: 'ListNode', fields: { val: 1, next: { $ref: '102' } } } }, arrays: {}, dataStructures: {}, objects: {}, callStack: ['middleNode'], lastEvent: { type: 'METHOD_ENTER', line: 2, method: 'middleNode' } },
+      { sequence: 2, line: 3, method: 'middleNode', depth: 1, variables: { head: { $objectId: '101', $type: 'ListNode', fields: { val: 1, next: { $ref: '102' } } } }, arrays: {}, dataStructures: {}, objects: {}, callStack: ['middleNode'], lastEvent: { type: 'METHOD_EXIT', line: 3, method: 'middleNode', data: { returnValue: { $objectId: '102', $type: 'ListNode', fields: { val: 3, next: { $ref: '103' } } } } } },
+      { sequence: 3, line: 3, method: 'middleNode', depth: 0, variables: {}, arrays: {}, dataStructures: {}, objects: {
+        '102': { $objectId: '102', $type: 'ListNode', fields: { val: 3, next: { $ref: '103' } } },
+        '103': { $objectId: '103', $type: 'ListNode', fields: { val: 4, next: { $ref: '104' } } },
+        '104': { $objectId: '104', $type: 'ListNode', fields: { val: 5, next: null } },
+      }, callStack: [], lastEvent: { type: 'PROGRAM_END', line: 3, method: 'middleNode', data: { returnValue: { $objectId: '102', $type: 'ListNode', fields: { val: 3, next: { $ref: '103' } } } } } },
+    ],
+  };
+
+  received.length = 0;
+  const { context, page, profile } = await launchPage('default', listSource);
+  try {
+    await page.locator('[data-yourvision-tab="true"]').click();
+    await page.locator('[data-yourvision-visualize="true"]').click();
+    const host = page.locator('[data-yourvision-host="true"]');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+
+    const output = host.locator('.yv-output');
+    await expect(output).toContainText('ListNode@102');
+    await expect(output).toContainText('Returned node and reachable chain');
+    await expect(output.locator('.yv-node')).allTextContents().resolves.toEqual(['3', '4', '5']);
+    await expect(output.locator('.yv-linked-piece')).toHaveCount(3);
+  } finally {
+    await context.close();
+    await rm(profile, { recursive: true, force: true });
+  }
+});
+
+test('Chrome extension renders returned TreeNode identity and reachable tree', async () => {
+  const treeSource = [
+    'class Solution {',
+    '  public TreeNode buildTree(TreeNode root) {',
+    '    return root;',
+    '  }',
+    '}',
+  ].join('\\n');
+
+  activeResponse = {
+    success: true,
+    kind: 'OK',
+    result: 'TreeNode@201',
+    states: [
+      { sequence: 1, line: 2, method: 'buildTree', depth: 1, variables: {}, arrays: {}, dataStructures: {}, objects: {}, callStack: ['buildTree'], lastEvent: { type: 'METHOD_ENTER', line: 2, method: 'buildTree' } },
+      { sequence: 2, line: 3, method: 'buildTree', depth: 0, variables: {}, arrays: {}, dataStructures: {}, objects: {
+        '201': { $objectId: '201', $type: 'TreeNode', fields: { val: 1, left: { $ref: '202' }, right: { $ref: '203' } } },
+        '202': { $objectId: '202', $type: 'TreeNode', fields: { val: 2, left: null, right: null } },
+        '203': { $objectId: '203', $type: 'TreeNode', fields: { val: 3, left: { $ref: '204' }, right: null } },
+        '204': { $objectId: '204', $type: 'TreeNode', fields: { val: 4, left: null, right: null } },
+      }, callStack: [], lastEvent: { type: 'PROGRAM_END', line: 3, method: 'buildTree', data: { returnValue: { $objectId: '201', $type: 'TreeNode', fields: { val: 1, left: { $ref: '202' }, right: { $ref: '203' } } } } } },
+    ],
+  };
+
+  received.length = 0;
+  const { context, page, profile } = await launchPage('default', treeSource);
+  try {
+    await page.locator('[data-yourvision-tab="true"]').click();
+    await page.locator('[data-yourvision-visualize="true"]').click();
+    const host = page.locator('[data-yourvision-host="true"]');
+    await page.keyboard.press('ArrowRight');
+
+    const output = host.locator('.yv-output');
+    await expect(output).toContainText('TreeNode@201');
+    await expect(output).toContainText('Returned root and reachable tree');
+    await expect(output.locator('.yv-tree .yv-node')).allTextContents().resolves.toEqual(['1', '2', '3', '4']);
+  } finally {
+    await context.close();
+    await rm(profile, { recursive: true, force: true });
+  }
+});
+
 test('Chrome extension navigates real repeated-line checkpoints through return and caller resume', async () => {
   const states = sameLineLoopStates();
   activeResponse = { success: true, kind: 'OK', result: '4', states };
