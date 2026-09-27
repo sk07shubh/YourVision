@@ -390,11 +390,15 @@ public class YourVisionRuntime {
             );
         }
 if (isListNodeType(type)) {
-    return parseListNode(text, type);
+    return text.startsWith("{")
+        ? parseObject(text, type)
+        : parseListNode(text, type);
 }
 
 if (isTreeNodeType(type)) {
-    return parseTreeNode(text, type);
+    return text.startsWith("{")
+        ? parseObject(text, type)
+        : parseTreeNode(text, type);
 }
 
         if (type.isArray()) {
