@@ -318,7 +318,7 @@ assert(nestedCycle.kind === "OK", "nested object/collection cycle execution fail
 
 const nestedCycleState = nestedCycle.states?.at(-1);
 const nestedCycleVariables = nestedCycleState?.variables ?? {};
-const nestedCycleMap = nestedCycleVariables.links as Record<string, any> | undefined;
+const nestedCycleMap = nestedCycleVariables.links as Record<string, any>;
 assert(
     typeof nestedCycleMap?.$mapId === "string" &&
     Array.isArray(nestedCycleMap.entries),
