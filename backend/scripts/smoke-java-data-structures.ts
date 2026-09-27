@@ -91,7 +91,7 @@ const emptyState = empty.states?.find(
 );
 const emptyStructures = emptyState?.dataStructures ?? {};
 
-for (const name of ["map","set","stack","queue","list"]) {
+for (const name of ["map","set","stack","queue","priorityQueue","list"]) {
     assert(name in emptyStructures, "empty " + name + " missing");
     const value = emptyStructures[name] as Record<string, unknown>;
     const length = name === "map"
