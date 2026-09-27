@@ -341,6 +341,7 @@ function collectSnapshots(
     if (
         typeof record.$ref === "string" &&
         (
+            typeof record.$objectId === "string" ||
             typeof record.$arrayId === "string" ||
             typeof record.$mapId === "string" ||
             typeof record.$collectionId === "string"
