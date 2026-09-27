@@ -322,8 +322,8 @@ const nestedCycleState = nestedCycle.states?.find(state =>
         const links = object.fields?.links as Record<string, any> | null | undefined;
         return typeof object.$objectId === "string" &&
             links !== undefined &&
-            typeof links.$mapId === "string" &&
-            Array.isArray(links.entries);
+            typeof links?.$mapId === "string" &&
+            Array.isArray(links?.entries);
     })
 );
 assert(nestedCycleState !== undefined, "object -> map link was not preserved");
