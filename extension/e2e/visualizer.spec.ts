@@ -520,9 +520,9 @@ test('Chrome extension groups aliased arrays and collections by identity', async
 
     const host = page.locator('[data-yourvision-host="true"]');
     const structures = host.locator('.yv-section').filter({ hasText: 'Data Structures' });
-    await expect(structures.locator('.yv-ds-title')).toContainText('firstArray / secondArray');
-    await expect(structures.locator('.yv-ds-title')).toContainText('firstMap / secondMap');
-    await expect(structures.locator('.yv-ds-title')).toContainText('firstList / secondList');
+    await expect(structures.getByText('firstArray / secondArray', { exact: true })).toBeVisible();
+    await expect(structures.getByText('firstMap / secondMap', { exact: true })).toBeVisible();
+    await expect(structures.getByText('firstList / secondList', { exact: true })).toBeVisible();
     await expect(structures.locator('.yv-ds')).toHaveCount(3);
   } finally {
     await context.close();
