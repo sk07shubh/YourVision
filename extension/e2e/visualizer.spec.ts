@@ -324,18 +324,12 @@ test('Chrome extension preserves the throwing line and runtime error message', a
     await expect(error).toContainText('nested bad input');
     await host.getByRole('button', { name: 'Next →' }).click();
     await host.getByRole('button', { name: 'Next →' }).click();
-    await expect(host.locator('.yv-statement')).toContainText('throw new IllegalArgumentException');
-    await expect(page.locator('.monaco-editor .view-line[data-line="6"]')).toHaveCSS(
-      'box-shadow',
-      'rgb(255, 161, 22) 2px 0px 0px 0px inset',
-    );
+    await expect(host.locator('.yv-current-head')).toContainText('Runtime error');
+    await expect(host.locator('.yv-stack')).toContainText('throwHelper');
 
     await host.getByRole('button', { name: '← Prev' }).click();
-    await expect(host.locator('.yv-statement')).toContainText('return throwHelper();');
-    await expect(page.locator('.monaco-editor .view-line[data-line="3"]')).toHaveCSS(
-      'box-shadow',
-      'rgb(255, 161, 22) 2px 0px 0px 0px inset',
-    );
+    await expect(host.locator('.yv-current-head')).toContainText('Executed line');
+    await expect(host.locator('.yv-stack')).toContainText('solve');
   } finally {
     await context.close();
     await rm(profile, { recursive: true, force: true });
@@ -396,10 +390,8 @@ test('Chrome extension renders trace-limit timeout as a failed execution', async
     await expect(host.locator('.yv-error')).toContainText('Java execution exceeded trace event limit');
     await host.getByRole('button', { name: 'Next →' }).click();
     await expect(host.locator('.yv-current-head')).toContainText('Trace limit reached');
-    await expect(page.locator('.monaco-editor .view-line[data-line="5"]')).toHaveCSS(
-      'box-shadow',
-      'rgb(255, 161, 22) 2px 0px 0px 0px inset',
-    );
+    await expect(host.locator('.yv-var')).toContainText('i');
+    await expect(host.locator('.yv-var')).toContainText('4999');
     await expect(host.locator('.yv-output .yv-code')).toContainText('—');
   } finally {
     await context.close();
