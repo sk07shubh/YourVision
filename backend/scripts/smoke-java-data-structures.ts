@@ -336,8 +336,9 @@ const nestedCycleBox = Object.values(nestedCycleObjects)
     }) as Record<string, any> | undefined;
 assert(nestedCycleBox !== undefined, "nested cycle box snapshot was not preserved");
 
-const nestedCycleMap = nestedCycleBox.fields?.links as Record<string, any>;
-const nestedCycleObjectId = nestedCycleBox.$objectId;
+const verifiedNestedCycleBox = nestedCycleBox as Record<string, any>;
+const nestedCycleMap = verifiedNestedCycleBox.fields?.links as Record<string, any>;
+const nestedCycleObjectId = verifiedNestedCycleBox.$objectId;
 assert(typeof nestedCycleObjectId === "string", "nested cycle box id missing");
 
 const ownerEntry = (nestedCycleMap.entries as Array<Record<string, any>>)
