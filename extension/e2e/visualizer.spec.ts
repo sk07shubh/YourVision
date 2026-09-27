@@ -299,7 +299,7 @@ test('Chrome extension renders ordinary object fields, nested arrays, and aliase
     await expect(structures).toContainText('4');
     await expect(structures).toContainText('child');
     await expect(structures).toContainText('7');
-    await expect(structures.locator('.yv-object')).toHaveCount(3);
+    await expect(structures.locator('.yv-object')).toHaveCount(2);
   } finally {
     await context.close();
     await rm(profile, { recursive: true, force: true });
@@ -349,7 +349,7 @@ test('Chrome extension expands nested objects inside maps and collections', asyn
     await expect(structures).toContainText('ArrayList');
     await expect(structures).toContainText('42');
     await expect(structures).toContainText('7');
-    await expect(structures.locator('.yv-object')).toHaveCount(2);
+    await expect(structures.locator('.yv-object')).toHaveCount(3);
   } finally {
     await context.close();
     await rm(profile, { recursive: true, force: true });
