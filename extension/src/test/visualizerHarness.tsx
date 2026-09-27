@@ -124,7 +124,10 @@ export function mountMonacoHarness(source = VISUALIZER_SOURCE): HTMLElement {
   return editor;
 }
 
-export function mountVisualizer(source = VISUALIZER_SOURCE): {
+export function mountVisualizer(
+  source = VISUALIZER_SOURCE,
+  response: VisualizationResponse = fixedResponse(),
+): {
   root: Root;
   host: HTMLDivElement;
 } {
@@ -138,7 +141,7 @@ export function mountVisualizer(source = VISUALIZER_SOURCE): {
 
   act(() => {
     sessionStore.begin(source, TESTCASE);
-    sessionStore.finish(fixedResponse());
+    sessionStore.finish(response);
     root.render(<VisualizerPanel />);
   });
 

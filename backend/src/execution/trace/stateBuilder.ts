@@ -230,9 +230,8 @@ function applyEvent(
             break;
 
         case "METHOD_EXIT":
-            // A MethodExitEvent is located at the last executed source
-            // location. For a top-level return this is the return statement.
-            // When a caller exists, callerLine is the correct resume point.
+            // Preserve the callee's actual return location for this checkpoint.
+            // A later caller STEP represents the caller resuming execution.
             next.line = event.line ?? previous.line;
             next.method = previous.method;
             next.callStack =
@@ -243,19 +242,8 @@ function applyEvent(
                     )
                     : [];
 
-            if (typeof data.callerLine === "number") {
-                next.line = data.callerLine;
-            }
-
-            if (typeof data.callerMethod === "string") {
-                next.method = data.callerMethod;
-            }
-
-            if (data.callerVariables) {
-                applyVariableSnapshot(
-                    next,
-                    data.callerVariables
-                );
+            if (data.variables) {
+                applyVariableSnapshot(next, data.variables);
             }
             break;
 

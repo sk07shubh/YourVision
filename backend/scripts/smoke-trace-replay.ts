@@ -56,14 +56,16 @@ const trace: ExecutionTrace = {
 };
 
 const states = buildStates(trace);
-assert(states.length === 4, "replay state count must match visible checkpoints");
+assert(states.length === 5, "replay state count must include return and caller-resume checkpoints");
 assert(states[0]?.lastEvent?.type === "METHOD_ENTER", "method entry must be visible");
 assert(states[1]?.arrays.nums !== undefined, "STEP must hydrate named arrays");
 assert(states[2]?.lastEvent?.type === "METHOD_ENTER", "nested method entry must be replayable");
 assert(states[2]?.callStack.join("/") === "solve/helper", "nested call stack replay is incorrect");
 assert(states[3]?.lastEvent?.type === "METHOD_EXIT", "method return must be replayable");
-assert(states[3]?.line === 7 && states[3]?.method === "solve", "caller location was not restored");
-assert(states[3]?.callStack.join("/") === "solve", "caller stack was not restored");
+assert(states[3]?.line === 6 && states[3]?.method === "helper", "callee return location was not preserved");
+assert(states[3]?.callStack.join("/") === "solve", "callee exit did not pop the call stack");
+assert(states[4]?.line === 7 && states[4]?.method === "solve", "caller resume location was not restored");
+assert(states[4]?.callStack.join("/") === "solve", "caller stack was not restored");
 
 
 const replay = buildStates(trace);

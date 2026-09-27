@@ -9,6 +9,7 @@ import {
   unmount,
   VISUALIZER_SOURCE,
 } from '../test/visualizerHarness';
+import { sameLineLoopStates, SAME_LINE_LOOP_SOURCE } from '../test/sameLineLoopTrace';
 
 Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', {
   configurable: true,
@@ -53,6 +54,76 @@ function clickButton(host: ParentNode, label: string): void {
 }
 
 describe('VisualizerPanel deterministic DOM harness', () => {
+  it('steps through enriched same-line loop visits, restores structures, and resumes the caller', () => {
+    const states = sameLineLoopStates();
+    const visitStates = states
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => item.method === 'helper' && item.lastEvent?.type === 'STEP' && typeof item.variables.visits === 'number');
+    const loopVisitStates = visitStates.filter(({ item }) => item.lastEvent?.line === 9);
+    expect(loopVisitStates.map(({ item }) => item.variables.visits)).toEqual([0, 1, 2, 3]);
+    expect(new Set(visitStates.map(({ item }) => item.sequence)).size).toBe(visitStates.length);
+
+    editor = mountMonacoHarness(SAME_LINE_LOOP_SOURCE);
+    const mounted = mountVisualizer(SAME_LINE_LOOP_SOURCE, {
+      success: true,
+      kind: 'OK',
+      result: '4',
+      states,
+    });
+    root = mounted.root;
+    const panel = mounted.host.shadowRoot!;
+
+    // Advance one checkpoint at a time; consecutive genuine visits share the
+    // same source highlight while the locals and array snapshot keep changing.
+    const loopVisit = loopVisitStates.find(({ item }) => item.variables.visits === 1)!;
+    while (sessionStore.get().index < loopVisit.index) clickButton(panel, 'Next →');
+    expect(sessionStore.get().index).toBe(loopVisit.index);
+    expect(highlightedSourceLine(editor!)).toBe(9);
+    expect(panel.querySelector('.yv-statement')?.textContent).toContain('while (visits++ < 3)');
+
+    const visitsRow = () => [...panel.querySelectorAll<HTMLElement>('.yv-var')]
+      .find(row => row.querySelector('.yv-var-name')?.textContent === 'visits');
+    const arrayValues = () => [...panel.querySelectorAll('.yv-cell-value')].map(cell => cell.textContent);
+    expect(visitsRow()?.textContent).toContain('1');
+    expect(arrayValues()).toEqual(['1', '0', '0']);
+
+    clickButton(panel, 'Next →');
+    expect(sessionStore.get().index).toBe(loopVisit.index + 1);
+    expect(highlightedSourceLine(editor!)).toBe(9);
+    expect(visitsRow()?.textContent).toContain('2');
+    expect(arrayValues()).toEqual(['1', '2', '0']);
+
+    clickButton(panel, '← Prev');
+    expect(sessionStore.get().index).toBe(loopVisit.index);
+    expect(highlightedSourceLine(editor!)).toBe(9);
+    expect(visitsRow()?.textContent).toContain('1');
+    expect(arrayValues()).toEqual(['1', '0', '0']);
+    clickButton(panel, 'Next →');
+    clickButton(panel, 'Next →');
+    expect(visitsRow()?.textContent).toContain('3');
+    expect(arrayValues()).toEqual(['1', '2', '3']);
+
+    const helperReturn = states.findIndex(item => item.method === 'helper' && item.line === 10 && item.lastEvent?.type === 'METHOD_EXIT');
+    while (sessionStore.get().index < helperReturn) clickButton(panel, 'Next →');
+    expect(highlightedSourceLine(editor!)).toBe(10);
+    expect(panel.querySelector('.yv-statement')?.textContent).toContain('return visits;');
+    expect(visitsRow()?.textContent).toContain('4');
+
+    const callerResume = states.findIndex(item => item.method === 'run' && item.line === 3 && item.lastEvent?.type === 'STEP');
+    while (sessionStore.get().index < callerResume) clickButton(panel, 'Next →');
+    expect(highlightedSourceLine(editor!)).toBe(3);
+    expect(panel.querySelector('.yv-statement')?.textContent).toContain('int result = helper();');
+    expect(panel.querySelector('.yv-stack')?.textContent).toContain('run');
+    expect(panel.querySelector('.yv-stack')?.textContent).not.toContain('helper');
+
+    clickButton(panel, 'Next →');
+    clickButton(panel, 'Next →');
+    expect(highlightedSourceLine(editor!)).toBe(4);
+    expect(panel.querySelector('.yv-statement')?.textContent).toContain('return result;');
+    clickButton(panel, 'Next →');
+    expect(panel.querySelector('.yv-output .yv-code')?.textContent).toBe('4');
+  });
+
   it('keeps line, statement, parameters, variables, and structures synchronized', () => {
     const { panel } = renderPanel();
     expect(highlightedSourceLine(editor!)).toBe(2);

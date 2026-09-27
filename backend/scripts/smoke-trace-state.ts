@@ -63,14 +63,22 @@ const trace: ExecutionTrace = {
         },
         {
             sequence: 7,
-            type: "ERROR",
-            line: 7,
-            data: { type: "IndexOutOfBoundsException", message: "index 3" }
+            type: "STEP",
+            line: 5,
+            method: "twoSum",
+            depth: 1,
+            data: {
+                variables: {
+                    nums: { $arrayId: "41", $type: "int[]", values: [2, 7, 11] },
+                    target: 9,
+                    left: 0
+                }
+            }
         },
         {
             sequence: 8,
             type: "STEP",
-            line: 8,
+            line: 7,
             method: "twoSum",
             depth: 1,
             data: {
@@ -84,18 +92,25 @@ const trace: ExecutionTrace = {
                     }
                 }
             }
+        },
+        {
+            sequence: 9,
+            type: "ERROR",
+            line: 8,
+            data: { type: "IndexOutOfBoundsException", message: "index 3" }
         }
     ]
 };
 
 const states = buildStates(trace);
 
-if (states.length !== 5) throw new Error("only METHOD_ENTER, STEP, caller-return, and ERROR checkpoints should be replayable");
+if (states.length !== 6) throw new Error("method return, caller resume, STEP, and ERROR checkpoints should all be replayable");
 
 if (stateAt(states, 0).variables.target !== 9) throw new Error("method-entry arguments were not hydrated");
 if (stateAt(states, 0).arrays.nums === undefined) throw new Error("method-entry array argument was not hydrated");
 if (stateAt(states, 1).variables.left !== undefined) throw new Error("non-checkpoint variable update created a replay state");
-if (stateAt(states, 2).line !== 5 || stateAt(states, 2).method !== "twoSum") throw new Error("method return did not restore the caller location");
+if (stateAt(states, 2).line !== 6 || stateAt(states, 2).method !== "helper") throw new Error("method return line was not preserved");
+if (stateAt(states, 3).line !== 5 || stateAt(states, 3).method !== "twoSum") throw new Error("caller resume line was not restored");
 
 const returnTrace: ExecutionTrace = {
     version: 1,
@@ -188,8 +203,8 @@ if (
     throw new Error("repeated runtime checkpoints at the same source line were deduplicated");
 }
 
-if (stateAt(states, 2).variables.left !== 0) throw new Error("caller variables were not restored on method return");
-if (stateAt(states, 3).error?.type !== "IndexOutOfBoundsException") throw new Error("error state was not replayed");
+if (stateAt(states, 3).variables.left !== 0) throw new Error("caller variables were not restored on caller resume");
+if (stateAt(states, 5).error?.type !== "IndexOutOfBoundsException") throw new Error("error state was not replayed");
 if (stateAt(states, 4).variables.left !== 1) throw new Error("STEP variables were not hydrated");
 
 const nums = stateAt(states, 4).arrays.nums as { objectId?: string; values?: unknown[] };
