@@ -595,7 +595,7 @@ function DataValue({
   if (isArraySnapshot(value)) {
     return (
       <>
-        <ArrayView value={value.values} state={state} source={source} arrayName={name}/>
+        <ArrayView value={value.values} state={state} source={source} arrayName={name} depth={depth} seen={seen}/>
         {value.truncated === true && (
           <div className="yv-truncated">
             Showing first {value.values.length} of {String(value.length ?? '?')} items.

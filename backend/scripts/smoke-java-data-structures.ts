@@ -66,6 +66,12 @@ class Solution {
         return alias.value + map.get("self").value + list.get(0).value;
     }
 
+    public int cyclicArray() {
+        Object[] values = new Object[1];
+        values[0] = values;
+        return values.length;
+    }
+
     public int empty() {
         HashMap<Integer, Integer> map = new HashMap<>();
         HashSet<Integer> set = new HashSet<>();
@@ -146,6 +152,12 @@ assert(typeof cyclicObjectId === "string", "cyclic object id missing");
 assert(cyclicObject?.fields?.self?.$ref === cyclicObjectId, "cyclic self reference was not preserved");
 assert((cyclicList.values as Array<Record<string, any>>)[0]?.$objectId === cyclicObjectId, "aliased collection object identity was not preserved");
 assert((cyclicState?.variables?.alias as Record<string, any>)?.$objectId === cyclicObjectId, "aliased object variable identity was not preserved");
+
+const cyclicArray = await runJava(source, { method: "cyclicArray" });
+assert(cyclicArray.kind === "OK", "cyclic array execution failed");
+const cyclicArrayState = cyclicArray.states?.at(-1);
+const cyclicArraySnapshot = cyclicArrayState?.arrays?.values as Record<string, any>;
+assert(cyclicArraySnapshot?.values?.[0]?.$ref === cyclicArraySnapshot?.$arrayId, "self-referencing array was not represented as a structural ref");
 
 const empty = await runJava(source, { method: "empty" });
 assert(empty.kind === "OK", "empty DS execution failed");

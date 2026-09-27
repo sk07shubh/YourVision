@@ -334,6 +334,21 @@ function collectSnapshots(
     const record =
         value as Record<string, unknown>;
 
+    // A structural reference points back to an already-snapshotted array,
+    // map, or collection. Do not recursively walk it again: JSON decoding
+    // materializes each $ref as a fresh object, so identity-based cycle guards
+    // cannot catch this case.
+    if (
+        typeof record.$ref === "string" &&
+        (
+            typeof record.$arrayId === "string" ||
+            typeof record.$mapId === "string" ||
+            typeof record.$collectionId === "string"
+        )
+    ) {
+        return;
+    }
+
     if (
         typeof record.$arrayId === "string"
     ) {
