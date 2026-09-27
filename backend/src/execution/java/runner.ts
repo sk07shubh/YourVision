@@ -458,6 +458,8 @@ function isTimeout(
         error?.killed ||
         error?.code ===
             "ETIMEDOUT" ||
+        error?.code ===
+            124 ||
         error?.signal ===
             "SIGTERM"
     );
