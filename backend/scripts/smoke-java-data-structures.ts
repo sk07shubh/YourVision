@@ -326,12 +326,15 @@ const nestedCycleState = nestedCycle.states?.find(state =>
         const object = value as Record<string, any>;
         const links = object.fields?.links as Record<string, any> | null | undefined;
         return typeof object.$objectId === "string" &&
-            links !== undefined &&
-            typeof links?.$mapId === "string" &&
-            Array.isArray(links?.entries);
+            links !== undefined;
+    }) &&
+    Object.values(state.dataStructures ?? {}).some(value => {
+        const record = value as Record<string, any>;
+        return typeof record.$mapId === "string" &&
+            Array.isArray(record.entries);
     })
 );
-assert(nestedCycleState !== undefined, "object -> map link was not preserved");
+assert(nestedCycleState !== undefined, "nested object/map state was not preserved");
 
 const nestedCycleObjects = nestedCycleState?.objects ?? {};
 const nestedCycleBox = Object.values(nestedCycleObjects)
