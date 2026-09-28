@@ -96,9 +96,14 @@ class Solution {
         Box box = new Box(21);
         HashMap<String, Object> links = new HashMap<>();
         links.put("owner", box);
-        links.put("self", links);
         box.links = links;
         return box.value + links.size();
+    }
+
+    public int selfMapCycle() {
+        HashMap<String, Object> links = new HashMap<>();
+        links.put("self", links);
+        return links.size();
     }
 
     public int[] returnedArray() {
@@ -349,12 +354,22 @@ assert(
     "map -> object identity was not preserved"
 );
 
-const selfEntry = (nestedCycleMap.entries as Array<Record<string, any>>)
-    .find(entry => entry.key === "self");
-assert(
-    selfEntry?.value?.$ref === nestedCycleMap.$mapId,
-    "map self-reference was not preserved"
-);
+const selfMapCycle = await runJava(source, { method: "selfMapCycle" });
+assert(selfMapCycle.kind === "OK", "self-referencing map execution failed");
+const selfMapCycleState = selfMapCycle.states?.at(-1);
+const selfMapCycleSnapshot = Object.values(
+    selfMapCycleState?.dataStructures ?? {}
+).find(value => {
+    const record = value as Record<string, any>;
+    return typeof record.$mapId === "string" &&
+        Array.isArray(record.entries) &&
+        record.entries.some(
+            entry => entry.key === "self" &&
+                entry.value?.$ref === record.$mapId
+        );
+});
+assert(selfMapCycleSnapshot !== undefined, "map self-reference was not preserved");
+
 const empty = await runJava(source, { method: "empty" });
 assert(empty.kind === "OK", "empty DS execution failed");
 
