@@ -109,7 +109,7 @@ describe('VisualizerPanel deterministic DOM harness', () => {
     expect(panel.querySelector('.yv-statement')?.textContent).toContain('return visits;');
     expect(visitsRow()?.textContent).toContain('4');
 
-    const callerResume = states.findIndex(item => item.method === 'run' && item.line === 3 && item.lastEvent?.type === 'STEP');
+    const callerResume = states.findIndex((item, index) => index > helperReturn && item.method === 'run' && item.line === 3 && item.lastEvent?.type === 'STEP');
     while (sessionStore.get().index < callerResume) clickButton(panel, 'Next →');
     expect(highlightedSourceLine(editor!)).toBe(3);
     expect(panel.querySelector('.yv-statement')?.textContent).toContain('int result = helper();');
@@ -153,6 +153,32 @@ describe('VisualizerPanel deterministic DOM harness', () => {
     expect(highlighted?.style.getPropertyPriority('background')).toBe('important');
     expect(highlighted?.style.getPropertyValue('box-shadow')).toContain('inset 2px');
     expect(panel.querySelector('.yv-execution-arrow, .yv-arrow-marker')).toBeNull();
+  });
+
+  it('shows backing array snapshots for stacks, queues, sets and priority queues', () => {
+    editor = mountMonacoHarness();
+    const response = {
+      success: true,
+      kind: 'OK' as const,
+      result: '—',
+      states: [{
+        ...sameLineLoopStates()[0],
+        dataStructures: {
+          stack: { $collectionId: 'stack-1', $type: 'Stack', $kind: 'stack', values: [1, 2], size: 2 },
+          queue: { $collectionId: 'queue-1', $type: 'ArrayDeque', $kind: 'queue', values: [3, 4], size: 2 },
+          set: { $collectionId: 'set-1', $type: 'HashSet', $kind: 'set', values: [5, 6], size: 2 },
+          heap: { $collectionId: 'heap-1', $type: 'PriorityQueue', $kind: 'priorityQueue', values: [7, 8], size: 2 },
+        },
+      }],
+    };
+    const mounted = mountVisualizer(SAME_LINE_LOOP_SOURCE, response);
+    root = mounted.root;
+    const panel = mounted.host.shadowRoot!;
+    expect(panel.querySelectorAll('.yv-collection-backing')).toHaveLength(4);
+    expect([...panel.querySelectorAll('.yv-collection-backing')].map(node => node.textContent)).toEqual([
+      expect.stringContaining('1'), expect.stringContaining('3'),
+      expect.stringContaining('5'), expect.stringContaining('7'),
+    ]);
   });
 
   it('restores previous highlights and shows the actual return line and output', () => {

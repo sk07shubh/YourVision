@@ -104,7 +104,7 @@ const writeState =
         (state) =>
             state.lastEvent?.type ===
             "STEP" &&
-            state.line === 4 &&
+            state.line === 5 &&
             JSON.stringify(
                 (state.arrays.nums as { values?: unknown[] } | undefined)?.values
             ) === "[9,2,3]"
@@ -183,20 +183,20 @@ const lineSemanticsTrace: ExecutionTrace = {
 const lineSemantics = enrichTrace(lineSemanticsTrace);
 const firstStep = lineSemantics.events.find(event => event.type === "STEP");
 
-if (firstStep?.data?.displayLine !== 2) {
-    throw new Error("first STEP did not map to the method-entry boundary");
+if (firstStep?.data?.displayLine !== undefined) {
+    throw new Error("first STEP was incorrectly remapped to the method declaration");
 }
 
 const lineStates = buildStates(lineSemantics).filter(state => state.lastEvent?.type === "STEP");
 
 if (
-    lineStates[0]?.line !== 2 ||
+    lineStates[0]?.line !== 3 ||
     lineStates[0]?.variables?.target !== 9 ||
     lineStates[0]?.variables?.i !== 0 ||
-    lineStates[1]?.line !== 3 ||
+    lineStates[1]?.line !== 4 ||
     lineStates[1]?.variables?.i !== 1
 ) {
-    throw new Error("execution state does not align with the line that just completed");
+    throw new Error("execution state does not align with its JDI source location");
 }
 
 
@@ -227,8 +227,8 @@ const declarationTrace: ExecutionTrace = {
 
 const declarationEnriched = enrichTrace(declarationTrace);
 const declarationStates = buildStates(declarationEnriched);
-if (declarationStates[0]?.line !== 2 || declarationStates[1]?.line !== 2) {
-    throw new Error("method declaration display line was not preserved through replay");
+if (declarationStates[0]?.line !== 2 || declarationStates[1]?.line !== 6) {
+    throw new Error("method entry and first body checkpoint did not retain their own source lines");
 }
 
 console.log("PASS: execution line semantics");

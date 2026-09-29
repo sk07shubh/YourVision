@@ -133,14 +133,16 @@ for (const flow of [
     const { context, page, profile } = await launchPage(flow.kind);
     try {
       if (flow.kind === 'default') await page.getByRole('button', { name: 'Case 2' }).click();
-      await page.locator('[data-yourvision-tab="true"]').click();
       const visualize = flow.kind === 'failed'
         ? page.locator('[data-yourvision-result-visualize="true"]')
         : page.locator('[data-yourvision-visualize="true"]');
+      await expect(page.locator('[data-yourvision-visualize="true"]:not([data-yourvision-result-visualize="true"])')).toHaveCount(1);
+      await expect(page.locator('[data-yourvision-result-visualize="true"]')).toHaveCount(flow.kind === 'failed' ? 1 : 0);
       await visualize.click();
 
       const statement = page.locator('[data-yourvision-host="true"] .yv-statement');
       await expect(statement).toContainText('public int sum');
+      await expect(page.locator('[data-yourvision-tab="true"]')).toHaveAttribute('aria-selected', 'true');
       await expect(page.locator('.monaco-editor .view-line[data-line="2"]')).toHaveCSS('box-shadow', 'rgb(255, 161, 22) 2px 0px 0px 0px inset');
       await expect(page.locator('[data-yourvision-host="true"] .yv-case')).toHaveText(flow.label);
       if (flow.kind !== 'default') {
@@ -478,6 +480,8 @@ test('Chrome extension renders nested objects across collection views', async ()
     await expect(structures.locator('.yv-collection-meta').filter({ hasText: 'FRONT ↔ REAR' })).toHaveCount(1);
     await expect(structures.locator('.yv-heap-tree .yv-heap-node')).toHaveCount(1);
     await expect(structures.locator('.yv-heap-note')).toContainText('root is index 0');
+    await expect(structures.locator('.yv-collection-backing')).toHaveCount(5);
+    await expect(structures.locator('.yv-collection-backing')).toContainText('snapshot order');
     const setView = structures.locator('.yv-set-view');
     await expect(setView).toContainText('66');
     await expect(setView.locator('.yv-cell-index')).toHaveCount(0);

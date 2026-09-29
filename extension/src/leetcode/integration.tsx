@@ -752,6 +752,11 @@ async function visualize(region?: HTMLElement) {
     sessionStore.finish(
       response
     );
+
+    // LeetCode can re-render its tabset while the request is in flight and
+    // restore the native Description tab. Reassert selection after the run so
+    // Visualize reliably leaves the completed trace visible.
+    activateTab();
   } catch (error) {
     const message =
       error instanceof Error

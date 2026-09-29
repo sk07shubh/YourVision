@@ -8,7 +8,11 @@ type SnapshotRecord = Record<string, unknown>;
 export function enrichTrace(trace: ExecutionTrace): ExecutionTrace {
     const enriched: ExecutionEvent[] = [];
     let previousStep: ExecutionEvent | undefined;
-    let pendingResumeLine: number | undefined;
+    let pendingCallerResume: {
+        method: string | undefined;
+        line: number;
+        sawCallLine: boolean;
+    } | undefined;
     const methodEntries: ExecutionEvent[] = [];
 
     for (let event of trace.events) {
@@ -17,22 +21,33 @@ export function enrichTrace(trace: ExecutionTrace): ExecutionTrace {
                 enriched.push(...deriveArrayReferenceEvents(event));
                 enriched.push(...deriveChanges(previousStep, event));
                 enriched.push(...deriveMapChanges(previousStep, event));
-                event = {
-                    ...event,
-                    data: {
-                        ...(event.data ?? {}),
-                        displayLine: previousStep.line
-                    }
-                };
-            } else if (pendingResumeLine !== undefined) {
-                event = {
-                    ...event,
-                    data: {
-                        ...(event.data ?? {}),
-                        displayLine: pendingResumeLine
-                    }
-                };
-                pendingResumeLine = undefined;
+            }
+
+            if (pendingCallerResume) {
+                const isCaller =
+                    pendingCallerResume.method === undefined ||
+                    pendingCallerResume.method === event.method;
+                if (!isCaller) {
+                    pendingCallerResume = undefined;
+                } else if (
+                    !pendingCallerResume.sawCallLine &&
+                    event.line === pendingCallerResume.line
+                ) {
+                    // JDI can first stop at the call instruction with the
+                    // caller's pre-assignment locals, then at the next line
+                    // with the returned value assigned. Keep the latter
+                    // checkpoint tied to the call line that produced it.
+                    pendingCallerResume.sawCallLine = true;
+                } else {
+                    event = {
+                        ...event,
+                        data: {
+                            ...(event.data ?? {}),
+                            displayLine: pendingCallerResume.line
+                        }
+                    };
+                    pendingCallerResume = undefined;
+                }
             }
             enriched.push(event);
             previousStep = event;
@@ -42,12 +57,11 @@ export function enrichTrace(trace: ExecutionTrace): ExecutionTrace {
         if (event.type === "METHOD_ENTER") {
             methodEntries.push(event);
             previousStep = undefined;
-            // The first STEP inside this method describes the state at the
-            // method-entry boundary, so keep the declaration line visible.
-            pendingResumeLine =
-                typeof event.data?.displayLine === "number"
-                    ? event.data.displayLine as number
-                    : event.line;
+            // Keep the declaration line on METHOD_ENTER. The first STEP is a
+            // distinct pause at its own JDI location (the first body line).
+            // Reusing the declaration line here caused the first body line to
+            // be skipped in the editor and the declaration to appear twice.
+            pendingCallerResume = undefined;
             enriched.push(event);
             continue;
         }
@@ -61,7 +75,14 @@ export function enrichTrace(trace: ExecutionTrace): ExecutionTrace {
             }
 
             if (typeof event.data?.callerLine === "number") {
-                pendingResumeLine = event.data.callerLine as number;
+                pendingCallerResume = {
+                    method:
+                        typeof event.data.callerMethod === "string"
+                            ? event.data.callerMethod
+                            : undefined,
+                    line: event.data.callerLine as number,
+                    sawCallLine: false
+                };
             }
 
             // A method can return before STEP_LINE gives us a second
@@ -115,7 +136,7 @@ export function enrichTrace(trace: ExecutionTrace): ExecutionTrace {
             event.type === "TRACE_LIMIT"
         ) {
             previousStep = undefined;
-            pendingResumeLine = undefined;
+            pendingCallerResume = undefined;
         }
 
         enriched.push(event);

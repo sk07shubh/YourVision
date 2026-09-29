@@ -116,17 +116,16 @@ describe('LeetCode testcase to visualizer flow harness', () => {
     });
     expect(tabInjected).toBe(true);
     expect(buttonInjected).toBe(true);
+    act(() => { injectVisualizeButton(); });
 
     const selectedCase = [...document.querySelectorAll<HTMLButtonElement>('[data-e2e-locator="console-testcase-tag"]')]
       .find(button => button.textContent === flow.buttonLabel)!;
     act(() => selectedCase.click());
     expect(selectedCase.classList.contains('bg-fill-3')).toBe(true);
 
-    const tab = document.querySelector<HTMLElement>('[data-yourvision-tab="true"]')!;
-    act(() => tab.click());
-    expect(tab.getAttribute('aria-selected')).toBe('true');
-
     const visualizeButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-yourvision-visualize="true"]')];
+    expect(visualizeButtons.filter(button => !button.hasAttribute('data-yourvision-result-visualize'))).toHaveLength(1);
+    expect(document.querySelectorAll('[data-yourvision-result-visualize="true"]')).toHaveLength(flow.kind === 'failed' ? 1 : 0);
     const visualize = flow.kind === 'failed'
       ? document.querySelector<HTMLButtonElement>('[data-yourvision-result-visualize="true"]')!
       : visualizeButtons.find(button => button.textContent === 'Visualize')!;
@@ -144,6 +143,7 @@ describe('LeetCode testcase to visualizer flow harness', () => {
     expect(state.testcase?.source).toBe(flow.kind);
     expect(state.testcase?.label).toBe(flow.buttonLabel);
     expect(state.testcase?.orderedArguments).toEqual([flow.input]);
+    expect(document.querySelector<HTMLElement>('[data-yourvision-tab="true"]')?.getAttribute('aria-selected')).toBe('true');
     expect(messages.find(message => message.type === 'RUN_VISUALIZATION')).toMatchObject({
       source: VISUALIZER_SOURCE,
       method: 'sum',

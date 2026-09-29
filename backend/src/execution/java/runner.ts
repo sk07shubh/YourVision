@@ -90,6 +90,15 @@ function prepareJavaSource(source: string): string {
 
     return `${standardImport} ${source}`;
 }
+function declaresType(source: string, typeName: string): boolean {
+    // LeetCode snippets sometimes include the commented-out type definition
+    // in their problem boilerplate. It must not suppress our compatibility
+    // type, or ordinary references to ListNode/TreeNode fail at javac time.
+    const code = source
+        .replace(/\/\*[\s\S]*?\*\//g, " ")
+        .replace(/\/\/[^\r\n]*/g, " ");
+    return new RegExp("\\bclass\\s+" + typeName + "\\b").test(code);
+}
 export async function runJava(
     source: string,
     testcase?: JavaTestcase
@@ -187,9 +196,9 @@ await fs.writeFile(
             tracerPath
         );
         const declaresListNode =
-            /\bclass\s+ListNode\b/.test(preparedSource);
+            declaresType(preparedSource, "ListNode");
         const declaresTreeNode =
-            /\bclass\s+TreeNode\b/.test(preparedSource);
+            declaresType(preparedSource, "TreeNode");
 
         if (!declaresListNode) {
             await fs.copyFile(

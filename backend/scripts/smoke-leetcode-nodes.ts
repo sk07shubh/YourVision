@@ -90,6 +90,30 @@ assert(tree.success && tree.kind === "OK", "TreeNode execution failed");
 assert(tree.result === "10", "TreeNode level-order parsing produced the wrong result");
 assert(tree.states?.[0]?.line === 3, "TreeNode method entry line is incorrect");
 
+const commentedDefinitionSource = [
+    "/**",
+    " * Definition for singly-linked list.",
+    " * public class ListNode {",
+    " *     int val;",
+    " *     ListNode next;",
+    " * }",
+    " */",
+    "class Solution {",
+    "    public ListNode identity(ListNode head) {",
+    "        return head;",
+    "    }",
+    "}"
+].join("\n");
+const commentedDefinition = await runJava(commentedDefinitionSource, {
+    method: "identity",
+    arguments: ["[7,8]"]
+});
+assert(
+    commentedDefinition.success &&
+        commentedDefinition.result?.startsWith('"ListNode@') === true,
+    "commented-out LeetCode ListNode boilerplate suppressed the compatibility type"
+);
+
 const customListSource = `
 class ListNode {
     int val;

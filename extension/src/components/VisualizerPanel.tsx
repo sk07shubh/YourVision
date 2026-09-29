@@ -60,6 +60,29 @@ function isCollectionSnapshot(value: unknown): value is Obj & {
   );
 }
 
+function CollectionBackingArray({
+  value,
+  state,
+  source,
+  name,
+  depth,
+  seen
+}: {
+  value: { values: unknown[] };
+  state?: TraceState;
+  source: string;
+  name?: string;
+  depth: number;
+  seen: Set<string>;
+}) {
+  return (
+    <div className="yv-collection-backing">
+      <div className="yv-code yv-collection-backing-title">Array view · snapshot order</div>
+      <ArrayView value={value.values} state={state} source={source} arrayName={name} depth={depth} seen={seen}/>
+    </div>
+  );
+}
+
 function CollectionView({
   value,
   state,
@@ -109,6 +132,7 @@ function CollectionView({
           ))}
           {!value.values.length && <div className="yv-empty">Empty stack</div>}
         </div>
+        <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
       </div>
     );
   }
@@ -130,6 +154,7 @@ function CollectionView({
           <div className="yv-queue-end">REAR</div>
           {!value.values.length && <div className="yv-empty">Empty queue</div>}
         </div>
+        <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
       </div>
     );
   }
@@ -149,6 +174,7 @@ function CollectionView({
           ))}
           {!value.values.length && <div className="yv-empty">Empty set</div>}
         </div>
+        <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
       </div>
     );
   }
@@ -180,7 +206,7 @@ function CollectionView({
           })()}
         </div>
         <div className="yv-code yv-heap-note">Heap tree · root is index 0</div>
-        <ArrayView value={value.values} state={state} source={source} arrayName={name} depth={depth} seen={seen}/>
+        <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
       </div>
     );
   }
@@ -191,7 +217,7 @@ function CollectionView({
         <span>{type}</span>
         <span>{kind} · {itemCount} items</span>
       </div>
-      <ArrayView value={value.values} state={state} source={source} arrayName={name} depth={depth} seen={seen}/>
+      <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
     </div>
   );
 }
