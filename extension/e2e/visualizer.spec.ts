@@ -368,7 +368,7 @@ test('Chrome extension expands nested objects inside maps and collections', asyn
     await expect(structures).toContainText('ArrayList');
     await expect(structures).toContainText('42');
     await expect(structures).toContainText('7');
-    await expect(structures.locator('.yv-object')).toHaveCount(3);
+    await expect(structures.locator('.yv-object')).toHaveCount(4);
   } finally {
     await context.close();
     await rm(profile, { recursive: true, force: true });
