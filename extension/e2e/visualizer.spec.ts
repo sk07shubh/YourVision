@@ -146,6 +146,12 @@ for (const flow of [
       if (flow.kind !== 'default') {
         await expect(page.locator('[data-yourvision-host="true"] .yv-case-kind')).toHaveText(flow.kind === 'failed' ? 'Failed testcase' : 'Custom');
       }
+      await page.evaluate(() => {
+        (window as Window & { leetCodeKeyEvents?: string[] }).leetCodeKeyEvents = [];
+        window.addEventListener('keydown', event => {
+          (window as Window & { leetCodeKeyEvents?: string[] }).leetCodeKeyEvents?.push(event.key);
+        });
+      });
 
       await page.keyboard.press('ArrowRight');
       await expect(statement).toContainText('int total = 0');
@@ -153,6 +159,17 @@ for (const flow of [
       await page.keyboard.press('ArrowRight');
       await expect(page.locator('[data-yourvision-host="true"] .yv-output')).toContainText('3');
       await expect(page.locator('.monaco-editor .view-line[data-line="7"]')).toHaveCSS('box-shadow', 'rgb(255, 161, 22) 2px 0px 0px 0px inset');
+
+      await page.keyboard.press('ArrowLeft');
+      await expect(statement).toContainText('int total = 0');
+      await page.keyboard.press('Space');
+      await expect(page.locator('[data-yourvision-host="true"] .yv-output')).toContainText('3');
+      await page.keyboard.press('r');
+      await expect(statement).toContainText('public int sum');
+      await expect(page.locator('.monaco-editor .view-line[data-line="2"]')).toHaveCSS('box-shadow', 'rgb(255, 161, 22) 2px 0px 0px 0px inset');
+      await expect(page.locator('[data-yourvision-host="true"] .yv-case')).toHaveText(flow.label);
+      expect(await page.evaluate(() => (window as Window & { leetCodeKeyEvents?: string[] }).leetCodeKeyEvents)).toEqual([]);
+      expect(await page.evaluate(() => document.activeElement?.closest('[data-yourvision-host="true"] .yv-btn') !== null)).toBe(false);
 
       expect(received).toHaveLength(1);
       expect(received[0]).toMatchObject({
