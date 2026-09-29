@@ -6,18 +6,13 @@ It is intentionally not a copy of the full product specification.
 
 ## Current baseline
 
-- Baseline commit: `ec9a06fd5e93d8d05e988d9fe949c5f3f68dfbd0` (`ec9a06f`)
-- Baseline commit message: `test: fix loop variable browser locator`
+- Latest verified commit: `4817fa6` (`test: assert unordered set metadata`)
 - Default branch: `main`
-- Browser Regression run: `36330294112`, run #6 — passed
-- Backend Regression run on the same commit: `36330294140`, run #174 — passed
-- The repository's two main regression workflows are green for this baseline.
+- Backend Regression run #227 (`36536446724`) — passed on Eclipse Temurin JDK 17
+- Extension Browser Regression run #59 (`36536446719`) — passed; Playwright Chromium installed successfully
+- Historical baseline `ec9a06f` and its runs are retained in the verification record below.
 
-The browser run covers four flows in one Playwright spec:
-1. selected/default testcase
-2. custom testcase
-3. failed submission using "Use Testcase"
-4. repeated same-line loop -> helper return -> caller resume
+The browser suite contains 15 tests (12 declared cases plus the three testcase-flow variants). It uses deterministic LeetCode-shaped pages and a local mock `/visualize` backend.
 
 ## Test layers
 
@@ -57,6 +52,7 @@ npm run test:leetcode-nodes
 npm run test:leetcode-structures
 npm run test:leetcode-algorithms
 npm run test:backend-readiness
+npm run test:server-security
 npm run test:java-safety
 npm run test:java-exception-unwind
 npm run test:array-discovery
@@ -76,6 +72,7 @@ Important backend coverage currently includes:
 - LeetCode structure inputs
 - algorithm smoke coverage
 - backend readiness
+- loopback-only backend binding and extension-origin CORS policy
 - Java safety/timeout behavior
 - Java exception unwind
 - Java array-access discovery
@@ -142,7 +139,7 @@ The browser test loads the built extension into Chromium and uses a deterministi
 
 ## Current browser regression coverage
 
-The current Playwright suite contains four functional flows.
+The Playwright suite currently covers testcase integration, trace replay, data structures, returns, errors, and safety behavior.
 
 ### Selected/default testcase
 
@@ -178,6 +175,12 @@ Verifies:
 - execution then resumes at the caller's call line
 - the helper disappears from the displayed call stack after returning
 - the backend request is made with the expected source
+
+### Keyboard controls and data-structure views
+
+Browser coverage verifies ArrowLeft, ArrowRight, Space, and `R`, including previous-state restoration, reset, focus behavior, stable testcase selection, and prevention of key events bubbling into the page.
+
+Structure rendering coverage includes indexed arrays, key/value maps, unordered set chips without array indexes, vertically displayed stacks, queue/deque directions, priority-queue heap layout, linked-list identity, tree relationships, nested objects, aliases, and cycles.
 
 ## What browser tests currently assert
 
@@ -308,6 +311,10 @@ Same-line backward-branch capture relies on JDI access to method bytecode/locati
 
 The current CI environment uses Temurin JDK 17 and exercises this path successfully. Compatibility with other JVM implementations should be treated as a separate verification item.
 
+### Java process isolation
+
+The backend runs the Java tracer as a child process with execution timeouts and trace-size limits. It is not an OS-level sandbox: submitted Java may otherwise use the backend process user's filesystem and network permissions. Do not describe the execution as sandboxed. A cross-platform process-isolation strategy remains a separate security design milestone.
+
 ### Local managed Chrome environment
 
 The local development Chrome installation has previously been administrator-managed and did not allow the unpacked extension to be loaded normally.
@@ -351,17 +358,25 @@ C++ support is planned product scope but is not part of the current implementati
 
 ## Current verification record
 
-At the `ec9a06f` baseline:
+At the latest verified commit `4817fa6`:
+- Backend Regression: passed (run #227, Eclipse Temurin JDK 17)
+- Local backend `npm run test:all`: passed on OpenJDK 26.0.1
+- Extension Vitest: 6 files / 15 tests passed
+- Extension typecheck and production build: passed
+- Extension Browser Regression: passed (run #59; Chromium installed; 15/15 tests passed)
+- The local machine has no Playwright Chromium executable; browser behavior was verified by GitHub Actions.
+
+At the historical `ec9a06f` baseline:
 - Backend Regression: passed (`36330294140`, run #174)
 - Extension Browser Regression: passed (`36330294112`, run #6)
-- Browser coverage: 4/4 flows
+- Browser coverage at that time: 4 flows
 - Backend `test:all`: included in the successful Backend Regression run
 - Extension browser suite: included in the successful Extension Browser Regression run
-- Main branch baseline is the reference point for the next functional-correctness audit.
+- This is historical verification, not the current main branch baseline.
 
 ## Next-audit rule
 
-After this documentation milestone, audit the repository against the product/test context and identify the next concrete functional correctness gap.
+After the earlier automation-documentation milestone, the repository was audited against the product/test context. The latest audit found and fixed two concrete gaps: the cyclic snapshot regression selected an earlier pre-assignment state, and HashSet was displayed with array-style indexes despite having no guaranteed order. It also expanded browser coverage for keyboard navigation and specialized structure views.
 
 Do not immediately implement that next gap in the same documentation milestone. First identify:
 - the exact user-visible failure or missing guarantee

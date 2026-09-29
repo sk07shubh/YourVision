@@ -38,7 +38,7 @@ chrome.runtime.onMessage.addListener((msg: ExtensionRequest | {type:'REVEAL_LINE
         sendResponse({ok:true}); return;
       }
       if (msg.type === 'RUN_VISUALIZATION') {
-        const res = await fetch('http://localhost:3000/visualize',{method:'POST',headers:{'content-type':'application/json'},body: JSON.stringify({
+        const res = await fetch('http://127.0.0.1:3000/visualize',{method:'POST',headers:{'content-type':'application/json'},body: JSON.stringify({
     language: 'java',
     source: msg.source,
     testcase: {

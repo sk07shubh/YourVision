@@ -1,10 +1,23 @@
 import { runJava } from "./execution/java/runner.js";
 import express from "express";
 import cors from "cors";
+import { pathToFileURL } from "node:url";
+import { resolve } from "node:path";
 
-const app = express();
+const CHROME_EXTENSION_ORIGIN =
+    /^chrome-extension:\/\/[a-p]{32}$/;
 
-app.use(cors());
+export const app = express();
+
+app.use(cors({
+    origin(origin, callback) {
+        callback(
+            null,
+            typeof origin === "string" &&
+                CHROME_EXTENSION_ORIGIN.test(origin)
+        );
+    }
+}));
 app.use(express.json());
 
 app.get("/health", (req, res) => {
@@ -56,8 +69,20 @@ app.post("/visualize", async (req, res) => {
     });
 });
 
-app.listen(3000, () => {
-    console.log(
-        "YourVision backend running on http://localhost:3000"
-    );
-});
+export function startServer(port = 3000) {
+    return app.listen(port, "127.0.0.1", () => {
+        if (port !== 0) {
+            console.log(
+                `YourVision backend running on http://127.0.0.1:${port}`
+            );
+        }
+    });
+}
+
+const invokedPath = process.argv[1]
+    ? pathToFileURL(resolve(process.argv[1])).href
+    : undefined;
+
+if (invokedPath === import.meta.url) {
+    startServer();
+}
