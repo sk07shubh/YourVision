@@ -414,6 +414,13 @@ test('Chrome extension renders nested objects across collection views', async ()
           values: [box('box3', 33)],
           size: 1
         },
+        deque: {
+          $collectionId: 'deque1',
+          $type: 'java.util.ArrayDeque',
+          $kind: 'deque',
+          values: [1, 2],
+          size: 2
+        },
         heap: {
           $collectionId: 'heap1',
           $type: 'java.util.PriorityQueue',
@@ -464,6 +471,17 @@ test('Chrome extension renders nested objects across collection views', async ()
       await expect(structures).toContainText(value);
     }
     await expect(structures.locator('.yv-object')).toHaveCount(7);
+    await expect(structures.locator('.yv-stack-view')).toHaveCount(1);
+    await expect(structures.locator('.yv-stack-position').filter({ hasText: 'TOP' })).toHaveCount(1);
+    await expect(structures.locator('.yv-queue-view')).toHaveCount(2);
+    await expect(structures.locator('.yv-collection-meta').filter({ hasText: 'FRONT → REAR' })).toHaveCount(1);
+    await expect(structures.locator('.yv-collection-meta').filter({ hasText: 'FRONT ↔ REAR' })).toHaveCount(1);
+    await expect(structures.locator('.yv-heap-tree .yv-heap-node')).toHaveCount(1);
+    await expect(structures.locator('.yv-heap-note')).toContainText('root is index 0');
+    const setView = structures.locator('.yv-set-view');
+    await expect(setView).toContainText('66');
+    await expect(setView.locator('.yv-cell-index')).toHaveCount(0);
+    await expect(setView).toContainText('UNORDERED');
   } finally {
     await context.close();
     await rm(profile, { recursive: true, force: true });

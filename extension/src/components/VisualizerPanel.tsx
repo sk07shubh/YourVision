@@ -134,6 +134,25 @@ function CollectionView({
     );
   }
 
+  if (kind === 'set') {
+    return (
+      <div className="yv-collection">
+        <div className="yv-collection-meta">
+          <span>{type}</span>
+          <span>UNORDERED · {itemCount} elements</span>
+        </div>
+        <div className="yv-set-view">
+          {value.values.map((item, index) => (
+            <div className="yv-set-element" key={index}>
+              <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
+            </div>
+          ))}
+          {!value.values.length && <div className="yv-empty">Empty set</div>}
+        </div>
+      </div>
+    );
+  }
+
   if (kind === 'priorityQueue') {
     return (
       <div className="yv-collection">
