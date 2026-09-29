@@ -6,10 +6,10 @@ It is intentionally not a copy of the full product specification.
 
 ## Current baseline
 
-- Latest verified commit: `4817fa6` (`test: assert unordered set metadata`)
+- Latest verified commit: `7a5fb75` (`fix: restrict local execution backend access`)
 - Default branch: `main`
-- Backend Regression run #227 (`36536446724`) — passed on Eclipse Temurin JDK 17
-- Extension Browser Regression run #59 (`36536446719`) — passed; Playwright Chromium installed successfully
+- Backend Regression run #228 (`36546537125`) — passed on Eclipse Temurin JDK 17.0.20
+- Extension Browser Regression run #60 (`36546537118`) — passed; Playwright Chromium installed successfully
 - Historical baseline `ec9a06f` and its runs are retained in the verification record below.
 
 The browser suite contains 15 tests (12 declared cases plus the three testcase-flow variants). It uses deterministic LeetCode-shaped pages and a local mock `/visualize` backend.
@@ -358,12 +358,12 @@ C++ support is planned product scope but is not part of the current implementati
 
 ## Current verification record
 
-At the latest verified commit `4817fa6`:
-- Backend Regression: passed (run #227, Eclipse Temurin JDK 17)
-- Local backend `npm run test:all`: passed on OpenJDK 26.0.1
+At the latest verified commit `7a5fb75`:
+- Backend Regression: passed (run #228, Eclipse Temurin JDK 17.0.20)
+- Local backend `npm run test:all`: passed on OpenJDK 26.0.1, including `test:server-security`
 - Extension Vitest: 6 files / 15 tests passed
 - Extension typecheck and production build: passed
-- Extension Browser Regression: passed (run #59; Chromium installed; 15/15 tests passed)
+- Extension Browser Regression: passed (run #60; Chromium installed; 15/15 tests passed)
 - The local machine has no Playwright Chromium executable; browser behavior was verified by GitHub Actions.
 
 At the historical `ec9a06f` baseline:
@@ -376,7 +376,7 @@ At the historical `ec9a06f` baseline:
 
 ## Next-audit rule
 
-After the earlier automation-documentation milestone, the repository was audited against the product/test context. The latest audit found and fixed two concrete gaps: the cyclic snapshot regression selected an earlier pre-assignment state, and HashSet was displayed with array-style indexes despite having no guaranteed order. It also expanded browser coverage for keyboard navigation and specialized structure views.
+After the earlier automation-documentation milestone, the repository was audited against the product/test context. The latest audit fixed these gaps: the cyclic snapshot regression selected an earlier pre-assignment state; HashSet was displayed with array-style indexes despite having no guaranteed order; browser coverage omitted Space/`R` controls and some collection semantics; and the local execution backend was exposed on all interfaces with permissive CORS. Fixes and regression coverage are recorded above.
 
 Do not immediately implement that next gap in the same documentation milestone. First identify:
 - the exact user-visible failure or missing guarantee
