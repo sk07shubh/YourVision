@@ -481,7 +481,7 @@ test('Chrome extension renders nested objects across collection views', async ()
     const setView = structures.locator('.yv-set-view');
     await expect(setView).toContainText('66');
     await expect(setView.locator('.yv-cell-index')).toHaveCount(0);
-    await expect(setView).toContainText('UNORDERED');
+    await expect(structures.locator('.yv-collection-meta').filter({ hasText: 'UNORDERED' })).toHaveCount(1);
   } finally {
     await context.close();
     await rm(profile, { recursive: true, force: true });
