@@ -472,7 +472,9 @@ test('Chrome extension renders nested objects across collection views', async ()
     for (const value of ['11', '22', '33', '44', '55', '66']) {
       await expect(structures).toContainText(value);
     }
-    await expect(structures.locator('.yv-object')).toHaveCount(7);
+    // Collections now show both their logical ADT view and the array snapshot,
+    // so object elements appear in each representation.
+    await expect(structures.locator('.yv-object')).toHaveCount(10);
     await expect(structures.locator('.yv-stack-view')).toHaveCount(1);
     await expect(structures.locator('.yv-stack-position').filter({ hasText: 'TOP' })).toHaveCount(1);
     await expect(structures.locator('.yv-queue-view')).toHaveCount(2);
@@ -1048,7 +1050,7 @@ test('Chrome extension navigates real repeated-line checkpoints through return a
     for (let step = loopStates[3]!.index + 1; step <= returnIndex; step++) await next.click();
     await expect(statement).toContainText('return visits;');
     await expect(page.locator('.monaco-editor .view-line[data-line="10"]')).toHaveCSS('box-shadow', 'rgb(255, 161, 22) 2px 0px 0px 0px inset');
-    const resumeIndex = states.findIndex(state => state.method === 'run' && state.lastEvent?.type === 'STEP' && state.line === 3);
+    const resumeIndex = states.findIndex((state, index) => index > returnIndex && state.method === 'run' && state.lastEvent?.type === 'STEP' && state.line === 3);
     for (let step = returnIndex + 1; step <= resumeIndex; step++) await next.click();
     await expect(statement).toContainText('int result = helper();');
     await expect(host.locator('.yv-stack')).toContainText('run');
