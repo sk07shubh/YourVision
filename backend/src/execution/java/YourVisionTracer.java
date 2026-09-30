@@ -269,6 +269,16 @@ public class YourVisionTracer {
                             data
                         );
 
+                        // STEP_LINE resumes from MethodEntryEvent at the first
+                        // executable location and may report only the next
+                        // source line (skipping the first body statement).
+                        // Capture the suspended entry location itself as the
+                        // initial real STEP checkpoint before execution resumes.
+                        recordStep(
+                            methodLocation,
+                            entry.thread()
+                        );
+
                         enableLineStepping(
                             manager,
                             entry.thread()

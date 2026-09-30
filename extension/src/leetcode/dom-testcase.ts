@@ -151,11 +151,9 @@ export function readSelectedTestcase(
   const panelText =
     textOf(panel);
 
-  const source =
-    detectSource(
-      label,
-      panelText
-    );
+  const source = region.dataset.yourvisionResultRegion === 'true'
+    ? 'failed'
+    : detectSource(label, '');
 
   const raw =
     pickRawInput(

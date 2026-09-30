@@ -11,11 +11,18 @@ const visible = (
     return false;
   }
 
-  const style = getComputedStyle(el);
+  let current: HTMLElement | null = el;
+  while (current) {
+    const style = getComputedStyle(current);
+    if (
+      style.display === 'none' ||
+      style.visibility === 'hidden' ||
+      current.getAttribute('aria-hidden') === 'true'
+    ) return false;
+    current = current.parentElement;
+  }
 
   return (
-    style.display !== 'none' &&
-    style.visibility !== 'hidden' &&
     el.getBoundingClientRect().width > 0
   );
 };
@@ -120,16 +127,22 @@ export function findTestcaseRegion(): HTMLElement | null {
 
 export function findTestResultContainers(): HTMLElement[] {
   const candidates = [...document.querySelectorAll<HTMLElement>('div,section,article')].filter(visible);
-  const qualifies = (node: HTMLElement) => {
+  const visibleText = (node: HTMLElement) => {
     const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
     const textParts: string[] = [];
-    while (walker.nextNode()) textParts.push(walker.currentNode.textContent ?? '');
-    const text = textParts.join(' ').replace(/\s+/g, ' ').trim().toLowerCase();
-    if (!/\btest result\b/i.test(text)) return false;
-    const hasInputOutput = /\binput\b/i.test(text) && /\boutput\b/i.test(text);
-    const hasCase = node.querySelector('[data-e2e-locator="console-testcase-tag"]') !== null ||
-      [...node.querySelectorAll('button')].some(button => /^case\s+\d+$/i.test((button.textContent ?? '').trim()));
-    return hasInputOutput && hasCase;
+    while (walker.nextNode()) {
+      const textNode = walker.currentNode;
+      if (visible(textNode.parentElement)) textParts.push(textNode.textContent ?? '');
+    }
+    return textParts.join(' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  };
+  const qualifies = (node: HTMLElement) => {
+    const text = visibleText(node);
+    // The console keeps its inactive "Test Result" tab mounted alongside
+    // ordinary testcase inputs. Only add a second Visualize control when an
+    // actual failed execution result is visible.
+    if (!/\b(?:wrong answer|runtime error|time limit exceeded|memory limit exceeded|compilation error|compile error)\b/i.test(text)) return false;
+    return /\binput\b/i.test(text) && /\boutput\b/i.test(text);
   };
 
   const matching = candidates.filter(qualifies);

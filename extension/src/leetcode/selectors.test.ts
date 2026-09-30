@@ -140,6 +140,28 @@ describe('LeetCode selectors', () => {
     const containers = findTestResultContainers();
 
     expect(containers).toHaveLength(1);
-    expect(containers[0]?.classList.contains('result-panel')).toBe(true);
+    expect(containers[0]?.textContent).toContain('Wrong Answer');
+    expect(containers[0]?.textContent).toContain('Input');
+    expect(containers[0]?.textContent).toContain('Output');
+  });
+
+  it('does not treat an inactive Test Result tab as a failed result panel', () => {
+    document.body.innerHTML = `
+      <section class="console-shell">
+        <div class="console-tabs"><button>Testcase</button><button>Test Result</button></div>
+        <div class="active-testcase">
+          <div class="result-cases"><button data-e2e-locator="console-testcase-tag">Case 2</button></div>
+          <div>Input nums = [3,2,4] Output —</div>
+        </div>
+        <div class="result-panel" style="display:none" aria-hidden="true">
+          <h2>Test Result</h2>
+          <div>Wrong Answer</div>
+          <div>Input nums = [3,2,4] Output [1,2]</div>
+          <div class="result-cases"><button data-e2e-locator="console-testcase-tag">Case 2</button></div>
+        </div>
+      </section>
+    `;
+
+    expect(findTestResultContainers()).toHaveLength(0);
   });
 });

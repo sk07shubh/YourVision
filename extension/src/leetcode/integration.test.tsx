@@ -51,7 +51,7 @@ function makePage(flow: Flow): void {
   const testcaseRegion = `<div class="case-region">${cases}</div>`;
   const testcasePanel = flow.kind === 'failed'
     ? `<div class="result-panel"><h2>Test Result</h2><div class="result-details"><div>Wrong Answer — Use Testcase</div><div>Input <input data-e2e-locator="console-testcase-input" value="${flow.input}"> Output <span></span></div>${testcaseRegion}</div></div>`
-    : `<div class="testcase-panel">${testcaseRegion}<input data-e2e-locator="console-testcase-input" value="${flow.input}"></div>`;
+    : `<div class="testcase-panel"><div class="console-tabs"><button>Testcase</button><button>Test Result</button></div>${testcaseRegion}<div>Input <input data-e2e-locator="console-testcase-input" value="${flow.input}"> Output —</div><div class="result-panel" style="display:none" aria-hidden="true"><h2>Test Result</h2><div>Wrong Answer</div>Input ${flow.input} Output mismatch${testcaseRegion}</div></div>`;
 
   document.body.innerHTML = `
     <div class="flexlayout__tabset">
@@ -87,9 +87,7 @@ afterEach(() => {
 describe('LeetCode testcase to visualizer flow harness', () => {
   it.each(flows)('visualizes the $name and replays its deterministic trace', async flow => {
     makePage(flow);
-    if (flow.kind === 'failed') {
-      expect(findTestResultContainers()).toHaveLength(1);
-    }
+    expect(findTestResultContainers()).toHaveLength(flow.kind === 'failed' ? 1 : 0);
     const messages: Array<Record<string, unknown>> = [];
     const sendMessage = vi.fn(async (message: Record<string, unknown>) => {
       messages.push(message);

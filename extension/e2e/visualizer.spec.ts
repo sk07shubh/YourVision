@@ -69,7 +69,7 @@ function leetCodePage(flow: 'default' | 'custom' | 'failed', editorSource = sour
   const input = flow === 'custom' ? '[4,5]' : flow === 'default' ? '[1,2]' : '[7,8]';
   const testcase = flow === 'failed'
     ? `<section class="result-panel"><h2>Test Result</h2><div class="result-details"><div>Wrong Answer — Use Testcase</div><div>Input <input data-e2e-locator="console-testcase-input" value="${input}"> Output <span>9</span></div><div class="case-region">${cases}</div></div></section>`
-    : `<section class="testcase-panel"><div class="case-region">${cases}</div><input data-e2e-locator="console-testcase-input" value="${input}"></section>`;
+    : `<section class="testcase-panel"><div class="console-tabs"><button>Testcase</button><button>Test Result</button></div><div class="case-region">${cases}</div><div>Input <input data-e2e-locator="console-testcase-input" value="${input}"> Output —</div><div class="result-panel" style="display:none" aria-hidden="true"><h2>Test Result</h2><div>Wrong Answer</div>Input ${input} Output mismatch<div class="case-region">${cases}</div></div></section>`;
   const lines = editorSource.split('\n').map((line, i) => `<div class="view-line" data-line="${i + 1}" style="top:${i * 20}px">${line.replaceAll('<', '&lt;').replaceAll('>', '&gt;')}</div>`).join('');
   const gutters = editorSource.split('\n').map((_, i) => `<div class="line-numbers" style="top:${i * 20}px">${i + 1}</div>`).join('');
 

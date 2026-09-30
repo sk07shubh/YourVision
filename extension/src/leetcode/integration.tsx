@@ -825,7 +825,9 @@ export function injectVisualizeButton(): boolean {
   const region = findTestcaseRegion();
   if (!region) return false;
 
-  const existing = document.querySelector<HTMLButtonElement>('[data-yourvision-visualize="true"]:not([data-yourvision-result-visualize="true"])');
+  const mainButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-yourvision-visualize="true"]:not([data-yourvision-result-visualize="true"])')];
+  const existing = mainButtons[0];
+  for (const duplicate of mainButtons.slice(1)) duplicate.remove();
   if (existing) {
     visualizeButton = existing;
     if (existing.parentElement !== region || region.lastElementChild !== existing) region.appendChild(existing);
@@ -833,24 +835,34 @@ export function injectVisualizeButton(): boolean {
     visualizeButton = createVisualizeButton(region);
   }
 
+  const activeResultButtons = new Set<HTMLButtonElement>();
   for (const panel of findTestResultContainers()) {
     const resultRegion =
       panel.querySelector<HTMLElement>('[data-yourvision-result-region="true"]') ??
-      panel.querySelector<HTMLElement>('[data-e2e-locator="console-testcase-tag"]')?.parentElement ??
-      [...panel.querySelectorAll<HTMLButtonElement>('button')].find(button => /^case\s+\d+$/i.test((button.textContent ?? '').trim()))?.parentElement;
+      [...panel.querySelectorAll<HTMLButtonElement>('[data-e2e-locator="console-testcase-tag"],button')]
+        .find(button => /^case\s+\d+$/i.test((button.textContent ?? '').trim()))?.parentElement ??
+      panel;
 
     if (!resultRegion) continue;
     resultRegion.dataset.yourvisionResultRegion = 'true';
 
     const existingResult = resultRegion.querySelector<HTMLButtonElement>('[data-yourvision-result-visualize="true"]');
     if (existingResult) {
-      resultVisualizeButtons.add(existingResult);
+      activeResultButtons.add(existingResult);
       continue;
     }
 
     const resultButton = createVisualizeButton(resultRegion,true);
-    if (resultButton) resultVisualizeButtons.add(resultButton);
+    if (resultButton) activeResultButtons.add(resultButton);
   }
+
+  // Clear controls retained in hidden testcase/result tabs after LeetCode swaps
+  // the console view, including stale buttons left by a prior injection.
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-yourvision-result-visualize="true"]')) {
+    if (!activeResultButtons.has(button)) button.remove();
+  }
+  resultVisualizeButtons.clear();
+  for (const button of activeResultButtons) resultVisualizeButtons.add(button);
 
   return Boolean(visualizeButton);
 }

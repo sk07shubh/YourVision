@@ -19,6 +19,7 @@ type Case = {
     expectedErrorType?: string;
     requiredTraceTypes?: string[];
     expectedEntryLine?: number;
+    expectedFirstStepLine?: number;
     expectedReturnLine?: number;
 };
 
@@ -312,6 +313,14 @@ const cases: Case[] = [
         expectedResult: "5",
         expectedEntryLine: 2,
         expectedReturnLine: 4
+    },
+    {
+        name: "method entry captures the first body line before STEP_LINE advances",
+        source: "import java.util.HashMap;\nimport java.util.Map;\nclass Solution {\n    public int[] twoSum(int[] nums, int target) {\n        int n = nums.length;\n        Map<Integer,Integer> mp = new HashMap<>();\n        for(int i=0;i<n;i++){\n            int need = target - nums[i];\n            if(mp.containsKey(need)){\n                return new int[] {mp.get(need),i};\n            }else{\n                mp.put(nums[i],i);\n            }\n        }\n        return new int[]{};\n    }\n}",
+        method: "twoSum",
+        args: ["[3,2,4]", "6"],
+        expectedKind: "OK",
+        expectedFirstStepLine: 5
     },
     {
         name: "zero arguments",
@@ -764,6 +773,15 @@ for (const test of cases) {
         result.trace?.events.find(event => event.type === "METHOD_ENTER")?.data?.displayLine === test.expectedEntryLine &&
         result.states?.[0]?.line === test.expectedEntryLine;
 
+    const firstStepIndex = result.trace?.events.findIndex(event => event.type === "STEP") ?? -1;
+    const firstStepLineMatches =
+        test.expectedFirstStepLine === undefined ||
+        firstStepIndex >= 0 &&
+        result.trace?.events[firstStepIndex]?.line === test.expectedFirstStepLine &&
+        result.states?.[1]?.line === test.expectedFirstStepLine &&
+        result.states?.[2]?.line === test.expectedFirstStepLine + 1 &&
+        result.states?.[2]?.variables.n === 3;
+
     const returnLineMatches =
         test.expectedReturnLine === undefined ||
         result.trace?.events.find(event => event.type === "METHOD_EXIT")?.line === test.expectedReturnLine;
@@ -774,6 +792,7 @@ for (const test of cases) {
         errorMatches &&
         traceMatches &&
         entryLineMatches &&
+        firstStepLineMatches &&
         returnLineMatches
     ) {
         console.log(
@@ -807,6 +826,8 @@ for (const test of cases) {
                 [...traceTypes],
             expectedEntryLine: test.expectedEntryLine,
             actualEntryLine: result.trace?.events.find(event => event.type === "METHOD_ENTER")?.data?.displayLine,
+            expectedFirstStepLine: test.expectedFirstStepLine,
+            actualFirstStepLine: result.trace?.events.find(event => event.type === "STEP")?.line,
             expectedReturnLine: test.expectedReturnLine,
             actualReturnLine: result.trace?.events.find(event => event.type === "METHOD_EXIT")?.line,
             stderr:
