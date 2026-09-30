@@ -210,7 +210,11 @@ test('Chrome extension injects and runs a result control when the failure panel 
     await expect(page.locator('[data-yourvision-host="true"] .yv-statement')).toContainText('public int sum');
     await expect(page.locator('[data-yourvision-host="true"] .yv-case')).toHaveText('Selected testcase');
     expect(received).toHaveLength(1);
-    expect(received[0]).toMatchObject({ language: 'java', source, arguments: ['[1,2]'] });
+    expect(received[0]).toMatchObject({
+      language: 'java',
+      source,
+      testcase: { method: 'sum', arguments: ['[1,2]'] },
+    });
   } finally {
     await context.close();
     await rm(profile, { recursive: true, force: true });
