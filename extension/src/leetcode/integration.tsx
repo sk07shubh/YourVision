@@ -805,7 +805,10 @@ function createVisualizeButton(region: HTMLElement, resultPanel = false): HTMLBu
   if (resultPanel) button.dataset.yourvisionResultVisualize = 'true';
   button.type = 'button';
   button.textContent = 'Visualize';
-  button.className = template.className;
+  // LeetCode's result view can contain a failure and testcase data without
+  // rendering any buttons. In that case there is no native class template.
+  // The control has its own styling below, so an empty class list is valid.
+  button.className = template?.className ?? '';
   button.classList.remove('bg-fill-3','dark:bg-dark-fill-3');
   button.classList.add('bg-transparent','dark:bg-dark-transparent');
   Object.assign(button.style,{color:'#ffa116',cursor:'pointer',flex:'0 0 auto',whiteSpace:'nowrap'});

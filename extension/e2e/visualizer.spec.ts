@@ -192,6 +192,31 @@ for (const flow of [
 }
 
 
+test('Chrome extension injects and runs a result control when the failure panel has no native buttons', async () => {
+  activeResponse = response;
+  received.length = 0;
+  const { context, page, profile } = await launchPage('default');
+  try {
+    await page.evaluate(() => {
+      const panel = document.createElement('section');
+      panel.className = 'result-panel';
+      panel.innerHTML = '<h2>Test Result</h2><div>Wrong Answer</div><div>Input <input data-e2e-locator="console-testcase-input" value="[1,2]"> Output mismatch</div>';
+      document.body.append(panel);
+    });
+
+    const resultButton = page.locator('body > .result-panel [data-yourvision-result-visualize="true"]');
+    await expect(resultButton).toBeVisible();
+    await resultButton.click();
+    await expect(page.locator('[data-yourvision-host="true"] .yv-statement')).toContainText('public int sum');
+    await expect(page.locator('[data-yourvision-host="true"] .yv-case')).toHaveText('Selected testcase');
+    expect(received).toHaveLength(1);
+    expect(received[0]).toMatchObject({ language: 'java', source, arguments: ['[1,2]'] });
+  } finally {
+    await context.close();
+    await rm(profile, { recursive: true, force: true });
+  }
+});
+
 test('Chrome extension renders ordinary object fields, nested arrays, and aliases', async () => {
   const objectSource = [
     'class Solution {',

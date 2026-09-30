@@ -85,6 +85,21 @@ afterEach(() => {
 });
 
 describe('LeetCode testcase to visualizer flow harness', () => {
+  it('adds a result Visualize button when a failure panel has no native button to copy classes from', () => {
+    makePage(flows[0]);
+    document.querySelector('.result-panel')?.remove();
+
+    const failurePanel = document.createElement('section');
+    failurePanel.className = 'result-panel';
+    failurePanel.innerHTML = '<h2>Test Result</h2><div>Wrong Answer</div><div>Input <input value="[1,2]"> Output mismatch</div>';
+    document.body.append(failurePanel);
+
+    expect(findTestResultContainers()).toContain(failurePanel);
+    expect(() => act(() => injectVisualizeButton())).not.toThrow();
+    expect(failurePanel.querySelector('[data-yourvision-result-visualize="true"]')).not.toBeNull();
+    expect(document.querySelectorAll('[data-yourvision-visualize="true"]:not([data-yourvision-result-visualize="true"])')).toHaveLength(1);
+  });
+
   it.each(flows)('visualizes the $name and replays its deterministic trace', async flow => {
     makePage(flow);
     expect(findTestResultContainers()).toHaveLength(flow.kind === 'failed' ? 1 : 0);
