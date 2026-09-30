@@ -203,12 +203,47 @@ export function findActiveTestcaseTab(
   );
 }
 
-export function findEditor(): HTMLElement | null {
-  return (
-    [
-      ...document.querySelectorAll<HTMLElement>(
-        '.monaco-editor'
-      ),
-    ].find(visible) ?? null
-  );
+function lineText(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+function editorSourceScore(editor: HTMLElement, sourceLines: string[]): number {
+  const viewLines = [...editor.querySelectorAll<HTMLElement>('.view-lines .view-line')];
+  const gutters = [...editor.querySelectorAll<HTMLElement>('.margin-view-overlays .line-numbers')];
+  let matches = 0;
+  let compared = 0;
+
+  for (const gutter of gutters) {
+    const lineNumber = Number(gutter.textContent?.trim());
+    if (!Number.isInteger(lineNumber) || lineNumber < 1 || lineNumber > sourceLines.length) continue;
+    const gutterTop = gutter.getBoundingClientRect().top;
+    const renderedLine = viewLines.reduce<HTMLElement | undefined>((closest, candidate) => {
+      if (!closest) return candidate;
+      return Math.abs(candidate.getBoundingClientRect().top - gutterTop) <
+        Math.abs(closest.getBoundingClientRect().top - gutterTop) ? candidate : closest;
+    }, undefined);
+    if (!renderedLine) continue;
+
+    const expected = lineText(sourceLines[lineNumber - 1] ?? '');
+    if (!expected) continue;
+    compared++;
+    if (lineText(renderedLine.textContent ?? '') === expected) matches++;
+  }
+
+  // Score both the number and proportion of exact source-line matches. The
+  // count distinguishes the full solution editor from short matching snippets.
+  return matches + (compared ? matches / compared : 0);
+}
+
+export function findEditor(source?: string): HTMLElement | null {
+  const editors = [...document.querySelectorAll<HTMLElement>('.monaco-editor')].filter(visible);
+  if (!editors.length) return null;
+  if (!source) return editors.find(editor => editor.classList.contains('monaco-editor-focused')) ?? editors[0] ?? null;
+
+  const sourceLines = source.split(/\r?\n/);
+  const ranked = editors
+    .map((editor, index) => ({ editor, index, score: editorSourceScore(editor, sourceLines) }))
+    .sort((left, right) => right.score - left.score || left.index - right.index);
+  if (ranked[0]?.score) return ranked[0].editor;
+  return editors.find(editor => editor.classList.contains('monaco-editor-focused')) ?? editors[0] ?? null;
 }

@@ -1,19 +1,45 @@
 import { findEditor } from './selectors';
 
 let decoratedLine: HTMLElement | null = null;
+let retryTimer: number | undefined;
+let generation = 0;
+let revealRequestedGeneration = -1;
 
-export function clearEditorExecutionMarker(): void {
-  if (decoratedLine) {
-    decoratedLine.style.removeProperty('background');
-    decoratedLine.style.removeProperty('box-shadow');
-    decoratedLine = null;
-  }
+function removeDecoration(): void {
+  if (!decoratedLine) return;
+  decoratedLine.style.removeProperty('background');
+  decoratedLine.style.removeProperty('box-shadow');
+  decoratedLine = null;
 }
 
-export function highlightEditorLine(lineNumber?: number): void {
+export function clearEditorExecutionMarker(): void {
+  generation++;
+  if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+  retryTimer = undefined;
+  removeDecoration();
+}
+
+export function highlightEditorLine(lineNumber?: number, source?: string): void {
   clearEditorExecutionMarker();
   if (!lineNumber || lineNumber < 1) return;
-  const editor = findEditor();
+  const currentGeneration = generation;
+  const retry = () => {
+    if (currentGeneration !== generation) return;
+    retryTimer = window.setTimeout(() => {
+      retryTimer = undefined;
+      highlight(lineNumber, source, currentGeneration, retry);
+    }, 40);
+  };
+  highlight(lineNumber, source, currentGeneration, retry);
+}
+
+function highlight(
+  lineNumber: number,
+  source: string | undefined,
+  currentGeneration: number,
+  retry: () => void
+): void {
+  const editor = findEditor(source);
   if (!editor) return;
 
   const viewLines = editor.querySelector<HTMLElement>('.view-lines');
@@ -35,15 +61,16 @@ export function highlightEditorLine(lineNumber?: number): void {
     );
 
   if (!gutter) {
-    void chrome.runtime.sendMessage({
-      type: 'REVEAL_LINE',
-      line: lineNumber
-    });
-
-    window.setTimeout(
-      () => highlightEditorLine(lineNumber),
-      40
-    );
+    if (currentGeneration !== generation) return;
+    if (revealRequestedGeneration !== currentGeneration && typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      revealRequestedGeneration = currentGeneration;
+      void chrome.runtime.sendMessage({
+        type: 'REVEAL_LINE',
+        line: lineNumber,
+        source
+      });
+    }
+    retry();
 
     return;
   }

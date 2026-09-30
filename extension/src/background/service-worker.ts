@@ -5,27 +5,34 @@ async function readMonaco(tabId: number): Promise<string> {
   const results = await chrome.scripting.executeScript({
     target: { tabId }, world: 'MAIN',
     func: () => {
-      const w = window as unknown as { monaco?: { editor?: { getModels?: () => Array<{ getValue(): string; getLanguageId?:()=>string }> } } };
+      const w = window as unknown as { monaco?: { editor?: { getModels?: () => Array<{ getValue(): string; getLanguageId?:()=>string }>; getEditors?:()=>Array<{getModel?:()=>{getValue():string;getLanguageId?:()=>string}|null;getDomNode?:()=>HTMLElement|null}> } } };
+      const editors = w.monaco?.editor?.getEditors?.() ?? [];
+      const focusedJava = editors.find(editor =>
+        editor.getDomNode?.()?.classList.contains('monaco-editor-focused') &&
+        editor.getModel?.()?.getLanguageId?.() === 'java'
+      )?.getModel?.();
       const models = w.monaco?.editor?.getModels?.() ?? [];
-      const java = models.find(m => m.getLanguageId?.() === 'java');
+      const java = focusedJava ?? models.find(m => m.getLanguageId?.() === 'java');
       return (java ?? models.find(m => /class\s+Solution/.test(m.getValue())) ?? models[0])?.getValue?.() ?? '';
     }
   });
   return String(results[0]?.result ?? '');
 }
 
-async function revealLine(tabId: number, line: number): Promise<void> {
+async function revealLine(tabId: number, line: number, source: string): Promise<void> {
   await chrome.scripting.executeScript({
-    target: { tabId }, world: 'MAIN', args: [line],
-    func: (targetLine: number) => {
-      const w = window as unknown as { monaco?: { editor?: { getEditors?:()=>Array<{revealLineInCenter:(n:number)=>void;setPosition?:(p:{lineNumber:number;column:number})=>void}> } } };
-      const editor = w.monaco?.editor?.getEditors?.()?.[0];
+    target: { tabId }, world: 'MAIN', args: [line, source],
+    func: (targetLine: number, targetSource: string) => {
+      const w = window as unknown as { monaco?: { editor?: { getEditors?:()=>Array<{revealLineInCenter:(n:number)=>void;setPosition?:(p:{lineNumber:number;column:number})=>void;getModel?:()=>{getValue?:()=>string}|null;getDomNode?:()=>HTMLElement|null}> } } };
+      const editors = w.monaco?.editor?.getEditors?.() ?? [];
+      const editor = editors.find(candidate => candidate.getModel?.()?.getValue?.() === targetSource) ??
+        editors.find(candidate => candidate.getDomNode?.()?.classList.contains('monaco-editor-focused')) ?? editors[0];
       editor?.revealLineInCenter?.(targetLine);
     }
   }).catch(()=>undefined);
 }
 
-chrome.runtime.onMessage.addListener((msg: ExtensionRequest | {type:'REVEAL_LINE';line:number}, sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown)=>void) => {
+chrome.runtime.onMessage.addListener((msg: ExtensionRequest | {type:'REVEAL_LINE';line:number;source?:string}, sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown)=>void) => {
   void (async () => {
     try {
       if (msg.type === 'READ_SOURCE') {
@@ -34,7 +41,7 @@ chrome.runtime.onMessage.addListener((msg: ExtensionRequest | {type:'REVEAL_LINE
         sendResponse({ok:true,source} satisfies ExtensionResponse); return;
       }
       if (msg.type === 'REVEAL_LINE') {
-        if (sender.tab?.id) await revealLine(sender.tab.id,msg.line);
+        if (sender.tab?.id) await revealLine(sender.tab.id,msg.line,msg.source ?? '');
         sendResponse({ok:true}); return;
       }
       if (msg.type === 'RUN_VISUALIZATION') {

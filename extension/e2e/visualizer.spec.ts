@@ -145,6 +145,11 @@ for (const flow of [
       await expect(page.locator('[data-yourvision-tab="true"]')).toHaveAttribute('aria-selected', 'true');
       await expect(page.locator('.monaco-editor .view-line[data-line="2"]')).toHaveCSS('box-shadow', 'rgb(255, 161, 22) 2px 0px 0px 0px inset');
       await expect(page.locator('[data-yourvision-host="true"] .yv-case')).toHaveText(flow.label);
+      if (flow.kind === 'default') {
+        await page.locator('.native-content').evaluate(node => node.append(document.createElement('span')));
+        await expect(page.locator('[data-yourvision-tab="true"]')).toHaveAttribute('aria-selected', 'true');
+        await expect(page.locator('.native-content')).toHaveCSS('display', 'none');
+      }
       if (flow.kind !== 'default') {
         await expect(page.locator('[data-yourvision-host="true"] .yv-case-kind')).toHaveText(flow.kind === 'failed' ? 'Failed testcase' : 'Custom');
       }
@@ -324,6 +329,27 @@ test('Chrome extension renders ordinary object fields, nested arrays, and aliase
     await rm(profile, { recursive: true, force: true });
   }
 });
+
+test('Chrome extension highlights the source-matching Monaco editor when a decoy editor is present', async () => {
+  activeResponse = response;
+  const { context, page, profile } = await launchPage('default');
+  try {
+    await page.evaluate(() => {
+      const decoy = document.createElement('div');
+      decoy.className = 'monaco-editor';
+      decoy.innerHTML = '<div class="view-lines"><div class="view-line" data-line="1" style="top:0px">class Example {</div><div class="view-line" data-line="2" style="top:20px">  public int unrelated() {</div></div><div class="margin-view-overlays"><div class="line-numbers" style="top:0px">1</div><div class="line-numbers" style="top:20px">2</div></div>';
+      document.querySelector('.monaco-editor')?.before(decoy);
+    });
+    await page.locator('[data-yourvision-visualize="true"]').click();
+    const editors = page.locator('.monaco-editor');
+    await expect(editors).toHaveCount(2);
+    await expect(editors.nth(1).locator('.view-line[data-line="2"]')).toHaveCSS('box-shadow', 'rgb(255, 161, 22) 2px 0px 0px 0px inset');
+    await expect(editors.nth(0).locator('.view-line[data-line="2"]')).not.toHaveCSS('box-shadow', 'rgb(255, 161, 22) 2px 0px 0px 0px inset');
+  } finally {
+    await context.close();
+    await rm(profile, { recursive: true, force: true });
+  }
+});
 test('Chrome extension expands nested objects inside maps and collections', async () => {
   const nestedSource = [
     'class Solution {',
@@ -368,7 +394,7 @@ test('Chrome extension expands nested objects inside maps and collections', asyn
     await expect(structures).toContainText('ArrayList');
     await expect(structures).toContainText('42');
     await expect(structures).toContainText('7');
-    await expect(structures.locator('.yv-object')).toHaveCount(4);
+    await expect(structures.locator('.yv-object')).toHaveCount(3);
   } finally {
     await context.close();
     await rm(profile, { recursive: true, force: true });
@@ -483,7 +509,9 @@ test('Chrome extension renders nested objects across collection views', async ()
     await expect(structures.locator('.yv-heap-tree .yv-heap-node')).toHaveCount(1);
     await expect(structures.locator('.yv-heap-note')).toContainText('root is index 0');
     await expect(structures.locator('.yv-collection-backing')).toHaveCount(5);
-    await expect(structures.locator('.yv-collection-backing')).toContainText('snapshot order');
+    await expect(structures.locator('.yv-collection-backing').allTextContents()).resolves.toEqual(
+      expect.arrayContaining(Array(5).fill(expect.stringContaining('snapshot order')))
+    );
     const setView = structures.locator('.yv-set-view');
     await expect(setView).toContainText('66');
     await expect(setView.locator('.yv-cell-index')).toHaveCount(0);

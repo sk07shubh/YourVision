@@ -745,7 +745,7 @@ export function VisualizerPanel(){
   const lastEventData = isPlainObject(current?.lastEvent?.data) ? current.lastEvent.data : undefined;
   const sourceLines=useMemo(()=>s.source.split(/\r?\n/),[s.source]);
   const statement=line?sourceLines[line-1]?.trim():'';
-  useEffect(()=>{highlightEditorLine(line);return()=>clearEditorExecutionMarker();},[line]);
+  useEffect(()=>{highlightEditorLine(line,s.source);return()=>clearEditorExecutionMarker();},[line,s.source]);
   useEffect(()=>{ if(!s.playing)return; const id=setInterval(()=>sessionStore.next(),650); return()=>clearInterval(id); },[s.playing,s.index,s.states.length]);
   useEffect(()=>{ const onKey=(e:KeyboardEvent)=>{ if(!sessionStore.get().open)return; const target=e.target as HTMLElement|null; if(target?.matches('input,textarea,[contenteditable=true]'))return; const handled=e.key==='ArrowRight'||e.key==='ArrowLeft'||e.code==='Space'||e.key.toLowerCase()==='r'; if(!handled)return; e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); const active=document.activeElement?.shadowRoot?.activeElement as HTMLElement|null; if(active?.matches('button'))active.blur(); if(e.key==='ArrowRight'||e.code==='Space')sessionStore.next(); else if(e.key==='ArrowLeft')sessionStore.prev(); else sessionStore.restart(); }; window.addEventListener('keydown',onKey,true);return()=>window.removeEventListener('keydown',onKey,true)},[]);
   const output=s.response?.result; const tc=s.testcase; const finished=current?.lastEvent?.type==='PROGRAM_END' || (s.states.length>0&&s.index===s.states.length-1);

@@ -10,6 +10,7 @@ import {
   VISUALIZER_SOURCE,
 } from '../test/visualizerHarness';
 import { sameLineLoopStates, SAME_LINE_LOOP_SOURCE } from '../test/sameLineLoopTrace';
+import { highlightEditorLine } from '../leetcode/editor-overlay';
 
 Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', {
   configurable: true,
@@ -24,6 +25,8 @@ afterEach(() => {
   root = undefined;
   editor = undefined;
   document.body.innerHTML = '';
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -153,6 +156,31 @@ describe('VisualizerPanel deterministic DOM harness', () => {
     expect(highlighted?.style.getPropertyPriority('background')).toBe('important');
     expect(highlighted?.style.getPropertyValue('box-shadow')).toContain('inset 2px');
     expect(panel.querySelector('.yv-execution-arrow, .yv-arrow-marker')).toBeNull();
+  });
+
+  it('highlights the editor containing the traced source when other Monaco editors are present', () => {
+    const decoy = mountMonacoHarness('class Example {\n  public int sample() {\n    return 99;\n  }\n}');
+    editor = mountMonacoHarness(VISUALIZER_SOURCE);
+    const mounted = mountVisualizer(VISUALIZER_SOURCE);
+    root = mounted.root;
+
+    expect(highlightedSourceLine(editor)).toBe(2);
+    expect(decoy.querySelector<HTMLElement>('[data-line="2"]')?.style.getPropertyValue('box-shadow')).toBe('');
+  });
+
+  it('cancels a delayed highlight when navigation has moved to another source line', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('chrome', { runtime: { sendMessage: vi.fn() } });
+    editor = mountMonacoHarness(VISUALIZER_SOURCE);
+    editor.querySelector('.margin-view-overlays .line-numbers:nth-child(2)')?.remove();
+
+    highlightEditorLine(2, VISUALIZER_SOURCE);
+    highlightEditorLine(3, VISUALIZER_SOURCE);
+    vi.advanceTimersByTime(50);
+
+    expect(highlightedSourceLine(editor)).toBe(3);
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it('shows backing array snapshots for stacks, queues, sets and priority queues', () => {
