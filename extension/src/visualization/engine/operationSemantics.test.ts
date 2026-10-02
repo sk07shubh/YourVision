@@ -160,3 +160,52 @@ describe('exact collection, map, and object reads', () => {
     expect(indexes).toEqual([0, 2]);
   });
 });
+
+
+describe('array alias targeting', () => {
+  it('targets an aliased array variable', () => {
+    const before = makeState({
+      variables: {
+        i: 2,
+        row: { $arrayId: 'row-1', values: [4, 8, 15, 16] },
+      },
+    });
+    const after = makeState({
+      sequence: 1,
+      line: 3,
+      variables: {
+        i: 2,
+        row: { $arrayId: 'row-1', values: [4, 8, 15, 16] },
+      },
+    });
+    const events = semanticEventsBetween(before, after, 'int x = row[i];');
+    expect(events).toContainEqual({
+      type: 'highlight',
+      target: { structureId: 'row-1', kind: 'array', index: 2 },
+    });
+  });
+
+  it('targets a matrix alias with both runtime indices', () => {
+    const before = makeState({
+      variables: {
+        r: 1,
+        c: 2,
+        grid: { $arrayId: 'grid-1', values: [[1, 2, 3], [4, 5, 6]] },
+      },
+    });
+    const after = makeState({
+      sequence: 1,
+      line: 4,
+      variables: {
+        r: 1,
+        c: 2,
+        grid: { $arrayId: 'grid-1', values: [[1, 2, 3], [4, 5, 6]] },
+      },
+    });
+    const events = semanticEventsBetween(before, after, 'int x = grid[r][c];');
+    expect(events).toContainEqual({
+      type: 'highlight',
+      target: { structureId: 'grid-1', kind: 'matrix', row: 1, column: 2 },
+    });
+  });
+});

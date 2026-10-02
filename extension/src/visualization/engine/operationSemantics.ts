@@ -9,8 +9,10 @@ function isRecord(value: unknown): value is RecordValue {
 }
 
 function arrayId(state: TraceState, name: string): string | undefined {
-  const value = state.arrays[name];
-  return isRecord(value) && typeof value.$arrayId === 'string' ? value.$arrayId : undefined;
+  const direct = state.arrays[name];
+  if (isRecord(direct) && typeof direct.$arrayId === 'string') return direct.$arrayId;
+  const variable = state.variables[name];
+  return isRecord(variable) && typeof variable.$arrayId === 'string' ? variable.$arrayId : undefined;
 }
 
 function accessTargets(statement: string, state: TraceState): VisualTarget[] {
