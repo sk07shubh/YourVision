@@ -131,3 +131,25 @@
 .yv-algorithm-high { border-color: rgba(76,175,80,.55); }
 .yv-algorithm-medium { border-color: rgba(255,193,7,.55); }
 .yv-algorithm-low { opacity: .65; }
+
+
+/* Algorithm narratives: compact, state-driven visuals layered above existing DS views. */
+.yv-algorithm-narrative{margin-top:7px;padding:7px 8px;border:1px solid var(--yv-border);border-radius:7px;background:var(--yv-bg);font-size:10px;overflow:hidden}
+.yv-algo-label{font-size:9px;font-weight:700;letter-spacing:.04em;color:var(--yv-muted);margin-bottom:6px}
+.yv-algo-track{display:flex;gap:2px;overflow-x:auto;min-width:0}
+.yv-algo-track>span{min-width:25px;padding:4px 5px;text-align:center;border:1px solid var(--yv-border);border-radius:4px;background:var(--yv-elevated);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.yv-algo-track>span.yv-algo-active{box-shadow:inset 0 0 0 1px var(--yv-accent);background:color-mix(in srgb,var(--yv-accent),var(--yv-elevated) 88%);animation:yv-structure-pulse .16s ease-out}
+.yv-algo-track>span.yv-algo-dim{opacity:.3}
+.yv-algo-track>span.yv-algo-window{box-shadow:inset 0 -2px 0 var(--yv-accent);background:color-mix(in srgb,var(--yv-accent),var(--yv-elevated) 92%)}
+.yv-algo-markers{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:5px}
+.yv-algo-marker{display:inline-flex;align-items:center;gap:4px;padding:2px 5px;border-radius:999px;background:var(--yv-elevated);border:1px solid var(--yv-border);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.yv-algo-marker b{font-size:8px;color:var(--yv-accent)}
+.yv-algo-value{color:var(--yv-muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.yv-algo-dp{display:flex;gap:3px;overflow-x:auto}
+.yv-algo-dp>span{min-width:30px;padding:5px;border:1px solid var(--yv-border);border-radius:4px;background:var(--yv-elevated);text-align:center;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.yv-algo-dp>.yv-algo-active{box-shadow:inset 0 0 0 1px var(--yv-accent)}
+.yv-algo-phase-flow{display:flex;align-items:center;gap:5px;overflow-x:auto;white-space:nowrap}
+.yv-algo-phase-active{font-weight:700;color:var(--yv-accent)}
+.yv-algo-phase-next{color:var(--yv-text)}
+.yv-algo-chevron{color:var(--yv-muted)}
+@media(prefers-reduced-motion:reduce){.yv-algo-track>span.yv-algo-active{animation:none}}
