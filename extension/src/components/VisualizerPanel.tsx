@@ -11,6 +11,7 @@ import type { TrieNodeLike } from '../visualization/structures/TrieView';
 import { eventTargets, primaryVisualOperation, semanticEventsBetween, visualOperationLabel } from '../visualization/engine/operationSemantics';
 import type { VisualEvent } from '../visualization/engine/visualEvents';
 import { detectAlgorithm } from '../visualization/engine/algorithmSemantics';
+import { SortingView } from './SortingView';
 
 type Obj = Record<string, unknown>;
 
@@ -924,7 +925,7 @@ function AlgorithmNarrative({
       body = <><div className="yv-algo-track">{values.map((v,i)=><span key={i} className={i===pointerA||i===pointerB?'yv-algo-active':''}>{displayValue(v)}</span>)}</div><div className="yv-algo-markers">{marker('A',pointerA)}{marker('B',pointerB)}</div></>;
       break;
     case 'sorting':
-      body = <><div className="yv-algo-track">{values.map((v,i)=><span key={i} className={i===currentIndex?'yv-algo-active':''}>{displayValue(v)}</span>)}</div><div className="yv-algo-markers">{marker('I',currentIndex)}<span className="yv-algo-value">{algorithm.phase}</span></div></>;
+      body = <SortingView state={state} previous={previous} visualEvents={visualEvents}/>;
       break;
     case 'prefix-sum':
       body = <><div className="yv-algo-track">{values.map((v,i)=><span key={i} className={i===currentIndex?'yv-algo-active':''}>{displayValue(v)}</span>)}</div><div className="yv-algo-markers">{marker('IDX',currentIndex)}{sum!==undefined&&<span className="yv-algo-value">sum = {sum}</span>}</div></>;
