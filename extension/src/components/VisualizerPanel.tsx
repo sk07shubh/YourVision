@@ -87,11 +87,20 @@ function CollectionBackingArray({
   );
 }
 
+function changedCollectionIndices(value: Obj|undefined, previousValue: unknown): Set<number> {
+  const currentValues=isCollectionSnapshot(value)?value.values:[];
+  const previousValues=isCollectionSnapshot(previousValue)?previousValue.values:[];
+  const changed=new Set<number>();
+  const limit=Math.max(currentValues.length,previousValues.length);
+  for(let i=0;i<limit;i++)if(stableStringify(currentValues[i])!==stableStringify(previousValues[i]))changed.add(i);
+  return changed;
+}
 function CollectionView({
   value,
   state,
   source,
   name,
+  previousValue,
   depth = 0,
   seen = new Set<string>()
 }: {
@@ -105,6 +114,7 @@ function CollectionView({
   state?: TraceState;
   source: string;
   name?: string;
+  previousValue?: unknown;
   depth?: number;
   seen?: Set<string>;
 }) {
@@ -119,6 +129,7 @@ function CollectionView({
       : 'collection';
 
   const itemCount = value.size ?? value.values.length;
+  const changed=changedCollectionIndices(value,previousValue);
 
   if (kind === 'stack') {
     return (
@@ -129,7 +140,7 @@ function CollectionView({
         </div>
         <div className="yv-stack-view">
           {[...value.values].reverse().map((item, index) => (
-            <div className="yv-stack-cell" key={index}>
+            <div className={changed.has(value.values.length-1-index)?'yv-stack-cell yv-collection-changed':'yv-stack-cell'} key={index}>
               <span className="yv-stack-position">{index === 0 ? 'TOP' : ''}</span>
               <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
             </div>
@@ -151,7 +162,7 @@ function CollectionView({
         <div className="yv-queue-view">
           <div className="yv-queue-end">FRONT</div>
           {value.values.map((item, index) => (
-            <div className="yv-queue-cell" key={index}>
+            <div className={changed.has(index)?'yv-queue-cell yv-collection-changed':'yv-queue-cell'} key={index}>
               <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
             </div>
           ))}
@@ -172,7 +183,7 @@ function CollectionView({
         </div>
         <div className="yv-set-view">
           {value.values.map((item, index) => (
-            <div className="yv-set-element" key={index}>
+            <div className={changed.has(index)?'yv-set-element yv-collection-changed':'yv-set-element'} key={index}>
               <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
             </div>
           ))}
@@ -200,7 +211,7 @@ function CollectionView({
             return levels.map((items, level) => (
               <div className="yv-heap-level" key={level}>
                 {items.map((item, index) => (
-                  <div className="yv-heap-node-wrap" key={`${level}-${index}`}>
+                  <div className={changed.has((2 ** level) - 1 + index)?'yv-heap-node-wrap yv-collection-changed':'yv-heap-node-wrap'} key={`${level}-${index}`}>
                     <div className="yv-heap-node"><DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/></div>
                     <div className="yv-cell-index">[{(2 ** level) - 1 + index}]</div>
                   </div>
@@ -650,6 +661,7 @@ function DataValue({
   value: unknown;
   state?: TraceState;
   source: string;
+  previousValue?: unknown;
   name?: string;
   depth?: number;
   seen?: Set<string>;
@@ -669,7 +681,7 @@ function DataValue({
   }
 
   if (isCollectionSnapshot(value)) {
-    return <CollectionView value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>;
+    return <CollectionView value={value} state={state} source={source} name={name} previousValue={previousValue} depth={depth} seen={seen}/>
   }
 
   if (isArraySnapshot(value)) {
@@ -721,7 +733,7 @@ function isStructuralObject(value: unknown): value is Obj {
     (('left' in fields || 'right' in fields) && ('val' in fields || 'value' in fields));
 }
 
-function DataStructures({ state, source }: { state?: TraceState; source: string }) {
+function DataStructures({ state, previousState, source }: { state?: TraceState; previousState?: TraceState; source: string }) {
   const namedObjectIds = new Map<string, string[]>();
 
   for (const [name, value] of Object.entries(state?.variables ?? {})) {
@@ -781,7 +793,7 @@ function DataStructures({ state, source }: { state?: TraceState; source: string 
         return (
           <div className="yv-ds" key={title}>
             <div className="yv-ds-title">{title}</div>
-            <DataValue value={value} state={state} source={source} name={title}/>
+            <DataValue value={value} state={state} source={source} name={title} previousValue={state?.dataStructures?.[names[0]] && previousState?.dataStructures?.[names[0]]}/>
           </div>
         );
       })}
@@ -802,6 +814,6 @@ export function VisualizerPanel(){
   return <div className="yv-root"><div className="yv-scroll">
     {tc&&<div className="yv-top"><div className="yv-title-row"><div className="yv-case">{tc.label}</div>{tc.source==='custom'&&<span className="yv-case-kind">Custom</span>}{tc.source==='failed'&&<span className="yv-case-kind">Failed testcase</span>}</div><div className="yv-inputs">{Object.keys(tc.inputs).length?Object.entries(tc.inputs).map(([k,v])=><div className="yv-input" key={k}><div className="yv-key">{k}</div><div className="yv-code">{v}</div></div>):<div className="yv-code">{tc.raw}</div>}</div><div className="yv-output-row"><div className={`yv-output ${finished&&s.response?.success?'good':''}`}><div className="yv-label">Output</div>{finished&&output!==undefined?<ReturnValueView text={displayValue(output)} value={lastEventData?.returnValue} state={current}/>:<div className="yv-code">—</div>}</div></div></div>}
     {s.loading&&<div className="yv-loading">Tracing your code…</div>}{s.error&&<div className="yv-error">{s.error}</div>}
-    {!s.loading&&<><Section title="Variables"><Variables state={current} previous={prev}/></Section><Section title="Call Stack">{current?.callStack?.length?<div className="yv-stack-wrap"><div className="yv-stack-label">TOP</div><div className="yv-stack">{current.callStack.map((f:string,i:number)=><div className="yv-frame" key={`${f}-${i}`}>{f}</div>)}</div><div className="yv-stack-label bottom">BOTTOM</div></div>:<div className="yv-empty">No active method calls.</div>}</Section><Section title="Data Structures"><DataStructures state={current} source={s.source}/></Section></>}
+    {!s.loading&&<><Section title="Variables"><Variables state={current} previous={prev}/></Section><Section title="Call Stack">{current?.callStack?.length?<div className="yv-stack-wrap"><div className="yv-stack-label">TOP</div><div className="yv-stack">{current.callStack.map((f:string,i:number)=><div className="yv-frame" key={`${f}-${i}`}>{f}</div>)}</div><div className="yv-stack-label bottom">BOTTOM</div></div>:<div className="yv-empty">No active method calls.</div>}</Section><Section title="Data Structures"><DataStructures state={current} previousState={prev} source={s.source}/></Section></>}
   </div><div className="yv-current"><div className="yv-current-head"><span>{eventLabel(current)}</span></div><div className="yv-statement">{statement||'Select a testcase and press Visualize.'}</div><div className="yv-controls"><div className="yv-buttons"><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.restart()} disabled={!s.states.length}>↺ Restart</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.prev()} disabled={s.index<=0}>← Prev</button><button className="yv-btn primary" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.togglePlay()} disabled={s.states.length<2}>{s.playing?'■ Stop':'▶ Play'}</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.next()} disabled={!s.states.length||s.index>=s.states.length-1}>Next →</button></div></div></div></div>;
 }
