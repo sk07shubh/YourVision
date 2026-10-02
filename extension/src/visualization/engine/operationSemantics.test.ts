@@ -58,3 +58,21 @@ describe('operation semantics', () => {
     expect(events.some(event => event.type === 'traverse')).toBe(true);
     expect(primaryVisualOperation(events)).toBe('move');
   });
+
+
+describe('exact runtime read targeting',()=>{
+  it('highlights every array operand in a non-comparison read',()=>{
+    const before=makeState({variables:{left:1,right:3},arrays:{nums:{$arrayId:'nums',values:[4,2,9,7]}}});
+    const after=makeState({sequence:1,line:5,variables:{left:1,right:3},arrays:{nums:{$arrayId:'nums',values:[4,2,9,7]}}});
+    const events=semanticEventsBetween(before,after,'int x = nums[left] + nums[right];');
+    const highlights=events.filter(event=>event.type==='highlight');
+    expect(highlights).toHaveLength(2);
+    expect(highlights.map(event=>event.type==='highlight'?event.target.index:-1)).toEqual([1,3]);
+  });
+  it('targets a collection read instead of producing a generic step',()=>{
+    const before=makeState({dataStructures:{q:{$collectionId:'queue-1',$kind:'queue',values:[4,5],size:2}}});
+    const after=makeState({sequence:1,line:2,dataStructures:{q:{$collectionId:'queue-1',$kind:'queue',values:[4,5],size:2}}});
+    const events=semanticEventsBetween(before,after,'int x = q.peek();');
+    expect(events.some(event=>event.type==='highlight'&&event.target.structureId==='queue-1')).toBe(true);
+  });
+});

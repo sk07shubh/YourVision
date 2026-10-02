@@ -84,7 +84,22 @@ export function semanticEventsBetween(
   );
 
   if (!mutations.length && accesses.length) {
-    return [...events, { type: 'highlight', target: accesses[0] }];
+    return [...events, ...accesses.map(target => ({ type: 'highlight' as const, target }))];
+  }
+
+  const structureReads: VisualEvent[] = [];
+  const methodRead = /\.(get|peek|peekFirst|peekLast|contains|containsKey|containsValue|element|front|back)\s*\(/i.test(statement);
+  if (methodRead && !mutations.length) {
+    const names = new Set([...Object.keys(current.dataStructures), ...Object.keys(current.arrays)]);
+    for (const name of names) {
+      const id = arrayId(current, name);
+      if (id && statement.includes(name)) structureReads.push({ type: 'highlight', target: { structureId: id, kind: 'array' } });
+      const ds = current.dataStructures[name];
+      if (isRecord(ds)) {
+        const dsId = typeof ds.$collectionId === 'string' ? ds.$collectionId : typeof ds.$mapId === 'string' ? ds.$mapId : undefined;
+        if (dsId && statement.includes(name)) structureReads.push({ type: 'highlight', target: { structureId: dsId, kind: 'collection' } });
+      }
+    }
   }
 
   const previousVariables = previous.variables;
@@ -113,7 +128,7 @@ export function semanticEventsBetween(
     }
   }
 
-  return [...events, ...pointerMoves];
+  return [...events, ...structureReads, ...pointerMoves];
 }
 
 export type VisualOperation =
