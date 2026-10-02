@@ -183,6 +183,37 @@ describe('VisualizerPanel deterministic DOM harness', () => {
     vi.useRealTimers();
   });
 
+  it('renders a traced graph with active, visited, and frontier nodes', () => {
+    editor = mountMonacoHarness();
+    const response = {
+      success: true,
+      kind: 'OK' as const,
+      result: '3',
+      states: [{
+        ...sameLineLoopStates()[0],
+        variables: { start: { $objectId: 'a' } },
+        dataStructures: {
+          queue: { $collectionId: 'q', $type: 'ArrayDeque', $kind: 'queue', values: [{ $objectId: 'b' }], size: 1 },
+          seen: { $collectionId: 's', $type: 'HashSet', $kind: 'set', values: [{ $objectId: 'a' }], size: 1 },
+        },
+        objects: {
+          a: { $objectId: 'a', $type: 'Node', fields: { val: 1, neighbors: [{ $objectId: 'b' }] } },
+          b: { $objectId: 'b', $type: 'Node', fields: { val: 2, neighbors: [{ $objectId: 'c' }] } },
+          c: { $objectId: 'c', $type: 'Node', fields: { val: 3, neighbors: [] } },
+        },
+      }],
+    };
+    const mounted = mountVisualizer(SAME_LINE_LOOP_SOURCE, response);
+    root = mounted.root;
+    const panel = mounted.host.shadowRoot!;
+    expect(panel.querySelector('.yv-graph-view')).not.toBeNull();
+    expect(panel.querySelectorAll('.yv-graph-node')).toHaveLength(3);
+    expect(panel.querySelectorAll('.yv-graph-edge')).toHaveLength(2);
+    expect(panel.querySelector('.yv-graph-active')).not.toBeNull();
+    expect(panel.querySelector('.yv-graph-visited')).not.toBeNull();
+    expect(panel.querySelector('.yv-graph-frontier')).not.toBeNull();
+  });
+
   it('shows backing array snapshots for stacks, queues, sets and priority queues', () => {
     editor = mountMonacoHarness();
     const response = {
