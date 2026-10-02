@@ -12,7 +12,8 @@ function indexLabels(vars:Record<string,number>,length:number):Map<number,string
 export function SortingView({state,previous,visualEvents}:{state?:TraceState;previous?:TraceState;visualEvents:VisualEvent[]}){
  const entry=Object.entries(state?.arrays??{}).find(([,value])=>isArraySnapshot(value));
  if(!entry)return null;
- const [name,value]=entry; const previousValue=previous?.arrays?.[name]; const arrayId=value.$arrayId;
+ const name=entry[0];
+ const value=entry[1] as ArraySnapshot; const previousValue=previous?.arrays?.[name]; const arrayId=value.$arrayId;
  const compareIndexes=uniqueIndexes(targetsOf(visualEvents,'compare'),arrayId);
  const swapIndexes=uniqueIndexes(targetsOf(visualEvents,'swap'),arrayId);
  const updateIndexes=uniqueIndexes(targetsOf(visualEvents,'update'),arrayId);
