@@ -117,3 +117,17 @@
 .yv-map-row.yv-map-insert,
 .yv-map-row.yv-map-remove,
 .yv-map-row.yv-map-update { animation: yv-structure-pulse 160ms ease-out; }
+
+.yv-algorithm {
+  margin-left: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--yv-border, rgba(255,255,255,.12));
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .035em;
+  opacity: .9;
+}
+.yv-algorithm-high { border-color: rgba(76,175,80,.55); }
+.yv-algorithm-medium { border-color: rgba(255,193,7,.55); }
+.yv-algorithm-low { opacity: .65; }
