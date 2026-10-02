@@ -42,8 +42,8 @@ function diffMap(before:unknown,after:unknown):VisualEvent[]{
   if(!isMapSnapshot(before)||!isMapSnapshot(after)||before.$mapId!==after.$mapId)return [];
   const events:VisualEvent[]=[];const beforeMap=new Map<string,{key:unknown;value:unknown}>();const afterMap=new Map<string,{key:unknown;value:unknown}>();
   for(const e of before.entries)beforeMap.set(JSON.stringify(e.key),e);for(const e of after.entries)afterMap.set(JSON.stringify(e.key),e);
-  for(const [key,e] of afterMap){const old=beforeMap.get(key);if(!old)events.push({type:'insert',target:{structureId:after.$mapId,kind:'collection',field:'entry'},value:e});else if(!sameSnapshot(old.value,e.value))events.push({type:'update',target:{structureId:after.$mapId,kind:'collection',field:'entry'},from:old.value,to:e.value});}
-  for(const [key,e] of beforeMap)if(!afterMap.has(key))events.push({type:'remove',target:{structureId:after.$mapId,kind:'collection',field:'entry'},value:e.value});return events;
+  for(const [key,e] of afterMap){const old=beforeMap.get(key);if(!old)events.push({type:'insert',target:{structureId:after.$mapId,kind:'collection',field:JSON.stringify(e.key)},value:e});else if(!sameSnapshot(old.value,e.value))events.push({type:'update',target:{structureId:after.$mapId,kind:'collection',field:JSON.stringify(e.key)},from:old.value,to:e.value});}
+  for(const [key,e] of beforeMap)if(!afterMap.has(key))events.push({type:'remove',target:{structureId:after.$mapId,kind:'collection',field:JSON.stringify(e.key)},value:e.value});return events;
 }
 function referenceId(value: unknown): string | undefined {
   if (!isRecord(value)) return undefined;

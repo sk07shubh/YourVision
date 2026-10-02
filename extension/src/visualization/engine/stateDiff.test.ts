@@ -76,3 +76,13 @@ describe('diffStates', () => {
     expect(events.some(event => event.type === 'disconnect')).toBe(true);
     expect(events.some(event => event.type === 'connect')).toBe(true);
   });
+
+
+describe('map mutation targets',()=>{
+  it('targets only the changed map key',()=>{
+    const previous=state({dataStructures:{freq:{$mapId:'map-1',entries:[{key:'a',value:1},{key:'b',value:2}]}}});
+    const current=state({dataStructures:{freq:{$mapId:'map-1',entries:[{key:'a',value:1},{key:'b',value:3}]}}});
+    const events=diffStates(previous,current);
+    expect(events).toEqual([{type:'update',target:{structureId:'map-1',kind:'collection',field:'"b"'},from:2,to:3}]);
+  });
+});
