@@ -76,3 +76,13 @@ describe('exact runtime read targeting',()=>{
     expect(events.some(event=>event.type==='highlight'&&event.target.structureId==='queue-1')).toBe(true);
   });
 });
+
+
+describe('exact graph traversal targeting',()=>{
+  it('emits the traversed edge when a runtime node pointer advances',()=>{
+    const before={sequence:0,depth:0,variables:{cur:{$objectId:'n1'}},arrays:{},dataStructures:{},objects:{},callStack:[]} as TraceState;
+    const after={sequence:1,depth:0,variables:{cur:{$objectId:'n2'}},arrays:{},dataStructures:{},objects:{},callStack:[]} as TraceState;
+    const events=semanticEventsBetween(before,after);
+    expect(events.some(event=>event.type==='traverse'&&event.target.kind==='edge'&&event.target.structureId==='n1->n2')).toBe(true);
+  });
+});

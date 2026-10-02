@@ -11,6 +11,8 @@ function edgeOperations(events: VisualEvent[], from: string, to: string): string
       const matches = event.from.structureId === from &&
         event.to?.structureId === to;
       if (matches) operations.add(event.type);
+    } else if (event.type === 'traverse' && event.target.kind === 'edge' && event.target.structureId === from + '->' + to) {
+      operations.add('traverse');
     }
   }
   return [...operations];

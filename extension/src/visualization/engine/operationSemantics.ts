@@ -118,6 +118,7 @@ export function semanticEventsBetween(
         to: { index: undefined },
       });
       pointerMoves.push({ type: 'traverse', target: { structureId: toId, kind: 'node', objectId: toId } });
+      pointerMoves.push({ type: 'traverse', target: { structureId: fromId + '->' + toId, kind: 'edge' } });
     } else if (typeof from === 'number' && typeof to === 'number' && !Object.is(from, to)) {
       pointerMoves.push({
         type: 'move',
