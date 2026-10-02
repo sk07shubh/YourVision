@@ -11,6 +11,7 @@ import type { TrieNodeLike } from '../visualization/structures/TrieView';
 import { eventTargets, primaryVisualOperation, semanticEventsBetween, visualOperationLabel } from '../visualization/engine/operationSemantics';
 import type { VisualEvent } from '../visualization/engine/visualEvents';
 import { detectAlgorithm } from '../visualization/engine/algorithmSemantics';
+import { SortingView } from './SortingView';
 
 type Obj = Record<string, unknown>;
 
@@ -884,10 +885,12 @@ function AlgorithmNarrative({
   algorithm,
   state,
   previous,
+  visualEvents,
 }: {
   algorithm: ReturnType<typeof detectAlgorithm>;
   state?: TraceState;
   previous?: TraceState;
+  visualEvents: VisualEvent[];
 }) {
   const vars = state?.variables ?? {};
   const numberVar = (...names: string[]) => {
@@ -924,7 +927,7 @@ function AlgorithmNarrative({
       body = <><div className="yv-algo-track">{values.map((v,i)=><span key={i} className={i===pointerA||i===pointerB?'yv-algo-active':''}>{displayValue(v)}</span>)}</div><div className="yv-algo-markers">{marker('A',pointerA)}{marker('B',pointerB)}</div></>;
       break;
     case 'sorting':
-      body = <><div className="yv-algo-track">{values.map((v,i)=><span key={i} className={i===currentIndex?'yv-algo-active':''}>{displayValue(v)}</span>)}</div><div className="yv-algo-markers">{marker('I',currentIndex)}<span className="yv-algo-value">{algorithm.phase}</span></div></>;
+      body = <SortingView state={state} previous={previous} visualEvents={visualEvents}/>;
       break;
     case 'prefix-sum':
       body = <><div className="yv-algo-track">{values.map((v,i)=><span key={i} className={i===currentIndex?'yv-algo-active':''}>{displayValue(v)}</span>)}</div><div className="yv-algo-markers">{marker('IDX',currentIndex)}{sum!==undefined&&<span className="yv-algo-value">sum = {sum}</span>}</div></>;
@@ -972,5 +975,5 @@ export function VisualizerPanel(){
     {tc&&<div className="yv-top"><div className="yv-title-row"><div className="yv-case">{tc.label}</div>{tc.source==='custom'&&<span className="yv-case-kind">Custom</span>}{tc.source==='failed'&&<span className="yv-case-kind">Failed testcase</span>}</div><div className="yv-inputs">{Object.keys(tc.inputs).length?Object.entries(tc.inputs).map(([k,v])=><div className="yv-input" key={k}><div className="yv-key">{k}</div><div className="yv-code">{v}</div></div>):<div className="yv-code">{tc.raw}</div>}</div><div className="yv-output-row"><div className={`yv-output ${finished&&s.response?.success?'good':''}`}><div className="yv-label">Output</div>{finished&&output!==undefined?<ReturnValueView text={displayValue(output)} value={lastEventData?.returnValue} state={current}/>:<div className="yv-code">—</div>}</div></div></div>}
     {s.loading&&<div className="yv-loading">Tracing your code…</div>}{s.error&&<div className="yv-error">{s.error}</div>}
     {!s.loading&&<><Section title="Variables"><Variables state={current} previous={prev}/></Section><Section title="Call Stack">{current?.callStack?.length?<div className="yv-stack-wrap"><div className="yv-stack-label">TOP</div><div className="yv-stack">{current.callStack.map((f:string,i:number)=><div className="yv-frame" key={`${f}-${i}`}>{f}</div>)}</div><div className="yv-stack-label bottom">BOTTOM</div></div>:<div className="yv-empty">No active method calls.</div>}</Section><Section title="Data Structures"><DataStructures state={current} previousState={prev} source={s.source} visualEvents={visualEvents}/></Section></>}
-  </div><div className="yv-current"><div className="yv-current-head"><span>{eventLabel(current)}</span><span className={`yv-operation yv-operation-${visualOperation}`}>{visualOperationLabel(visualOperation)}</span><span className={`yv-algorithm yv-algorithm-${algorithm.confidence}`} title={algorithm.signals.join(' · ')}>{algorithm.label}</span><AlgorithmNarrative algorithm={algorithm} state={current} previous={prev}/></div><div className="yv-statement">{statement||'Select a testcase and press Visualize.'}</div><div className="yv-controls"><div className="yv-buttons"><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.restart()} disabled={!s.states.length}>↺ Restart</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.prev()} disabled={s.index<=0}>← Prev</button><button className="yv-btn primary" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.togglePlay()} disabled={s.states.length<2}>{s.playing?'■ Stop':'▶ Play'}</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.next()} disabled={!s.states.length||s.index>=s.states.length-1}>Next →</button></div></div></div></div>;
+  </div><div className="yv-current"><div className="yv-current-head"><span>{eventLabel(current)}</span><span className={`yv-operation yv-operation-${visualOperation}`}>{visualOperationLabel(visualOperation)}</span><span className={`yv-algorithm yv-algorithm-${algorithm.confidence}`} title={algorithm.signals.join(' · ')}>{algorithm.label}</span><AlgorithmNarrative algorithm={algorithm} state={current} previous={prev} visualEvents={visualEvents}/></div><div className="yv-statement">{statement||'Select a testcase and press Visualize.'}</div><div className="yv-controls"><div className="yv-buttons"><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.restart()} disabled={!s.states.length}>↺ Restart</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.prev()} disabled={s.index<=0}>← Prev</button><button className="yv-btn primary" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.togglePlay()} disabled={s.states.length<2}>{s.playing?'■ Stop':'▶ Play'}</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.next()} disabled={!s.states.length||s.index>=s.states.length-1}>Next →</button></div></div></div></div>;
 }
