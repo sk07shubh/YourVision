@@ -158,7 +158,7 @@ export function visualOperationLabel(operation: VisualOperation): string {
   })[operation];
 }
 
-export function eventTargets(events: VisualEvent[], structureId: string, index?: number, row?: number, column?: number): string[] {
+export function eventTargets(events: VisualEvent[], structureId: string, index?: number, row?: number, column?: number, field?: string): string[] {
   const kinds = new Set<string>();
   for (const event of events) {
     const targets = event.type === 'swap' || event.type === 'compare'
@@ -171,6 +171,7 @@ export function eventTargets(events: VisualEvent[], structureId: string, index?:
       if (target.index !== undefined && target.index !== index) continue;
       if (target.row !== undefined && target.row !== row) continue;
       if (target.column !== undefined && target.column !== column) continue;
+      if (target.field !== undefined && target.field !== field) continue;
       kinds.add(event.type);
     }
   }

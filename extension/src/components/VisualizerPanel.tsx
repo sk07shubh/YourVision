@@ -451,7 +451,7 @@ function MapView({
         </div>
 
         {value.entries.map((entry, index) => {
-          const change = findChange(entry.key); const ops=eventTargets(visualEvents,value.$mapId);
+          const change = findChange(entry.key); const ops=eventTargets(visualEvents,value.$mapId,undefined,undefined,undefined,stableStringify(entry.key));
 
           return (
             <div
@@ -485,7 +485,7 @@ function MapView({
 
         {deleted.map((change, index) => (
           <div
-            className="yv-map-row yv-map-delete"
+            className={['yv-map-row','yv-map-delete',...eventTargets(visualEvents,value.$mapId,undefined,undefined,undefined,stableStringify(change.key)).map(op=>'yv-map-'+op)].join(' ')}
             key={`deleted-${stableStringify(change.key)}-${index}`}
           >
             <div className="yv-map-key">
