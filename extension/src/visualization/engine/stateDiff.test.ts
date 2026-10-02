@@ -57,3 +57,22 @@ describe('diffStates', () => {
     ]);
   });
 });
+
+  it('emits connect and disconnect when a node link changes', () => {
+    const previous = state({
+      objects: {
+        n1: { $objectId: 'n1', fields: { val: 1, next: { $ref: 'n2' } } },
+        n2: { $objectId: 'n2', fields: { val: 2, next: null } },
+      },
+    });
+    const current = state({
+      objects: {
+        n1: { $objectId: 'n1', fields: { val: 1, next: { $ref: 'n3' } } },
+        n2: { $objectId: 'n2', fields: { val: 2, next: null } },
+        n3: { $objectId: 'n3', fields: { val: 3, next: null } },
+      },
+    });
+    const events = diffStates(previous, current);
+    expect(events.some(event => event.type === 'disconnect')).toBe(true);
+    expect(events.some(event => event.type === 'connect')).toBe(true);
+  });

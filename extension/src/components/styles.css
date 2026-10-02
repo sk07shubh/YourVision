@@ -93,3 +93,27 @@
   .yv-cell-op-insert .yv-cell-value,
   .yv-cell-op-update .yv-cell-value { animation: none; }
 }
+
+.yv-node-move,
+.yv-node-traverse { animation: yv-structure-pulse 140ms ease-out; }
+.yv-node-update { animation: yv-structure-glow 140ms ease-out; }
+.yv-node-connect { animation: yv-structure-glow 160ms ease-out; }
+.yv-node-disconnect { opacity: .7; animation: yv-structure-pulse 160ms ease-out; }
+
+.yv-graph-node.yv-graph-move circle,
+.yv-graph-node.yv-graph-traverse circle,
+.yv-graph-node.yv-graph-update circle,
+.yv-graph-node.yv-graph-connect circle { animation: yv-structure-pulse 160ms ease-out; }
+.yv-graph-edge-connect,
+.yv-graph-edge-disconnect { animation: yv-structure-glow 160ms ease-out; stroke-width: 3; }
+
+.yv-collection-changed.yv-cell-op-insert,
+.yv-collection-changed.yv-cell-op-remove,
+.yv-collection-changed.yv-cell-op-update,
+.yv-stack-cell.yv-cell-op-insert,
+.yv-stack-cell.yv-cell-op-remove,
+.yv-stack-cell.yv-cell-op-update { animation: yv-structure-pulse 180ms ease-out; }
+
+.yv-map-row.yv-map-insert,
+.yv-map-row.yv-map-remove,
+.yv-map-row.yv-map-update { animation: yv-structure-pulse 160ms ease-out; }

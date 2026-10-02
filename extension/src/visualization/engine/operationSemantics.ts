@@ -40,6 +40,14 @@ function accessTargets(statement: string, state: TraceState): VisualTarget[] {
   return targets;
 }
 
+
+function objectReference(value: unknown): string | undefined {
+  if (!isRecord(value)) return undefined;
+  if (typeof value.$objectId === 'string') return value.$objectId;
+  if (typeof value.$ref === 'string') return value.$ref;
+  return undefined;
+}
+
 function comparisonIn(statement: string): boolean {
   return /(?:==|!=|<=|>=|<|>)(?!=)/.test(statement) || /\.equals\s*\(/.test(statement);
 }
@@ -81,26 +89,31 @@ export function semanticEventsBetween(
 
   const previousVariables = previous.variables;
   const currentVariables = current.variables;
-  const movedNames = Object.keys(currentVariables).filter(name => {
+  const pointerMoves: VisualEvent[] = [];
+  for (const name of Object.keys(currentVariables)) {
     const from = previousVariables[name];
     const to = currentVariables[name];
-    return typeof from === 'number' && typeof to === 'number' && !Object.is(from, to);
-  });
-
-  if (movedNames.length && accesses.length) {
-    return [
-      ...events,
-      ...movedNames.map(name => ({
-        type: 'move' as const,
-        target: { structureId: name, kind: 'variable' as const },
-        from: { index: typeof previousVariables[name] === 'number' ? previousVariables[name] as number : undefined },
-        to: { index: typeof currentVariables[name] === 'number' ? currentVariables[name] as number : undefined },
-      })),
-      { type: 'traverse', target: accesses[0] },
-    ];
+    const fromId = objectReference(from);
+    const toId = objectReference(to);
+    if (fromId !== toId && toId) {
+      pointerMoves.push({
+        type: 'move',
+        target: { structureId: toId, kind: 'node', objectId: toId },
+        from: { index: undefined },
+        to: { index: undefined },
+      });
+      pointerMoves.push({ type: 'traverse', target: { structureId: toId, kind: 'node', objectId: toId } });
+    } else if (typeof from === 'number' && typeof to === 'number' && !Object.is(from, to)) {
+      pointerMoves.push({
+        type: 'move',
+        target: { structureId: name, kind: 'variable' },
+        from: { index: from },
+        to: { index: to },
+      });
+    }
   }
 
-  return events;
+  return [...events, ...pointerMoves];
 }
 
 export type VisualOperation =

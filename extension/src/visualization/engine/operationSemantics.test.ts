@@ -44,3 +44,17 @@ describe('operation semantics', () => {
     ))).toBe('READ');
   });
 });
+
+  it('turns a runtime node pointer change into TRAVERSE', () => {
+    const before = {
+      sequence: 0, depth: 0, variables: { cur: { $objectId: 'n1' } },
+      arrays: {}, dataStructures: {}, objects: {}, callStack: []
+    } as TraceState;
+    const after = {
+      sequence: 1, depth: 0, variables: { cur: { $objectId: 'n2' } },
+      arrays: {}, dataStructures: {}, objects: {}, callStack: []
+    } as TraceState;
+    const events = semanticEventsBetween(before, after);
+    expect(events.some(event => event.type === 'traverse')).toBe(true);
+    expect(primaryVisualOperation(events)).toBe('move');
+  });
