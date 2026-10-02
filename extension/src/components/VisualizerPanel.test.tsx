@@ -298,4 +298,38 @@ describe('VisualizerPanel deterministic DOM harness', () => {
 
     window.removeEventListener('keydown', pageKeyHandler);
   });
+  it('renders algorithm-specific narrative markers from runtime state', () => {
+    const source = `class Solution {
+  public int search(int[] nums,int target) {
+    int lo = 0;
+    int hi = nums.length - 1;
+    while (lo <= hi) {
+      int mid = lo + (hi - lo) / 2;
+      if (nums[mid] == target) return mid;
+      if (nums[mid] < target) lo = mid + 1;
+      else hi = mid - 1;
+    }
+    return -1;
+  }
+}`;
+    editor = mountMonacoHarness(source);
+    const states = sameLineLoopStates().map((state,index) => ({
+      ...state,
+      line: index % 2 === 0 ? 6 : 7,
+      variables: { lo: 0, mid: 2, hi: 5, nums: [1,3,5,7,9,11] },
+      arrays: { nums: { $arrayId: 'nums', $type: 'int[]', values: [1,3,5,7,9,11] } },
+    }));
+    const mounted = mountVisualizer(source, {
+      success: true,
+      kind: 'OK',
+      result: '2',
+      states,
+    });
+    root = mounted.root;
+    const panel = mounted.host.shadowRoot!;
+    expect(panel.querySelector('.yv-algorithm-narrative')).not.toBeNull();
+    expect(panel.querySelector('.yv-algo-marker')?.textContent).toContain('MID');
+    expect(panel.querySelectorAll('.yv-algo-active').length).toBeGreaterThan(0);
+  });
+
 });
