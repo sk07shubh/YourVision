@@ -54,6 +54,9 @@ function detectFamily(source:string,state?:TraceState,events:VisualEvent[]=[]): 
   if (has(s,/memo|dp\b|cache|\btable\b/i) && has(s,/\b(?:min|max|Math\.min|Math\.max)\b/)) {
     return {family:'dynamic-programming',label:'DYNAMIC PROGRAMMING',phase:'STATE → TRANSITION → UPDATE',confidence:'high',signals:['memo/table state','recurrence-style min/max transition']};
   }
+  if (has(s,/dist\s*\[|distance|shortest|Dijkstra/i) && has(s,/neighbors|adjacent|edge|graph|PriorityQueue/i)) {
+    return {family:'shortest-path',label:'SHORTEST PATH',phase:'RELAX → UPDATE DISTANCE',confidence:'high',signals:['distance state','graph edges','relaxation candidate']};
+  }
   if (has(s,/PriorityQueue|heap/i) || /priorityqueue|heap/.test(names)) {
     return {family:'heap',label:'HEAP / PRIORITY QUEUE',phase:'PUSH → TOP → POP',confidence:'high',signals:['heap/priority queue detected']};
   }
@@ -69,9 +72,6 @@ function detectFamily(source:string,state?:TraceState,events:VisualEvent[]=[]): 
     }
     return {family:'queue-bfs',label:'QUEUE PROCESSING',phase:'ENQUEUE → PROCESS → DEQUEUE',confidence:'medium',signals:['queue mutation']};
   }
-  if (has(s,/PriorityQueue|dist\[|distance|shortest|Dijkstra/i) && has(s,/neighbors|adjacent|edge|graph/i)) {
-    return {family:'shortest-path',label:'SHORTEST PATH',phase:'RELAX → UPDATE DISTANCE',confidence:'medium',signals:['distance/relaxation state','graph edges']};
-  }
   if (has(s,/neighbors|adjacent|adjacency|visited|dfs|bfs/i) && has(s,/\b(?:dfs|visit|traverse)\b/i)) {
     return {family:'graph-traversal',label:'GRAPH TRAVERSAL',phase:'VISIT → TRAVERSE EDGE',confidence:'medium',signals:['visited graph traversal']};
   }
@@ -81,7 +81,7 @@ function detectFamily(source:string,state?:TraceState,events:VisualEvent[]=[]): 
   if (has(s,/left\s*=|right\s*=|head\s*=|next\b/i) && has(s,/next|ListNode|Node/i)) {
     return {family:'linked-list',label:'LINKED LIST',phase:'FOLLOW POINTER → UPDATE LINK',confidence:'medium',signals:['node pointer/link manipulation']};
   }
-  if (has(s,/left|right|TreeNode|root/) && has(s,/queue|recursive|dfs|bfs/i)) {
+  if (has(s,/TreeNode|root|children|left|right/) && has(s,/queue|recursive|dfs|bfs|traverse|visit/i)) {
     return {family:'tree-traversal',label:'TREE TRAVERSAL',phase:'VISIT NODE → TRAVERSE CHILD',confidence:'medium',signals:['tree child traversal']};
   }
   if (has(s,/Trie|children|isEnd|isWord/i) && has(s,/char|prefix/i)) {
