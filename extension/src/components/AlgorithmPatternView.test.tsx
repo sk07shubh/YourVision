@@ -1,0 +1,16 @@
+import { describe, expect, it } from 'vitest';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { AlgorithmPatternView } from './AlgorithmPatternView';
+import type { TraceState } from '../types/trace';
+import type { VisualEvent } from '../visualization/engine/visualEvents';
+import type { AlgorithmFamily } from '../visualization/engine/algorithmSemantics';
+const state=(variables:Record<string,unknown>,values:number[]):TraceState=>({sequence:3,line:5,depth:0,variables,arrays:{nums:{$arrayId:'nums-1',$type:'int[]',values}},dataStructures:{},objects:{},callStack:['solve'],lastEvent:{type:'STEP',line:5}});
+const render=(family:AlgorithmFamily,current:TraceState,previous?:TraceState,events:VisualEvent[]=[])=>(renderToStaticMarkup(<AlgorithmPatternView family={family} state={current} previous={previous} visualEvents={events}/>));
+describe('AlgorithmPatternView',()=>{
+ it('renders live sliding-window bounds and sum',()=>{const html=render('sliding-window',state({left:1,right:3,windowSum:12},[2,3,4,5,6]));expect(html).toContain('SLIDING WINDOW');expect(html).toContain('LEFT');expect(html).toContain('RIGHT');expect(html).toContain('12');expect((html.match(/yv-pattern-in-window/g)||[]).length).toBe(3);});
+ it('renders two-pointer positions from runtime variables',()=>{const html=render('two-pointer',state({i:0,j:4},[1,2,3,4,5]));expect(html).toContain('TWO POINTER');expect(html).toContain('yv-pattern-left');expect(html).toContain('yv-pattern-right');expect(html).toContain('A');expect(html).toContain('B');});
+ it('renders prefix array when trace exposes one',()=>{const current=state({i:2,prefixSum:6},[1,2,3]);current.arrays.prefix={$arrayId:'prefix-1',$type:'int[]',values:[1,3,6]};const html=render('prefix-sum',current);expect(html).toContain('PREFIX SUM');expect(html).toContain('PREFIX ARRAY');expect(html).toContain('ACCUMULATED');expect(html).toContain('prefix');});
+ it('renders hash map entries and current key',()=>{const current=state({key:3},[1,2]);current.dataStructures.freq={$mapId:'map-1',$type:'HashMap',$kind:'map',entries:[{key:2,value:1},{key:3,value:4}]};const html=render('hashing',current);expect(html).toContain('HASH LOOKUP / FREQUENCY');expect(html).toContain('yv-pattern-current');expect(html).toContain('VALUE');expect(html).toContain('4');});
+ it('renders actual stack values',()=>{const current=state({},[1]);current.dataStructures.stack={$collectionId:'stack-1',$type:'ArrayDeque',$kind:'stack',values:[2,5],size:2};const html=render('monotonic-stack',current);expect(html).toContain('MONOTONIC STACK');expect(html).toContain('5');expect(html).toContain('TOP');});
+ it('renders shortest-path distance values for the current edge',()=>{const current=state({u:1,v:2},[1,2,3]);current.arrays.dist={$arrayId:'dist-1',$type:'int[]',values:[0,4,6]};const html=render('shortest-path',current);expect(html).toContain('SHORTEST PATH');expect(html).toContain('DISTANCES');expect(html).toContain('FROM');expect(html).toContain('TO');expect(html).toContain('Distance state from runtime trace');});
+});

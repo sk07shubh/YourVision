@@ -13,6 +13,7 @@ import type { VisualEvent } from '../visualization/engine/visualEvents';
 import { detectAlgorithm } from '../visualization/engine/algorithmSemantics';
 import { SortingView } from './SortingView';
 import { BinarySearchView } from './BinarySearchView';
+import { AlgorithmPatternView } from './AlgorithmPatternView';
 
 type Obj = Record<string, unknown>;
 
@@ -854,19 +855,18 @@ function AlgorithmStructureView({
     </div>;
   }
 
+  const first1d=arrays.find(a=>!a.values.some(Array.isArray));
+  if (family==='dynamic-programming' && first1d && !matrix?.length) {
+    const index=Object.entries(vars).find(([name,value])=>typeof value==='number'&&['i','j','index','idx','pos','currentIndex'].includes(name))?.[1] as number|undefined;
+    const oldArray=Object.values(previous?.arrays??{}).find(v=>isArraySnapshot(v)&&v.$arrayId===first1d.$arrayId);
+    const oldValues=isArraySnapshot(oldArray)?oldArray.values:undefined;
+    return <div className="yv-algo-structure"><div className="yv-algo-structure-title">DP STATE ARRAY</div><div className="yv-algo-grid">{first1d.values.map((v,i)=>{const changed=stableStringify(oldValues?.[i])!==stableStringify(v);return <div key={i} className={`yv-algo-grid-cell ${i===index?'yv-algo-grid-active':''} ${changed?'yv-algo-grid-changed':''}`}><span>{displayValue(v)}</span><small>{i}</small></div>})}</div></div>;
+  }
+
   if ((family==='queue-bfs'||family==='graph-traversal'||family==='shortest-path') && collection) {
     return <div className="yv-algo-structure">
       <div className="yv-algo-structure-title">FRONTIER / QUEUE</div>
       <div className="yv-algo-queue">{collection.values.map((v,i)=><div key={i} className={i===0?'yv-algo-queue-active':''}>{displayValue(v)}</div>)}</div>
-    </div>;
-  }
-
-  if ((family==='heap'||family==='monotonic-stack'||family==='stack') && collection) {
-    return <div className="yv-algo-structure">
-      <div className="yv-algo-structure-title">{family==='heap'?'HEAP STATE':'STACK STATE'}</div>
-      <div className={family==='heap'?'yv-algo-heap':'yv-algo-stack'}>
-        {collection.values.map((v,i)=><div key={i} className={i===collection.values.length-1?'yv-algo-structure-active':''}><span>{displayValue(v)}</span><small>{i}</small></div>)}
-      </div>
     </div>;
   }
 
@@ -893,62 +893,45 @@ function AlgorithmNarrative({
   previous?: TraceState;
   visualEvents: VisualEvent[];
 }) {
-  const vars = state?.variables ?? {};
-  const numberVar = (...names: string[]) => {
-    for (const name of names) if (typeof vars[name] === 'number') return vars[name] as number;
-    return undefined;
-  };
-  const firstArray = Object.values(state?.arrays ?? {}).find(isArraySnapshot);
-  const values = firstArray?.values ?? [];
-  const lo = numberVar('lo','low','left','start','l');
-  const hi = numberVar('hi','high','right','end','r');
-  const mid = numberVar('mid','middle');
-  const windowLeft = numberVar('left','start','l');
-  const windowRight = numberVar('right','end','r');
-  const pointerA = numberVar('i','left','l','a');
-  const pointerB = numberVar('j','right','r','b');
-  const currentIndex = numberVar('i','index','idx','pos');
-  const sum = numberVar('sum','windowSum','currentSum','prefix');
-  const dpIndex = numberVar('i','j','index','row','col');
-
-  const marker = (label: string, index?: number) =>
-    index !== undefined && Number.isInteger(index)
-      ? <span className="yv-algo-marker"><b>{label}</b><span>{index}</span></span>
-      : null;
-
   let body: React.ReactNode = null;
   switch (algorithm.family) {
     case 'binary-search':
       body = <BinarySearchView state={state} previous={previous} visualEvents={visualEvents}/>;
       break;
     case 'sliding-window':
-      body = <><div className="yv-algo-track">{values.map((v,i)=><span key={i} className={windowLeft!==undefined&&windowRight!==undefined&&i>=windowLeft&&i<=windowRight?'yv-algo-window':''}>{displayValue(v)}</span>)}</div><div className="yv-algo-markers">{marker('L',windowLeft)}{marker('R',windowRight)}{sum!==undefined&&<span className="yv-algo-value">sum = {sum}</span>}</div></>;
+      body = <AlgorithmPatternView family={algorithm.family} state={state} previous={previous} visualEvents={visualEvents}/>;
       break;
     case 'two-pointer':
-      body = <><div className="yv-algo-track">{values.map((v,i)=><span key={i} className={i===pointerA||i===pointerB?'yv-algo-active':''}>{displayValue(v)}</span>)}</div><div className="yv-algo-markers">{marker('A',pointerA)}{marker('B',pointerB)}</div></>;
+      body = <AlgorithmPatternView family={algorithm.family} state={state} previous={previous} visualEvents={visualEvents}/>;
       break;
     case 'sorting':
       body = <SortingView state={state} previous={previous} visualEvents={visualEvents}/>;
       break;
     case 'prefix-sum':
-      body = <><div className="yv-algo-track">{values.map((v,i)=><span key={i} className={i===currentIndex?'yv-algo-active':''}>{displayValue(v)}</span>)}</div><div className="yv-algo-markers">{marker('IDX',currentIndex)}{sum!==undefined&&<span className="yv-algo-value">sum = {sum}</span>}</div></>;
+      body = <AlgorithmPatternView family={algorithm.family} state={state} previous={previous} visualEvents={visualEvents}/>;
       break;
     case 'dynamic-programming':
-      body = <><div className="yv-algo-dp">{values.length?values.map((v,i)=><span key={i} className={i===dpIndex?'yv-algo-active':''}>{displayValue(v)}</span>):Object.entries(vars).filter(([,v])=>typeof v==='number').slice(0,8).map(([k,v])=><span key={k} className={v===dpIndex?'yv-algo-active':''}>{k}={String(v)}</span>)}</div><div className="yv-algo-markers"><span className="yv-algo-value">{algorithm.phase}</span></div></>;
+      body = <div className="yv-algo-phase-flow"><span className="yv-algo-phase-active">{algorithm.phase.split(' → ')[0]}</span>{algorithm.phase.split(' → ').slice(1).map((phase,i)=><Fragment key={phase}><span className="yv-algo-chevron">→</span><span className={i===0?'yv-algo-phase-next':''}>{phase}</span></Fragment>)}</div>;
+      break;
+    case 'monotonic-stack':
+    case 'stack':
+    case 'heap':
+      body = <AlgorithmPatternView family={algorithm.family} state={state} previous={previous} visualEvents={visualEvents}/>;
+      break;
+    case 'hashing':
+    case 'greedy':
+      body = <AlgorithmPatternView family={algorithm.family} state={state} previous={previous} visualEvents={visualEvents}/>;
+      break;
+    case 'shortest-path':
+      body = <AlgorithmPatternView family={algorithm.family} state={state} previous={previous} visualEvents={visualEvents}/>;
       break;
     case 'queue-bfs':
     case 'dfs':
     case 'graph-traversal':
-    case 'shortest-path':
     case 'backtracking':
-    case 'greedy':
-    case 'heap':
-    case 'monotonic-stack':
-    case 'stack':
     case 'linked-list':
     case 'tree-traversal':
     case 'trie':
-    case 'hashing':
     case 'recursion':
     case 'array-scan':
       body = <div className="yv-algo-phase-flow"><span className="yv-algo-phase-active">{algorithm.phase.split(' → ')[0]}</span>{algorithm.phase.split(' → ').slice(1).map((phase,i)=><Fragment key={phase}><span className="yv-algo-chevron">→</span><span className={i===0?'yv-algo-phase-next':''}>{phase}</span></Fragment>)}</div>;
