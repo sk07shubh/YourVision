@@ -845,7 +845,8 @@ function AlgorithmStructureView({
         );
         const oldRow=previous?.arrays?.[first2d!.$arrayId];
         const oldValues=isArraySnapshot(oldRow)?oldRow.values:undefined;
-        const changed=stableStringify(oldValues?.[r]?.[col])!==stableStringify(v);
+        const oldCell=Array.isArray(oldValues?.[r]) ? oldValues[r][col] : undefined;
+        const changed=stableStringify(oldCell)!==stableStringify(v);
         return <div key={`${r}-${col}`} className={`yv-algo-grid-cell ${active?'yv-algo-grid-active':''} ${changed?'yv-algo-grid-changed':''}`}>{displayValue(v)}</div>;
       }))}</div>
     </div>;
