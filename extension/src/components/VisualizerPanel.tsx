@@ -135,7 +135,7 @@ function CollectionView({
       : 'collection';
 
   const itemCount = value.size ?? value.values.length;
-  const changed=changedCollectionIndices(value,previousValue);
+  const changed=changedCollectionIndices(value,previousValue); const structureId=value.$collectionId; const operationClass=(index:number)=>eventTargets(visualEvents,structureId,index).map(op=>'yv-cell-op-'+op).join(' ');
 
   if (kind === 'stack') {
     return (
@@ -146,7 +146,7 @@ function CollectionView({
         </div>
         <div className="yv-stack-view">
           {[...value.values].reverse().map((item, index) => (
-            <div className={changed.has(value.values.length-1-index)?'yv-stack-cell yv-collection-changed':'yv-stack-cell'} key={index}>
+            <div className={['yv-stack-cell',changed.has(value.values.length-1-index)?'yv-collection-changed':'',operationClass(value.values.length-1-index)].filter(Boolean).join(' ')} key={index}>
               <span className="yv-stack-position">{index === 0 ? 'TOP' : ''}</span>
               <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
             </div>
@@ -168,7 +168,7 @@ function CollectionView({
         <div className="yv-queue-view">
           <div className="yv-queue-end">FRONT</div>
           {value.values.map((item, index) => (
-            <div className={changed.has(index)?'yv-queue-cell yv-collection-changed':'yv-queue-cell'} key={index}>
+            <div className={['yv-queue-cell',changed.has(index)?'yv-collection-changed':'',operationClass(index)].filter(Boolean).join(' ')} key={index}>
               <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
             </div>
           ))}
@@ -403,7 +403,8 @@ function MapView({
   state,
   source,
   depth = 0,
-  seen = new Set<string>()
+  seen = new Set<string>(),
+  visualEvents = []
 }: {
   value: Obj & {
     $mapId: string;
@@ -413,6 +414,7 @@ function MapView({
   source: string;
   depth?: number;
   seen?: Set<string>;
+  visualEvents?: VisualEvent[];
 }) {
   const changes = mapChanges(state);
 
@@ -445,11 +447,11 @@ function MapView({
         </div>
 
         {value.entries.map((entry, index) => {
-          const change = findChange(entry.key);
+          const change = findChange(entry.key); const ops=eventTargets(visualEvents,value.$mapId);
 
           return (
             <div
-              className={`yv-map-row ${change ? `yv-map-${change.kind}` : ''}`}
+              className={['yv-map-row',change?'yv-map-'+change.kind:'',...ops.map(op=>'yv-map-'+op)].filter(Boolean).join(' ')}
               key={stableStringify(entry.key) || index}
             >
               <div className="yv-map-key">
@@ -515,11 +517,13 @@ function nodeValue(value: Obj): unknown { const f=objectFields(value); return f.
 function LinkedListView({
   root,
   objects,
-  variables = {}
+  variables = {},
+  visualEvents = []
 }: {
   root: Obj;
   objects: Record<string, unknown>;
   variables?: Record<string, unknown>;
+  visualEvents?: VisualEvent[];
 }) {
   const pointerNames = new Map<string, string[]>();
   for (const [name, value] of Object.entries(variables)) {
@@ -533,21 +537,21 @@ function LinkedListView({
   const nodes: Array<{id:string;value:unknown}> = []; const seen=new Set<string>(); let cur: unknown=root;
   for(let guard=0;guard<40;guard++){
     cur=resolveRef(cur,objects); if(!isPlainObject(cur))break;
-    const id=String(cur.$objectId ?? `node-${guard}`); if(seen.has(id)){nodes.push({id:'cycle',value:'↻'});break;} seen.add(id);
+    const id=String(cur.$objectId ?? ('node-'+guard)); if(seen.has(id)){nodes.push({id:'cycle',value:'↻'});break;} seen.add(id);
     nodes.push({id,value:nodeValue(cur)}); const f=objectFields(cur); if(f.next==null)break; cur=f.next;
   }
   return <div className="yv-linked">{nodes.map((n,i)=><div className="yv-linked-piece" key={`${n.id}-${i}`}>
     {pointerNames.get(n.id)?.map(name => <div className="yv-node-pointer" key={name}>{name}</div>)}
-    <div className={'yv-node '+(pointerNames.has(n.id)?'yv-node-active':'')}>{displayValue(n.value)}</div>{i<nodes.length-1&&<div className="yv-edge">→</div>}
+    <div className={'yv-node '+(pointerNames.has(n.id)?'yv-node-active ':'')+eventTargets(visualEvents,n.id).map(op=>'yv-node-'+op).join(' ')}>{displayValue(n.value)}</div>{i<nodes.length-1&&<div className="yv-edge">→</div>}
   </div>)}</div>;
 }
 
-function TreeNodeView({ value, objects, variables = {}, depth=0 }: { value: unknown; objects: Record<string,unknown>; variables?: Record<string,unknown>; depth?: number }) {
+function TreeNodeView({ value, objects, variables = {}, depth=0, visualEvents = [] }: { value: unknown; objects: Record<string,unknown>; variables?: Record<string,unknown>; depth?: number; visualEvents?: VisualEvent[] }) {
   const resolved=resolveRef(value,objects); if(!isPlainObject(resolved)||depth>8)return null;
   const id=typeof resolved.$objectId==='string'?resolved.$objectId:undefined;
   const active=Boolean(id&&Object.values(variables).some(item=>isPlainObject(item)&&item.$objectId===id));
   const f=objectFields(resolved);
-  return <div className="yv-tree-node"><div className={'yv-node '+(active?'yv-tree-node-active':'')}>{displayValue(nodeValue(resolved))}</div>{(f.left!=null||f.right!=null)&&<div className="yv-tree-children"><div>{f.left!=null?<TreeNodeView value={f.left} objects={objects} variables={variables} depth={depth+1}/>:<span className="yv-null">null</span>}</div><div>{f.right!=null?<TreeNodeView value={f.right} objects={objects} variables={variables} depth={depth+1}/>:<span className="yv-null">null</span>}</div></div>}</div>;
+  return <div className="yv-tree-node"><div className={'yv-node '+(active?'yv-tree-node-active ':'')+eventTargets(visualEvents,id||'').map(op=>'yv-node-'+op).join(' ')}>{displayValue(nodeValue(resolved))}</div>{(f.left!=null||f.right!=null)&&<div className="yv-tree-children"><div>{f.left!=null?<TreeNodeView value={f.left} objects={objects} variables={variables} depth={depth+1} visualEvents={visualEvents}/>:<span className="yv-null">null</span>}</div><div>{f.right!=null?<TreeNodeView value={f.right} objects={objects} variables={variables} depth={depth+1} visualEvents={visualEvents}/>:<span className="yv-null">null</span>}</div></div>}</div>;
 }
 function ReturnValueView({
   text,
@@ -687,7 +691,7 @@ function DataValue({
   }
 
   if (isMapSnapshot(value)) {
-    return <MapView value={value} state={state} source={source} depth={depth} seen={seen}/>;
+    return <MapView value={value} state={state} source={source} depth={depth} seen={seen} visualEvents={visualEvents}/>;
   }
 
   if (isCollectionSnapshot(value)) {
@@ -709,9 +713,9 @@ function DataValue({
 
   if (Array.isArray(value)) return <ArrayView value={value} state={state} source={source} arrayName={name} depth={depth} seen={seen} visualEvents={visualEvents}/>;
   if (isPlainObject(value)) {
-    const smart=smartStructureView(value,state); if(smart)return smart;
-    if (looksTreeNode(value)) return <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects??{}} variables={state?.variables??{}}/></div>;
-    if (looksListNode(value)) return <LinkedListView root={value} objects={state?.objects??{}} variables={state?.variables??{}}/>;
+    const smart=smartStructureView(value,state,visualEvents); if(smart)return smart;
+    if (looksTreeNode(value)) return <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects??{}} variables={state?.variables??{}} visualEvents={visualEvents}/></div>;
+    if (looksListNode(value)) return <LinkedListView root={value} objects={state?.objects??{}} variables={state?.variables??{}} visualEvents={visualEvents}/>;
     const resolved = resolveObjects ? resolveRef(value, state?.objects ?? {}) : value;
     if (isPlainObject(resolved)) {
       return <ObjectView value={resolved} state={state} source={source} depth={depth} seen={seen}/>;
@@ -730,10 +734,10 @@ function runtimeObjectIds(state?: TraceState): Set<string> { const ids=new Set<s
 function collectionObjectIds(state: TraceState|undefined,kinds:Set<string>): Set<string> { const ids=new Set<string>(); for(const value of Object.values(state?.dataStructures??{})){if(!isCollectionSnapshot(value)||!kinds.has(value.$kind??''))continue;for(const item of value.values){const id=objectIdOf(item);if(id)ids.add(id);}} return ids; }
 function graphNeighbors(value: Obj): unknown[] { const fields=objectFields(value); for(const key of ['neighbors','neighbours','adjacent','adjacency','connections']){const candidate=fields[key];if(isCollectionSnapshot(candidate)||isArraySnapshot(candidate))return candidate.values;if(Array.isArray(candidate))return candidate;if(isMapSnapshot(candidate))return candidate.entries.map(entry=>entry.value);} return []; }
 function isGraphNode(value: unknown): value is Obj { if(!isPlainObject(value)||looksListNode(value)||looksTreeNode(value))return false; return ['neighbors','neighbours','adjacent','adjacency','connections'].some(key=>key in objectFields(value)); }
-function graphSnapshot(root: Obj,state?:TraceState): {nodes:GraphNode[];edges:GraphEdge[]} { const objects=state?.objects??{};const queue:unknown[]=[resolveRef(root,objects)];const seen=new Set<string>();const nodes:GraphNode[]=[];const edges:GraphEdge[]=[];const active=runtimeObjectIds(state);const visited=collectionObjectIds(state,new Set(['set']));const frontier=collectionObjectIds(state,new Set(['queue','deque']));while(queue.length&&nodes.length<80){const raw=queue.shift();const node=resolveRef(raw,objects);if(!isPlainObject(node))continue;const id=objectIdOf(node);if(!id||seen.has(id))continue;seen.add(id);nodes.push({id,label:String(nodeValue(node)),active:active.has(id),visited:visited.has(id),frontier:frontier.has(id)});for(const childRaw of graphNeighbors(node)){const child=resolveRef(childRaw,objects);const childId=objectIdOf(child);if(!childId)continue;edges.push({from:id,to:childId});queue.push(child);}}return {nodes,edges}; }
+function graphSnapshot(root: Obj,state?:TraceState,visualEvents:VisualEvent[]=[]): {nodes:GraphNode[];edges:GraphEdge[]} { const objects=state?.objects??{};const queue:unknown[]=[resolveRef(root,objects)];const seen=new Set<string>();const nodes:GraphNode[]=[];const edges:GraphEdge[]=[];const active=runtimeObjectIds(state);const visited=collectionObjectIds(state,new Set(['set']));const frontier=collectionObjectIds(state,new Set(['queue','deque']));while(queue.length&&nodes.length<80){const raw=queue.shift();const node=resolveRef(raw,objects);if(!isPlainObject(node))continue;const id=objectIdOf(node);if(!id||seen.has(id))continue;seen.add(id);const nodeOps=eventTargets(visualEvents,id); nodes.push({id,label:String(nodeValue(node)),active:active.has(id),visited:visited.has(id),frontier:frontier.has(id),operation:nodeOps[0]});for(const childRaw of graphNeighbors(node)){const child=resolveRef(childRaw,objects);const childId=objectIdOf(child);if(!childId)continue;edges.push({from:id,to:childId});queue.push(child);}}return {nodes,edges}; }
 function isTrieNode(value: unknown): value is Obj { if(!isPlainObject(value)||looksListNode(value)||looksTreeNode(value)||isGraphNode(value))return false;const fields=objectFields(value);const children=fields.children??fields.child;const terminal=['terminal','isEnd','isWord','end'].some(key=>typeof fields[key]==='boolean');return /TrieNode/i.test(objectType(value)) || Boolean(children && (isMapSnapshot(children)||isCollectionSnapshot(children)||Array.isArray(children)) && (terminal || 'char' in fields)); }
-function trieSnapshot(root: Obj,state?:TraceState): TrieNodeLike { const objects=state?.objects??{};const active=runtimeObjectIds(state);const build=(raw:unknown):TrieNodeLike=>{const resolved=resolveRef(raw,objects);const node=isPlainObject(resolved)?resolved:{};const fields=objectFields(node);const id=objectIdOf(node)??'trie-node';const rawChildren=fields.children??fields.child;const children:TrieNodeLike[]=[];if(isMapSnapshot(rawChildren)){for(const entry of rawChildren.entries)children.push(build(entry.value));}else{const values=isCollectionSnapshot(rawChildren)?rawChildren.values:Array.isArray(rawChildren)?rawChildren:[];for(const item of values)children.push(build(item));}const terminal=typeof fields.terminal==='boolean'?fields.terminal:typeof fields.isEnd==='boolean'?fields.isEnd:typeof fields.isWord==='boolean'?fields.isWord:typeof fields.end==='boolean'?fields.end:false;return {id,value:String(fields.char??fields.value??fields.val??''),terminal,active:active.has(id),children};};return build(root); }
-function smartStructureView(value: Obj,state?:TraceState): React.ReactNode|null { if(isGraphNode(value)){const graph=graphSnapshot(value,state);if(graph.nodes.length>1||graph.edges.length)return <GraphView nodes={graph.nodes} edges={graph.edges} directed/>;}if(isTrieNode(value))return <TrieView root={trieSnapshot(value,state)}/>;return null; }
+function trieSnapshot(root: Obj,state?:TraceState,visualEvents:VisualEvent[]=[]): TrieNodeLike { const objects=state?.objects??{};const active=runtimeObjectIds(state);const build=(raw:unknown):TrieNodeLike=>{const resolved=resolveRef(raw,objects);const node=isPlainObject(resolved)?resolved:{};const fields=objectFields(node);const id=objectIdOf(node)??'trie-node';const rawChildren=fields.children??fields.child;const children:TrieNodeLike[]=[];if(isMapSnapshot(rawChildren)){for(const entry of rawChildren.entries)children.push(build(entry.value));}else{const values=isCollectionSnapshot(rawChildren)?rawChildren.values:Array.isArray(rawChildren)?rawChildren:[];for(const item of values)children.push(build(item));}const terminal=typeof fields.terminal==='boolean'?fields.terminal:typeof fields.isEnd==='boolean'?fields.isEnd:typeof fields.isWord==='boolean'?fields.isWord:typeof fields.end==='boolean'?fields.end:false;return {id,value:String(fields.char??fields.value??fields.val??''),terminal,active:active.has(id),operation:eventTargets(visualEvents,id)[0],children};};return build(root); }
+function smartStructureView(value: Obj,state?:TraceState,visualEvents:VisualEvent[]=[]): React.ReactNode|null { if(isGraphNode(value)){const graph=graphSnapshot(value,state,visualEvents);if(graph.nodes.length>1||graph.edges.length)return <GraphView nodes={graph.nodes} edges={graph.edges} directed/>;}if(isTrieNode(value))return <TrieView root={trieSnapshot(value,state,visualEvents)}/>;return null; }
 function isStructuralObject(value: unknown): value is Obj {
   if (!isPlainObject(value)) return false;
   const fields = objectFields(value);
