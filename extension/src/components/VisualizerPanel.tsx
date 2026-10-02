@@ -12,6 +12,7 @@ import { eventTargets, primaryVisualOperation, semanticEventsBetween, visualOper
 import type { VisualEvent } from '../visualization/engine/visualEvents';
 import { detectAlgorithm } from '../visualization/engine/algorithmSemantics';
 import { SortingView } from './SortingView';
+import { BinarySearchView } from './BinarySearchView';
 
 type Obj = Record<string, unknown>;
 
@@ -918,7 +919,7 @@ function AlgorithmNarrative({
   let body: React.ReactNode = null;
   switch (algorithm.family) {
     case 'binary-search':
-      body = <><div className="yv-algo-track">{values.map((_,i)=><span key={i} className={i===mid?'yv-algo-active':(lo!==undefined&&hi!==undefined&&(i<lo||i>hi)?'yv-algo-dim':'')}>{i}</span>)}</div><div className="yv-algo-markers">{marker('LO',lo)}{marker('MID',mid)}{marker('HI',hi)}</div></>;
+      body = <BinarySearchView state={state} previous={previous} visualEvents={visualEvents}/>;
       break;
     case 'sliding-window':
       body = <><div className="yv-algo-track">{values.map((v,i)=><span key={i} className={windowLeft!==undefined&&windowRight!==undefined&&i>=windowLeft&&i<=windowRight?'yv-algo-window':''}>{displayValue(v)}</span>)}</div><div className="yv-algo-markers">{marker('L',windowLeft)}{marker('R',windowRight)}{sum!==undefined&&<span className="yv-algo-value">sum = {sum}</span>}</div></>;
