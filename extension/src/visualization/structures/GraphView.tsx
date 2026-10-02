@@ -14,7 +14,11 @@ export function GraphView({nodes,edges,directed=true}:GraphViewProps){
   for(const edge of edges){
     const a=positions.get(edge.from),b=positions.get(edge.to);
     if(!a||!b)continue;
-    lines.push(<line key={`${edge.from}->${edge.to}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} className="yv-graph-edge" markerEnd={directed?'url(#yv-graph-arrow)':undefined}/>);
+    const from=nodes.find(node=>node.id===edge.from),to=nodes.find(node=>node.id===edge.to);
+    const active=Boolean(from?.active||to?.active);
+    const visited=Boolean(from?.visited&&to?.visited);
+    const edgeClass=['yv-graph-edge',active?'yv-graph-edge-active':'',visited?'yv-graph-edge-visited':''].filter(Boolean).join(' ');
+    lines.push(<line key={edge.from+'->'+edge.to} x1={a.x} y1={a.y} x2={b.x} y2={b.y} className={edgeClass} markerEnd={directed?'url(#yv-graph-arrow)':undefined}/>);
   }
   return <div className="yv-graph-view">
     <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMinYMin meet">
