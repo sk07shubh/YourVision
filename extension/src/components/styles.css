@@ -61,3 +61,5 @@
 .yv-node-active{box-shadow:inset 0 0 0 1px var(--yv-accent);background:color-mix(in srgb,var(--yv-accent),var(--yv-elevated) 90%);animation:yv-structure-glow .18s ease-out}
 .yv-graph-edge{transition:stroke-width .12s ease-out,opacity .12s ease-out}
 @media (prefers-reduced-motion:reduce){.yv-node-active{animation:none}.yv-graph-edge{transition:none}}
+
+.yv-graph-edge-active{stroke:var(--yv-accent);stroke-width:3}.yv-graph-edge-visited{opacity:.8}.yv-graph-edge-active{animation:yv-graph-edge-pulse .16s ease-out}@keyframes yv-graph-edge-pulse{0%{stroke-width:2}55%{stroke-width:4}100%{stroke-width:3}}@media (prefers-reduced-motion:reduce){.yv-graph-edge-active{animation:none}}
