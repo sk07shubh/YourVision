@@ -86,3 +86,77 @@ describe('exact graph traversal targeting',()=>{
     expect(events.some(event=>event.type==='traverse'&&event.target.kind==='edge'&&event.target.structureId==='n1->n2')).toBe(true);
   });
 });
+
+
+describe('exact collection, map, and object reads', () => {
+  it('targets the exact list index for get(i)', () => {
+    const before = makeState({
+      variables: { i: 1 },
+      dataStructures: { list: { $collectionId: 'list-1', $kind: 'list', values: [10, 20, 30] } },
+    });
+    const after = makeState({
+      sequence: 1,
+      line: 3,
+      variables: { i: 1 },
+      dataStructures: { list: { $collectionId: 'list-1', $kind: 'list', values: [10, 20, 30] } },
+    });
+    const events = semanticEventsBetween(before, after, 'int x = list.get(i);');
+    expect(events).toContainEqual({
+      type: 'highlight',
+      target: { structureId: 'list-1', kind: 'collection', index: 1 },
+    });
+  });
+
+  it('targets the exact map key for get(key)', () => {
+    const before = makeState({
+      variables: { key: 'b' },
+      dataStructures: { freq: { $mapId: 'map-1', entries: [{ key: 'a', value: 1 }, { key: 'b', value: 2 }] } },
+    });
+    const after = makeState({
+      sequence: 1,
+      line: 4,
+      variables: { key: 'b' },
+      dataStructures: { freq: { $mapId: 'map-1', entries: [{ key: 'a', value: 1 }, { key: 'b', value: 2 }] } },
+    });
+    const events = semanticEventsBetween(before, after, 'int x = freq.get(key);');
+    expect(events).toContainEqual({
+      type: 'highlight',
+      target: { structureId: 'map-1', kind: 'collection', field: '"b"' },
+    });
+  });
+
+  it('targets an exact object field read', () => {
+    const before = makeState({
+      variables: { cur: { $objectId: 'node-1' } },
+    });
+    const after = makeState({
+      sequence: 1,
+      line: 5,
+      variables: { cur: { $objectId: 'node-1' } },
+    });
+    const events = semanticEventsBetween(before, after, 'Node next = cur.next;');
+    expect(events).toContainEqual({
+      type: 'highlight',
+      target: { structureId: 'node-1', kind: 'node', objectId: 'node-1', field: 'next' },
+    });
+  });
+
+  it('targets both matching collection values for contains(x)', () => {
+    const before = makeState({
+      variables: { x: 7 },
+      dataStructures: { list: { $collectionId: 'list-1', $kind: 'list', values: [7, 2, 7] } },
+    });
+    const after = makeState({
+      sequence: 1,
+      line: 2,
+      variables: { x: 7 },
+      dataStructures: { list: { $collectionId: 'list-1', $kind: 'list', values: [7, 2, 7] } },
+    });
+    const events = semanticEventsBetween(before, after, 'list.contains(x);');
+    const indexes = events
+      .filter(event => event.type === 'highlight')
+      .map(event => event.type === 'highlight' ? event.target.index : undefined)
+      .filter((index): index is number => index !== undefined);
+    expect(indexes).toEqual([0, 2]);
+  });
+});
