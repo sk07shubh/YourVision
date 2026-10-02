@@ -4,6 +4,10 @@ import { sessionStore } from '../state/store';
 import { displayValue, stableStringify, isPlainObject } from '../utils/value';
 import { highlightEditorLine, clearEditorExecutionMarker } from '../leetcode/editor-overlay';
 import type { TraceState } from '../types/trace';
+import { GraphView } from '../visualization/structures/GraphView';
+import { TrieView } from '../visualization/structures/TrieView';
+import type { GraphNode, GraphEdge } from '../visualization/structures/GraphView';
+import type { TrieNodeLike } from '../visualization/structures/TrieView';
 
 type Obj = Record<string, unknown>;
 
@@ -516,13 +520,16 @@ function LinkedListView({
   }
   return <div className="yv-linked">{nodes.map((n,i)=><div className="yv-linked-piece" key={`${n.id}-${i}`}>
     {pointerNames.get(n.id)?.map(name => <div className="yv-node-pointer" key={name}>{name}</div>)}
-    <div className="yv-node">{displayValue(n.value)}</div>{i<nodes.length-1&&<div className="yv-edge">→</div>}
+    <div className={'yv-node '+(pointerNames.has(n.id)?'yv-node-active':'')}>{displayValue(n.value)}</div>{i<nodes.length-1&&<div className="yv-edge">→</div>}
   </div>)}</div>;
 }
 
-function TreeNodeView({ value, objects, depth=0 }: { value: unknown; objects: Record<string,unknown>; depth?: number }) {
-  const resolved=resolveRef(value,objects); if(!isPlainObject(resolved) || depth>6)return null;
-  const f=objectFields(resolved); return <div className="yv-tree-node"><div className="yv-node">{displayValue(nodeValue(resolved))}</div>{(f.left!=null||f.right!=null)&&<div className="yv-tree-children"><div>{f.left!=null?<TreeNodeView value={f.left} objects={objects} depth={depth+1}/>:<span className="yv-null">null</span>}</div><div>{f.right!=null?<TreeNodeView value={f.right} objects={objects} depth={depth+1}/>:<span className="yv-null">null</span>}</div></div>}</div>;
+function TreeNodeView({ value, objects, variables = {}, depth=0 }: { value: unknown; objects: Record<string,unknown>; variables?: Record<string,unknown>; depth?: number }) {
+  const resolved=resolveRef(value,objects); if(!isPlainObject(resolved)||depth>8)return null;
+  const id=typeof resolved.$objectId==='string'?resolved.$objectId:undefined;
+  const active=Boolean(id&&Object.values(variables).some(item=>isPlainObject(item)&&item.$objectId===id));
+  const f=objectFields(resolved);
+  return <div className="yv-tree-node"><div className={'yv-node '+(active?'yv-tree-node-active':'')}>{displayValue(nodeValue(resolved))}</div>{(f.left!=null||f.right!=null)&&<div className="yv-tree-children"><div>{f.left!=null?<TreeNodeView value={f.left} objects={objects} variables={variables} depth={depth+1}/>:<span className="yv-null">null</span>}</div><div>{f.right!=null?<TreeNodeView value={f.right} objects={objects} variables={variables} depth={depth+1}/>:<span className="yv-null">null</span>}</div></div>}</div>;
 }
 function ReturnValueView({
   text,
@@ -680,7 +687,8 @@ function DataValue({
 
   if (Array.isArray(value)) return <ArrayView value={value} state={state} source={source} arrayName={name} depth={depth} seen={seen}/>;
   if (isPlainObject(value)) {
-    if (looksTreeNode(value)) return <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects??{}}/></div>;
+    const smart=smartStructureView(value,state); if(smart)return smart;
+    if (looksTreeNode(value)) return <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects??{}} variables={state?.variables??{}}/></div>;
     if (looksListNode(value)) return <LinkedListView root={value} objects={state?.objects??{}} variables={state?.variables??{}}/>;
     const resolved = resolveObjects ? resolveRef(value, state?.objects ?? {}) : value;
     if (isPlainObject(resolved)) {
@@ -690,6 +698,20 @@ function DataValue({
   return <div className="yv-code">{displayValue(value)}</div>;
 }
 
+function objectIdOf(value: unknown): string | undefined {
+  if (!isPlainObject(value)) return undefined;
+  if (typeof value.$objectId === 'string') return value.$objectId;
+  if (typeof value.$ref === 'string') return value.$ref;
+  return undefined;
+}
+function runtimeObjectIds(state?: TraceState): Set<string> { const ids=new Set<string>(); for(const value of Object.values(state?.variables??{})){const id=objectIdOf(value);if(id)ids.add(id);} return ids; }
+function collectionObjectIds(state: TraceState|undefined,kinds:Set<string>): Set<string> { const ids=new Set<string>(); for(const value of Object.values(state?.dataStructures??{})){if(!isCollectionSnapshot(value)||!kinds.has(value.$kind??''))continue;for(const item of value.values){const id=objectIdOf(item);if(id)ids.add(id);}} return ids; }
+function graphNeighbors(value: Obj): unknown[] { const fields=objectFields(value); for(const key of ['neighbors','neighbours','adjacent','adjacency','connections']){const candidate=fields[key];if(isCollectionSnapshot(candidate)||isArraySnapshot(candidate))return candidate.values;if(Array.isArray(candidate))return candidate;if(isMapSnapshot(candidate))return candidate.entries.map(entry=>entry.value);} return []; }
+function isGraphNode(value: unknown): value is Obj { if(!isPlainObject(value)||looksListNode(value)||looksTreeNode(value))return false; return ['neighbors','neighbours','adjacent','adjacency','connections'].some(key=>key in objectFields(value)); }
+function graphSnapshot(root: Obj,state?:TraceState): {nodes:GraphNode[];edges:GraphEdge[]} { const objects=state?.objects??{};const queue:unknown[]=[resolveRef(root,objects)];const seen=new Set<string>();const nodes:GraphNode[]=[];const edges:GraphEdge[]=[];const active=runtimeObjectIds(state);const visited=collectionObjectIds(state,new Set(['set']));const frontier=collectionObjectIds(state,new Set(['queue','deque']));while(queue.length&&nodes.length<80){const raw=queue.shift();const node=resolveRef(raw,objects);if(!isPlainObject(node))continue;const id=objectIdOf(node);if(!id||seen.has(id))continue;seen.add(id);nodes.push({id,label:String(nodeValue(node)),active:active.has(id),visited:visited.has(id),frontier:frontier.has(id)});for(const childRaw of graphNeighbors(node)){const child=resolveRef(childRaw,objects);const childId=objectIdOf(child);if(!childId)continue;edges.push({from:id,to:childId});queue.push(child);}}return {nodes,edges}; }
+function isTrieNode(value: unknown): value is Obj { if(!isPlainObject(value)||looksListNode(value)||looksTreeNode(value)||isGraphNode(value))return false;const fields=objectFields(value);const children=fields.children??fields.child;const terminal=['terminal','isEnd','isWord','end'].some(key=>typeof fields[key]==='boolean');return /TrieNode/i.test(objectType(value))||Boolean(children&&(isMapSnapshot(children)||isCollectionSnapshot(children)||Array.isArray(children))&&(terminal||'char' in fields||'value' in fields)); }
+function trieSnapshot(root: Obj,state?:TraceState): TrieNodeLike { const objects=state?.objects??{};const active=runtimeObjectIds(state);const build=(raw:unknown):TrieNodeLike=>{const resolved=resolveRef(raw,objects);const node=isPlainObject(resolved)?resolved:{};const fields=objectFields(node);const id=objectIdOf(node)??'trie-node';const rawChildren=fields.children??fields.child;const children:TrieNodeLike[]=[];if(isMapSnapshot(rawChildren)){for(const entry of rawChildren.entries)children.push(build(entry.value));}else{const values=isCollectionSnapshot(rawChildren)?rawChildren.values:Array.isArray(rawChildren)?rawChildren:[];for(const item of values)children.push(build(item));}const terminal=typeof fields.terminal==='boolean'?fields.terminal:typeof fields.isEnd==='boolean'?fields.isEnd:typeof fields.isWord==='boolean'?fields.isWord:typeof fields.end==='boolean'?fields.end:false;return {id,value:String(fields.char??fields.value??fields.val??''),terminal,active:active.has(id),children};};return build(root); }
+function smartStructureView(value: Obj,state?:TraceState): React.ReactNode|null { if(isGraphNode(value)){const graph=graphSnapshot(value,state);if(graph.nodes.length>1||graph.edges.length)return <GraphView nodes={graph.nodes} edges={graph.edges} directed/>;}if(isTrieNode(value))return <TrieView root={trieSnapshot(value,state)}/>;return null; }
 function isStructuralObject(value: unknown): value is Obj {
   if (!isPlainObject(value)) return false;
   const fields = objectFields(value);

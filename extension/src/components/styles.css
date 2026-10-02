@@ -56,3 +56,8 @@
 .yv-graph-active{animation:yv-structure-pulse .18s ease-out}
 .yv-graph-visited circle,.yv-graph-frontier circle{transition:stroke-width .12s ease-out,stroke-dasharray .12s ease-out}
 @media (prefers-reduced-motion:reduce){.yv-cell-active,.yv-tree-node-active>.yv-node,.yv-heap-active,.yv-trie-active,.yv-graph-active{animation:none}.yv-graph-node,.yv-graph-visited circle,.yv-graph-frontier circle{transition:none}}
+
+/* Structure traversal feedback: active pointers/nodes stay lightweight and state-driven. */
+.yv-node-active{box-shadow:inset 0 0 0 1px var(--yv-accent);background:color-mix(in srgb,var(--yv-accent),var(--yv-elevated) 90%);animation:yv-structure-glow .18s ease-out}
+.yv-graph-edge{transition:stroke-width .12s ease-out,opacity .12s ease-out}
+@media (prefers-reduced-motion:reduce){.yv-node-active{animation:none}.yv-graph-edge{transition:none}}
