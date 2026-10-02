@@ -4,6 +4,8 @@ import type { TraceState } from '../../types/trace';
 
 const state=(variables:Record<string,unknown>={}):TraceState=>({
   sequence:1,depth:0,variables,arrays:{},dataStructures:{},objects:{},callStack:[]
+ it('detects shortest path before generic heap',()=>{const insight=detectAlgorithm(undefined,state({}),'PriorityQueue<Node> pq=new PriorityQueue<>();while(!pq.isEmpty()){Node u=pq.poll();for(Edge e:u.neighbors){if(dist[e.v]>dist[u]+e.w)dist[e.v]=dist[u]+e.w;}}');expect(insight.family).toBe('shortest-path');});
+ it('detects tree traversal from node structure',()=>{const insight=detectAlgorithm(undefined,state({}),'void dfs(TreeNode root){if(root==null)return;dfs(root.left);dfs(root.right);}');expect(insight.family).toBe('tree-traversal');});
 });
 
 describe('algorithm semantics',()=>{

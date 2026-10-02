@@ -833,6 +833,7 @@ function AlgorithmStructureView({
   const arrays=Object.values(state?.arrays ?? {}).filter(isArraySnapshot);
   const collections=Object.values(state?.dataStructures ?? {}).filter(isCollectionSnapshot);
   const vars=state?.variables ?? {};
+  if (['dynamic-programming','queue-bfs','dfs','graph-traversal','shortest-path','backtracking','linked-list','tree-traversal','trie','recursion','array-scan'].includes(family)) return null;
   const first2d=arrays.find(a=>a.values.some(v=>Array.isArray(v)));
   const matrix=first2d?.values.filter(Array.isArray) as unknown[][]|undefined;
   const collection=collections[0];
@@ -911,33 +912,26 @@ function AlgorithmNarrative({
       body = <AlgorithmPatternView family={algorithm.family} state={state} previous={previous} visualEvents={visualEvents}/>;
       break;
     case 'dynamic-programming':
-      body = <div className="yv-algo-phase-flow"><span className="yv-algo-phase-active">{algorithm.phase.split(' → ')[0]}</span>{algorithm.phase.split(' → ').slice(1).map((phase,i)=><Fragment key={phase}><span className="yv-algo-chevron">→</span><span className={i===0?'yv-algo-phase-next':''}>{phase}</span></Fragment>)}</div>;
-      break;
+    case 'sliding-window':
+    case 'two-pointer':
+    case 'prefix-sum':
     case 'monotonic-stack':
     case 'stack':
     case 'heap':
-      body = <AlgorithmPatternView family={algorithm.family} state={state} previous={previous} visualEvents={visualEvents}/>;
-      break;
     case 'hashing':
     case 'greedy':
-      body = <AlgorithmPatternView family={algorithm.family} state={state} previous={previous} visualEvents={visualEvents}/>;
-      break;
-    case 'shortest-path':
-      body = <AlgorithmPatternView family={algorithm.family} state={state} previous={previous} visualEvents={visualEvents}/>;
-      break;
     case 'queue-bfs':
     case 'dfs':
     case 'graph-traversal':
+    case 'shortest-path':
     case 'backtracking':
     case 'linked-list':
     case 'tree-traversal':
     case 'trie':
     case 'recursion':
     case 'array-scan':
-      body = <div className="yv-algo-phase-flow"><span className="yv-algo-phase-active">{algorithm.phase.split(' → ')[0]}</span>{algorithm.phase.split(' → ').slice(1).map((phase,i)=><Fragment key={phase}><span className="yv-algo-chevron">→</span><span className={i===0?'yv-algo-phase-next':''}>{phase}</span></Fragment>)}</div>;
+      body = <AlgorithmPatternView family={algorithm.family} state={state} previous={previous} visualEvents={visualEvents}/>;
       break;
-  }
-
   if (!body) return null;
   return <div className="yv-algorithm-narrative"><div className="yv-algo-label">{algorithm.label}</div><AlgorithmStructureView family={algorithm.family} state={state} previous={previous}/>{body}</div>;
 }
