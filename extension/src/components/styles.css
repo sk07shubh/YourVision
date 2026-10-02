@@ -153,3 +153,26 @@
 .yv-algo-phase-next{color:var(--yv-text)}
 .yv-algo-chevron{color:var(--yv-muted)}
 @media(prefers-reduced-motion:reduce){.yv-algo-track>span.yv-algo-active{animation:none}}
+
+
+/* Algorithm structural states: compact, state-driven, CSS-only. */
+.yv-algo-structure{margin:6px 0;padding:6px;border:1px solid var(--yv-border);border-radius:6px;background:var(--yv-elevated)}
+.yv-algo-structure-title{font-size:8px;font-weight:700;letter-spacing:.06em;color:var(--yv-muted);margin-bottom:5px}
+.yv-algo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(28px,1fr));gap:2px;max-height:150px;overflow:auto}
+.yv-algo-grid-cell{min-width:24px;padding:5px 3px;text-align:center;border:1px solid var(--yv-border);border-radius:3px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:9px}
+.yv-algo-grid-active{box-shadow:inset 0 0 0 1px var(--yv-accent);background:color-mix(in srgb,var(--yv-accent),var(--yv-elevated) 88%)}
+.yv-algo-grid-changed{animation:yv-structure-pulse .16s ease-out}
+.yv-algo-queue{display:flex;gap:3px;overflow:auto}
+.yv-algo-queue>div{min-width:30px;padding:5px;text-align:center;border:1px solid var(--yv-border);border-radius:4px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:9px}
+.yv-algo-queue-active{box-shadow:inset 0 0 0 1px var(--yv-accent)}
+.yv-algo-stack{display:flex;flex-direction:column-reverse;gap:2px;max-height:130px;overflow:auto}
+.yv-algo-heap{display:flex;gap:3px;overflow:auto}
+.yv-algo-stack>div,.yv-algo-heap>div{padding:5px 7px;border:1px solid var(--yv-border);border-radius:4px;background:var(--yv-bg);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:9px}
+.yv-algo-heap>div{border-radius:50%;min-width:30px;text-align:center}
+.yv-algo-structure-active{box-shadow:inset 0 0 0 1px var(--yv-accent);animation:yv-structure-glow .16s ease-out}
+.yv-algo-stack small,.yv-algo-heap small{display:block;color:var(--yv-muted);font-size:7px}
+.yv-algo-path{display:flex;gap:3px;align-items:center;overflow:auto}
+.yv-algo-path>div{padding:4px 6px;border:1px solid var(--yv-border);border-radius:4px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:8px;white-space:nowrap}
+.yv-algo-path>div:not(:last-child)::after{content:' →';color:var(--yv-muted)}
+.yv-algo-path-active{box-shadow:inset 0 0 0 1px var(--yv-accent)}
+@media(prefers-reduced-motion:reduce){.yv-algo-grid-changed,.yv-algo-structure-active{animation:none}}
