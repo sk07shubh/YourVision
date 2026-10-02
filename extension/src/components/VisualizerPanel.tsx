@@ -296,6 +296,25 @@ function arrayIndexVariableNames(source: string, arrayName?: string): Set<string
   return names;
 }
 
+function matrixIndexVariableNames(source: string, arrayName?: string): [Set<string>, Set<string>] {
+  const rows = new Set<string>(); const columns = new Set<string>();
+  if (!arrayName) return [rows, columns];
+  const pattern = new RegExp(arrayName + '\\s*\\[\\s*([A-Za-z_$][\\w$]*)\\s*\\]\\s*\\[\\s*([A-Za-z_$][\\w$]*)\\s*\\]', 'g');
+  for (const match of source.matchAll(pattern)) { rows.add(match[1]); columns.add(match[2]); }
+  return [rows, columns];
+}
+function activeMatrixCell(state: TraceState | undefined, source: string, arrayName?: string): { row: number; column: number } | undefined {
+  const [rowNames, columnNames] = matrixIndexVariableNames(source, arrayName);
+  if (!rowNames.size || !columnNames.size) return undefined;
+  let row: number | undefined; let column: number | undefined;
+  for (const [name, value] of Object.entries(state?.variables ?? {})) {
+    if (!Number.isInteger(value)) continue;
+    if (rowNames.has(name)) row = value as number;
+    if (columnNames.has(name)) column = value as number;
+  }
+  return row !== undefined && column !== undefined && row >= 0 && column >= 0 ? { row, column } : undefined;
+}
+
 function pointerLabels(state: TraceState | undefined, length: number, indexNames: Set<string>): Map<number,string[]> {
   const map = new Map<number,string[]>();
   for (const [name,value] of Object.entries(state?.variables ?? {})) {
@@ -320,9 +339,18 @@ function changedArrayIndices(state?: TraceState): Set<number> {
 }
 
 function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<string>() }: { value: unknown[]; state?: TraceState; source?: string; arrayName?: string; depth?: number; seen?: Set<string> }) {
-  if (value.every(Array.isArray)) return <div className="yv-matrix">{value.map((row,r)=><div className="yv-array" key={r}>{(row as unknown[]).map((v,i)=><div className="yv-cell" key={i}><div className="yv-cell-value"><DataValue value={v} state={state} source={source ?? ''} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">[{r},{i}]</div></div>)}</div>)}</div>;
+  if (value.every(Array.isArray)) {
+    const active = activeMatrixCell(state, source ?? '', arrayName);
+    return <div className="yv-matrix">{value.map((row,r)=><div className="yv-array" key={r}>{(row as unknown[]).map((v,i)=>{
+      const selected = active?.row === r && active?.column === i;
+      return <div className="yv-cell" key={selected ? `${i}-${state?.sequence ?? 0}` : i}><div className={`yv-cell-value ${selected ? 'yv-cell-active' : ''}`}><DataValue value={v} state={state} source={source ?? ''} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">[${r},${i}]</div></div>;
+    })}</div>)}</div>;
+  }
   const labels=pointerLabels(state,value.length,arrayIndexVariableNames(source ?? '', arrayName)); const changed=changedArrayIndices(state);
-  return <div className="yv-array">{value.map((v,i)=><div className="yv-cell" key={i}>{labels.has(i)&&<div className="yv-pointer">{labels.get(i)!.join(' · ')}</div>}<div className={`yv-cell-value ${changed.has(i)?'yv-cell-changed':''}`}><DataValue value={v} state={state} source={source ?? ''} name={arrayName} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">{i}</div></div>)}</div>;
+  return <div className="yv-array">{value.map((v,i)=>{
+    const changedCell = changed.has(i);
+    return <div className="yv-cell" key={changedCell ? `${i}-${state?.sequence ?? 0}` : i}>{labels.has(i)&&<div className="yv-pointer">{labels.get(i)!.join(' · ')}</div>}<div className={`yv-cell-value ${changedCell?'yv-cell-changed':''}`}><DataValue value={v} state={state} source={source ?? ''} name={arrayName} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">{i}</div></div>;
+  })}</div>;
 }
 
 function mapChanges(state?: TraceState): Array<{

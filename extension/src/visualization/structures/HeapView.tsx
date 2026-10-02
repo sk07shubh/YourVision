@@ -12,7 +12,7 @@ export function HeapView({values,activeIndex}:HeapViewProps){
       return <div className="yv-heap-level" key={levelIndex}>
         {level.map((value,index)=>{
           const actual=start+index;
-          return <div className={`yv-heap-node ${actual===activeIndex?'yv-heap-active':''}`} key={actual}><span>{String(value)}</span><small>[{actual}]</small></div>;
+          return <div className={`yv-heap-node ${actual===activeIndex?'yv-heap-active':''}`} key={`${actual}-${actual===activeIndex?'active':''}`}><span>{String(value)}</span><small>[{actual}]</small></div>;
         })}
       </div>;
     })}
