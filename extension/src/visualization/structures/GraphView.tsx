@@ -23,7 +23,7 @@ export function GraphView({nodes,edges,directed=true}:GraphViewProps){
       {nodes.map(node=>{
         const p=positions.get(node.id)!;
         const cls=['yv-graph-node',node.active?'yv-graph-active':'',node.visited?'yv-graph-visited':'',node.frontier?'yv-graph-frontier':''].filter(Boolean).join(' ');
-        return <g key={node.id} className={cls}><circle cx={p.x} cy={p.y} r="18"/><text x={p.x} y={p.y+4} textAnchor="middle">{node.label}</text></g>;
+        return <g key={`${node.id}-${node.active?'a':''}-${node.visited?'v':''}-${node.frontier?'f':''}`} className={cls}><circle cx={p.x} cy={p.y} r="18"/><text x={p.x} y={p.y+4} textAnchor="middle">{node.label}</text></g>;
       })}
     </svg>
   </div>;
