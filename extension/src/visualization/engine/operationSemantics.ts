@@ -15,14 +15,14 @@ function arrayId(state: TraceState, name: string): string | undefined {
 
 function accessTargets(statement: string, state: TraceState): VisualTarget[] {
   const targets: VisualTarget[] = [];
-  const pattern = /([A-Za-z_$][\\w$]*)\\s*\\[\\s*([A-Za-z_$][\\w$]*|\\d+)\\s*\\](?:\\s*\\[\\s*([A-Za-z_$][\\w$]*|\\d+)\\s*\\])?/g;
+  const pattern = /([A-Za-z_$][\w$]*)\s*\[\s*([A-Za-z_$][\w$]*|\d+)\s*\](?:\s*\[\s*([A-Za-z_$][\w$]*|\d+)\s*\])?/g;
   for (const match of statement.matchAll(pattern)) {
     const name = match[1];
     const id = arrayId(state, name);
     if (!id) continue;
     const readIndex = (token: string | undefined) => {
       if (!token) return undefined;
-      if (/^\\d+$/.test(token)) return Number(token);
+      if (/^\d+$/.test(token)) return Number(token);
       const value = state.variables[token];
       return typeof value === 'number' && Number.isInteger(value) ? value : undefined;
     };
@@ -41,7 +41,7 @@ function accessTargets(statement: string, state: TraceState): VisualTarget[] {
 }
 
 function comparisonIn(statement: string): boolean {
-  return /(?:==|!=|<=|>=|<|>)(?!=)/.test(statement) || /\\.equals\\s*\\(/.test(statement);
+  return /(?:==|!=|<=|>=|<|>)(?!=)/.test(statement) || /\.equals\s*\(/.test(statement);
 }
 
 function sameTarget(a: VisualTarget, b: VisualTarget): boolean {
@@ -60,7 +60,8 @@ export function semanticEventsBetween(
   if (!previous || !current) return [];
 
   const events = diffStates(previous, current);
-  const statement = current.line > 0 ? source.split(/\\r?\\n/)[current.line - 1]?.trim() ?? '' : '';
+  const line = current.line ?? 0;
+  const statement = line > 0 ? source.split(/\r?\n/)[line - 1]?.trim() ?? '' : '';
   const accesses = accessTargets(statement, current);
 
   if (comparisonIn(statement) && accesses.length >= 2) {
@@ -112,7 +113,7 @@ export function primaryVisualOperation(events: VisualEvent[]): VisualOperation {
     'traverse', 'update', 'highlight'
   ];
   const type = priority.find(item => events.some(event => event.type === item));
-  return type ?? 'step';
+  return (type ?? 'step') as VisualOperation;
 }
 
 export function visualOperationLabel(operation: VisualOperation): string {
