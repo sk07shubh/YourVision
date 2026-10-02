@@ -45,9 +45,32 @@ function diffMap(before:unknown,after:unknown):VisualEvent[]{
   for(const [key,e] of afterMap){const old=beforeMap.get(key);if(!old)events.push({type:'insert',target:{structureId:after.$mapId,kind:'collection',field:'entry'},value:e});else if(!sameSnapshot(old.value,e.value))events.push({type:'update',target:{structureId:after.$mapId,kind:'collection',field:'entry'},from:old.value,to:e.value});}
   for(const [key,e] of beforeMap)if(!afterMap.has(key))events.push({type:'remove',target:{structureId:after.$mapId,kind:'collection',field:'entry'},value:e.value});return events;
 }
+function referenceId(value: unknown): string | undefined {
+  if (!isRecord(value)) return undefined;
+  if (typeof value.$objectId === 'string') return value.$objectId;
+  if (typeof value.$ref === 'string') return value.$ref;
+  return undefined;
+}
 function diffObjects(previous:TraceState,current:TraceState):VisualEvent[]{
   const events:VisualEvent[]=[];const ids=new Set([...Object.keys(previous.objects),...Object.keys(current.objects)]);
-  for(const id of ids){const a=previous.objects[id],b=current.objects[id];if(!isRecord(a)||!isRecord(b)||a.$objectId!==b.$objectId)continue;const af=isRecord(a.fields)?a.fields:{};const bf=isRecord(b.fields)?b.fields:{};const fields=new Set([...Object.keys(af),...Object.keys(bf)]);for(const field of fields)if(!sameSnapshot(af[field],bf[field]))events.push({type:'update',target:{structureId:id,kind:'object',objectId:id,field},from:af[field],to:bf[field]});}
+  for(const id of ids){
+    const a=previous.objects[id],b=current.objects[id];
+    if(!isRecord(a)||!isRecord(b)||a.$objectId!==b.$objectId)continue;
+    const af=isRecord(a.fields)?a.fields:{};const bf=isRecord(b.fields)?b.fields:{};
+    const fields=new Set([...Object.keys(af),...Object.keys(bf)]);
+    for(const field of fields){
+      const from=af[field],to=bf[field];
+      if(sameSnapshot(from,to))continue;
+      const fromId=referenceId(from),toId=referenceId(to);
+      if(fromId!==toId && (fromId||toId)){
+        const fromTarget=fromId?{structureId:fromId,kind:'node' as const,objectId:fromId}:undefined;
+        const toTarget=toId?{structureId:toId,kind:'node' as const,objectId:toId}:undefined;
+        if(fromTarget&&toTarget)events.push({type:'disconnect',from:{structureId:id,kind:'node',objectId:id},to:fromTarget,field});
+        if(toTarget)events.push({type:'connect',from:{structureId:id,kind:'node',objectId:id},to:toTarget,field});
+      }
+      events.push({type:'update',target:{structureId:id,kind:'object',objectId:id,field},from,to});
+    }
+  }
   return events;
 }
 /** Converts two immutable execution snapshots into only the semantic visual changes. */
