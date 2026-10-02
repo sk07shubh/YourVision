@@ -656,7 +656,8 @@ function DataValue({
   name,
   depth = 0,
   seen = new Set<string>(),
-  resolveObjects = true
+  resolveObjects = true,
+  previousValue
 }: {
   value: unknown;
   state?: TraceState;
