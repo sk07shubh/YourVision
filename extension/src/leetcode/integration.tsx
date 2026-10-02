@@ -60,6 +60,7 @@ const resultVisualizeButtons = new Set<HTMLButtonElement>();
 let observer:
   MutationObserver | null = null;
 let hrefPollingInterval: number | null = null;
+let reinjectTimer: number | null = null;
 
 let yourVisionActive = false;
 let originalHostOverflow = '';
@@ -907,6 +908,10 @@ export function uninstallLeetCodeIntegration() {
     window.clearInterval(hrefPollingInterval);
     hrefPollingInterval = null;
   }
+  if (reinjectTimer !== null) {
+    window.clearTimeout(reinjectTimer);
+    reinjectTimer = null;
+  }
   cleanup();
 }
 
@@ -926,20 +931,53 @@ export function installLeetCodeIntegration() {
 
   let scheduled = false;
 
+  const mutationNeedsIntegration = (records: MutationRecord[]): boolean => {
+    for (const record of records) {
+      const target = record.target instanceof HTMLElement ? record.target : null;
+
+      // Monaco mutates its DOM continuously while the user types, scrolls,
+      // autocompletes, and highlights lines. None of those mutations require
+      // YourVision to rescan the LeetCode page.
+      if (target?.closest('.monaco-editor')) {
+        continue;
+      }
+
+      for (const node of [...record.addedNodes, ...record.removedNodes]) {
+        if (!(node instanceof HTMLElement)) {
+          continue;
+        }
+
+        if (node.closest('.monaco-editor') || node.querySelector('.monaco-editor')) {
+          // A whole editor was mounted/unmounted. That is a real page change.
+          return true;
+        }
+      }
+
+      return true;
+    }
+
+    return false;
+  };
+
   observer =
-    new MutationObserver(() => {
-      if (scheduled) {
+    new MutationObserver(records => {
+      if (!mutationNeedsIntegration(records)) {
         return;
       }
 
-      scheduled = true;
+      if (scheduled || reinjectTimer !== null) {
+        return;
+      }
 
-      requestAnimationFrame(
-        () => {
+      reinjectTimer = window.setTimeout(() => {
+        reinjectTimer = null;
+        scheduled = true;
+
+        requestAnimationFrame(() => {
           scheduled = false;
           attempt();
-        }
-      );
+        });
+      }, 120);
     });
 
   observer.observe(

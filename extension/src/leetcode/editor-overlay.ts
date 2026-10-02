@@ -2,6 +2,8 @@ import { findEditor } from './selectors';
 
 let decoratedLine: HTMLElement | null = null;
 let retryTimer: number | undefined;
+let cachedEditor: HTMLElement | null = null;
+let cachedSource: string | undefined;
 let generation = 0;
 let revealRequestedGeneration = -1;
 
@@ -39,8 +41,17 @@ function highlight(
   currentGeneration: number,
   retry: () => void
 ): void {
-  const editor = findEditor(source);
+  const editor =
+    cachedEditor &&
+    cachedEditor.isConnected &&
+    cachedSource === source
+      ? cachedEditor
+      : findEditor(source);
+
   if (!editor) return;
+
+  cachedEditor = editor;
+  cachedSource = source;
 
   const viewLines = editor.querySelector<HTMLElement>('.view-lines');
   if (!viewLines) return;
