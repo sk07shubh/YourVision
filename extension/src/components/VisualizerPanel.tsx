@@ -8,6 +8,8 @@ import { GraphView } from '../visualization/structures/GraphView';
 import { TrieView } from '../visualization/structures/TrieView';
 import type { GraphNode, GraphEdge } from '../visualization/structures/GraphView';
 import type { TrieNodeLike } from '../visualization/structures/TrieView';
+import { eventTargets, primaryVisualOperation, semanticEventsBetween, visualOperationLabel } from '../visualization/engine/operationSemantics';
+import type { VisualEvent } from '../visualization/engine/visualEvents';
 
 type Obj = Record<string, unknown>;
 
@@ -70,7 +72,8 @@ function CollectionBackingArray({
   source,
   name,
   depth,
-  seen
+  seen,
+  visualEvents = []
 }: {
   value: { values: unknown[] };
   state?: TraceState;
@@ -78,11 +81,12 @@ function CollectionBackingArray({
   name?: string;
   depth: number;
   seen: Set<string>;
+  visualEvents?: VisualEvent[];
 }) {
   return (
     <div className="yv-collection-backing">
       <div className="yv-code yv-collection-backing-title">Array view · snapshot order</div>
-      <ArrayView value={value.values} state={state} source={source} arrayName={name} depth={depth} seen={seen}/>
+      <ArrayView value={value.values} state={state} source={source} arrayName={name} depth={depth} seen={seen} visualEvents={visualEvents}/>
     </div>
   );
 }
@@ -102,7 +106,8 @@ function CollectionView({
   name,
   previousValue,
   depth = 0,
-  seen = new Set<string>()
+  seen = new Set<string>(),
+  visualEvents = []
 }: {
   value: Obj & {
     $collectionId: string;
@@ -117,6 +122,7 @@ function CollectionView({
   previousValue?: unknown;
   depth?: number;
   seen?: Set<string>;
+  visualEvents?: VisualEvent[];
 }) {
   const type =
     typeof value.$type === 'string'
@@ -147,7 +153,7 @@ function CollectionView({
           ))}
           {!value.values.length && <div className="yv-empty">Empty stack</div>}
         </div>
-        <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
+        <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen} visualEvents={visualEvents}/>
       </div>
     );
   }
@@ -353,18 +359,19 @@ function changedArrayIndices(state?: TraceState): Set<number> {
   return set;
 }
 
-function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<string>() }: { value: unknown[]; state?: TraceState; source?: string; arrayName?: string; depth?: number; seen?: Set<string> }) {
+function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<string>(), visualEvents = [] }: { value: unknown[]; state?: TraceState; source?: string; arrayName?: string; depth?: number; seen?: Set<string>; visualEvents?: VisualEvent[] }) {
   if (value.every(Array.isArray)) {
     const active = activeMatrixCell(state, source ?? '', arrayName);
     return <div className="yv-matrix">{value.map((row,r)=><div className="yv-array" key={r}>{(row as unknown[]).map((v,i)=>{
       const selected = active?.row === r && active?.column === i;
-      return <div className="yv-cell" key={selected ? `${i}-${state?.sequence ?? 0}` : i}><div className={`yv-cell-value ${selected ? 'yv-cell-active' : ''}`}><DataValue value={v} state={state} source={source ?? ''} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">[${r},${i}]</div></div>;
+      const operations = eventTargets(visualEvents, isArraySnapshot(state?.arrays?.[arrayName ?? '']) ? String((state?.arrays?.[arrayName ?? ''] as Obj).$arrayId) : String(arrayName ?? ''), undefined, r, i);
+      return <div className={`yv-cell ${operations.map(op => `yv-cell-op-${op}`).join(' ')}`} key={selected ? `${i}-${state?.sequence ?? 0}` : i}><div className={`yv-cell-value ${selected ? 'yv-cell-active' : ''}`}><DataValue value={v} state={state} source={source ?? ''} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">[${r},${i}]</div></div>;
     })}</div>)}</div>;
   }
-  const labels=pointerLabels(state,value.length,arrayIndexVariableNames(source ?? '', arrayName)); const changed=changedArrayIndices(state);
+  const labels=pointerLabels(state,value.length,arrayIndexVariableNames(source ?? '', arrayName)); const changed=changedArrayIndices(state); const structureId = arrayName && isArraySnapshot(state?.arrays?.[arrayName]) ? state.arrays[arrayName].$arrayId : arrayName;
   return <div className="yv-array">{value.map((v,i)=>{
-    const changedCell = changed.has(i);
-    return <div className="yv-cell" key={changedCell ? `${i}-${state?.sequence ?? 0}` : i}>{labels.has(i)&&<div className="yv-pointer">{labels.get(i)!.join(' · ')}</div>}<div className={`yv-cell-value ${changedCell?'yv-cell-changed':''}`}><DataValue value={v} state={state} source={source ?? ''} name={arrayName} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">{i}</div></div>;
+    const changedCell = changed.has(i); const operations = structureId ? eventTargets(visualEvents, structureId, i) : [];
+    return <div className={`yv-cell ${operations.map(op => `yv-cell-op-${op}`).join(' ')}`} key={changedCell ? `${i}-${state?.sequence ?? 0}` : i}>{labels.has(i)&&<div className="yv-pointer">{labels.get(i)!.join(' · ')}</div>}<div className={`yv-cell-value ${changedCell?'yv-cell-changed':''}`}><DataValue value={v} state={state} source={source ?? ''} name={arrayName} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">{i}</div></div>;
   })}</div>;
 }
 
@@ -657,7 +664,8 @@ function DataValue({
   depth = 0,
   seen = new Set<string>(),
   resolveObjects = true,
-  previousValue
+  previousValue,
+  visualEvents = []
 }: {
   value: unknown;
   state?: TraceState;
@@ -667,6 +675,7 @@ function DataValue({
   depth?: number;
   seen?: Set<string>;
   resolveObjects?: boolean;
+  visualEvents?: VisualEvent[];
 }) {
   if (isPlainObject(value) && typeof value.$ref === 'string' &&
       (typeof value.$arrayId === 'string' || typeof value.$mapId === 'string' || typeof value.$collectionId === 'string')) {
@@ -682,13 +691,13 @@ function DataValue({
   }
 
   if (isCollectionSnapshot(value)) {
-    return <CollectionView value={value} state={state} source={source} name={name} previousValue={previousValue} depth={depth} seen={seen}/>
+    return <CollectionView value={value} state={state} source={source} name={name} previousValue={previousValue} depth={depth} seen={seen} visualEvents={visualEvents}/>
   }
 
   if (isArraySnapshot(value)) {
     return (
       <>
-        <ArrayView value={value.values} state={state} source={source} arrayName={name} depth={depth} seen={seen}/>
+        <ArrayView value={value.values} state={state} source={source} arrayName={name} depth={depth} seen={seen} visualEvents={visualEvents}/>
         {value.truncated === true && (
           <div className="yv-truncated">
             Showing first {value.values.length} of {String(value.length ?? '?')} items.
@@ -698,7 +707,7 @@ function DataValue({
     );
   }
 
-  if (Array.isArray(value)) return <ArrayView value={value} state={state} source={source} arrayName={name} depth={depth} seen={seen}/>;
+  if (Array.isArray(value)) return <ArrayView value={value} state={state} source={source} arrayName={name} depth={depth} seen={seen} visualEvents={visualEvents}/>;
   if (isPlainObject(value)) {
     const smart=smartStructureView(value,state); if(smart)return smart;
     if (looksTreeNode(value)) return <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects??{}} variables={state?.variables??{}}/></div>;
@@ -734,7 +743,7 @@ function isStructuralObject(value: unknown): value is Obj {
     (('left' in fields || 'right' in fields) && ('val' in fields || 'value' in fields));
 }
 
-function DataStructures({ state, previousState, source }: { state?: TraceState; previousState?: TraceState; source: string }) {
+function DataStructures({ state, previousState, source, visualEvents = [] }: { state?: TraceState; previousState?: TraceState; source: string; visualEvents?: VisualEvent[] }) {
   const namedObjectIds = new Map<string, string[]>();
 
   for (const [name, value] of Object.entries(state?.variables ?? {})) {
@@ -794,7 +803,7 @@ function DataStructures({ state, previousState, source }: { state?: TraceState; 
         return (
           <div className="yv-ds" key={title}>
             <div className="yv-ds-title">{title}</div>
-            <DataValue value={value} state={state} source={source} name={title} previousValue={state?.dataStructures?.[names[0]] && previousState?.dataStructures?.[names[0]]}/>
+            <DataValue value={value} state={state} source={source} name={title} previousValue={state?.dataStructures?.[names[0]] && previousState?.dataStructures?.[names[0]]} visualEvents={visualEvents}/>
           </div>
         );
       })}
@@ -804,6 +813,8 @@ function DataStructures({ state, previousState, source }: { state?: TraceState; 
 
 export function VisualizerPanel(){
   const s=useSession(); const current=s.states[s.index]; const prev=s.index>0?s.states[s.index-1]:undefined;
+  const visualEvents = useMemo(() => semanticEventsBetween(prev, current, s.source), [prev, current, s.source]);
+  const visualOperation = primaryVisualOperation(visualEvents);
   const line = current?.line;
   const lastEventData = isPlainObject(current?.lastEvent?.data) ? current.lastEvent.data : undefined;
   const sourceLines=useMemo(()=>s.source.split(/\r?\n/),[s.source]);
@@ -815,6 +826,6 @@ export function VisualizerPanel(){
   return <div className="yv-root"><div className="yv-scroll">
     {tc&&<div className="yv-top"><div className="yv-title-row"><div className="yv-case">{tc.label}</div>{tc.source==='custom'&&<span className="yv-case-kind">Custom</span>}{tc.source==='failed'&&<span className="yv-case-kind">Failed testcase</span>}</div><div className="yv-inputs">{Object.keys(tc.inputs).length?Object.entries(tc.inputs).map(([k,v])=><div className="yv-input" key={k}><div className="yv-key">{k}</div><div className="yv-code">{v}</div></div>):<div className="yv-code">{tc.raw}</div>}</div><div className="yv-output-row"><div className={`yv-output ${finished&&s.response?.success?'good':''}`}><div className="yv-label">Output</div>{finished&&output!==undefined?<ReturnValueView text={displayValue(output)} value={lastEventData?.returnValue} state={current}/>:<div className="yv-code">—</div>}</div></div></div>}
     {s.loading&&<div className="yv-loading">Tracing your code…</div>}{s.error&&<div className="yv-error">{s.error}</div>}
-    {!s.loading&&<><Section title="Variables"><Variables state={current} previous={prev}/></Section><Section title="Call Stack">{current?.callStack?.length?<div className="yv-stack-wrap"><div className="yv-stack-label">TOP</div><div className="yv-stack">{current.callStack.map((f:string,i:number)=><div className="yv-frame" key={`${f}-${i}`}>{f}</div>)}</div><div className="yv-stack-label bottom">BOTTOM</div></div>:<div className="yv-empty">No active method calls.</div>}</Section><Section title="Data Structures"><DataStructures state={current} previousState={prev} source={s.source}/></Section></>}
-  </div><div className="yv-current"><div className="yv-current-head"><span>{eventLabel(current)}</span></div><div className="yv-statement">{statement||'Select a testcase and press Visualize.'}</div><div className="yv-controls"><div className="yv-buttons"><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.restart()} disabled={!s.states.length}>↺ Restart</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.prev()} disabled={s.index<=0}>← Prev</button><button className="yv-btn primary" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.togglePlay()} disabled={s.states.length<2}>{s.playing?'■ Stop':'▶ Play'}</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.next()} disabled={!s.states.length||s.index>=s.states.length-1}>Next →</button></div></div></div></div>;
+    {!s.loading&&<><Section title="Variables"><Variables state={current} previous={prev}/></Section><Section title="Call Stack">{current?.callStack?.length?<div className="yv-stack-wrap"><div className="yv-stack-label">TOP</div><div className="yv-stack">{current.callStack.map((f:string,i:number)=><div className="yv-frame" key={`${f}-${i}`}>{f}</div>)}</div><div className="yv-stack-label bottom">BOTTOM</div></div>:<div className="yv-empty">No active method calls.</div>}</Section><Section title="Data Structures"><DataStructures state={current} previousState={prev} source={s.source} visualEvents={visualEvents}/></Section></>}
+  </div><div className="yv-current"><div className="yv-current-head"><span>{eventLabel(current)}</span><span className={`yv-operation yv-operation-${visualOperation}`}>{visualOperationLabel(visualOperation)}</span></div><div className="yv-statement">{statement||'Select a testcase and press Visualize.'}</div><div className="yv-controls"><div className="yv-buttons"><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.restart()} disabled={!s.states.length}>↺ Restart</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.prev()} disabled={s.index<=0}>← Prev</button><button className="yv-btn primary" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.togglePlay()} disabled={s.states.length<2}>{s.playing?'■ Stop':'▶ Play'}</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.next()} disabled={!s.states.length||s.index>=s.states.length-1}>Next →</button></div></div></div></div>;
 }
