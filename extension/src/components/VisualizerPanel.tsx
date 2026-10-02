@@ -883,57 +883,16 @@ function AlgorithmStructureView({
   return null;
 }
 
-function AlgorithmNarrative({
-  algorithm,
-  state,
-  previous,
-  visualEvents,
-}: {
-  algorithm: ReturnType<typeof detectAlgorithm>;
-  state?: TraceState;
-  previous?: TraceState;
-  visualEvents: VisualEvent[];
-}) {
-  let body: React.ReactNode = null;
-  switch (algorithm.family) {
-    case 'binary-search':
-      body = <BinarySearchView state={state} previous={previous} visualEvents={visualEvents}/>;
-      break;
-    case 'sliding-window':
-      body = <AlgorithmPatternView family={algorithm.family} state={state} previous={previous} visualEvents={visualEvents}/>;
-      break;
-    case 'two-pointer':
-      body = <AlgorithmPatternView family={algorithm.family} state={state} previous={previous} visualEvents={visualEvents}/>;
-      break;
-    case 'sorting':
-      body = <SortingView state={state} previous={previous} visualEvents={visualEvents}/>;
-      break;
-    case 'prefix-sum':
-      body = <AlgorithmPatternView family={algorithm.family} state={state} previous={previous} visualEvents={visualEvents}/>;
-      break;
-    case 'dynamic-programming':
-    case 'sliding-window':
-    case 'two-pointer':
-    case 'prefix-sum':
-    case 'monotonic-stack':
-    case 'stack':
-    case 'heap':
-    case 'hashing':
-    case 'greedy':
-    case 'queue-bfs':
-    case 'dfs':
-    case 'graph-traversal':
-    case 'shortest-path':
-    case 'backtracking':
-    case 'linked-list':
-    case 'tree-traversal':
-    case 'trie':
-    case 'recursion':
-    case 'array-scan':
-      body = <AlgorithmPatternView family={algorithm.family} state={state} previous={previous} visualEvents={visualEvents}/>;
-      break;
-  if (!body) return null;
-  return <div className="yv-algorithm-narrative"><div className="yv-algo-label">{algorithm.label}</div><AlgorithmStructureView family={algorithm.family} state={state} previous={previous}/>{body}</div>;
+function AlgorithmNarrative({algorithm,state,previous,visualEvents}:{algorithm:ReturnType<typeof detectAlgorithm>;state?:TraceState;previous?:TraceState;visualEvents:VisualEvent[]}){
+ let body:React.ReactNode=null;
+ switch(algorithm.family){
+  case 'binary-search': body=<BinarySearchView state={state} previous={previous} visualEvents={visualEvents}/>; break;
+  case 'sorting': body=<SortingView state={state} previous={previous} visualEvents={visualEvents}/>; break;
+  case 'sliding-window':case 'two-pointer':case 'prefix-sum':case 'dynamic-programming':case 'monotonic-stack':case 'stack':case 'heap':case 'hashing':case 'greedy':case 'queue-bfs':case 'dfs':case 'graph-traversal':case 'shortest-path':case 'backtracking':case 'linked-list':case 'tree-traversal':case 'trie':case 'recursion':case 'array-scan':
+   body=<AlgorithmPatternView family={algorithm.family} state={state} previous={previous} visualEvents={visualEvents}/>;break;
+ }
+ if(!body)return null;
+ return <div className="yv-algorithm-narrative"><div className="yv-algo-label">{algorithm.label}</div><AlgorithmStructureView family={algorithm.family} state={state} previous={previous}/>{body}</div>;
 }
 
 export function VisualizerPanel(){
