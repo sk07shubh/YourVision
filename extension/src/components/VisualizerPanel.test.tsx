@@ -332,4 +332,63 @@ describe('VisualizerPanel deterministic DOM harness', () => {
     expect(panel.querySelectorAll('.yv-algo-active').length).toBeGreaterThan(0);
   });
 
+  it('renders a DP state table when a traced 2D array is present', () => {
+    const source = `class Solution {
+  public int solve(int[][] dp) {
+    int i = 1;
+    int j = 1;
+    dp[i][j] = Math.max(dp[i-1][j],dp[i][j-1]);
+    return dp[i][j];
+  }
+}`;
+    editor = mountMonacoHarness(source);
+    const base = sameLineLoopStates()[0];
+    const mounted = mountVisualizer(source, {
+      success: true,
+      kind: 'OK',
+      result: '4',
+      states: [{
+        ...base,
+        line: 5,
+        variables: { i: 1, j: 1 },
+        arrays: {
+          dp: { $arrayId: 'dp', $type: 'int[][]', values: [[1,2],[3,4]] },
+        },
+      }],
+    });
+    root = mounted.root;
+    const panel = mounted.host.shadowRoot!;
+    expect(panel.querySelector('.yv-algo-structure-title')?.textContent).toContain('DP STATE TABLE');
+    expect(panel.querySelectorAll('.yv-algo-grid-cell')).toHaveLength(4);
+  });
+
+  it('renders a BFS frontier from a traced queue collection', () => {
+    const source = `class Solution {
+  public void bfs() {
+    Queue<Integer> q = new ArrayDeque<>();
+    q.add(1);
+    int node = q.poll();
+  }
+}`;
+    editor = mountMonacoHarness(source);
+    const base = sameLineLoopStates()[0];
+    const mounted = mountVisualizer(source, {
+      success: true,
+      kind: 'OK',
+      result: '1',
+      states: [{
+        ...base,
+        line: 4,
+        variables: {},
+        dataStructures: {
+          q: { $collectionId: 'q', $type: 'ArrayDeque', $kind: 'queue', values: [2,3], size: 2 },
+        },
+      }],
+    });
+    root = mounted.root;
+    const panel = mounted.host.shadowRoot!;
+    expect(panel.querySelector('.yv-algo-structure-title')?.textContent).toContain('FRONTIER / QUEUE');
+    expect(panel.querySelectorAll('.yv-algo-queue > div')).toHaveLength(2);
+  });
+
 });

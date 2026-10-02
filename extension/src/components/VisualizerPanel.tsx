@@ -817,6 +817,69 @@ function DataStructures({ state, previousState, source, visualEvents = [] }: { s
 }
 
 
+
+function AlgorithmStructureView({
+  family,
+  state,
+  previous,
+}: {
+  family: ReturnType<typeof detectAlgorithm>['family'];
+  state?: TraceState;
+  previous?: TraceState;
+}) {
+  const arrays=Object.values(state?.arrays ?? {}).filter(isArraySnapshot);
+  const collections=Object.values(state?.dataStructures ?? {}).filter(isCollectionSnapshot);
+  const vars=state?.variables ?? {};
+  const first2d=arrays.find(a=>a.values.some(v=>Array.isArray(v)));
+  const matrix=first2d?.values.filter(Array.isArray) as unknown[][]|undefined;
+  const collection=collections[0];
+
+  if (family==='dynamic-programming' && matrix?.length) {
+    return <div className="yv-algo-structure">
+      <div className="yv-algo-structure-title">DP STATE TABLE</div>
+      <div className="yv-algo-grid">{matrix.map((row,r)=>row.map((v,col)=>{
+        const active=Object.entries(vars).some(([name,value])=>
+          (name==='i'||name==='row'||name==='r')&&value===r
+        )&&Object.entries(vars).some(([name,value])=>
+          (name==='j'||name==='col'||name==='c')&&value===col
+        );
+        const oldRow=previous?.arrays?.[first2d!.$arrayId];
+        const oldValues=isArraySnapshot(oldRow)?oldRow.values:undefined;
+        const oldCell=Array.isArray(oldValues?.[r]) ? oldValues[r][col] : undefined;
+        const changed=stableStringify(oldCell)!==stableStringify(v);
+        return <div key={`${r}-${col}`} className={`yv-algo-grid-cell ${active?'yv-algo-grid-active':''} ${changed?'yv-algo-grid-changed':''}`}>{displayValue(v)}</div>;
+      }))}</div>
+    </div>;
+  }
+
+  if ((family==='queue-bfs'||family==='graph-traversal'||family==='shortest-path') && collection) {
+    return <div className="yv-algo-structure">
+      <div className="yv-algo-structure-title">FRONTIER / QUEUE</div>
+      <div className="yv-algo-queue">{collection.values.map((v,i)=><div key={i} className={i===0?'yv-algo-queue-active':''}>{displayValue(v)}</div>)}</div>
+    </div>;
+  }
+
+  if ((family==='heap'||family==='monotonic-stack'||family==='stack') && collection) {
+    return <div className="yv-algo-structure">
+      <div className="yv-algo-structure-title">{family==='heap'?'HEAP STATE':'STACK STATE'}</div>
+      <div className={family==='heap'?'yv-algo-heap':'yv-algo-stack'}>
+        {collection.values.map((v,i)=><div key={i} className={i===collection.values.length-1?'yv-algo-structure-active':''}><span>{displayValue(v)}</span><small>{i}</small></div>)}
+      </div>
+    </div>;
+  }
+
+  if (family==='backtracking') {
+    const frames=state?.callStack ?? [];
+    if (!frames.length) return null;
+    return <div className="yv-algo-structure">
+      <div className="yv-algo-structure-title">DECISION PATH</div>
+      <div className="yv-algo-path">{frames.map((frame,i)=><div key={i} className={i===frames.length-1?'yv-algo-path-active':''}>{String(frame)}</div>)}</div>
+    </div>;
+  }
+
+  return null;
+}
+
 function AlgorithmNarrative({
   algorithm,
   state,
@@ -889,7 +952,7 @@ function AlgorithmNarrative({
   }
 
   if (!body) return null;
-  return <div className="yv-algorithm-narrative"><div className="yv-algo-label">{algorithm.label}</div>{body}</div>;
+  return <div className="yv-algorithm-narrative"><div className="yv-algo-label">{algorithm.label}</div><AlgorithmStructureView family={algorithm.family} state={state} previous={previous}/>{body}</div>;
 }
 
 export function VisualizerPanel(){
