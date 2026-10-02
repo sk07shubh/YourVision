@@ -25,7 +25,8 @@ export class AnimationQueue {
     if (this.running || !this.tasks.length) return;
     this.running = true;
     const task = this.tasks.shift()!;
-    this.cancelCurrent = typeof task.run() === 'function' ? task.run() as () => void : undefined;
+    const cleanup = task.run();
+    this.cancelCurrent = typeof cleanup === 'function' ? cleanup : undefined;
     queueMicrotask(() => {
       this.cancelCurrent?.();
       this.cancelCurrent = undefined;
