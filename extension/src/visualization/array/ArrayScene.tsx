@@ -28,6 +28,19 @@ function eventClass(event: ArraySemanticEvent): string | undefined {
 
 export function ArrayScene({ scene, events = [] }: { scene: ArraySceneModel; events?: ArraySemanticEvent[] }) {
   const timeline = buildArrayAnimationTimeline(events);
+  const eventForPointer = (pointerId: string): CSSProperties | undefined => {
+    const frame = timeline.frames.find(item => item.event.type === "POINTER_MOVE" && item.event.pointerId === pointerId);
+    return frame ? { transitionDelay: frame.startMs + "ms" } : undefined;
+  };
+
+  const eventForRange = (rangeId: string): CSSProperties | undefined => {
+    const frame = timeline.frames.find(item =>
+      (item.event.type === "RANGE_MOVE" || item.event.type === "RANGE_SHRINK" || item.event.type === "RANGE_EXPAND") &&
+      item.event.rangeId === rangeId
+    );
+    return frame ? { transitionDelay: frame.startMs + "ms" } : undefined;
+  };
+
   const eventForCell = (arrayId: string, index: number): { className?: string; style?: CSSProperties } => {
     const matches = timeline.frames.filter(frame => {
       const event = frame.event;
@@ -77,7 +90,16 @@ export function ArrayScene({ scene, events = [] }: { scene: ArraySceneModel; eve
           <div className="yv-array-canvas">
             <svg className="yv-array-svg" width={Math.max(120, arrayWidth(array.cells.length, DEFAULT_ARRAY_LAYOUT))} height={112} viewBox={"0 0 " + Math.max(120, arrayWidth(array.cells.length, DEFAULT_ARRAY_LAYOUT)) + " 112"} role="img" aria-label={"Array " + array.name}>
               {scene.ranges.filter(range => range.arrayId === array.id).map(range => (
-                <rect key={range.id} className={"yv-array-range " + range.kind} x={arrayX(range.start, DEFAULT_ARRAY_LAYOUT)} y={12} width={Math.max(0, range.end - range.start + 1) * (DEFAULT_ARRAY_LAYOUT.cellWidth + DEFAULT_ARRAY_LAYOUT.cellGap)} height={50} rx={8}/>
+                <rect
+                  key={range.id}
+                  className={"yv-array-range " + range.kind}
+                  style={eventForRange(range.id)}
+                  x={arrayX(range.start, DEFAULT_ARRAY_LAYOUT)}
+                  y={12}
+                  width={Math.max(0, range.end - range.start + 1) * (DEFAULT_ARRAY_LAYOUT.cellWidth + DEFAULT_ARRAY_LAYOUT.cellGap)}
+                  height={50}
+                  rx={8}
+                />
               ))}
               {array.cells.map(cell => {
                 const animation = eventForCell(array.id, cell.index);
@@ -100,7 +122,7 @@ export function ArrayScene({ scene, events = [] }: { scene: ArraySceneModel; eve
                 const top = lane < 2;
                 const y = top ? 4 + lane * 13 : 84 - (lane - 2) * 13;
                 return (
-                  <g key={pointer.id} className="yv-array-pointer" transform={"translate(" + (arrayX(pointer.index, DEFAULT_ARRAY_LAYOUT) + DEFAULT_ARRAY_LAYOUT.cellWidth / 2) + "," + y + ")"}>
+                  <g key={pointer.id} className="yv-array-pointer" style={eventForPointer(pointer.id)} transform={"translate(" + (arrayX(pointer.index, DEFAULT_ARRAY_LAYOUT) + DEFAULT_ARRAY_LAYOUT.cellWidth / 2) + "," + y + ")"}>
                     <text textAnchor="middle">{pointer.label}</text>
                     <path d={top ? "M0,7 L-5,14 L5,14 Z" : "M0,-7 L-5,-14 L5,-14 Z"}/>
                   </g>
