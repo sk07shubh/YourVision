@@ -1563,7 +1563,7 @@ public class YourVisionTracer {
         } else if (type.contains("PriorityQueue")) {
             kind = "priorityQueue";
         } else if (type.contains("LinkedList")) {
-            kind = "list";
+            kind = "linkedList";
         } else if (
             type.contains("HashSet") ||
             type.contains("LinkedHashSet") ||
