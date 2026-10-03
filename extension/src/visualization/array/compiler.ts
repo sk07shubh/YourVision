@@ -39,6 +39,15 @@ function currentLineSource(source: string, line?: number): string {
   return source.split(/\r?\n/)[line - 1]?.trim() ?? "";
 }
 
+function context(state: TraceState, source: string): { sourceLine?: number; sourceExpression?: string; method?: string; sequence?: number } {
+  return {
+    sourceLine: state.line,
+    sourceExpression: currentLineSource(source, state.line),
+    method: state.method,
+    sequence: state.sequence
+  };
+}
+
 function evaluateIndex(expression: string, state: TraceState): number | undefined {
   const text = expression.trim();
   if (/^-?\d+$/.test(text)) return Number(text);
@@ -72,9 +81,15 @@ function eventLabel(event: ArraySemanticEvent): string {
     case "POINTER_MOVE": return "Moved pointer";
     case "ARRAY_CREATE": return "Created array";
     case "VARIABLE_UPDATE": return "Updated variable";
+    case "RANGE_CREATE": return "Created active range";
     case "RANGE_MOVE": return "Moved active range";
     case "RANGE_SHRINK": return "Shrank active range";
     case "RANGE_EXPAND": return "Expanded active range";
+    case "CONDITION_TRUE": return "Condition true";
+    case "CONDITION_FALSE": return "Condition false";
+    case "LOOP_ENTER": return "Entered loop";
+    case "LOOP_ITERATION": return "Loop iteration";
+    case "LOOP_EXIT": return "Exited loop";
     case "RETURN": return "Returned";
     default: return event.type.replaceAll("_", " ").toLowerCase();
   }
@@ -87,7 +102,6 @@ function pointerEvents(state: TraceState, previous: TraceState | undefined, sour
 
   for (const pointer of current.pointers) {
     const old = before?.pointers.find(item => item.id === pointer.id);
-
     if (!old) {
       events.push({
         type: "POINTER_CREATE",
@@ -97,10 +111,7 @@ function pointerEvents(state: TraceState, previous: TraceState | undefined, sour
         index: pointer.index,
         sourceLine: state.line
       });
-      continue;
-    }
-
-    if (old.index !== pointer.index) {
+    } else if (old.index !== pointer.index) {
       events.push({
         type: "POINTER_MOVE",
         pointerId: pointer.id,
@@ -115,14 +126,12 @@ function pointerEvents(state: TraceState, previous: TraceState | undefined, sour
 }
 
 function rangeEvents(state: TraceState, previous: TraceState | undefined, source: string): ArraySemanticEvent[] {
-  if (!previous) return [];
-
   const current = createArrayScene(state, source);
-  const before = createArrayScene(previous, source);
+  const before = previous ? createArrayScene(previous, source) : undefined;
   const events: ArraySemanticEvent[] = [];
 
   for (const range of current.ranges) {
-    const old = before.ranges.find(item => item.id === range.id);
+    const old = before?.ranges.find(item => item.id === range.id);
     if (!old) {
       events.push({ type: "RANGE_CREATE", range, sourceLine: state.line });
       continue;
@@ -137,7 +146,13 @@ function rangeEvents(state: TraceState, previous: TraceState | undefined, source
         ? "RANGE_SHRINK"
         : "RANGE_EXPAND";
 
-    events.push({ type, rangeId: range.id, start: range.start, end: range.end, sourceLine: state.line });
+    events.push({
+      type,
+      rangeId: range.id,
+      start: range.start,
+      end: range.end,
+      sourceLine: state.line
+    });
   }
 
   return events;
@@ -147,18 +162,13 @@ function variableEvents(state: TraceState, previous: TraceState | undefined): Ar
   if (!previous) return [];
 
   const events: ArraySemanticEvent[] = [];
-
   for (const [name, value] of Object.entries(state.variables)) {
     if (!(name in previous.variables)) {
       events.push({ type: "VARIABLE_CREATE", name, value, sourceLine: state.line });
-      continue;
-    }
-
-    if (!same(previous.variables[name], value)) {
+    } else if (!same(previous.variables[name], value)) {
       events.push({ type: "VARIABLE_UPDATE", name, value, sourceLine: state.line });
     }
   }
-
   return events;
 }
 
@@ -176,12 +186,11 @@ function accessEvents(state: TraceState, source: string): ArraySemanticEvent[] {
 
     const id = arrayId(name, value);
     const accesses = arrayAccesses(statement, name, state);
-    if (accesses.length === 0) continue;
-
     const uniqueIndices = [...new Set(accesses.map(item => item.index))]
       .filter(index => index >= 0 && index < values.length);
+    if (uniqueIndices.length === 0) continue;
 
-    if (isComparison && uniqueIndices.length > 0) {
+    if (isComparison) {
       events.push({
         type: "ARRAY_COMPARE",
         arrayId: id,
@@ -191,7 +200,7 @@ function accessEvents(state: TraceState, source: string): ArraySemanticEvent[] {
       });
     }
 
-    const writesToArray = isAssignment && statement.indexOf("=") > -1 && /\[[^\]]+\]\s*=/.test(statement);
+    const writesToArray = isAssignment && /\[[^\]]+\]\s*=/.test(statement);
     if (!writesToArray) {
       for (const index of uniqueIndices) {
         events.push({
@@ -209,12 +218,7 @@ function accessEvents(state: TraceState, source: string): ArraySemanticEvent[] {
   return events;
 }
 
-function insertionOrRemoval(
-  before: unknown[],
-  after: unknown[],
-  id: string,
-  sourceLine?: number
-): ArraySemanticEvent[] {
+function insertionOrRemoval(before: unknown[], after: unknown[], id: string, sourceLine?: number): ArraySemanticEvent[] {
   if (after.length === before.length + 1) {
     for (let index = 0; index < after.length; index++) {
       if (same(after.slice(0, index), before.slice(0, index)) &&
@@ -236,54 +240,116 @@ function insertionOrRemoval(
   return [];
 }
 
+function singleElementMove(before: unknown[], after: unknown[], id: string, sourceLine?: number): ArraySemanticEvent | undefined {
+  if (before.length !== after.length || before.length < 2) return undefined;
+
+  for (let from = 0; from < before.length; from++) {
+    for (let to = 0; to < before.length; to++) {
+      if (from === to || !same(before[from], after[to])) continue;
+      const moved = before[from];
+      const candidate = before.slice();
+      candidate.splice(from, 1);
+      candidate.splice(to, 0, moved);
+      if (same(candidate, after)) {
+        return {
+          type: "ARRAY_SHIFT",
+          arrayId: id,
+          from,
+          to,
+          direction: to > from ? "right" : "left",
+          sourceLine
+        };
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function controlFlowEvents(state: TraceState, previous?: TraceState): ArraySemanticEvent[] {
+  const event = state.lastEvent?.type;
+  if (!event) return [];
+
+  switch (event) {
+    case "METHOD_ENTER":
+      return [{ type: "LOOP_ENTER", sourceLine: state.line }];
+    case "METHOD_EXIT":
+      return [{ type: "LOOP_EXIT", sourceLine: state.line }];
+    case "PROGRAM_END":
+      return [{ type: "RETURN", value: state.lastEvent?.returnValue, sourceLine: state.line }];
+    default:
+      break;
+  }
+
+  if (previous && state.line === previous.line && state.sequence !== previous.sequence) {
+    return [{ type: "LOOP_ITERATION", sourceLine: state.line }];
+  }
+
+  const statement = state.line ? undefined : undefined;
+  void statement;
+  return [];
+}
+
 export function compileArrayEvents(state: TraceState, previous?: TraceState, source = ""): ArraySemanticEvent[] {
+  const currentArrays = { ...state.arrays, ...state.variables };
+  const previousArrays = previous ? { ...previous.arrays, ...previous.variables } : {};
+
   if (!previous) {
+    const created = Object.entries(currentArrays).flatMap(([name, value]) => {
+      const values = arrayValues(value);
+      if (!values) return [];
+      return [{
+        type: "ARRAY_CREATE" as const,
+        arrayId: arrayId(name, value),
+        name,
+        values,
+        sourceLine: state.line,
+        sourceExpression: currentLineSource(source, state.line)
+      }];
+    });
+
     return [
-      ...Object.entries(state.arrays).flatMap(([name, value]) => {
-        const values = arrayValues(value);
-        if (!values) return [];
-        return [{
-          type: "ARRAY_CREATE" as const,
-          arrayId: arrayId(name, value),
-          name,
-          values,
-          sourceLine: state.line
-        }];
-      }),
+      ...created,
       ...pointerEvents(state, undefined, source),
-      ...accessEvents(state, source)
+      ...rangeEvents(state, undefined, source),
+      ...accessEvents(state, source),
+      ...controlFlowEvents(state)
     ];
   }
 
   const events: ArraySemanticEvent[] = [];
-  const previousArrays = { ...previous.arrays, ...previous.variables };
-  const currentArrays = { ...state.arrays, ...state.variables };
 
   for (const [name, current] of Object.entries(currentArrays)) {
     const after = arrayValues(current);
     const before = arrayValues(previousArrays[name]);
     if (!after) continue;
 
+    const id = arrayId(name, current);
     if (!before) {
       events.push({
         type: "ARRAY_CREATE",
-        arrayId: arrayId(name, current),
+        arrayId: id,
         name,
         values: after,
-        sourceLine: state.line
+        sourceLine: state.line,
+        sourceExpression: currentLineSource(source, state.line)
       });
       continue;
     }
 
-    const id = arrayId(name, current);
     const structural = insertionOrRemoval(before, after, id, state.line);
     if (structural.length > 0) {
       events.push(...structural);
       continue;
     }
 
-    const changes = changedIndices(before, after);
+    const shift = singleElementMove(before, after, id, state.line);
+    if (shift) {
+      events.push(shift);
+      continue;
+    }
 
+    const changes = changedIndices(before, after);
     if (changes.length === 2) {
       const [first, second] = changes;
       if (same(before[first], after[second]) && same(before[second], after[first])) {
@@ -317,6 +383,7 @@ export function compileArrayEvents(state: TraceState, previous?: TraceState, sou
     ...pointerEvents(state, previous, source),
     ...rangeEvents(state, previous, source),
     ...accessEvents(state, source),
+    ...controlFlowEvents(state, previous),
     ...events
   ];
 }
