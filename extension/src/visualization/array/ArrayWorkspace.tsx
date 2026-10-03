@@ -24,6 +24,10 @@ import { DequeScene } from "../deque/DequeScene";
 import { createDequeScene } from "../deque/scene";
 import { compileDequeEvents } from "../deque/compiler";
 import { presentDequeScene } from "../deque/presentation";
+import { createTreeScene } from "../tree/scene";
+import { compileTreeEvents } from "../tree/compiler";
+import { presentTreeScene } from "../tree/presentation";
+import { TreeScene } from "../tree/TreeScene";
 
 export function ArrayWorkspace() {
   const session = useSession();
