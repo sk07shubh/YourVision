@@ -12,12 +12,7 @@ export interface AnimationMotion {
   delayMs: number;
 }
 
-export interface AnimationEvent {
-  type: string;
-  sourceLine?: number;
-}
-
-export interface AnimationFrame<TEvent extends AnimationEvent = AnimationEvent> {
+export interface AnimationFrame<TEvent = unknown> {
   index: number;
   event: TEvent;
   motion: AnimationMotion;
@@ -25,7 +20,7 @@ export interface AnimationFrame<TEvent extends AnimationEvent = AnimationEvent> 
   endMs: number;
 }
 
-export interface AnimationTimeline<TEvent extends AnimationEvent = AnimationEvent> {
+export interface AnimationTimeline<TEvent = unknown> {
   frames: AnimationFrame<TEvent>[];
   durationMs: number;
 }
@@ -35,7 +30,7 @@ export interface AnimationCursor {
   elapsedMs: number;
 }
 
-export function buildAnimationTimeline<TEvent extends AnimationEvent>(
+export function buildAnimationTimeline<TEvent>(
   events: TEvent[],
   motionFor: (event: TEvent) => AnimationMotion
 ): AnimationTimeline<TEvent> {
@@ -50,7 +45,7 @@ export function buildAnimationTimeline<TEvent extends AnimationEvent>(
   return { frames, durationMs: cursor };
 }
 
-export function frameAtElapsed<TEvent extends AnimationEvent>(
+export function frameAtElapsed<TEvent>(
   timeline: AnimationTimeline<TEvent>,
   elapsedMs: number
 ): AnimationFrame<TEvent> | undefined {
@@ -60,7 +55,7 @@ export function frameAtElapsed<TEvent extends AnimationEvent>(
     ?? timeline.frames[timeline.frames.length - 1];
 }
 
-export function cursorForFrame<TEvent extends AnimationEvent>(
+export function cursorForFrame<TEvent>(
   timeline: AnimationTimeline<TEvent>,
   frameIndex: number
 ): AnimationCursor {
