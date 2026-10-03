@@ -12,6 +12,10 @@ import { createStackScene } from "../stack/scene";
 import { compileStackEvents } from "../stack/compiler";
 import { presentStackScene } from "../stack/presentation";
 import { StackScene } from "../stack/StackScene";
+import { createQueueScene } from "../queue/scene";
+import { compileQueueEvents } from "../queue/compiler";
+import { presentQueueScene } from "../queue/presentation";
+import { QueueScene } from "../queue/QueueScene";
 
 export function ArrayWorkspace() {
   const session = useSession();
@@ -26,6 +30,9 @@ export function ArrayWorkspace() {
   const stackScene = current ? createStackScene(current) : [];
   const stackEvents = current ? compileStackEvents(current, previous) : [];
   const presentedStackScene = presentStackScene(stackScene, stackEvents);
+  const queueScene = current ? createQueueScene(current) : [];
+  const queueEvents = current ? compileQueueEvents(current, previous) : [];
+  const presentedQueueScene = presentQueueScene(queueScene, queueEvents);
 
   useEffect(() => {
     highlightEditorLine(current?.line, session.source);
@@ -82,6 +89,7 @@ export function ArrayWorkspace() {
           </div>
           <ArrayScene scene={presentedScene ?? step.scene} events={step.events}/>
           {presentedStackScene.length > 0 && <StackScene scene={presentedStackScene} events={stackEvents}/>}
+          {presentedQueueScene.length > 0 && <QueueScene scene={presentedQueueScene} events={queueEvents}/>}
         </section>
 
         <aside className="yv-inspector">
