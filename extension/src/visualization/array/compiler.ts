@@ -185,6 +185,8 @@ function accessEvents(state: TraceState, source: string): ArraySemanticEvent[] {
     if (!values) continue;
 
     const id = arrayId(name, value);
+    const escaped = name.replace(/[.*+?^$()|[\]\\]/g, "\\    const id = arrayId(name, value);
+    const accesses = arrayAccesses(statement, name, state);");
     const accesses = arrayAccesses(statement, name, state);
     const uniqueIndices = [...new Set(accesses.map(item => item.index))]
       .filter(index => index >= 0 && index < values.length);
