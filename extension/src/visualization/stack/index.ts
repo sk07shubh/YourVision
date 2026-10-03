@@ -1,1 +1,1 @@
-export*from"./types";export*from"./scene";export*from"./compiler";export*from"./presentation";export*from"./timeline";export*from"./module";export*from"./StackScene";
+export*from"./types";export*from"./scene";export*from"./compiler";export*from"./presentation";export*from"./timeline";export*from"./module";export{StackScene as StackSceneView}from"./StackScene";
