@@ -7,7 +7,7 @@ export function StackScene({ scene, events = [] }: { scene: StackSceneModel[]; e
     {scene.map(stack => <section className="yv-stack-card" key={stack.id}>
       <header className="yv-stack-head"><strong>{stack.name}</strong><span>TOP · {stack.items.length} items</span></header>
       <div className="yv-stack-view">
-        {[...stack.items].reverse().map(item => <div className={"yv-stack-cell " + (item.state !== "neutral" ? "yv-stack-" + item.state : "")} key={item.index}>
+        {[...stack.items, ...events.filter(event => event.stackId === stack.id && event.type === "STACK_POP" && !stack.items.some(item => item.index === event.index)).map(event => ({ index: event.index, value: event.value, state: "pop" as const }))].reverse().map(item => <div className={"yv-stack-cell " + (item.state !== "neutral" ? "yv-stack-" + item.state : "")} key={item.index}>
           <span className="yv-stack-position">{item.index === stack.items.length - 1 ? "TOP" : ""}</span>
           <code>{String(item.value)}</code>
         </div>)}
