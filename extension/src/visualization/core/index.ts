@@ -1,8 +1,5 @@
-export type {
-  VisualDataStructure,
-  VisualOperation,
-  VisualSemanticEvent,
-  VisualEventContext,
-  VisualPrimitiveEvent
-} from "./semantic";
-export type { VisualizationModule } from "./module";
+export * from "./animation";
+export * from "./events";
+export * from "./semantic";
+export * from "./module";
+export * from "./player";

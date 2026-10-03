@@ -5,6 +5,7 @@ import { displayValue, stableStringify, isPlainObject } from '../utils/value';
 import { highlightEditorLine, clearEditorExecutionMarker } from '../leetcode/editor-overlay';
 import type { TraceState } from '../types/trace';
 import { ArrayWorkspace } from '../visualization/array/ArrayWorkspace';
+import { createStackScene } from '../visualization/stack/scene';
 
 type Obj = Record<string, unknown>;
 
@@ -116,6 +117,7 @@ function CollectionView({
       : 'collection';
 
   const itemCount = value.size ?? value.values.length;
+  const stackScene = kind === 'stack' && state ? createStackScene(state).find(scene => scene.id === value.$collectionId) : undefined;
 
   if (kind === 'stack') {
     return (
@@ -125,10 +127,10 @@ function CollectionView({
           <span>TOP · {itemCount} items</span>
         </div>
         <div className="yv-stack-view">
-          {[...value.values].reverse().map((item, index) => (
-            <div className="yv-stack-cell" key={index}>
+          {[...(stackScene?.items ?? [])].reverse().map((item, index) => (
+            <div className={"yv-stack-cell " + (item.state !== "neutral" ? "yv-stack-" + item.state : "")} key={item.index}>
               <span className="yv-stack-position">{index === 0 ? 'TOP' : ''}</span>
-              <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
+              <DataValue value={item.value} state={state} source={source} depth={depth + 1} seen={seen}/>
             </div>
           ))}
           {!value.values.length && <div className="yv-empty">Empty stack</div>}

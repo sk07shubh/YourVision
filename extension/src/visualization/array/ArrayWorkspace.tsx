@@ -8,6 +8,52 @@ import { ArrayScene } from "./ArrayScene";
 import { presentArrayScene } from "./presentation";
 import { PlaybackControls } from "../core/PlaybackControls";
 import "./array-workspace.css";
+import { createStackScene } from "../stack/scene";
+import { compileStackEvents } from "../stack/compiler";
+import { presentStackScene } from "../stack/presentation";
+import { StackScene } from "../stack/StackScene";
+import { createQueueScene } from "../queue/scene";
+import { compileQueueEvents } from "../queue/compiler";
+import { presentQueueScene } from "../queue/presentation";
+import { QueueScene } from "../queue/QueueScene";
+import { createLinkedListScene } from "../linked-list/scene";
+import { compileLinkedListEvents } from "../linked-list/compiler";
+import { presentLinkedListScene } from "../linked-list/presentation";
+import { LinkedListScene } from "../linked-list/LinkedListScene";
+import { DequeScene } from "../deque/DequeScene";
+import { createDequeScene } from "../deque/scene";
+import { compileDequeEvents } from "../deque/compiler";
+import { presentDequeScene } from "../deque/presentation";
+import { createTreeScene } from "../tree/scene";
+import { compileTreeEvents } from "../tree/compiler";
+import { presentTreeScene } from "../tree/presentation";
+import { TreeScene as TreeSceneView } from "../tree/TreeScene";
+import { createHeapScene } from "../heap/scene";
+import { compileHeapEvents } from "../heap/compiler";
+import { presentHeapScene } from "../heap/presentation";
+import { HeapScene as HeapSceneView } from "../heap/HeapScene";
+import { createMapScene } from "../map/scene";
+import { compileMapEvents } from "../map/compiler";
+import { presentMapScene } from "../map/presentation";
+import { MapScene as MapSceneView } from "../map/MapScene";
+import { createSetScene } from "../set/scene";
+import { compileSetEvents } from "../set/compiler";
+import { presentSetScene } from "../set/presentation";
+import { SetScene as SetSceneView } from "../set/SetScene";
+import { createTrieScene } from "../trie/scene";
+import { compileTrieEvents } from "../trie/compiler";
+import { presentTrieScene } from "../trie/presentation";
+import { TrieScene as TrieSceneView } from "../trie/TrieScene";
+import { createMatrixScene } from "../matrix/scene";
+import { compileMatrixEvents } from "../matrix/compiler";
+import { presentMatrixScene } from "../matrix/presentation";
+import { MatrixScene as MatrixSceneView } from "../matrix/MatrixScene";
+import "../matrix/matrix-scene.css";
+import { createGraphScene } from "../graph/scene";
+import { compileGraphEvents } from "../graph/compiler";
+import { presentGraphScene } from "../graph/presentation";
+import { GraphScene as GraphSceneView } from "../graph/GraphScene";
+import "../graph/graph-scene.css";
 
 export function ArrayWorkspace() {
   const session = useSession();
@@ -19,6 +65,39 @@ export function ArrayWorkspace() {
   const eventData = isPlainObject(current?.lastEvent?.data) ? current.lastEvent.data : undefined;
   const presentedScene = step ? presentArrayScene(step.scene, step.events) : undefined;
   const finished = current?.lastEvent?.type === "PROGRAM_END" || (session.states.length > 0 && session.index === session.states.length - 1);
+  const stackScene = current ? createStackScene(current) : [];
+  const stackEvents = current ? compileStackEvents(current, previous) : [];
+  const presentedStackScene = presentStackScene(stackScene, stackEvents);
+  const queueScene = current ? createQueueScene(current) : [];
+  const queueEvents = current ? compileQueueEvents(current, previous) : [];
+  const presentedQueueScene = presentQueueScene(queueScene, queueEvents);
+  const linkedListScene = current ? createLinkedListScene(current) : [];
+  const linkedListEvents = current ? compileLinkedListEvents(current, previous) : [];
+  const presentedLinkedListScene = presentLinkedListScene(linkedListScene, linkedListEvents);
+  const dequeScene = current ? createDequeScene(current) : [];
+  const dequeEvents = current ? compileDequeEvents(current, previous) : [];
+  const presentedDequeScene = presentDequeScene(dequeScene, dequeEvents);
+  const treeScene = current ? createTreeScene(current) : [];
+  const treeEvents = current ? compileTreeEvents(current, previous) : [];
+  const presentedTreeScene = presentTreeScene(treeScene, treeEvents);
+  const heapScene = current ? createHeapScene(current) : [];
+  const heapEvents = current ? compileHeapEvents(current, previous) : [];
+  const presentedHeapScene = presentHeapScene(heapScene, heapEvents);
+  const mapScene = current ? createMapScene(current) : [];
+  const mapEvents = current ? compileMapEvents(current, previous) : [];
+  const presentedMapScene = presentMapScene(mapScene, mapEvents);
+  const setScene = current ? createSetScene(current) : [];
+  const setEvents = current ? compileSetEvents(current, previous) : [];
+  const presentedSetScene = presentSetScene(setScene, setEvents);
+  const trieScene = current ? createTrieScene(current) : [];
+  const trieEvents = current ? compileTrieEvents(current, previous) : [];
+  const presentedTrieScene = presentTrieScene(trieScene, trieEvents);
+  const matrixScene = current ? createMatrixScene(current) : [];
+  const matrixEvents = current ? compileMatrixEvents(current, previous) : [];
+  const presentedMatrixScene = presentMatrixScene(matrixScene, matrixEvents);
+  const graphScene = current ? createGraphScene(current) : [];
+  const graphEvents = current ? compileGraphEvents(current, previous) : [];
+  const presentedGraphScene = presentGraphScene(graphScene, graphEvents);
 
   useEffect(() => {
     highlightEditorLine(current?.line, session.source);
@@ -27,7 +106,7 @@ export function ArrayWorkspace() {
 
   useEffect(() => {
     if (!session.playing) return;
-    const id = window.setInterval(() => sessionStore.next(), session.playbackDelay);
+    const id = window.setInterval(() => sessionStore.tick(), session.playbackDelay);
     return () => window.clearInterval(id);
   }, [session.playing, session.index, session.states.length]);
 
@@ -55,7 +134,7 @@ export function ArrayWorkspace() {
     <div className="yv-root yv-workspace">
       <header className="yv-workspace-header">
         <div>
-          <div className="yv-workspace-kicker">YOURVISION · ARRAY EXECUTION</div>
+          <div className="yv-workspace-kicker">YOURVISION · DATA STRUCTURE EXECUTION</div>
           <div className="yv-workspace-title yv-case">{testcase?.label ?? "Testcase"}</div>
           {testcase?.source === "custom" && <span className="yv-case-kind">Custom</span>}
           {testcase?.source === "failed" && <span className="yv-case-kind">Failed testcase</span>}
@@ -74,6 +153,16 @@ export function ArrayWorkspace() {
             <div className="yv-method">{step.method ?? "—"}</div>
           </div>
           <ArrayScene scene={presentedScene ?? step.scene} events={step.events}/>
+          {presentedStackScene.length > 0 && <StackScene scene={presentedStackScene} events={stackEvents}/>}
+          {presentedQueueScene.length > 0 && <QueueScene scene={presentedQueueScene} events={queueEvents}/>} {presentedLinkedListScene.length > 0 && <LinkedListScene scene={presentedLinkedListScene} events={linkedListEvents}/>}
+          {presentedDequeScene.length > 0 && <DequeScene scene={presentedDequeScene} events={dequeEvents}/>}
+          {presentedTreeScene.length > 0 && <TreeSceneView scene={presentedTreeScene} events={treeEvents}/>}
+          {presentedHeapScene.length > 0 && <HeapSceneView scene={presentedHeapScene} events={heapEvents}/>}
+          {presentedMapScene.length > 0 && <MapSceneView scene={presentedMapScene} events={mapEvents}/>}
+          {presentedSetScene.length > 0 && <SetSceneView scene={presentedSetScene} events={setEvents}/>}
+          {presentedTrieScene.length > 0 && <TrieSceneView scene={presentedTrieScene} events={trieEvents}/>}
+          {presentedMatrixScene.length > 0 && <MatrixSceneView scene={presentedMatrixScene} events={matrixEvents}/>}
+          {presentedGraphScene.length > 0 && <GraphSceneView scene={presentedGraphScene} events={graphEvents}/>}
         </section>
 
         <aside className="yv-inspector">

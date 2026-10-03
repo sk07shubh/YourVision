@@ -1,0 +1,1 @@
+import type{GraphScene,GraphSemanticEvent}from"./types";export function presentGraphScene(scene:GraphScene[],events:GraphSemanticEvent[]):GraphScene[]{return scene.map(graph=>({...graph,edges:graph.edges.map(edge=>({...edge,state:events.some(e=>e.type==="GRAPH_CONNECT"&&e.graphId===graph.id&&e.edgeId===edge.id)?"connect":"neutral"}))}))}

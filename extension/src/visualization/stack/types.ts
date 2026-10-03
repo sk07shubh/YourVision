@@ -1,0 +1,3 @@
+export interface StackItem { index:number; value:unknown; state:"neutral"|"active"|"push"|"pop"; }
+export interface StackScene { id:string; name:string; items:StackItem[]; }
+export type StackSemanticEvent={type:"STACK_CREATE";stackId:string;name:string;values:unknown[];sourceLine?:number}|{type:"STACK_PUSH";stackId:string;index:number;value:unknown;sourceLine?:number}|{type:"STACK_POP";stackId:string;index:number;value:unknown;sourceLine?:number}|{type:"STACK_PEEK";stackId:string;index:number;value:unknown;sourceLine?:number};

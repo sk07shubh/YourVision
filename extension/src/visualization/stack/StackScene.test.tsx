@@ -1,0 +1,4 @@
+import{act}from"react";import{createRoot,type Root}from"react-dom/client";import{afterEach,describe,expect,it}from"vitest";import{StackScene}from"./StackScene";
+let root:Root|undefined;let host:HTMLDivElement|undefined;
+afterEach(()=>{act(()=>root?.unmount());root=undefined;host=undefined;document.body.innerHTML="";});
+describe("StackScene",()=>{it("renders top-first and marks semantic changes",()=>{host=document.createElement("div");document.body.appendChild(host);root=createRoot(host);act(()=>root!.render(<StackScene scene={[{id:"s",name:"stack",items:[{index:0,value:1,state:"neutral"},{index:1,value:2,state:"push"}]}]} events={[{type:"STACK_PUSH",stackId:"s",index:1,value:2}]}/>));expect(host.textContent).toContain("TOP");expect(host.textContent).toContain("2");expect(host.querySelector(".yv-stack-push")).not.toBeNull();});});
