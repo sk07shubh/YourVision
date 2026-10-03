@@ -208,3 +208,30 @@ describe("array access semantics", () => {
     }));
   });
 });
+
+describe("array search ranges", () => {
+  it("derives a binary-search range from low and high around a mid pointer", () => {
+    const current = state({
+      variables: { low: 0, high: 3, mid: 1 },
+      line: 6
+    });
+    const scene = createArrayScene(current, "if (nums[mid] < target)");
+
+    expect(scene.pointers).toContainEqual({
+      id: "nums-1:low", label: "low", arrayId: "nums-1", index: 0
+    });
+    expect(scene.pointers).toContainEqual({
+      id: "nums-1:high", label: "high", arrayId: "nums-1", index: 3
+    });
+    expect(scene.pointers).toContainEqual({
+      id: "nums-1:mid", label: "mid", arrayId: "nums-1", index: 1
+    });
+    expect(scene.ranges).toContainEqual({
+      id: "nums-1:range:nums-1:low:nums-1:high",
+      arrayId: "nums-1",
+      start: 0,
+      end: 3,
+      kind: "search"
+    });
+  });
+});

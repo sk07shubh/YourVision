@@ -61,13 +61,27 @@ function collectPointers(state: TraceState, source: string, arrays: ArraySceneAr
 
   for (const array of arrays) {
     const candidates = sourceIndexVariables(source, array.name);
+    const directPointers: ArrayPointer[] = [];
 
     for (const [name, value] of Object.entries(state.variables)) {
       if (!candidates.has(name)) continue;
       if (typeof value !== "number" || !Number.isInteger(value)) continue;
       if (value < 0 || value >= array.cells.length) continue;
 
-      pointers.push({ id: array.id + ":" + name, label: name, arrayId: array.id, index: value });
+      directPointers.push({ id: array.id + ":" + name, label: name, arrayId: array.id, index: value });
+    }
+
+    pointers.push(...directPointers);
+
+    if (directPointers.length > 0) {
+      for (const [name, value] of Object.entries(state.variables)) {
+        if (directPointers.some(pointer => pointer.label === name)) continue;
+        if (!RANGE_STARTS.test(name) && !RANGE_ENDS.test(name)) continue;
+        if (typeof value !== "number" || !Number.isInteger(value)) continue;
+        if (value < 0 || value >= array.cells.length) continue;
+
+        pointers.push({ id: array.id + ":" + name, label: name, arrayId: array.id, index: value });
+      }
     }
   }
 
@@ -89,12 +103,17 @@ function collectRanges(arrays: ArraySceneArray[], pointers: ArrayPointer[]): Arr
       const end = ends.find(pointer => pointer.index >= start.index) ?? ends[0];
       if (!end) continue;
 
+      const kind: ArrayRange["kind"] =
+        /^(low|lo)$/i.test(start.label) || /^(high|hi)$/i.test(end.label)
+          ? "search"
+          : "window";
+
       ranges.push({
         id: array.id + ":range:" + start.id + ":" + end.id,
         arrayId: array.id,
         start: Math.min(start.index, end.index),
         end: Math.max(start.index, end.index),
-        kind: "window"
+        kind
       });
     }
   }
