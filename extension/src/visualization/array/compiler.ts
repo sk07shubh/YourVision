@@ -43,17 +43,77 @@ function eventLabel(event: ArraySemanticEvent): string {
     case "POINTER_CREATE": return "Created pointer";
     case "POINTER_MOVE": return "Moved pointer";
     case "ARRAY_CREATE": return "Created array";
+    case "VARIABLE_UPDATE": return "Updated variable";
     case "RETURN": return "Returned";
     default: return event.type.replaceAll("_", " ").toLowerCase();
   }
 }
 
-export function compileArrayEvents(state: TraceState, previous?: TraceState): ArraySemanticEvent[] {
+function pointerEvents(state: TraceState, previous: TraceState | undefined, source: string): ArraySemanticEvent[] {
+  const current = createArrayScene(state, source);
+  const before = previous ? createArrayScene(previous, source) : undefined;
+  const events: ArraySemanticEvent[] = [];
+
+  for (const pointer of current.pointers) {
+    const old = before?.pointers.find(item => item.id === pointer.id);
+
+    if (!old) {
+      events.push({
+        type: "POINTER_CREATE",
+        pointerId: pointer.id,
+        label: pointer.label,
+        arrayId: pointer.arrayId,
+        index: pointer.index,
+        sourceLine: state.line
+      });
+      continue;
+    }
+
+    if (old.index !== pointer.index) {
+      events.push({
+        type: "POINTER_MOVE",
+        pointerId: pointer.id,
+        from: old.index,
+        to: pointer.index,
+        sourceLine: state.line
+      });
+    }
+  }
+
+  return events;
+}
+
+function variableEvents(state: TraceState, previous: TraceState | undefined): ArraySemanticEvent[] {
+  if (!previous) return [];
+
+  const events: ArraySemanticEvent[] = [];
+
+  for (const [name, value] of Object.entries(state.variables)) {
+    if (!(name in previous.variables)) {
+      events.push({ type: "VARIABLE_CREATE", name, value, sourceLine: state.line });
+      continue;
+    }
+
+    if (!same(previous.variables[name], value)) {
+      events.push({ type: "VARIABLE_UPDATE", name, value, sourceLine: state.line });
+    }
+  }
+
+  return events;
+}
+
+export function compileArrayEvents(state: TraceState, previous?: TraceState, source = ""): ArraySemanticEvent[] {
   if (!previous) {
     return Object.entries(state.arrays).flatMap(([name, value]) => {
       const values = arrayValues(value);
       if (!values) return [];
-      return [{ type: "ARRAY_CREATE" as const, arrayId: arrayId(name, value), name, values, sourceLine: state.line }];
+      return [{
+        type: "ARRAY_CREATE" as const,
+        arrayId: arrayId(name, value),
+        name,
+        values,
+        sourceLine: state.line
+      }];
     });
   }
 
@@ -67,7 +127,13 @@ export function compileArrayEvents(state: TraceState, previous?: TraceState): Ar
     if (!after) continue;
 
     if (!before) {
-      events.push({ type: "ARRAY_CREATE", arrayId: arrayId(name, current), name, values: after, sourceLine: state.line });
+      events.push({
+        type: "ARRAY_CREATE",
+        arrayId: arrayId(name, current),
+        name,
+        values: after,
+        sourceLine: state.line
+      });
       continue;
     }
 
@@ -77,25 +143,44 @@ export function compileArrayEvents(state: TraceState, previous?: TraceState): Ar
     if (changes.length === 2) {
       const [first, second] = changes;
       if (same(before[first], after[second]) && same(before[second], after[first])) {
-        events.push({ type: "ARRAY_SWAP", arrayId: id, first, second, sourceLine: state.line });
+        events.push({
+          type: "ARRAY_SWAP",
+          arrayId: id,
+          first,
+          second,
+          sourceLine: state.line
+        });
         continue;
       }
     }
 
     for (const index of changes) {
-      events.push({ type: "ARRAY_WRITE", arrayId: id, index, before: before[index], after: after[index], sourceLine: state.line });
+      events.push({
+        type: "ARRAY_WRITE",
+        arrayId: id,
+        index,
+        before: before[index],
+        after: after[index],
+        sourceLine: state.line
+      });
     }
   }
 
-  return events;
+  return [
+    ...variableEvents(state, previous),
+    ...pointerEvents(state, previous, source),
+    ...events
+  ];
 }
 
 export function compileArrayStep(state: TraceState, source = "", previous?: TraceState) {
-  const events = compileArrayEvents(state, previous);
+  const events = compileArrayEvents(state, previous, source);
   return {
     sourceLine: state.line,
     method: state.method,
-    eventLabel: events.length > 0 ? eventLabel(events[0]) : (state.lastEvent?.type?.replaceAll("_", " ").toLowerCase() ?? "Execution state"),
+    eventLabel: events.length > 0
+      ? eventLabel(events[0])
+      : (state.lastEvent?.type?.replaceAll("_", " ").toLowerCase() ?? "Execution state"),
     events,
     scene: createArrayScene(state, source, previous)
   };
