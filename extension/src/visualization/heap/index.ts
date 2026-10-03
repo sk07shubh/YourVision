@@ -1,1 +1,1 @@
-export*from"./types";export*from"./scene";export*from"./compiler";export*from"./presentation";export*from"./timeline";export*from"./module";
+export*from"./types";export*from"./scene";export*from"./compiler";export*from"./presentation";export*from"./timeline";export*from"./module";export{HeapScene as HeapSceneView}from"./HeapScene";
