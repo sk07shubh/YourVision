@@ -186,7 +186,6 @@ function accessEvents(state: TraceState, source: string): ArraySemanticEvent[] {
 
     const id = arrayId(name, value);
     const escaped = name.replaceAll("$", "\\$");
-    const accesses = arrayAccesses(statement, name, state);");
     const accesses = arrayAccesses(statement, name, state);
     const uniqueIndices = [...new Set(accesses.map(item => item.index))]
       .filter(index => index >= 0 && index < values.length);
