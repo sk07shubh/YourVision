@@ -1,6 +1,8 @@
 export type {
   VisualDataStructure,
   VisualOperation,
-  VisualSemanticEvent
+  VisualSemanticEvent,
+  VisualEventContext,
+  VisualPrimitiveEvent
 } from "./semantic";
 export type { VisualizationModule } from "./module";
