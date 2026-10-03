@@ -51,7 +51,12 @@ export function frameAtElapsed<TEvent>(
 ): AnimationFrame<TEvent> | undefined {
   if (!timeline.frames.length) return undefined;
   const clamped = Math.max(0, Math.min(elapsedMs, timeline.durationMs));
-  return timeline.frames.find(frame => clamped >= frame.startMs && clamped <= frame.endMs)
+  const active = timeline.frames.find(frame => {
+    if (frame.motion.durationMs === 0) return clamped === frame.startMs;
+    return clamped >= frame.startMs && clamped < frame.endMs;
+  });
+  if (active) return active;
+  return timeline.frames.find(frame => clamped < frame.startMs)
     ?? timeline.frames[timeline.frames.length - 1];
 }
 
