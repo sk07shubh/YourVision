@@ -1,0 +1,3 @@
+export interface TreeNode{id:string;value:unknown;leftId?:string;rightId?:string;depth:number;state:"neutral"|"active"|"insert"|"remove"|"visit"}
+export interface TreeScene{id:string;name:string;rootId?:string;nodes:TreeNode[]}
+export type TreeSemanticEvent={type:"TREE_CREATE";treeId:string;name:string;rootId?:string;sourceLine?:number}|{type:"TREE_CONNECT";treeId:string;fromId:string;toId:string;side:"left"|"right";sourceLine?:number}|{type:"TREE_DISCONNECT";treeId:string;fromId:string;toId:string;side:"left"|"right";sourceLine?:number}|{type:"TREE_INSERT";treeId:string;nodeId:string;sourceLine?:number}|{type:"TREE_REMOVE";treeId:string;nodeId:string;sourceLine?:number};
