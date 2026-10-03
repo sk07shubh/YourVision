@@ -5,6 +5,7 @@ import { createArrayScene } from "./scene";
 import { applyArraySemanticEvent } from "./reducer";
 import { arrayWidth, DEFAULT_ARRAY_LAYOUT } from "./layout";
 import { motionFor } from "./timeline";
+import { presentArrayScene } from "./presentation";
 
 function state(overrides: Partial<TraceState> = {}): TraceState {
   return {
@@ -126,6 +127,18 @@ describe("array visualization foundation", () => {
 
     expect(next.arrays[0].cells[1]).toEqual({ index: 1, value: 0, state: "write" });
     expect(next.arrays[0].cells[0]).toEqual({ index: 0, value: 2, state: "neutral" });
+  });
+
+  it("presents semantic reads and swaps as cell states", () => {
+    const scene = createArrayScene(state(), "nums[i] = nums[1];");
+    const presented = presentArrayScene(scene, [
+      { type: "ARRAY_READ", arrayId: "nums-1", index: 0, value: 2, sourceLine: 8 },
+      { type: "ARRAY_SWAP", arrayId: "nums-1", first: 1, second: 2, sourceLine: 9 }
+    ]);
+
+    expect(presented.arrays[0].cells[0].state).toBe("read");
+    expect(presented.arrays[0].cells[1].state).toBe("swap");
+    expect(presented.arrays[0].cells[2].state).toBe("swap");
   });
 
   it("keeps geometry independent from the renderer", () => {

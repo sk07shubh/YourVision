@@ -5,6 +5,7 @@ import { highlightEditorLine, clearEditorExecutionMarker } from "../../leetcode/
 import { displayValue, isPlainObject } from "../../utils/value";
 import { compileArrayStep } from "./compiler";
 import { ArrayScene } from "./ArrayScene";
+import { presentArrayScene } from "./presentation";
 import "./array-workspace.css";
 
 export function ArrayWorkspace() {
@@ -15,6 +16,7 @@ export function ArrayWorkspace() {
   const statement = current?.line ? sourceLines[current.line - 1]?.trim() : "";
   const step = current ? compileArrayStep(current, session.source, previous) : undefined;
   const eventData = isPlainObject(current?.lastEvent?.data) ? current.lastEvent.data : undefined;
+  const presentedScene = step ? presentArrayScene(step.scene, step.events) : undefined;
   const finished = current?.lastEvent?.type === "PROGRAM_END" || (session.states.length > 0 && session.index === session.states.length - 1);
 
   useEffect(() => {
@@ -70,7 +72,7 @@ export function ArrayWorkspace() {
             </div>
             <div className="yv-method">{step.method ?? "—"}</div>
           </div>
-          <ArrayScene scene={step.scene}/>
+          <ArrayScene scene={presentedScene ?? step.scene}/>
         </section>
 
         <aside className="yv-inspector">
