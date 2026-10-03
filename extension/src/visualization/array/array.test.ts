@@ -237,6 +237,15 @@ describe("array search ranges", () => {
 });
 
 
+describe("array module animation contract", () => {
+  it("exposes the shared animation timeline through the module", () => {
+    const event = { type: "ARRAY_READ", arrayId: "nums-1", index: 0, value: 2, sourceLine: 4 } as const;
+    const timeline = require("./module").arrayVisualizationModule.createAnimationTimeline?.([event]);
+    expect(timeline?.frames[0].event).toEqual(event);
+    expect(timeline?.durationMs).toBe(220);
+  });
+});
+
 describe("array animation timeline", () => {
   it("serializes multiple semantic events into ordered animation frames", async () => {
     const { buildArrayAnimationTimeline } = await import("./timeline");
