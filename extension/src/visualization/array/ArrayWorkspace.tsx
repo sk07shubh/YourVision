@@ -20,6 +20,7 @@ import { createLinkedListScene } from "../linked-list/scene";
 import { compileLinkedListEvents } from "../linked-list/compiler";
 import { presentLinkedListScene } from "../linked-list/presentation";
 import { LinkedListScene } from "../linked-list/LinkedListScene";
+import { DequeScene } from "../deque/DequeScene";
 
 export function ArrayWorkspace() {
   const session = useSession();
