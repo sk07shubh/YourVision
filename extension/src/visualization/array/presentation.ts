@@ -11,6 +11,10 @@ export function presentArrayScene(scene: ArrayScene, events: ArraySemanticEvent[
     ranges: scene.ranges.map(range => ({ ...range }))
   };
 
+  for (const pointer of next.pointers) {
+    next = withCellState(next, pointer.arrayId, [pointer.index], "active");
+  }
+
   for (const event of events) {
     switch (event.type) {
       case "ARRAY_READ":

@@ -129,6 +129,17 @@ describe("array visualization foundation", () => {
     expect(next.arrays[0].cells[0]).toEqual({ index: 0, value: 2, state: "neutral" });
   });
 
+  it("highlights pointer targets and lets semantic operations override them", () => {
+    const scene = createArrayScene(state(), "nums[i] = nums[1];");
+    const presented = presentArrayScene(scene, [
+      { type: "POINTER_MOVE", pointerId: "nums-1:i", from: 0, to: 1, sourceLine: 8 },
+      { type: "ARRAY_WRITE", arrayId: "nums-1", index: 1, before: 7, after: 9, sourceLine: 8 }
+    ]);
+
+    expect(presented.arrays[0].cells[1].state).toBe("write");
+    expect(presented.arrays[0].cells[3].state).toBe("active");
+  });
+
   it("presents semantic reads and swaps as cell states", () => {
     const scene = createArrayScene(state(), "nums[i] = nums[1];");
     const presented = presentArrayScene(scene, [
