@@ -1,0 +1,3 @@
+export interface HeapNode{index:number;value:unknown;state:"neutral"|"insert"|"remove"|"swap"|"active"}
+export interface HeapScene{id:string;name:string;nodes:HeapNode[]}
+export type HeapSemanticEvent={type:"HEAP_CREATE";heapId:string;name:string;values:unknown[];sourceLine?:number}|{type:"HEAP_INSERT";heapId:string;index:number;value:unknown;sourceLine?:number}|{type:"HEAP_REMOVE";heapId:string;index:number;value:unknown;sourceLine?:number}|{type:"HEAP_SWAP";heapId:string;first:number;second:number;sourceLine?:number};
