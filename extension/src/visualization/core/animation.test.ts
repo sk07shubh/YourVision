@@ -3,11 +3,10 @@ import {
   buildAnimationTimeline,
   cursorForFrame,
   frameAtElapsed,
-  type AnimationEvent,
   type AnimationMotion
 } from "./animation";
 
-type Event = AnimationEvent & { type: "A" | "B" };
+type Event = { type: "A" | "B"; sourceLine?: number };
 
 const motions: Record<Event["type"], AnimationMotion> = {
   A: { kind: "emphasis", durationMs: 100, delayMs: 20 },
