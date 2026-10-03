@@ -61,4 +61,19 @@ describe("generic animation timeline", () => {
     expect(cursorForFrame(timeline, 1)).toEqual({ frameIndex: 1, elapsedMs: 130 });
     expect(cursorForFrame(timeline, 99)).toEqual({ frameIndex: 1, elapsedMs: 130 });
   });
+
+  it("provides shared default motion policy for future data-structure modules", async () => {
+    const { motionForOperation } = await import("./animation");
+
+    expect(motionForOperation("push")).toEqual({
+      kind: "fade", durationMs: 180, delayMs: 0
+    });
+    expect(motionForOperation("pop")).toEqual({
+      kind: "range-move", durationMs: 260, delayMs: 0
+    });
+    expect(motionForOperation("swap")).toEqual({
+      kind: "value-move", durationMs: 300, delayMs: 0
+    });
+  });
+
 });
