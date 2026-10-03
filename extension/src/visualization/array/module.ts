@@ -1,5 +1,6 @@
 import type { TraceState } from "../../types/trace";
 import type { VisualizationModule } from "../core/module";
+import { buildArrayAnimationTimeline } from "./timeline";
 import type { ArraySemanticEvent, ArrayScene } from "./types";
 import { compileArrayEvents } from "./compiler";
 import { createArrayScene } from "./scene";
@@ -10,7 +11,8 @@ export const arrayVisualizationModule: VisualizationModule<ArraySemanticEvent, A
   dataStructure: "array",
   createScene: createArrayScene,
   compileEvents: compileArrayEvents,
-  presentScene: presentArrayScene
+  presentScene: presentArrayScene,
+  createAnimationTimeline: buildArrayAnimationTimeline
 };
 
 export function buildArrayVisualization(
