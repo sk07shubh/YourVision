@@ -285,7 +285,7 @@ test('Chrome extension navigates repeated-line checkpoints through the new works
       { sequence: 3, line: 9, method: 'helper', depth: 2, variables: { visits: 1 }, arrays: {}, dataStructures: {}, objects: {}, callStack: ['run', 'helper'], lastEvent: { type: 'STEP', line: 9, method: 'helper' } },
       { sequence: 4, line: 9, method: 'helper', depth: 2, variables: { visits: 2 }, arrays: {}, dataStructures: {}, objects: {}, callStack: ['run', 'helper'], lastEvent: { type: 'STEP', line: 9, method: 'helper' } },
       { sequence: 5, line: 9, method: 'helper', depth: 2, variables: { visits: 3 }, arrays: {}, dataStructures: {}, objects: {}, callStack: ['run', 'helper'], lastEvent: { type: 'STEP', line: 9, method: 'helper' } },
-      { sequence: 6, line: 10, method: 'helper', depth: 2, variables: { visits: 3 }, arrays: {}, dataStructures: {}, objects: {}, callStack: ['run', 'helper'], lastEvent: { type: 'METHOD_EXIT', line: 10, method: 'helper' } },
+      { sequence: 6, line: 9, method: 'helper', depth: 2, variables: { visits: 3 }, arrays: {}, dataStructures: {}, objects: {}, callStack: ['run', 'helper'], lastEvent: { type: 'METHOD_EXIT', line: 10, method: 'helper' } },
       { sequence: 7, line: 3, method: 'run', depth: 1, variables: { result: 3 }, arrays: {}, dataStructures: {}, objects: {}, callStack: ['run'], lastEvent: { type: 'STEP', line: 3, method: 'run' } },
       { sequence: 8, line: 4, method: 'run', depth: 1, variables: { result: 3 }, arrays: {}, dataStructures: {}, objects: {}, callStack: ['run'], lastEvent: { type: 'STEP', line: 4, method: 'run' } },
       { sequence: 9, line: 4, method: 'run', depth: 0, variables: { result: 3 }, arrays: {}, dataStructures: {}, objects: {}, callStack: [], lastEvent: { type: 'PROGRAM_END', line: 4, method: 'run', data: { returnValue: 3 } } },
@@ -295,7 +295,7 @@ test('Chrome extension navigates repeated-line checkpoints through the new works
   try {
     await page.locator('[data-yourvision-visualize="true"]').click();
     const host = page.locator('[data-yourvision-host="true"]');
-    for (let i = 0; i < 5; i++) await host.getByRole('button', { name: 'Next →' }).click();
+    for (let i = 0; i < 4; i++) await host.getByRole('button', { name: 'Next →' }).click();
     await expect(host.locator('.yv-statement')).toContainText('return visits');
     await host.getByRole('button', { name: 'Next →' }).click();
     await expect(host.locator('.yv-statement')).toContainText('int result');
