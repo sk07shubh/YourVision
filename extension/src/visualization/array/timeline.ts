@@ -1,7 +1,8 @@
 import {
   buildAnimationTimeline,
   type AnimationMotion,
-  type AnimationTimeline
+  type AnimationTimeline,
+  type AnimationFrame
 } from "../core/animation";
 import type { ArraySemanticEvent } from "./types";
 
@@ -14,13 +15,7 @@ export type MotionKind =
   | "range-move";
 
 export type MotionToken = AnimationMotion & { kind: MotionKind };
-export type ArrayAnimationFrame = {
-  index: number;
-  event: ArraySemanticEvent;
-  motion: MotionToken;
-  startMs: number;
-  endMs: number;
-};
+export type ArrayAnimationFrame = AnimationFrame<ArraySemanticEvent>;
 
 export type ArrayAnimationTimeline = AnimationTimeline<ArraySemanticEvent>;
 
