@@ -1,0 +1,1 @@
+import type{TrieScene,TrieSemanticEvent}from"./types";export function presentTrieScene(scene:TrieScene[],events:TrieSemanticEvent[]):TrieScene[]{const inserted=new Set(events.filter(e=>e.type==="TRIE_INSERT").map(e=>e.nodeId));return scene.map(t=>({...t,nodes:t.nodes.map(n=>({...n,state:inserted.has(n.id)?"insert":"neutral"}))}))}

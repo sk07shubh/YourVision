@@ -1,0 +1,1 @@
+import{buildAnimationTimeline}from"../core/animation";import type{TrieSemanticEvent}from"./types";export const createTrieAnimationTimeline=(events:TrieSemanticEvent[])=>buildAnimationTimeline(events,event=>event.type==="TRIE_INSERT"?"insert":event.type==="TRIE_VISIT"?"emphasis":"instant");

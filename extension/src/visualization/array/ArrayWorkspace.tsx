@@ -40,6 +40,10 @@ import { createSetScene } from "../set/scene";
 import { compileSetEvents } from "../set/compiler";
 import { presentSetScene } from "../set/presentation";
 import { SetScene as SetSceneView } from "../set/SetScene";
+import { createTrieScene } from "../trie/scene";
+import { compileTrieEvents } from "../trie/compiler";
+import { presentTrieScene } from "../trie/presentation";
+import { TrieScene as TrieSceneView } from "../trie/TrieScene";
 
 export function ArrayWorkspace() {
   const session = useSession();
@@ -75,6 +79,9 @@ export function ArrayWorkspace() {
   const setScene = current ? createSetScene(current) : [];
   const setEvents = current ? compileSetEvents(current, previous) : [];
   const presentedSetScene = presentSetScene(setScene, setEvents);
+  const trieScene = current ? createTrieScene(current) : [];
+  const trieEvents = current ? compileTrieEvents(current, previous) : [];
+  const presentedTrieScene = presentTrieScene(trieScene, trieEvents);
 
   useEffect(() => {
     highlightEditorLine(current?.line, session.source);
@@ -137,6 +144,7 @@ export function ArrayWorkspace() {
           {presentedHeapScene.length > 0 && <HeapSceneView scene={presentedHeapScene} events={heapEvents}/>}
           {presentedMapScene.length > 0 && <MapSceneView scene={presentedMapScene} events={mapEvents}/>}
           {presentedSetScene.length > 0 && <SetSceneView scene={presentedSetScene} events={setEvents}/>}
+          {presentedTrieScene.length > 0 && <TrieSceneView scene={presentedTrieScene} events={trieEvents}/>}
         </section>
 
         <aside className="yv-inspector">
