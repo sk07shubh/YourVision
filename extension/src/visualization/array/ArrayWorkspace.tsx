@@ -51,6 +51,9 @@ export function ArrayWorkspace() {
   const dequeScene = current ? createDequeScene(current) : [];
   const dequeEvents = current ? compileDequeEvents(current, previous) : [];
   const presentedDequeScene = presentDequeScene(dequeScene, dequeEvents);
+  const treeScene = current ? createTreeScene(current) : [];
+  const treeEvents = current ? compileTreeEvents(current, previous) : [];
+  const presentedTreeScene = presentTreeScene(treeScene, treeEvents);
 
   useEffect(() => {
     highlightEditorLine(current?.line, session.source);
