@@ -12,6 +12,46 @@ export interface AnimationMotion {
   delayMs: number;
 }
 
+export const DEFAULT_ANIMATION_MOTION: Record<AnimationMotionKind, AnimationMotion> = {
+  instant: { kind: "instant", durationMs: 0, delayMs: 0 },
+  fade: { kind: "fade", durationMs: 180, delayMs: 0 },
+  emphasis: { kind: "emphasis", durationMs: 220, delayMs: 0 },
+  "pointer-move": { kind: "pointer-move", durationMs: 260, delayMs: 0 },
+  "value-move": { kind: "value-move", durationMs: 300, delayMs: 0 },
+  "range-move": { kind: "range-move", durationMs: 260, delayMs: 0 }
+};
+
+export function motionForOperation(operation: import("./semantic").VisualOperation): AnimationMotion {
+  switch (operation) {
+    case "create":
+    case "read":
+    case "write":
+    case "compare":
+    case "update":
+    case "visit":
+    case "peek":
+      return DEFAULT_ANIMATION_MOTION.emphasis;
+    case "swap":
+    case "move":
+    case "shift":
+      return DEFAULT_ANIMATION_MOTION["value-move"];
+    case "insert":
+    case "push":
+    case "enqueue":
+    case "connect":
+      return DEFAULT_ANIMATION_MOTION.fade;
+    case "remove":
+    case "pop":
+    case "dequeue":
+    case "disconnect":
+      return DEFAULT_ANIMATION_MOTION["range-move"];
+    case "traverse":
+      return DEFAULT_ANIMATION_MOTION["pointer-move"];
+    default:
+      return DEFAULT_ANIMATION_MOTION.instant;
+  }
+}
+
 export interface AnimationFrame<TEvent = unknown> {
   index: number;
   event: TEvent;
