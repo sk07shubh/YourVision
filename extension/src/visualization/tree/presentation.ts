@@ -1,0 +1,1 @@
+import type{TreeScene,TreeSemanticEvent,TreeNode}from"./types";export function presentTreeScene(scene:TreeScene[],events:TreeSemanticEvent[]):TreeScene[]{return scene.map(t=>({...t,nodes:t.nodes.map(n=>{let state:TreeNode["state"]="neutral";if(events.some(e=>e.treeId===t.id&&e.type==="TREE_INSERT"&&e.nodeId===n.id))state="insert";return{...n,state}})}))}
