@@ -29,26 +29,40 @@ function eventClass(event: ArraySemanticEvent): string | undefined {
 export function ArrayScene({ scene, events = [] }: { scene: ArraySceneModel; events?: ArraySemanticEvent[] }) {
   const timeline = buildArrayAnimationTimeline(events);
   const eventForCell = (arrayId: string, index: number): { className?: string; style?: CSSProperties } => {
-    for (const frame of timeline.frames) {
+    const matches = timeline.frames.filter(frame => {
       const event = frame.event;
-      const matches =
+      return (
         (event.type === "ARRAY_SWAP" && event.arrayId === arrayId && (event.first === index || event.second === index)) ||
         (event.type === "ARRAY_SHIFT" && event.arrayId === arrayId && (event.from === index || event.to === index)) ||
         ((event.type === "ARRAY_WRITE" || event.type === "ARRAY_INSERT") && event.arrayId === arrayId && event.index === index) ||
         (event.type === "ARRAY_COMPARE" && event.arrayId === arrayId && event.indices.includes(index)) ||
-        (event.type === "ARRAY_READ" && event.arrayId === arrayId && event.index === index);
+        (event.type === "ARRAY_READ" && event.arrayId === arrayId && event.index === index)
+      );
+    });
 
-      if (matches) {
-        return {
-          className: eventClass(event),
-          style: {
-            animationDuration: frame.motion.durationMs ? frame.motion.durationMs + "ms" : undefined,
-            animationDelay: frame.startMs ? frame.startMs + "ms" : undefined
-          }
-        };
-      }
-    }
-    return {};
+    if (!matches.length) return {};
+
+    const classNames = matches.map(frame => eventClass(frame.event)).filter(Boolean);
+    const animations = matches
+      .filter(frame => frame.motion.durationMs > 0)
+      .map(frame => ({
+        name: eventClass(frame.event) ? "yv-cell-" + eventClass(frame.event) : undefined,
+        duration: frame.motion.durationMs,
+        delay: frame.startMs
+      }))
+      .filter(animation => animation.name);
+
+    return {
+      className: [...new Set(classNames)].join(" ") || undefined,
+      style: animations.length ? {
+        animationName: animations.map(animation => animation.name).join(", "),
+        animationDuration: animations.map(animation => animation.duration + "ms").join(", "),
+        animationDelay: animations.map(animation => animation.delay + "ms").join(", "),
+        animationTimingFunction: animations.map(() => "ease").join(", "),
+        animationIterationCount: animations.map(() => "1").join(", "),
+        animationFillMode: animations.map(() => "both").join(", ")
+      } : undefined
+    };
   };
 
   return (
