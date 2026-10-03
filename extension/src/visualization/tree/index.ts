@@ -1,1 +1,1 @@
-export*from"./types";export*from"./scene";export*from"./compiler";export*from"./presentation";export*from"./timeline";export*from"./module";export*from"./TreeScene";
+export*from"./types";export*from"./scene";export*from"./compiler";export*from"./presentation";export*from"./timeline";export*from"./module";export{TreeScene as TreeSceneView}from"./TreeScene";
