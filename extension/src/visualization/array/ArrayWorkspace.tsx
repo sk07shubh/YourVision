@@ -32,6 +32,14 @@ import { createHeapScene } from "../heap/scene";
 import { compileHeapEvents } from "../heap/compiler";
 import { presentHeapScene } from "../heap/presentation";
 import { HeapScene as HeapSceneView } from "../heap/HeapScene";
+import { createMapScene } from "../map/scene";
+import { compileMapEvents } from "../map/compiler";
+import { presentMapScene } from "../map/presentation";
+import { MapScene as MapSceneView } from "../map/MapScene";
+import { createSetScene } from "../set/scene";
+import { compileSetEvents } from "../set/compiler";
+import { presentSetScene } from "../set/presentation";
+import { SetScene as SetSceneView } from "../set/SetScene";
 
 export function ArrayWorkspace() {
   const session = useSession();
@@ -61,6 +69,12 @@ export function ArrayWorkspace() {
   const heapScene = current ? createHeapScene(current) : [];
   const heapEvents = current ? compileHeapEvents(current, previous) : [];
   const presentedHeapScene = presentHeapScene(heapScene, heapEvents);
+  const mapScene = current ? createMapScene(current) : [];
+  const mapEvents = current ? compileMapEvents(current, previous) : [];
+  const presentedMapScene = presentMapScene(mapScene, mapEvents);
+  const setScene = current ? createSetScene(current) : [];
+  const setEvents = current ? compileSetEvents(current, previous) : [];
+  const presentedSetScene = presentSetScene(setScene, setEvents);
 
   useEffect(() => {
     highlightEditorLine(current?.line, session.source);
@@ -121,6 +135,8 @@ export function ArrayWorkspace() {
           {presentedDequeScene.length > 0 && <DequeScene scene={presentedDequeScene} events={dequeEvents}/>}
           {presentedTreeScene.length > 0 && <TreeSceneView scene={presentedTreeScene} events={treeEvents}/>}
           {presentedHeapScene.length > 0 && <HeapSceneView scene={presentedHeapScene} events={heapEvents}/>}
+          {presentedMapScene.length > 0 && <MapSceneView scene={presentedMapScene} events={mapEvents}/>}
+          {presentedSetScene.length > 0 && <SetSceneView scene={presentedSetScene} events={setEvents}/>}
         </section>
 
         <aside className="yv-inspector">

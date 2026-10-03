@@ -1,0 +1,1 @@
+import type{SetSemanticEvent}from"./types";import{buildAnimationTimeline}from"../core/animation";export function createSetTimeline(events:SetSemanticEvent[]){return buildAnimationTimeline(events,event=>event.type==="SET_ADD"?{kind:"insert",durationMs:220}:event.type==="SET_REMOVE"?{kind:"remove",durationMs:220}:{kind:"idle",durationMs:0})}

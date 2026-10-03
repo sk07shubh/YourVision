@@ -1,0 +1,3 @@
+export interface SetItem{value:unknown;state:"neutral"|"add"|"remove"|"active"}
+export interface SetScene{id:string;name:string;items:SetItem[]}
+export type SetSemanticEvent={type:"SET_CREATE";setId:string;name:string;values:unknown[];sourceLine?:number}|{type:"SET_ADD";setId:string;value:unknown;index:number;sourceLine?:number}|{type:"SET_REMOVE";setId:string;value:unknown;index:number;sourceLine?:number};

@@ -1,0 +1,3 @@
+export interface MapEntry{key:unknown;value:unknown;state:"neutral"|"put"|"remove"|"update"|"active"}
+export interface MapScene{id:string;name:string;entries:MapEntry[]}
+export type MapSemanticEvent={type:"MAP_CREATE";mapId:string;name:string;entries:MapEntry[];sourceLine?:number}|{type:"MAP_PUT";mapId:string;key:unknown;value:unknown;index:number;sourceLine?:number}|{type:"MAP_UPDATE";mapId:string;key:unknown;value:unknown;index:number;sourceLine?:number}|{type:"MAP_REMOVE";mapId:string;key:unknown;value:unknown;index:number;sourceLine?:number};
