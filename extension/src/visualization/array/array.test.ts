@@ -235,3 +235,20 @@ describe("array search ranges", () => {
     });
   });
 });
+
+
+describe("array animation timeline", () => {
+  it("serializes multiple semantic events into ordered animation frames", async () => {
+    const { buildArrayAnimationTimeline } = await import("./timeline");
+    const timeline = buildArrayAnimationTimeline([
+      { type: "ARRAY_READ", arrayId: "nums-1", index: 0, value: 2, sourceLine: 4 },
+      { type: "ARRAY_SWAP", arrayId: "nums-1", first: 0, second: 1, sourceLine: 5 }
+    ]);
+
+    expect(timeline.frames).toHaveLength(2);
+    expect(timeline.frames[0].event.type).toBe("ARRAY_READ");
+    expect(timeline.frames[1].event.type).toBe("ARRAY_SWAP");
+    expect(timeline.frames[1].startMs).toBeGreaterThanOrEqual(timeline.frames[0].endMs);
+    expect(timeline.durationMs).toBe(timeline.frames[1].endMs);
+  });
+});

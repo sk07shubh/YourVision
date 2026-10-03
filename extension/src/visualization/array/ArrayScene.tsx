@@ -1,5 +1,7 @@
+import type { CSSProperties } from "react";
 import type { ArraySemanticEvent, ArrayScene as ArraySceneModel } from "./types";
 import { arrayWidth, arrayX, DEFAULT_ARRAY_LAYOUT } from "./layout";
+import { buildArrayAnimationTimeline } from "./timeline";
 import "./array-scene.css";
 
 function display(value: unknown): string {
@@ -12,20 +14,49 @@ function display(value: unknown): string {
   return String(value);
 }
 
+function eventClass(event: ArraySemanticEvent): string | undefined {
+  switch (event.type) {
+    case "ARRAY_SWAP": return "swap";
+    case "ARRAY_SHIFT": return "shift";
+    case "ARRAY_WRITE":
+    case "ARRAY_INSERT": return "write";
+    case "ARRAY_COMPARE": return "compare";
+    case "ARRAY_READ": return "read";
+    default: return undefined;
+  }
+}
+
 export function ArrayScene({ scene, events = [] }: { scene: ArraySceneModel; events?: ArraySemanticEvent[] }) {
-  const eventForCell = (arrayId: string, index: number): string | undefined => {
-    for (const event of events) {
-      if (event.type === "ARRAY_SWAP" && event.arrayId === arrayId && (event.first === index || event.second === index)) return "swap";
-      if (event.type === "ARRAY_SHIFT" && event.arrayId === arrayId && (event.from === index || event.to === index)) return "shift";
-      if (event.type === "ARRAY_WRITE" && event.arrayId === arrayId && event.index === index) return "write";
-      if (event.type === "ARRAY_INSERT" && event.arrayId === arrayId && event.index === index) return "write";
-      if (event.type === "ARRAY_COMPARE" && event.arrayId === arrayId && event.indices.includes(index)) return "compare";
-      if (event.type === "ARRAY_READ" && event.arrayId === arrayId && event.index === index) return "read";
+  const timeline = buildArrayAnimationTimeline(events);
+  const eventForCell = (arrayId: string, index: number): { className?: string; style?: CSSProperties } => {
+    for (const frame of timeline.frames) {
+      const event = frame.event;
+      const matches =
+        (event.type === "ARRAY_SWAP" && event.arrayId === arrayId && (event.first === index || event.second === index)) ||
+        (event.type === "ARRAY_SHIFT" && event.arrayId === arrayId && (event.from === index || event.to === index)) ||
+        ((event.type === "ARRAY_WRITE" || event.type === "ARRAY_INSERT") && event.arrayId === arrayId && event.index === index) ||
+        (event.type === "ARRAY_COMPARE" && event.arrayId === arrayId && event.indices.includes(index)) ||
+        (event.type === "ARRAY_READ" && event.arrayId === arrayId && event.index === index);
+
+      if (matches) {
+        return {
+          className: eventClass(event),
+          style: {
+            animationDuration: frame.motion.durationMs ? frame.motion.durationMs + "ms" : undefined,
+            animationDelay: frame.startMs ? frame.startMs + "ms" : undefined
+          }
+        };
+      }
     }
-    return undefined;
+    return {};
   };
+
   return (
-    <div className="yv-array-scene yv-array" data-testid="yv-array-scene">
+    <div
+      className="yv-array-scene yv-array"
+      data-testid="yv-array-scene"
+      data-animation-duration={timeline.durationMs}
+    >
       {scene.arrays.map(array => (
         <section className="yv-array-block" key={array.id}>
           <div className="yv-array-name">{array.name}</div>
@@ -34,13 +65,22 @@ export function ArrayScene({ scene, events = [] }: { scene: ArraySceneModel; eve
               {scene.ranges.filter(range => range.arrayId === array.id).map(range => (
                 <rect key={range.id} className={"yv-array-range " + range.kind} x={arrayX(range.start, DEFAULT_ARRAY_LAYOUT)} y={12} width={Math.max(0, range.end - range.start + 1) * (DEFAULT_ARRAY_LAYOUT.cellWidth + DEFAULT_ARRAY_LAYOUT.cellGap)} height={50} rx={8}/>
               ))}
-              {array.cells.map(cell => (
-                <g key={cell.index} transform={"translate(" + arrayX(cell.index, DEFAULT_ARRAY_LAYOUT) + ",18)"}>
-                  <rect className={"yv-array-cell " + cell.state + " " + (eventForCell(array.id, cell.index) ?? "")} width={58} height={42} rx={7}/>
-                  <text className="yv-array-value" x={29} y={26} textAnchor="middle">{display(cell.value)}</text>
-                  <text className="yv-array-index" x={29} y={59} textAnchor="middle">{cell.index}</text>
-                </g>
-              ))}
+              {array.cells.map(cell => {
+                const animation = eventForCell(array.id, cell.index);
+                return (
+                  <g key={cell.index} transform={"translate(" + arrayX(cell.index, DEFAULT_ARRAY_LAYOUT) + ",18)"}>
+                    <rect
+                      className={"yv-array-cell " + cell.state + " " + (animation.className ?? "")}
+                      style={animation.style}
+                      width={58}
+                      height={42}
+                      rx={7}
+                    />
+                    <text className="yv-array-value" x={29} y={26} textAnchor="middle">{display(cell.value)}</text>
+                    <text className="yv-array-index" x={29} y={59} textAnchor="middle">{cell.index}</text>
+                  </g>
+                );
+              })}
               {scene.pointers.filter(pointer => pointer.arrayId === array.id).map((pointer, pointerIndex) => {
                 const lane = pointerIndex % 4;
                 const top = lane < 2;
