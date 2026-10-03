@@ -28,18 +28,14 @@ function eventClass(event: ArraySemanticEvent): string | undefined {
 
 export function ArrayScene({ scene, events = [] }: { scene: ArraySceneModel; events?: ArraySemanticEvent[] }) {
   const timeline = buildArrayAnimationTimeline(events);
-  const eventForPointer = (pointerId: string): CSSProperties | undefined => {
-    const frame = timeline.frames.find(item => item.event.type === "POINTER_MOVE" && item.event.pointerId === pointerId);
-    return frame ? { transitionDelay: frame.startMs + "ms" } : undefined;
-  };
+  const pointerFrames = (pointerId: string) =>
+    timeline.frames.filter(frame => frame.event.type === "POINTER_MOVE" && frame.event.pointerId === pointerId);
 
-  const eventForRange = (rangeId: string): CSSProperties | undefined => {
-    const frame = timeline.frames.find(item =>
-      (item.event.type === "RANGE_MOVE" || item.event.type === "RANGE_SHRINK" || item.event.type === "RANGE_EXPAND") &&
-      item.event.rangeId === rangeId
+  const rangeFrames = (rangeId: string) =>
+    timeline.frames.filter(frame =>
+      (frame.event.type === "RANGE_MOVE" || frame.event.type === "RANGE_SHRINK" || frame.event.type === "RANGE_EXPAND") &&
+      frame.event.rangeId === rangeId
     );
-    return frame ? { transitionDelay: frame.startMs + "ms" } : undefined;
-  };
 
   const eventForCell = (arrayId: string, index: number): { className?: string; style?: CSSProperties } => {
     const matches = timeline.frames.filter(frame => {
@@ -121,10 +117,29 @@ export function ArrayScene({ scene, events = [] }: { scene: ArraySceneModel; eve
                 const lane = pointerIndex % 4;
                 const top = lane < 2;
                 const y = top ? 4 + lane * 13 : 84 - (lane - 2) * 13;
+                const frames = pointerFrames(pointer.id);
+                const finalX = arrayX(pointer.index, DEFAULT_ARRAY_LAYOUT) + DEFAULT_ARRAY_LAYOUT.cellWidth / 2;
                 return (
-                  <g key={pointer.id} className="yv-array-pointer" style={eventForPointer(pointer.id)} transform={"translate(" + (arrayX(pointer.index, DEFAULT_ARRAY_LAYOUT) + DEFAULT_ARRAY_LAYOUT.cellWidth / 2) + "," + y + ")"}>
-                    <text textAnchor="middle">{pointer.label}</text>
-                    <path d={top ? "M0,7 L-5,14 L5,14 Z" : "M0,-7 L-5,-14 L5,-14 Z"}/>
+                  <g key={pointer.id} className="yv-array-pointer" transform={"translate(0," + y + ")"}>
+                    <g transform={"translate(" + finalX + ",0)"}>
+                      {frames.map(frame => {
+                        if (frame.event.type !== "POINTER_MOVE") return null;
+                        return (
+                          <animateTransform
+                            key={frame.index}
+                            attributeName="transform"
+                            type="translate"
+                            from={(arrayX(frame.event.from, DEFAULT_ARRAY_LAYOUT) + DEFAULT_ARRAY_LAYOUT.cellWidth / 2) + " 0"}
+                            to={(arrayX(frame.event.to, DEFAULT_ARRAY_LAYOUT) + DEFAULT_ARRAY_LAYOUT.cellWidth / 2) + " 0"}
+                            dur={frame.motion.durationMs + "ms"}
+                            begin={frame.startMs + "ms"}
+                            fill="freeze"
+                          />
+                        );
+                      })}
+                      <text textAnchor="middle">{pointer.label}</text>
+                      <path d={top ? "M0,7 L-5,14 L5,14 Z" : "M0,-7 L-5,-14 L5,-14 Z"}/>
+                    </g>
                   </g>
                 );
               })}
