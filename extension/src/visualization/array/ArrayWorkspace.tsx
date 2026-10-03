@@ -49,6 +49,11 @@ import { compileMatrixEvents } from "../matrix/compiler";
 import { presentMatrixScene } from "../matrix/presentation";
 import { MatrixScene as MatrixSceneView } from "../matrix/MatrixScene";
 import "../matrix/matrix-scene.css";
+import { createGraphScene } from "../graph/scene";
+import { compileGraphEvents } from "../graph/compiler";
+import { presentGraphScene } from "../graph/presentation";
+import { GraphScene as GraphSceneView } from "../graph/GraphScene";
+import "../graph/graph-scene.css";
 
 export function ArrayWorkspace() {
   const session = useSession();
@@ -90,6 +95,9 @@ export function ArrayWorkspace() {
   const matrixScene = current ? createMatrixScene(current) : [];
   const matrixEvents = current ? compileMatrixEvents(current, previous) : [];
   const presentedMatrixScene = presentMatrixScene(matrixScene, matrixEvents);
+  const graphScene = current ? createGraphScene(current) : [];
+  const graphEvents = current ? compileGraphEvents(current, previous) : [];
+  const presentedGraphScene = presentGraphScene(graphScene, graphEvents);
 
   useEffect(() => {
     highlightEditorLine(current?.line, session.source);
@@ -154,6 +162,7 @@ export function ArrayWorkspace() {
           {presentedSetScene.length > 0 && <SetSceneView scene={presentedSetScene} events={setEvents}/>}
           {presentedTrieScene.length > 0 && <TrieSceneView scene={presentedTrieScene} events={trieEvents}/>}
           {presentedMatrixScene.length > 0 && <MatrixSceneView scene={presentedMatrixScene} events={matrixEvents}/>}
+          {presentedGraphScene.length > 0 && <GraphSceneView scene={presentedGraphScene} events={graphEvents}/>}
         </section>
 
         <aside className="yv-inspector">
