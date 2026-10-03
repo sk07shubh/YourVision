@@ -1,4 +1,5 @@
 import type { ArrayScene as ArraySceneModel } from "./types";
+import "./array-scene.css";
 
 function display(value: unknown): string {
   if (value === null) return "null";
@@ -17,24 +18,9 @@ export function ArrayScene({ scene }: { scene: ArraySceneModel }) {
         <section className="yv-array-block" key={array.id}>
           <div className="yv-array-name">{array.name}</div>
           <div className="yv-array-canvas">
-            <svg
-              className="yv-array-svg"
-              width={Math.max(120, array.cells.length * 64 + 24)}
-              height={96}
-              viewBox={"0 0 " + Math.max(120, array.cells.length * 64 + 24) + " 96"}
-              role="img"
-              aria-label={"Array " + array.name}
-            >
+            <svg className="yv-array-svg" width={Math.max(120, array.cells.length * 64 + 24)} height={96} viewBox={"0 0 " + Math.max(120, array.cells.length * 64 + 24) + " 96"} role="img" aria-label={"Array " + array.name}>
               {scene.ranges.filter(range => range.arrayId === array.id).map(range => (
-                <rect
-                  key={range.id}
-                  className={"yv-array-range " + range.kind}
-                  x={12 + range.start * 64}
-                  y={12}
-                  width={Math.max(0, range.end - range.start + 1) * 64}
-                  height={50}
-                  rx={8}
-                />
+                <rect key={range.id} className={"yv-array-range " + range.kind} x={12 + range.start * 64} y={12} width={Math.max(0, range.end - range.start + 1) * 64} height={50} rx={8}/>
               ))}
               {array.cells.map(cell => (
                 <g key={cell.index} transform={"translate(" + (12 + cell.index * 64) + ",18)"}>
@@ -44,13 +30,9 @@ export function ArrayScene({ scene }: { scene: ArraySceneModel }) {
                 </g>
               ))}
               {scene.pointers.filter(pointer => pointer.arrayId === array.id).map((pointer, pointerIndex) => (
-                <g
-                  key={pointer.id}
-                  className="yv-array-pointer"
-                  transform={"translate(" + (12 + pointer.index * 64 + 29) + "," + (pointerIndex % 2 === 0 ? 4 : 82) + ")"}
-                >
+                <g key={pointer.id} className="yv-array-pointer" transform={"translate(" + (12 + pointer.index * 64 + 29) + "," + (pointerIndex % 2 === 0 ? 4 : 82) + ")"}>
                   <text textAnchor="middle">{pointer.label}</text>
-                  <path d={pointerIndex % 2 === 0 ? "M0,7 L-5,14 L5,14 Z" : "M0,-7 L-5,-14 L5,-14 Z"} />
+                  <path d={pointerIndex % 2 === 0 ? "M0,7 L-5,14 L5,14 Z" : "M0,-7 L-5,-14 L5,-14 Z"}/>
                 </g>
               ))}
             </svg>
@@ -61,8 +43,7 @@ export function ArrayScene({ scene }: { scene: ArraySceneModel }) {
         <div className="yv-array-variables">
           {scene.variables.map(variable => (
             <div className={"yv-array-variable " + (variable.changed ? "changed" : "")} key={variable.name}>
-              <span>{variable.name}</span>
-              <code>{display(variable.value)}</code>
+              <span>{variable.name}</span><code>{display(variable.value)}</code>
             </div>
           ))}
         </div>
