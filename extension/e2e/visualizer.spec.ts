@@ -184,8 +184,8 @@ test('Chrome extension renders the new array scene and pointer state', async () 
     const host = page.locator('[data-yourvision-host="true"]');
     await expect(host.locator('.yv-array-name')).toContainText('nums');
     await expect(host.locator('.yv-array-cell')).toHaveCount(4);
-    await expect(host.locator('.yv-array-value')).toContainText('2');
-    await expect(host.locator('.yv-array-value')).toContainText('15');
+    await expect(host.getByText('2', { exact: true })).toBeVisible();
+    await expect(host.getByText('15', { exact: true })).toBeVisible();
     await expect(host.locator('.yv-array-index')).toHaveCount(4);
     await expect(host.locator('.yv-array-pointer')).toContainText('i');
     await host.getByRole('button', { name: 'Next →' }).click();
@@ -273,7 +273,7 @@ test('Chrome extension navigates repeated-line checkpoints through the new works
   try {
     await page.locator('[data-yourvision-visualize="true"]').click();
     const host = page.locator('[data-yourvision-host="true"]');
-    for (let i = 0; i < 4; i++) await host.getByRole('button', { name: 'Next →' }).click();
+    for (let i = 0; i < sameLineLoopStates.length - 1; i++) await host.getByRole('button', { name: 'Next →' }).click();
     await expect(host.locator('.yv-statement')).toContainText('return total');
     await host.getByRole('button', { name: 'Next →' }).click();
     await expect(host.locator('.yv-output')).toBeVisible();
