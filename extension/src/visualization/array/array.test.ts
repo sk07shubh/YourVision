@@ -6,6 +6,7 @@ import { applyArraySemanticEvent } from "./reducer";
 import { arrayWidth, DEFAULT_ARRAY_LAYOUT } from "./layout";
 import { motionFor } from "./timeline";
 import { presentArrayScene } from "./presentation";
+import { arrayVisualizationModule } from "./module";
 
 function state(overrides: Partial<TraceState> = {}): TraceState {
   return {
@@ -240,7 +241,7 @@ describe("array search ranges", () => {
 describe("array module animation contract", () => {
   it("exposes the shared animation timeline through the module", () => {
     const event = { type: "ARRAY_READ", arrayId: "nums-1", index: 0, value: 2, sourceLine: 4 } as const;
-    const timeline = require("./module").arrayVisualizationModule.createAnimationTimeline?.([event]);
+    const timeline = arrayVisualizationModule.createAnimationTimeline?.([event]);
     expect(timeline?.frames[0].event).toEqual(event);
     expect(timeline?.durationMs).toBe(220);
   });
