@@ -1,6 +1,6 @@
 import type { LeetCodeTestcase } from '../types/leetcode';
 import type { TraceState, VisualizationResponse } from '../types/trace';
-import { createAnimationPlayer, pause, play, restart, seek } from '../visualization/core/player';
+import { createAnimationPlayer, pause, play, restart, seek, tick as tickPlayer } from '../visualization/core/player';
 
 export interface SessionState {
   open: boolean; loading: boolean; playing: boolean; elapsedMs: number; playbackDelay: number; source: string; testcase?: LeetCodeTestcase;
@@ -42,6 +42,13 @@ export const sessionStore = {
   restart() {
     const player = restart(createAnimationPlayer());
     this.set({ index: 0, playing: player.playing, elapsedMs: player.elapsedMs });
+  },
+  tick() {
+    if (!state.playing || state.states.length < 2) return;
+    const durationMs = Math.max(0, (state.states.length - 1) * state.playbackDelay);
+    const player = tickPlayer({ playing: state.playing, elapsedMs: state.elapsedMs }, state.playbackDelay, durationMs);
+    const index = Math.min(state.states.length - 1, Math.floor(player.elapsedMs / state.playbackDelay));
+    this.set({ index, playing: player.playing, elapsedMs: player.elapsedMs });
   },
   togglePlay() {
     if (state.states.length > 1) {
