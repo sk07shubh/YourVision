@@ -86,18 +86,32 @@ export function ArrayScene({ scene, events = [] }: { scene: ArraySceneModel; eve
           <div className="yv-array-name">{array.name}</div>
           <div className="yv-array-canvas">
             <svg className="yv-array-svg" width={Math.max(120, arrayWidth(array.cells.length, DEFAULT_ARRAY_LAYOUT))} height={112} viewBox={"0 0 " + Math.max(120, arrayWidth(array.cells.length, DEFAULT_ARRAY_LAYOUT)) + " 112"} role="img" aria-label={"Array " + array.name}>
-              {scene.ranges.filter(range => range.arrayId === array.id).map(range => (
-                <rect
-                  key={range.id}
-                  className={"yv-array-range " + range.kind}
-                  style={eventForRange(range.id)}
-                  x={arrayX(range.start, DEFAULT_ARRAY_LAYOUT)}
-                  y={12}
-                  width={Math.max(0, range.end - range.start + 1) * (DEFAULT_ARRAY_LAYOUT.cellWidth + DEFAULT_ARRAY_LAYOUT.cellGap)}
-                  height={50}
-                  rx={8}
-                />
-              ))}
+              {scene.ranges.filter(range => range.arrayId === array.id).map(range => {
+                const frames = rangeFrames(range.id);
+                return (
+                  <rect
+                    key={range.id}
+                    className={"yv-array-range " + range.kind}
+                    x={arrayX(range.start, DEFAULT_ARRAY_LAYOUT)}
+                    y={12}
+                    width={Math.max(0, range.end - range.start + 1) * (DEFAULT_ARRAY_LAYOUT.cellWidth + DEFAULT_ARRAY_LAYOUT.cellGap)}
+                    height={50}
+                    rx={8}
+                  >
+                    {frames.map((frame,frameIndex)=>{
+                      if(frame.event.type!=="RANGE_MOVE"&&frame.event.type!=="RANGE_SHRINK"&&frame.event.type!=="RANGE_EXPAND")return null;
+                      const previous=frameIndex>0?frames[frameIndex-1].event:undefined;
+                      const previousRange=previous&&(previous.type==="RANGE_MOVE"||previous.type==="RANGE_SHRINK"||previous.type==="RANGE_EXPAND")?previous:undefined;
+                      const fromStart=previousRange?.start??range.start;
+                      const fromEnd=previousRange?.end??range.end;
+                      return <React.Fragment key={frame.index}>
+                        <animate attributeName="x" from={arrayX(fromStart,DEFAULT_ARRAY_LAYOUT)} to={arrayX(frame.event.start,DEFAULT_ARRAY_LAYOUT)} dur={frame.motion.durationMs+"ms"} begin={frame.startMs+"ms"} fill="freeze"/>
+                        <animate attributeName="width" from={Math.max(0,fromEnd-fromStart+1)*(DEFAULT_ARRAY_LAYOUT.cellWidth+DEFAULT_ARRAY_LAYOUT.cellGap)} to={Math.max(0,frame.event.end-frame.event.start+1)*(DEFAULT_ARRAY_LAYOUT.cellWidth+DEFAULT_ARRAY_LAYOUT.cellGap)} dur={frame.motion.durationMs+"ms"} begin={frame.startMs+"ms"} fill="freeze"/>
+                      </React.Fragment>;
+                    })}
+                  </rect>
+                );
+              })}
               {array.cells.map(cell => {
                 const animation = eventForCell(array.id, cell.index);
                 return (
