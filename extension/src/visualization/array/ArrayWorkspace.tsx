@@ -41,7 +41,7 @@ export function ArrayWorkspace() {
 
   useEffect(() => {
     if (!session.playing) return;
-    const id = window.setInterval(() => sessionStore.next(), session.playbackDelay);
+    const id = window.setInterval(() => sessionStore.tick(), session.playbackDelay);
     return () => window.clearInterval(id);
   }, [session.playing, session.index, session.states.length]);
 
