@@ -1,4 +1,4 @@
-export type ArrayCellState = "neutral" | "active" | "read" | "write" | "compare" | "swap" | "inactive";
+export type ArrayCellState = "neutral" | "active" | "read" | "write" | "compare" | "swap" | "shift" | "inactive";
 
 export type ArrayRangeKind = "window" | "active" | "search" | "processed";
 

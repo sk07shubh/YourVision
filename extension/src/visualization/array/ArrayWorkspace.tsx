@@ -73,7 +73,7 @@ export function ArrayWorkspace() {
             </div>
             <div className="yv-method">{step.method ?? "—"}</div>
           </div>
-          <ArrayScene scene={presentedScene ?? step.scene}/>
+          <ArrayScene scene={presentedScene ?? step.scene} events={step.events}/>
         </section>
 
         <aside className="yv-inspector">

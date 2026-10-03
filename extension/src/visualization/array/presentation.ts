@@ -27,6 +27,9 @@ export function presentArrayScene(scene: ArrayScene, events: ArraySemanticEvent[
       case "ARRAY_COMPARE":
         next = withCellState(next, event.arrayId, event.indices, "compare");
         break;
+      case "ARRAY_SHIFT":
+        next = withCellState(next, event.arrayId, [event.from, event.to], "shift");
+        break;
       case "ARRAY_SWAP":
         next = withCellState(next, event.arrayId, [event.first, event.second], "swap");
         break;

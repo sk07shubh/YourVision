@@ -1,4 +1,4 @@
-import type { ArrayScene as ArraySceneModel } from "./types";
+import type { ArraySemanticEvent, ArrayScene as ArraySceneModel } from "./types";
 import "./array-scene.css";
 
 function display(value: unknown): string {
@@ -11,7 +11,18 @@ function display(value: unknown): string {
   return String(value);
 }
 
-export function ArrayScene({ scene }: { scene: ArraySceneModel }) {
+export function ArrayScene({ scene, events = [] }: { scene: ArraySceneModel; events?: ArraySemanticEvent[] }) {
+  const eventForCell = (arrayId: string, index: number): string | undefined => {
+    for (const event of events) {
+      if (event.type === "ARRAY_SWAP" && event.arrayId === arrayId && (event.first === index || event.second === index)) return "swap";
+      if (event.type === "ARRAY_SHIFT" && event.arrayId === arrayId && (event.from === index || event.to === index)) return "shift";
+      if (event.type === "ARRAY_WRITE" && event.arrayId === arrayId && event.index === index) return "write";
+      if (event.type === "ARRAY_INSERT" && event.arrayId === arrayId && event.index === index) return "write";
+      if (event.type === "ARRAY_COMPARE" && event.arrayId === arrayId && event.indices.includes(index)) return "compare";
+      if (event.type === "ARRAY_READ" && event.arrayId === arrayId && event.index === index) return "read";
+    }
+    return undefined;
+  };
   return (
     <div className="yv-array-scene yv-array" data-testid="yv-array-scene">
       {scene.arrays.map(array => (
@@ -24,7 +35,7 @@ export function ArrayScene({ scene }: { scene: ArraySceneModel }) {
               ))}
               {array.cells.map(cell => (
                 <g key={cell.index} transform={"translate(" + (12 + cell.index * 64) + ",18)"}>
-                  <rect className={"yv-array-cell " + cell.state} width={58} height={42} rx={7}/>
+                  <rect className={"yv-array-cell " + cell.state + " " + (eventForCell(array.id, cell.index) ?? "")} width={58} height={42} rx={7}/>
                   <text className="yv-array-value" x={29} y={26} textAnchor="middle">{display(cell.value)}</text>
                   <text className="yv-array-index" x={29} y={59} textAnchor="middle">{cell.index}</text>
                 </g>

@@ -161,3 +161,30 @@ describe("array visualization foundation", () => {
     expect(motionFor({ type: "ARRAY_SWAP", arrayId: "nums-1", first: 0, second: 1 }).kind).toBe("value-move");
   });
 });
+
+
+describe("array operation coverage", () => {
+  it("detects a true shift without misclassifying it as a swap", () => {
+    const previous = state();
+    const current = state({ sequence: 2, arrays: { nums: { $arrayId: "nums-1", values: [2, 11, 15, 7] } } });
+
+    expect(compileArrayEvents(current, previous)).toContainEqual({
+      type: "ARRAY_SHIFT", arrayId: "nums-1", from: 1, to: 3, direction: "right", sourceLine: 4
+    });
+  });
+
+  it("keeps independent arrays as separate visualization targets", () => {
+    const current = state({
+      arrays: {
+        nums: { $arrayId: "nums-1", values: [1, 2] },
+        answer: { $arrayId: "answer-1", values: [3, 4] }
+      },
+      variables: { i: 0 }
+    });
+    const scene = createArrayScene(current, "answer[i] = nums[i];");
+
+    expect(scene.arrays.map(array => array.id)).toEqual(["nums-1", "answer-1"]);
+    expect(scene.pointers).toContainEqual({ id: "nums-1:i", label: "i", arrayId: "nums-1", index: 0 });
+    expect(scene.pointers).toContainEqual({ id: "answer-1:i", label: "i", arrayId: "answer-1", index: 0 });
+  });
+});
