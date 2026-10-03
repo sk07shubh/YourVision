@@ -1,0 +1,3 @@
+export interface LinkedListNode{index:number;id:string;value:unknown;nextId?:string;state:"neutral"|"active"|"insert"|"remove"|"connect"|"disconnect"}
+export interface LinkedListScene{id:string;name:string;nodes:LinkedListNode[]}
+export type LinkedListSemanticEvent={type:"LINKED_LIST_CREATE";listId:string;name:string;nodes:LinkedListNode[];sourceLine?:number}|{type:"LINKED_LIST_CONNECT";listId:string;fromId:string;toId:string;sourceLine?:number}|{type:"LINKED_LIST_DISCONNECT";listId:string;fromId:string;toId:string;sourceLine?:number}|{type:"LINKED_LIST_INSERT";listId:string;nodeId:string;sourceLine?:number}|{type:"LINKED_LIST_REMOVE";listId:string;nodeId:string;sourceLine?:number};
