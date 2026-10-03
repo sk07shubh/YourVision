@@ -46,6 +46,8 @@ describe("generic animation timeline", () => {
     );
 
     expect(frameAtElapsed(timeline, 50)?.event.type).toBe("A");
+    expect(frameAtElapsed(timeline, 120)?.event.type).toBe("B");
+    expect(frameAtElapsed(timeline, 125)?.event.type).toBe("B");
     expect(frameAtElapsed(timeline, 150)?.event.type).toBe("B");
     expect(frameAtElapsed(timeline, 999)?.event.type).toBe("B");
   });
