@@ -43,8 +43,9 @@ export function motionForOperation(operation: import("./semantic").VisualOperati
     case "remove":
     case "pop":
     case "dequeue":
+      return DEFAULT_ANIMATION_MOTION.fade;
     case "disconnect":
-      return DEFAULT_ANIMATION_MOTION["range-move"];
+      return DEFAULT_ANIMATION_MOTION["pointer-move"];
     case "traverse":
       return DEFAULT_ANIMATION_MOTION["pointer-move"];
     default:
