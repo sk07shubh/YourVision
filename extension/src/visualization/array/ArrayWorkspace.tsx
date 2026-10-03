@@ -71,7 +71,7 @@ export function ArrayWorkspace() {
       if (!sessionStore.get().open) return;
       const target = event.target as HTMLElement | null;
       if (target?.matches("input,textarea,[contenteditable=true]")) return;
-      if (event.key === "ArrowRight") { event.preventDefault(); event.stopPropagation(); sessionStore.tick(); }
+      if (event.key === "ArrowRight") { event.preventDefault(); event.stopPropagation(); sessionStore.next(); }
       else if (event.key === "ArrowLeft") { event.preventDefault(); event.stopPropagation(); sessionStore.prev(); }
       else if (event.code === "Space") { event.preventDefault(); event.stopPropagation(); sessionStore.togglePlay(); }
       else if (event.key.toLowerCase() === "r") { event.preventDefault(); event.stopPropagation(); sessionStore.restart(); }
