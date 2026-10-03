@@ -267,26 +267,14 @@ function singleElementMove(before: unknown[], after: unknown[], id: string, sour
 }
 
 function controlFlowEvents(state: TraceState, previous?: TraceState): ArraySemanticEvent[] {
-  const event = state.lastEvent?.type;
-  if (!event) return [];
-
-  switch (event) {
-    case "METHOD_ENTER":
-      return [{ type: "LOOP_ENTER", sourceLine: state.line }];
-    case "METHOD_EXIT":
-      return [{ type: "LOOP_EXIT", sourceLine: state.line }];
-    case "PROGRAM_END":
-      return [{ type: "RETURN", value: state.lastEvent?.returnValue, sourceLine: state.line }];
-    default:
-      break;
+  if (state.lastEvent?.type === "PROGRAM_END") {
+    return [{ type: "RETURN", value: state.lastEvent?.returnValue, sourceLine: state.line }];
   }
 
   if (previous && state.line === previous.line && state.sequence !== previous.sequence) {
     return [{ type: "LOOP_ITERATION", sourceLine: state.line }];
   }
 
-  const statement = state.line ? undefined : undefined;
-  void statement;
   return [];
 }
 
@@ -343,12 +331,6 @@ export function compileArrayEvents(state: TraceState, previous?: TraceState, sou
       continue;
     }
 
-    const shift = singleElementMove(before, after, id, state.line);
-    if (shift) {
-      events.push(shift);
-      continue;
-    }
-
     const changes = changedIndices(before, after);
     if (changes.length === 2) {
       const [first, second] = changes;
@@ -363,6 +345,12 @@ export function compileArrayEvents(state: TraceState, previous?: TraceState, sou
         });
         continue;
       }
+    }
+
+    const shift = singleElementMove(before, after, id, state.line);
+    if (shift) {
+      events.push(shift);
+      continue;
     }
 
     for (const index of changes) {
