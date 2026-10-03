@@ -76,7 +76,7 @@ export function ArrayWorkspace() {
     <div className="yv-root yv-workspace">
       <header className="yv-workspace-header">
         <div>
-          <div className="yv-workspace-kicker">YOURVISION · ARRAY EXECUTION</div>
+          <div className="yv-workspace-kicker">YOURVISION · DATA STRUCTURE EXECUTION</div>
           <div className="yv-workspace-title yv-case">{testcase?.label ?? "Testcase"}</div>
           {testcase?.source === "custom" && <span className="yv-case-kind">Custom</span>}
           {testcase?.source === "failed" && <span className="yv-case-kind">Failed testcase</span>}
