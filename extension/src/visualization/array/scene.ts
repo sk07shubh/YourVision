@@ -74,6 +74,34 @@ function collectPointers(state: TraceState, source: string, arrays: ArraySceneAr
   return pointers;
 }
 
+const RANGE_STARTS = /^(left|l|start|low|lo|begin|windowStart|from)$/i;
+const RANGE_ENDS = /^(right|r|end|high|hi|windowEnd|to)$/i;
+
+function collectRanges(arrays: ArraySceneArray[], pointers: ArrayPointer[]): ArrayRange[] {
+  const ranges: ArrayRange[] = [];
+
+  for (const array of arrays) {
+    const candidates = pointers.filter(pointer => pointer.arrayId === array.id);
+    const starts = candidates.filter(pointer => RANGE_STARTS.test(pointer.label));
+    const ends = candidates.filter(pointer => RANGE_ENDS.test(pointer.label));
+
+    for (const start of starts) {
+      const end = ends.find(pointer => pointer.index >= start.index) ?? ends[0];
+      if (!end) continue;
+
+      ranges.push({
+        id: array.id + ":range:" + start.id + ":" + end.id,
+        arrayId: array.id,
+        start: Math.min(start.index, end.index),
+        end: Math.max(start.index, end.index),
+        kind: "window"
+      });
+    }
+  }
+
+  return ranges;
+}
+
 function collectVariables(state: TraceState, previous?: TraceState): ArraySceneVariable[] {
   return Object.entries(state.variables)
     .filter(([, value]) => !arraySnapshotValues(value))
@@ -86,10 +114,12 @@ function collectVariables(state: TraceState, previous?: TraceState): ArraySceneV
 
 export function createArrayScene(state: TraceState, source = "", previous?: TraceState): ArrayScene {
   const arrays = collectArrays(state);
+  const pointers = collectPointers(state, source, arrays);
+
   return {
     arrays,
-    pointers: collectPointers(state, source, arrays),
-    ranges: [],
+    pointers,
+    ranges: collectRanges(arrays, pointers),
     variables: collectVariables(state, previous)
   };
 }
