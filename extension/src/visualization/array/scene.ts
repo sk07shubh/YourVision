@@ -48,7 +48,7 @@ function sourceIndexVariables(source: string, arrayName: string): Set<string> {
   const pattern = new RegExp(escaped + "\\s*\\[([^\\]]+)\\]", "g");
 
   for (const match of source.matchAll(pattern)) {
-    for (const identifier of match[1].matchAll(/\\b[A-Za-z_$][\\w$]*\\b/g)) {
+    for (const identifier of match[1].matchAll(/\b[A-Za-z_$][\w$]*\b/g)) {
       names.add(identifier[0]);
     }
   }
