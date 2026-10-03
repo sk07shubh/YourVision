@@ -25,12 +25,18 @@ class Solution {
         stack.push(5);
         Queue<Integer> queue = new ArrayDeque<>();
         queue.add(8);
+        Deque<Integer> deque = new ArrayDeque<>();
+        deque.add(20);
+        Queue<Integer> linkedQueue = new LinkedList<>();
+        linkedQueue.add(21);
         PriorityQueue<Integer> priorityQueue = new PriorityQueue<>();
         priorityQueue.add(9);
         priorityQueue.add(2);
         priorityQueue.add(5);
         ArrayList<Integer> list = new ArrayList<>();
         list.add(3);
+        LinkedList<Integer> linkedList = new LinkedList<>();
+        linkedList.add(14);
 
         map.put(3, 9);
         set.add(11);
@@ -38,6 +44,8 @@ class Solution {
         queue.add(12);
         priorityQueue.add(1);
         list.add(4);
+        linkedList.add(15);
+        linkedQueue.add(22);
         nums[0] = 99;
 
         return nums[0] + map.get(3) + set.size() +
@@ -142,8 +150,9 @@ class Solution {
         Queue<Integer> queue = new ArrayDeque<>();
         PriorityQueue<Integer> priorityQueue = new PriorityQueue<>();
         ArrayList<Integer> list = new ArrayList<>();
+        LinkedList<Integer> linkedList = new LinkedList<>();
         return map.size() + set.size() + stack.size() +
-            queue.size() + priorityQueue.size() + list.size();
+            queue.size() + priorityQueue.size() + list.size() + linkedList.size();
     }
 }
 `;
@@ -160,7 +169,7 @@ assert(!("nums" in variables), "array leaked into Variables");
 assert(!("map" in variables), "map leaked into Variables");
 assert("nums" in arrays, "array missing from Data Structures");
 
-for (const name of ["map","set","stack","queue","priorityQueue","list"]) {
+for (const name of ["map","set","stack","queue","deque","linkedQueue","priorityQueue","list","linkedList"]) {
     assert(name in structures, name + " missing from Data Structures");
 }
 
@@ -169,17 +178,29 @@ const map = structures.map as Record<string, unknown>;
 const set = structures.set as Record<string, unknown>;
 const stack = structures.stack as Record<string, unknown>;
 const queue = structures.queue as Record<string, unknown>;
+const deque = structures.deque as Record<string, unknown>;
+const linkedQueue = structures.linkedQueue as Record<string, unknown>;
 const priorityQueue = structures.priorityQueue as Record<string, unknown>;
 const list = structures.list as Record<string, unknown>;
+const linkedList = structures.linkedList as Record<string, unknown>;
 
 assert(JSON.stringify(nums.values) === "[99,7,11]", "array values incorrect");
 assert(Array.isArray(map.entries) && (map.entries as unknown[]).length === 2, "map entries incorrect");
 assert(JSON.stringify(set.values) === "[10,11]", "set values incorrect");
 assert(JSON.stringify(stack.values) === "[5,6]", "stack values incorrect");
 assert(JSON.stringify(queue.values) === "[8,12]", "queue values incorrect");
+assert(queue.$kind === "deque", "queue runtime kind is incorrect");
+assert(typeof queue.$declaredType === "string" && queue.$declaredType.includes("Queue"), "queue declared type missing");
+assert(JSON.stringify(deque.values) === "[20]", "deque values incorrect");
+assert(typeof deque.$declaredType === "string" && deque.$declaredType.includes("Deque"), "deque declared type incorrect");
+assert(JSON.stringify(linkedQueue.values) === "[21,22]", "linked queue values incorrect");
+assert(linkedQueue.$kind === "linkedList", "linked queue runtime kind is incorrect");
+assert(typeof linkedQueue.$declaredType === "string" && linkedQueue.$declaredType.includes("Queue"), "linked queue declared type missing");
 assert(priorityQueue.$kind === "priorityQueue", "priority queue kind is incorrect");
 assert(JSON.stringify(priorityQueue.values) === "[1,2,5,9]", "priority queue heap snapshot incorrect");
 assert(JSON.stringify(list.values) === "[3,4]", "list values incorrect");
+assert(linkedList.$kind === "linkedList", "linked list kind is incorrect");
+assert(JSON.stringify(linkedList.values) === "[14,15]", "linked list values incorrect");
 
 const nested = await runJava(source, { method: "nested" });
 assert(nested.kind === "OK", "nested data structure execution failed");
