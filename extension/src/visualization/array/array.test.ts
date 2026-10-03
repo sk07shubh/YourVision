@@ -188,3 +188,23 @@ describe("array operation coverage", () => {
     expect(scene.pointers).toContainEqual({ id: "answer-1:i", label: "i", arrayId: "answer-1", index: 0 });
   });
 });
+
+describe("array access semantics", () => {
+  it("keeps the right-hand array access as a read during an array write", () => {
+    const current = state({
+      line: 8,
+      variables: { i: 0, j: 1, left: 0, right: 3 },
+      arrays: { nums: { $arrayId: "nums-1", values: [7, 2, 11, 15] } }
+    });
+    const previous = state({
+      line: 7,
+      variables: { i: 0, j: 1, left: 0, right: 3 },
+      arrays: { nums: { $arrayId: "nums-1", values: [2, 7, 11, 15] } }
+    });
+    const events = compileArrayEvents(current, previous, "nums[i] = nums[j];");
+
+    expect(events).toContainEqual(expect.objectContaining({
+      type: "ARRAY_READ", arrayId: "nums-1", index: 1
+    }));
+  });
+});

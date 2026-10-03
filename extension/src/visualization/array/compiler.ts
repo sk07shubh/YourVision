@@ -200,18 +200,21 @@ function accessEvents(state: TraceState, source: string): ArraySemanticEvent[] {
       });
     }
 
-    const writesToArray = isAssignment && /\[[^\]]+\]\s*=/.test(statement);
-    if (!writesToArray) {
-      for (const index of uniqueIndices) {
-        events.push({
-          type: "ARRAY_READ",
-          arrayId: id,
-          index,
-          value: values[index],
-          sourceLine: state.line,
-          sourceExpression: statement
-        });
-      }
+    const lhsMatch = isAssignment
+      ? statement.match(new RegExp(escaped + "\\s*\\[([^\\]]+)\\]\\s*="))
+      : null;
+    const lhsIndex = lhsMatch ? evaluateIndex(lhsMatch[1], state) : undefined;
+
+    for (const index of uniqueIndices) {
+      if (lhsIndex !== undefined && index === lhsIndex) continue;
+      events.push({
+        type: "ARRAY_READ",
+        arrayId: id,
+        index,
+        value: values[index],
+        sourceLine: state.line,
+        sourceExpression: statement
+      });
     }
   }
 
@@ -269,10 +272,6 @@ function singleElementMove(before: unknown[], after: unknown[], id: string, sour
 function controlFlowEvents(state: TraceState, previous?: TraceState): ArraySemanticEvent[] {
   if (state.lastEvent?.type === "PROGRAM_END") {
     return [{ type: "RETURN", value: state.lastEvent?.returnValue, sourceLine: state.line }];
-  }
-
-  if (previous && state.line === previous.line && state.sequence !== previous.sequence) {
-    return [{ type: "LOOP_ITERATION", sourceLine: state.line }];
   }
 
   return [];
