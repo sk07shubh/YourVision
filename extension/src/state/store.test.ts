@@ -8,8 +8,11 @@ describe('session store', () => {
       {sequence:1,depth:0,variables:{x:2},arrays:{},dataStructures:{},objects:{},callStack:[]}
     ]});
     expect(sessionStore.get().index).toBe(0);
+    expect(sessionStore.get().elapsedMs).toBe(0);
     sessionStore.next(); expect(sessionStore.get().index).toBe(1);
+    expect(sessionStore.get().elapsedMs).toBe(650);
     sessionStore.prev(); expect(sessionStore.get().index).toBe(0);
+    expect(sessionStore.get().elapsedMs).toBe(0);
     sessionStore.setPlaybackDelay(325);
     expect(sessionStore.get().playbackDelay).toBe(325);
   });
