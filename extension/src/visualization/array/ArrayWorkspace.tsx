@@ -8,6 +8,10 @@ import { ArrayScene } from "./ArrayScene";
 import { presentArrayScene } from "./presentation";
 import { PlaybackControls } from "../core/PlaybackControls";
 import "./array-workspace.css";
+import { createStackScene } from "../stack/scene";
+import { compileStackEvents } from "../stack/compiler";
+import { presentStackScene } from "../stack/presentation";
+import { StackScene } from "../stack/StackScene";
 
 export function ArrayWorkspace() {
   const session = useSession();
@@ -19,6 +23,9 @@ export function ArrayWorkspace() {
   const eventData = isPlainObject(current?.lastEvent?.data) ? current.lastEvent.data : undefined;
   const presentedScene = step ? presentArrayScene(step.scene, step.events) : undefined;
   const finished = current?.lastEvent?.type === "PROGRAM_END" || (session.states.length > 0 && session.index === session.states.length - 1);
+  const stackScene = current ? createStackScene(current) : [];
+  const stackEvents = current ? compileStackEvents(current, previous) : [];
+  const presentedStackScene = presentStackScene(stackScene, stackEvents);
 
   useEffect(() => {
     highlightEditorLine(current?.line, session.source);
@@ -74,6 +81,7 @@ export function ArrayWorkspace() {
             <div className="yv-method">{step.method ?? "—"}</div>
           </div>
           <ArrayScene scene={presentedScene ?? step.scene} events={step.events}/>
+          {presentedStackScene.length > 0 && <StackScene scene={presentedStackScene} events={stackEvents}/>}
         </section>
 
         <aside className="yv-inspector">
