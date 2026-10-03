@@ -44,6 +44,11 @@ import { createTrieScene } from "../trie/scene";
 import { compileTrieEvents } from "../trie/compiler";
 import { presentTrieScene } from "../trie/presentation";
 import { TrieScene as TrieSceneView } from "../trie/TrieScene";
+import { createMatrixScene } from "../matrix/scene";
+import { compileMatrixEvents } from "../matrix/compiler";
+import { presentMatrixScene } from "../matrix/presentation";
+import { MatrixScene as MatrixSceneView } from "../matrix/MatrixScene";
+import "../matrix/matrix-scene.css";
 
 export function ArrayWorkspace() {
   const session = useSession();
@@ -82,6 +87,9 @@ export function ArrayWorkspace() {
   const trieScene = current ? createTrieScene(current) : [];
   const trieEvents = current ? compileTrieEvents(current, previous) : [];
   const presentedTrieScene = presentTrieScene(trieScene, trieEvents);
+  const matrixScene = current ? createMatrixScene(current) : [];
+  const matrixEvents = current ? compileMatrixEvents(current, previous) : [];
+  const presentedMatrixScene = presentMatrixScene(matrixScene, matrixEvents);
 
   useEffect(() => {
     highlightEditorLine(current?.line, session.source);
@@ -145,6 +153,7 @@ export function ArrayWorkspace() {
           {presentedMapScene.length > 0 && <MapSceneView scene={presentedMapScene} events={mapEvents}/>}
           {presentedSetScene.length > 0 && <SetSceneView scene={presentedSetScene} events={setEvents}/>}
           {presentedTrieScene.length > 0 && <TrieSceneView scene={presentedTrieScene} events={trieEvents}/>}
+          {presentedMatrixScene.length > 0 && <MatrixSceneView scene={presentedMatrixScene} events={matrixEvents}/>}
         </section>
 
         <aside className="yv-inspector">
