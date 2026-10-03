@@ -295,7 +295,7 @@ test('Chrome extension navigates repeated-line checkpoints through the new works
   try {
     await page.locator('[data-yourvision-visualize="true"]').click();
     const host = page.locator('[data-yourvision-host="true"]');
-    for (let i = 0; i < 4; i++) await host.getByRole('button', { name: 'Next →' }).click();
+    for (let i = 0; i < 5; i++) await host.getByRole('button', { name: 'Next →' }).click();
     await expect(host.locator('.yv-statement')).toContainText('return visits');
     await host.getByRole('button', { name: 'Next →' }).click();
     await expect(host.locator('.yv-statement')).toContainText('int result');
