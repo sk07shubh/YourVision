@@ -6,6 +6,7 @@ import { displayValue, isPlainObject } from "../../utils/value";
 import { compileArrayStep } from "./compiler";
 import { ArrayScene } from "./ArrayScene";
 import { presentArrayScene } from "./presentation";
+import { PlaybackControls } from "../core/PlaybackControls";
 import "./array-workspace.css";
 
 export function ArrayWorkspace() {
@@ -26,7 +27,7 @@ export function ArrayWorkspace() {
 
   useEffect(() => {
     if (!session.playing) return;
-    const id = window.setInterval(() => sessionStore.next(), 650);
+    const id = window.setInterval(() => sessionStore.next(), session.playbackDelay);
     return () => window.clearInterval(id);
   }, [session.playing, session.index, session.states.length]);
 
@@ -113,15 +114,17 @@ export function ArrayWorkspace() {
         </aside>
       </div>
 
-      <footer className="yv-workspace-controls">
-        <div className="yv-workspace-progress"><div className="yv-progress-track"><div className="yv-progress-fill" style={{ width: ((session.index + 1) / session.states.length) * 100 + "%" }}/></div></div>
-        <div className="yv-workspace-buttons">
-          <button className="yv-btn" onClick={() => sessionStore.restart()} disabled={session.index <= 0}>↺ Restart</button>
-          <button className="yv-btn" onClick={() => sessionStore.prev()} disabled={session.index <= 0}>← Prev</button>
-          <button className="yv-btn primary" onClick={() => sessionStore.togglePlay()} disabled={session.states.length < 2}>{session.playing ? "Pause" : "Play"}</button>
-          <button className="yv-btn" onClick={() => sessionStore.next()} disabled={session.index >= session.states.length - 1}>Next →</button>
-        </div>
-      </footer>
+      <PlaybackControls
+        index={session.index}
+        length={session.states.length}
+        playing={session.playing}
+        playbackDelay={session.playbackDelay}
+        onRestart={() => sessionStore.restart()}
+        onPrev={() => sessionStore.prev()}
+        onTogglePlay={() => sessionStore.togglePlay()}
+        onNext={() => sessionStore.next()}
+        onPlaybackDelay={delay => sessionStore.setPlaybackDelay(delay)}
+      />
     </div>
   );
 }

@@ -2,12 +2,12 @@ import type { LeetCodeTestcase } from '../types/leetcode';
 import type { TraceState, VisualizationResponse } from '../types/trace';
 
 export interface SessionState {
-  open: boolean; loading: boolean; playing: boolean; source: string; testcase?: LeetCodeTestcase;
+  open: boolean; loading: boolean; playing: boolean; playbackDelay: number; source: string; testcase?: LeetCodeTestcase;
   response?: VisualizationResponse; states: TraceState[]; index: number; error?: string;
 }
 
 type Listener = () => void;
-let state: SessionState = { open: false, loading: false, playing: false, source: '', states: [], index: 0 };
+let state: SessionState = { open: false, loading: false, playing: false, playbackDelay: 650, source: '', states: [], index: 0 };
 const listeners = new Set<Listener>();
 
 export const sessionStore = {
@@ -15,7 +15,7 @@ export const sessionStore = {
   subscribe(fn: Listener) { listeners.add(fn); return () => listeners.delete(fn); },
   set(patch: Partial<SessionState>) { state = { ...state, ...patch }; listeners.forEach(fn => fn()); },
   begin(source: string, testcase: LeetCodeTestcase) {
-    this.set({ open: true, loading: true, playing: false, source, testcase, response: undefined, states: [], index: 0, error: undefined });
+    this.set({ open: true, loading: true, playing: false, playbackDelay: 650, source, testcase, response: undefined, states: [], index: 0, error: undefined });
   },
   finish(response: VisualizationResponse) {
     const states = response.states ?? [];
@@ -26,4 +26,5 @@ export const sessionStore = {
   prev() { if (state.index > 0) this.set({ index: state.index - 1, playing: false }); },
   restart() { this.set({ index: 0, playing: false }); },
   togglePlay() { if (state.states.length > 1) this.set({ playing: !state.playing }); },
+  setPlaybackDelay(playbackDelay: number) { this.set({ playbackDelay }); },
 };

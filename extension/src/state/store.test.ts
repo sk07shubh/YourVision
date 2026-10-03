@@ -10,5 +10,7 @@ describe('session store', () => {
     expect(sessionStore.get().index).toBe(0);
     sessionStore.next(); expect(sessionStore.get().index).toBe(1);
     sessionStore.prev(); expect(sessionStore.get().index).toBe(0);
+    sessionStore.setPlaybackDelay(325);
+    expect(sessionStore.get().playbackDelay).toBe(325);
   });
 });
