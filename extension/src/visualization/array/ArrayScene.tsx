@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import React from "react";
 import type { ArraySemanticEvent, ArrayScene as ArraySceneModel } from "./types";
 import { arrayWidth, arrayX, DEFAULT_ARRAY_LAYOUT } from "./layout";
 import { buildArrayAnimationTimeline } from "./timeline";
@@ -28,18 +29,14 @@ function eventClass(event: ArraySemanticEvent): string | undefined {
 
 export function ArrayScene({ scene, events = [] }: { scene: ArraySceneModel; events?: ArraySemanticEvent[] }) {
   const timeline = buildArrayAnimationTimeline(events);
-  const eventForPointer = (pointerId: string): CSSProperties | undefined => {
-    const frame = timeline.frames.find(item => item.event.type === "POINTER_MOVE" && item.event.pointerId === pointerId);
-    return frame ? { transitionDelay: frame.startMs + "ms" } : undefined;
-  };
+  const pointerFrames = (pointerId: string) =>
+    timeline.frames.filter(frame => frame.event.type === "POINTER_MOVE" && frame.event.pointerId === pointerId);
 
-  const eventForRange = (rangeId: string): CSSProperties | undefined => {
-    const frame = timeline.frames.find(item =>
-      (item.event.type === "RANGE_MOVE" || item.event.type === "RANGE_SHRINK" || item.event.type === "RANGE_EXPAND") &&
-      item.event.rangeId === rangeId
+  const rangeFrames = (rangeId: string) =>
+    timeline.frames.filter(frame =>
+      (frame.event.type === "RANGE_MOVE" || frame.event.type === "RANGE_SHRINK" || frame.event.type === "RANGE_EXPAND") &&
+      frame.event.rangeId === rangeId
     );
-    return frame ? { transitionDelay: frame.startMs + "ms" } : undefined;
-  };
 
   const eventForCell = (arrayId: string, index: number): { className?: string; style?: CSSProperties } => {
     const matches = timeline.frames.filter(frame => {
@@ -89,18 +86,32 @@ export function ArrayScene({ scene, events = [] }: { scene: ArraySceneModel; eve
           <div className="yv-array-name">{array.name}</div>
           <div className="yv-array-canvas">
             <svg className="yv-array-svg" width={Math.max(120, arrayWidth(array.cells.length, DEFAULT_ARRAY_LAYOUT))} height={112} viewBox={"0 0 " + Math.max(120, arrayWidth(array.cells.length, DEFAULT_ARRAY_LAYOUT)) + " 112"} role="img" aria-label={"Array " + array.name}>
-              {scene.ranges.filter(range => range.arrayId === array.id).map(range => (
-                <rect
-                  key={range.id}
-                  className={"yv-array-range " + range.kind}
-                  style={eventForRange(range.id)}
-                  x={arrayX(range.start, DEFAULT_ARRAY_LAYOUT)}
-                  y={12}
-                  width={Math.max(0, range.end - range.start + 1) * (DEFAULT_ARRAY_LAYOUT.cellWidth + DEFAULT_ARRAY_LAYOUT.cellGap)}
-                  height={50}
-                  rx={8}
-                />
-              ))}
+              {scene.ranges.filter(range => range.arrayId === array.id).map(range => {
+                const frames = rangeFrames(range.id);
+                return (
+                  <rect
+                    key={range.id}
+                    className={"yv-array-range " + range.kind}
+                    x={arrayX(range.start, DEFAULT_ARRAY_LAYOUT)}
+                    y={12}
+                    width={Math.max(0, range.end - range.start + 1) * (DEFAULT_ARRAY_LAYOUT.cellWidth + DEFAULT_ARRAY_LAYOUT.cellGap)}
+                    height={50}
+                    rx={8}
+                  >
+                    {frames.map((frame,frameIndex)=>{
+                      if(frame.event.type!=="RANGE_MOVE"&&frame.event.type!=="RANGE_SHRINK"&&frame.event.type!=="RANGE_EXPAND")return null;
+                      const previous=frameIndex>0?frames[frameIndex-1].event:undefined;
+                      const previousRange=previous&&(previous.type==="RANGE_MOVE"||previous.type==="RANGE_SHRINK"||previous.type==="RANGE_EXPAND")?previous:undefined;
+                      const fromStart=previousRange?.start??range.start;
+                      const fromEnd=previousRange?.end??range.end;
+                      return <React.Fragment key={frame.index}>
+                        <animate attributeName="x" from={arrayX(fromStart,DEFAULT_ARRAY_LAYOUT)} to={arrayX(frame.event.start,DEFAULT_ARRAY_LAYOUT)} dur={frame.motion.durationMs+"ms"} begin={frame.startMs+"ms"} fill="freeze"/>
+                        <animate attributeName="width" from={Math.max(0,fromEnd-fromStart+1)*(DEFAULT_ARRAY_LAYOUT.cellWidth+DEFAULT_ARRAY_LAYOUT.cellGap)} to={Math.max(0,frame.event.end-frame.event.start+1)*(DEFAULT_ARRAY_LAYOUT.cellWidth+DEFAULT_ARRAY_LAYOUT.cellGap)} dur={frame.motion.durationMs+"ms"} begin={frame.startMs+"ms"} fill="freeze"/>
+                      </React.Fragment>;
+                    })}
+                  </rect>
+                );
+              })}
               {array.cells.map(cell => {
                 const animation = eventForCell(array.id, cell.index);
                 return (
@@ -121,10 +132,29 @@ export function ArrayScene({ scene, events = [] }: { scene: ArraySceneModel; eve
                 const lane = pointerIndex % 4;
                 const top = lane < 2;
                 const y = top ? 4 + lane * 13 : 84 - (lane - 2) * 13;
+                const frames = pointerFrames(pointer.id);
+                const finalX = arrayX(pointer.index, DEFAULT_ARRAY_LAYOUT) + DEFAULT_ARRAY_LAYOUT.cellWidth / 2;
                 return (
-                  <g key={pointer.id} className="yv-array-pointer" style={eventForPointer(pointer.id)} transform={"translate(" + (arrayX(pointer.index, DEFAULT_ARRAY_LAYOUT) + DEFAULT_ARRAY_LAYOUT.cellWidth / 2) + "," + y + ")"}>
-                    <text textAnchor="middle">{pointer.label}</text>
-                    <path d={top ? "M0,7 L-5,14 L5,14 Z" : "M0,-7 L-5,-14 L5,-14 Z"}/>
+                  <g key={pointer.id} className="yv-array-pointer" transform={"translate(0," + y + ")"}>
+                    <g transform={"translate(" + finalX + ",0)"}>
+                      {frames.map(frame => {
+                        if (frame.event.type !== "POINTER_MOVE") return null;
+                        return (
+                          <animateTransform
+                            key={frame.index}
+                            attributeName="transform"
+                            type="translate"
+                            from={(arrayX(frame.event.from, DEFAULT_ARRAY_LAYOUT) + DEFAULT_ARRAY_LAYOUT.cellWidth / 2) + " 0"}
+                            to={(arrayX(frame.event.to, DEFAULT_ARRAY_LAYOUT) + DEFAULT_ARRAY_LAYOUT.cellWidth / 2) + " 0"}
+                            dur={frame.motion.durationMs + "ms"}
+                            begin={frame.startMs + "ms"}
+                            fill="freeze"
+                          />
+                        );
+                      })}
+                      <text textAnchor="middle">{pointer.label}</text>
+                      <path d={top ? "M0,7 L-5,14 L5,14 Z" : "M0,-7 L-5,-14 L5,-14 Z"}/>
+                    </g>
                   </g>
                 );
               })}
