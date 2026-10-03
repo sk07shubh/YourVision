@@ -17,6 +17,22 @@ function updateArray(scene: ArrayScene, arrayId: string, updater: (values: unkno
   };
 }
 
+function insertArrayValue(scene: ArrayScene, arrayId: string, index: number, value: unknown): ArrayScene {
+  return updateArray(scene, arrayId, values => {
+    const next = [...values];
+    next.splice(index, 0, value);
+    return next;
+  });
+}
+
+function removeArrayValue(scene: ArrayScene, arrayId: string, index: number): ArrayScene {
+  return updateArray(scene, arrayId, values => {
+    const next = [...values];
+    next.splice(index, 1);
+    return next;
+  });
+}
+
 export function applyArraySemanticEvent(scene: ArrayScene, event: ArraySemanticEvent): ArrayScene {
   switch (event.type) {
     case "ARRAY_CREATE":
@@ -41,6 +57,12 @@ export function applyArraySemanticEvent(scene: ArrayScene, event: ArraySemanticE
         [next[event.first], next[event.second]] = [next[event.second], next[event.first]];
         return next;
       }), event.arrayId, [event.first, event.second], "swap");
+    case "ARRAY_INSERT":
+      return withCellState(insertArrayValue(scene, event.arrayId, event.index, event.value), event.arrayId, [event.index], "write");
+    case "ARRAY_REMOVE":
+      return removeArrayValue(scene, event.arrayId, event.index);
+    case "ARRAY_SHIFT":
+      return scene;
     case "POINTER_CREATE":
       return withPointer(scene, { id: event.pointerId, label: event.label, arrayId: event.arrayId, index: event.index });
     case "POINTER_MOVE": {

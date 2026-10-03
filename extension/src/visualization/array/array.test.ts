@@ -64,6 +64,60 @@ describe("array visualization foundation", () => {
     });
   });
 
+  it("detects an array read from the executed statement", () => {
+    const current = state({ line: 6, variables: { i: 2, left: 0, right: 3 } });
+    const events = compileArrayEvents(current, state({ line: 5 }), "int x = nums[i];");
+
+    expect(events).toContainEqual({
+      type: "ARRAY_READ",
+      arrayId: "nums-1",
+      index: 2,
+      value: 11,
+      sourceLine: 6,
+      sourceExpression: "int x = nums[i];"
+    });
+  });
+
+  it("detects array comparison without treating the compared cell as a write", () => {
+    const current = state({ line: 7, variables: { i: 1, j: 3, left: 0, right: 3 } });
+    const events = compileArrayEvents(current, state({ line: 6 }), "if (nums[i] < nums[j])");
+
+    expect(events).toContainEqual({
+      type: "ARRAY_COMPARE",
+      arrayId: "nums-1",
+      indices: [1, 3],
+      sourceLine: 7,
+      sourceExpression: "if (nums[i] < nums[j])"
+    });
+    expect(events.filter(event => event.type === "ARRAY_WRITE")).toHaveLength(0);
+  });
+
+  it("detects insertion and removal as structural operations", () => {
+    const previous = state();
+    const inserted = state({ sequence: 2, arrays: { nums: { $arrayId: "nums-1", values: [2, 7, 9, 11, 15] } } });
+    const removed = state({ sequence: 2, arrays: { nums: { $arrayId: "nums-1", values: [2, 11, 15] } } });
+
+    expect(compileArrayEvents(inserted, previous)).toContainEqual({
+      type: "ARRAY_INSERT", arrayId: "nums-1", index: 2, value: 9, sourceLine: 4
+    });
+    expect(compileArrayEvents(removed, previous)).toContainEqual({
+      type: "ARRAY_REMOVE", arrayId: "nums-1", index: 1, value: 7, sourceLine: 4
+    });
+  });
+
+  it("detects a sliding-window range change", () => {
+    const previous = state({ variables: { left: 0, right: 3, i: 0 } });
+    const current = state({ sequence: 2, variables: { left: 1, right: 3, i: 1 } });
+
+    expect(compileArrayEvents(current, previous, "int x = nums[i];")).toContainEqual({
+      type: "RANGE_SHRINK",
+      rangeId: "nums-1:range:nums-1:left:nums-1:right",
+      start: 1,
+      end: 3,
+      sourceLine: 4
+    });
+  });
+
   it("applies semantic writes without recreating the scene", () => {
     const scene = createArrayScene(state(), "nums[i] = 0;");
     const next = applyArraySemanticEvent(scene, {

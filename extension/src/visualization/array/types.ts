@@ -16,11 +16,14 @@ export interface ArrayScene {
 }
 
 export type ArraySemanticEvent =
-  | { type: "ARRAY_CREATE"; arrayId: string; name: string; values: unknown[]; sourceLine?: number }
-  | { type: "ARRAY_READ"; arrayId: string; index: number; value: unknown; sourceLine?: number }
-  | { type: "ARRAY_WRITE"; arrayId: string; index: number; before: unknown; after: unknown; sourceLine?: number }
-  | { type: "ARRAY_COMPARE"; arrayId: string; indices: number[]; sourceLine?: number }
-  | { type: "ARRAY_SWAP"; arrayId: string; first: number; second: number; sourceLine?: number }
+  | { type: "ARRAY_CREATE"; arrayId: string; name: string; values: unknown[]; sourceLine?: number; sourceExpression?: string }
+  | { type: "ARRAY_READ"; arrayId: string; index: number; value: unknown; sourceLine?: number; sourceExpression?: string }
+  | { type: "ARRAY_WRITE"; arrayId: string; index: number; before: unknown; after: unknown; sourceLine?: number; sourceExpression?: string }
+  | { type: "ARRAY_COMPARE"; arrayId: string; indices: number[]; sourceLine?: number; sourceExpression?: string }
+  | { type: "ARRAY_SWAP"; arrayId: string; first: number; second: number; sourceLine?: number; sourceExpression?: string }
+  | { type: "ARRAY_INSERT"; arrayId: string; index: number; value: unknown; sourceLine?: number; sourceExpression?: string }
+  | { type: "ARRAY_REMOVE"; arrayId: string; index: number; value: unknown; sourceLine?: number; sourceExpression?: string }
+  | { type: "ARRAY_SHIFT"; arrayId: string; from: number; to: number; direction: "left" | "right"; sourceLine?: number; sourceExpression?: string }
   | { type: "POINTER_CREATE"; pointerId: string; label: string; arrayId: string; index: number; sourceLine?: number }
   | { type: "POINTER_MOVE"; pointerId: string; from: number; to: number; sourceLine?: number }
   | { type: "RANGE_CREATE"; range: ArrayRange; sourceLine?: number }
