@@ -1045,6 +1045,17 @@ public class YourVisionTracer {
                 return boxedPrimitive;
             }
 
+            Object graphSnapshot =
+                snapshotGraph(
+                    object,
+                    depth,
+                    activeObjects
+                );
+
+            if (graphSnapshot != null) {
+                return graphSnapshot;
+            }
+
             Object mapSnapshot =
                 snapshotMap(
                     object,
@@ -1187,6 +1198,226 @@ public class YourVisionTracer {
         if (value instanceof CharValue v) return String.valueOf(v.charValue());
 
         return null;
+    }
+
+    private static Object snapshotGraph(
+        ObjectReference object,
+        int depth,
+        Set<Long> activeObjects
+    ) {
+        Value nodesValue = fieldValue(object, "nodes");
+        Value edgesValue = fieldValue(object, "edges");
+
+        if (nodesValue == null || edgesValue == null) {
+            return null;
+        }
+
+        String type = object.referenceType().name();
+
+        if (!type.contains("Graph") && !type.contains("graph")) {
+            return null;
+        }
+
+        long id = object.uniqueID();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("$graphId", String.valueOf(id));
+        result.put("$type", type);
+
+        if (!activeObjects.add(id)) {
+            result.put("$ref", String.valueOf(id));
+            return result;
+        }
+
+        try {
+            String name = graphName(object);
+            if (name != null) {
+                result.put("name", name);
+            }
+
+            result.put(
+                "nodes",
+                snapshotGraphElements(
+                    nodesValue,
+                    depth + 1,
+                    activeObjects,
+                    true
+                )
+            );
+            result.put(
+                "edges",
+                snapshotGraphElements(
+                    edgesValue,
+                    depth + 1,
+                    activeObjects,
+                    false
+                )
+            );
+
+            return result;
+        } catch (Exception ignored) {
+            return null;
+        } finally {
+            activeObjects.remove(id);
+        }
+    }
+
+    private static String graphName(ObjectReference object) {
+        Value value = fieldValue(object, "name");
+        if (value instanceof StringReference text) {
+            return text.value();
+        }
+        return null;
+    }
+
+    private static List<Object> snapshotGraphElements(
+        Value collection,
+        int depth,
+        Set<Long> activeObjects,
+        boolean node
+    ) {
+        List<Object> raw = new java.util.ArrayList<>();
+
+        if (collection instanceof ArrayReference array) {
+            int limit = Math.min(array.length(), MAX_ARRAY_ITEMS);
+            for (int i = 0; i < limit; i++) {
+                raw.add(
+                    snapshotValue(
+                        array.getValue(i),
+                        depth + 1,
+                        activeObjects
+                    )
+                );
+            }
+        } else if (collection instanceof ObjectReference reference) {
+            Object snapshot =
+                snapshotCollection(
+                    reference,
+                    depth + 1,
+                    activeObjects
+                );
+
+            if (snapshot instanceof Map<?, ?> map) {
+                Object values = map.get("values");
+                if (values instanceof List<?> list) {
+                    raw.addAll(list);
+                }
+            }
+        }
+
+        List<Object> normalized = new java.util.ArrayList<>();
+
+        for (int i = 0; i < raw.size(); i++) {
+            Object item = raw.get(i);
+            Map<String, Object> fields = graphFields(item);
+
+            if (node) {
+                Object nodeId = firstGraphField(fields, "id", "key", "value");
+                Object label = firstGraphField(fields, "label", "value", "id");
+
+                if (nodeId == null) {
+                    nodeId = String.valueOf(i);
+                }
+                if (label == null) {
+                    label = nodeId;
+                }
+
+                Map<String, Object> normalizedNode =
+                    new LinkedHashMap<>();
+                normalizedNode.put("id", graphEndpointId(nodeId));
+                normalizedNode.put("label", label);
+                normalized.add(normalizedNode);
+            } else {
+                Object from =
+                    firstGraphField(fields, "from", "source", "u");
+                Object to =
+                    firstGraphField(fields, "to", "target", "v");
+
+                if (from == null || to == null) {
+                    continue;
+                }
+
+                Map<String, Object> normalizedEdge =
+                    new LinkedHashMap<>();
+                Object edgeId =
+                    firstGraphField(fields, "id", "key");
+                normalizedEdge.put(
+                    "id",
+                    edgeId == null
+                        ? graphEndpointId(from) + "->" + graphEndpointId(to) + "#" + i
+                        : graphEndpointId(edgeId)
+                );
+                normalizedEdge.put("from", graphEndpointId(from));
+                normalizedEdge.put("to", graphEndpointId(to));
+
+                Object directed =
+                    firstGraphField(fields, "directed");
+                normalizedEdge.put(
+                    "directed",
+                    directed instanceof Boolean
+                        ? directed
+                        : true
+                );
+                normalized.add(normalizedEdge);
+            }
+        }
+
+        return normalized;
+    }
+
+    private static Map<String, Object> graphFields(Object item) {
+        if (!(item instanceof Map<?, ?> map)) {
+            return new LinkedHashMap<>();
+        }
+
+        Object fields = map.get("fields");
+        if (fields instanceof Map<?, ?> fieldMap) {
+            Map<String, Object> result = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : fieldMap.entrySet()) {
+                result.put(
+                    String.valueOf(entry.getKey()),
+                    entry.getValue()
+                );
+            }
+            return result;
+        }
+
+        return new LinkedHashMap<>();
+    }
+
+    private static Object firstGraphField(
+        Map<String, Object> fields,
+        String... names
+    ) {
+        for (String name : names) {
+            if (fields.containsKey(name) && fields.get(name) != null) {
+                return fields.get(name);
+            }
+        }
+        return null;
+    }
+
+    private static String graphEndpointId(Object value) {
+        if (value instanceof Map<?, ?> map) {
+            Object objectId = map.get("$objectId");
+            if (objectId != null) {
+                return String.valueOf(objectId);
+            }
+
+            Object id = map.get("id");
+            if (id != null) {
+                return String.valueOf(id);
+            }
+
+            Object fields = map.get("fields");
+            if (fields instanceof Map<?, ?> fieldMap) {
+                Object fieldId = fieldMap.get("id");
+                if (fieldId != null) {
+                    return String.valueOf(fieldId);
+                }
+            }
+        }
+
+        return String.valueOf(value);
     }
 
     private static Object snapshotMap(
