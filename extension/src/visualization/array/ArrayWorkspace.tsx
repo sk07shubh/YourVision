@@ -28,6 +28,10 @@ import { createTreeScene } from "../tree/scene";
 import { compileTreeEvents } from "../tree/compiler";
 import { presentTreeScene } from "../tree/presentation";
 import { TreeScene as TreeSceneView } from "../tree/TreeScene";
+import { createHeapScene } from "../heap/scene";
+import { compileHeapEvents } from "../heap/compiler";
+import { presentHeapScene } from "../heap/presentation";
+import { HeapScene as HeapSceneView } from "../heap/HeapScene";
 
 export function ArrayWorkspace() {
   const session = useSession();
@@ -54,6 +58,9 @@ export function ArrayWorkspace() {
   const treeScene = current ? createTreeScene(current) : [];
   const treeEvents = current ? compileTreeEvents(current, previous) : [];
   const presentedTreeScene = presentTreeScene(treeScene, treeEvents);
+  const heapScene = current ? createHeapScene(current) : [];
+  const heapEvents = current ? compileHeapEvents(current, previous) : [];
+  const presentedHeapScene = presentHeapScene(heapScene, heapEvents);
 
   useEffect(() => {
     highlightEditorLine(current?.line, session.source);
@@ -113,6 +120,7 @@ export function ArrayWorkspace() {
           {presentedQueueScene.length > 0 && <QueueScene scene={presentedQueueScene} events={queueEvents}/>} {presentedLinkedListScene.length > 0 && <LinkedListScene scene={presentedLinkedListScene} events={linkedListEvents}/>}
           {presentedDequeScene.length > 0 && <DequeScene scene={presentedDequeScene} events={dequeEvents}/>}
           {presentedTreeScene.length > 0 && <TreeSceneView scene={presentedTreeScene} events={treeEvents}/>}
+          {presentedHeapScene.length > 0 && <HeapSceneView scene={presentedHeapScene} events={heapEvents}/>}
         </section>
 
         <aside className="yv-inspector">
