@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import React from "react";
 import type { ArraySemanticEvent, ArrayScene as ArraySceneModel } from "./types";
 import { arrayWidth, arrayX, DEFAULT_ARRAY_LAYOUT } from "./layout";
 import { buildArrayAnimationTimeline } from "./timeline";
