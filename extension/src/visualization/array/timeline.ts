@@ -1,3 +1,8 @@
+import {
+  buildAnimationTimeline,
+  type AnimationMotion,
+  type AnimationTimeline
+} from "../core/animation";
 import type { ArraySemanticEvent } from "./types";
 
 export type MotionKind =
@@ -8,16 +13,16 @@ export type MotionKind =
   | "value-move"
   | "range-move";
 
-export interface MotionToken {
-  kind: MotionKind;
-  durationMs: number;
-  delayMs: number;
-}
-
-export interface ArrayAnimationFrame {
+export type MotionToken = AnimationMotion & { kind: MotionKind };
+export type ArrayAnimationFrame = {
+  index: number;
   event: ArraySemanticEvent;
   motion: MotionToken;
-}
+  startMs: number;
+  endMs: number;
+};
+
+export type ArrayAnimationTimeline = AnimationTimeline<ArraySemanticEvent>;
 
 export const ARRAY_MOTION: Record<MotionKind, MotionToken> = {
   instant: { kind: "instant", durationMs: 0, delayMs: 0 },
@@ -48,5 +53,10 @@ export function motionFor(event: ArraySemanticEvent): MotionToken {
 }
 
 export function buildAnimationFrame(event: ArraySemanticEvent): ArrayAnimationFrame {
-  return { event, motion: motionFor(event) };
+  const timeline = buildAnimationTimeline([event], motionFor);
+  return timeline.frames[0];
+}
+
+export function buildArrayAnimationTimeline(events: ArraySemanticEvent[]): ArrayAnimationTimeline {
+  return buildAnimationTimeline(events, motionFor);
 }
