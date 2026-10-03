@@ -1,4 +1,5 @@
 import type { ArraySemanticEvent, ArrayScene as ArraySceneModel } from "./types";
+import { arrayWidth, arrayX, DEFAULT_ARRAY_LAYOUT } from "./layout";
 import "./array-scene.css";
 
 function display(value: unknown): string {
@@ -29,23 +30,28 @@ export function ArrayScene({ scene, events = [] }: { scene: ArraySceneModel; eve
         <section className="yv-array-block" key={array.id}>
           <div className="yv-array-name">{array.name}</div>
           <div className="yv-array-canvas">
-            <svg className="yv-array-svg" width={Math.max(120, array.cells.length * 64 + 24)} height={96} viewBox={"0 0 " + Math.max(120, array.cells.length * 64 + 24) + " 96"} role="img" aria-label={"Array " + array.name}>
+            <svg className="yv-array-svg" width={Math.max(120, arrayWidth(array.cells.length, DEFAULT_ARRAY_LAYOUT))} height={112} viewBox={"0 0 " + Math.max(120, arrayWidth(array.cells.length, DEFAULT_ARRAY_LAYOUT)) + " 112"} role="img" aria-label={"Array " + array.name}>
               {scene.ranges.filter(range => range.arrayId === array.id).map(range => (
-                <rect key={range.id} className={"yv-array-range " + range.kind} x={12 + range.start * 64} y={12} width={Math.max(0, range.end - range.start + 1) * 64} height={50} rx={8}/>
+                <rect key={range.id} className={"yv-array-range " + range.kind} x={arrayX(range.start, DEFAULT_ARRAY_LAYOUT)} y={12} width={Math.max(0, range.end - range.start + 1) * (DEFAULT_ARRAY_LAYOUT.cellWidth + DEFAULT_ARRAY_LAYOUT.cellGap)} height={50} rx={8}/>
               ))}
               {array.cells.map(cell => (
-                <g key={cell.index} transform={"translate(" + (12 + cell.index * 64) + ",18)"}>
+                <g key={cell.index} transform={"translate(" + arrayX(cell.index, DEFAULT_ARRAY_LAYOUT) + ",18)"}>
                   <rect className={"yv-array-cell " + cell.state + " " + (eventForCell(array.id, cell.index) ?? "")} width={58} height={42} rx={7}/>
                   <text className="yv-array-value" x={29} y={26} textAnchor="middle">{display(cell.value)}</text>
                   <text className="yv-array-index" x={29} y={59} textAnchor="middle">{cell.index}</text>
                 </g>
               ))}
-              {scene.pointers.filter(pointer => pointer.arrayId === array.id).map((pointer, pointerIndex) => (
-                <g key={pointer.id} className="yv-array-pointer" transform={"translate(" + (12 + pointer.index * 64 + 29) + "," + (pointerIndex % 2 === 0 ? 4 : 82) + ")"}>
-                  <text textAnchor="middle">{pointer.label}</text>
-                  <path d={pointerIndex % 2 === 0 ? "M0,7 L-5,14 L5,14 Z" : "M0,-7 L-5,-14 L5,-14 Z"}/>
-                </g>
-              ))}
+              {scene.pointers.filter(pointer => pointer.arrayId === array.id).map((pointer, pointerIndex) => {
+                const lane = pointerIndex % 4;
+                const top = lane < 2;
+                const y = top ? 4 + lane * 13 : 84 - (lane - 2) * 13;
+                return (
+                  <g key={pointer.id} className="yv-array-pointer" transform={"translate(" + (arrayX(pointer.index, DEFAULT_ARRAY_LAYOUT) + DEFAULT_ARRAY_LAYOUT.cellWidth / 2) + "," + y + ")"}>
+                    <text textAnchor="middle">{pointer.label}</text>
+                    <path d={top ? "M0,7 L-5,14 L5,14 Z" : "M0,-7 L-5,-14 L5,-14 Z"}/>
+                  </g>
+                );
+              })}
             </svg>
           </div>
         </section>
