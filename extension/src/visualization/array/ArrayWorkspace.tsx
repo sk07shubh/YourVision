@@ -84,8 +84,8 @@ export function ArrayWorkspace() {
             <div className="yv-inspector-vars">
               {step.scene.variables.length === 0 && <span className="yv-inspector-muted">No local variables</span>}
               {step.scene.variables.map(variable => (
-                <div className={"yv-inspector-var " + (variable.changed ? "changed" : "")} key={variable.name}>
-                  <span>{variable.name}</span><code>{displayValue(variable.value)}</code>
+                <div className={"yv-inspector-var yv-var " + (variable.changed ? "changed" : "")} key={variable.name}>
+                  <span className="yv-var-name">{variable.name}</span><code className="yv-code">{displayValue(variable.value)}</code>
                 </div>
               ))}
             </div>
@@ -94,7 +94,7 @@ export function ArrayWorkspace() {
           {current.callStack.length > 0 && (
             <section className="yv-inspector-section">
               <div className="yv-inspector-title">Call stack</div>
-              <div className="yv-call-stack">
+              <div className="yv-call-stack yv-stack">
                 {[...current.callStack].reverse().map((frame, index) => (
                   <div className={"yv-call-frame " + (index === 0 ? "active" : "")} key={frame + index}>{frame}</div>
                 ))}
@@ -105,7 +105,7 @@ export function ArrayWorkspace() {
           {finished && eventData?.returnValue !== undefined && (
             <section className="yv-inspector-section">
               <div className="yv-inspector-title">Output</div>
-              <code className="yv-output yv-output-value">{displayValue(eventData.returnValue)}</code>
+              <code className="yv-output yv-output-value yv-code">{displayValue(eventData.returnValue)}</code>
             </section>
           )}
         </aside>
@@ -114,10 +114,10 @@ export function ArrayWorkspace() {
       <footer className="yv-workspace-controls">
         <div className="yv-workspace-progress"><div className="yv-progress-track"><div className="yv-progress-fill" style={{ width: ((session.index + 1) / session.states.length) * 100 + "%" }}/></div></div>
         <div className="yv-workspace-buttons">
-          <button className="yv-btn" onClick={() => sessionStore.restart()} disabled={session.index <= 0}>↺</button>
-          <button className="yv-btn" onClick={() => sessionStore.prev()} disabled={session.index <= 0}>←</button>
+          <button className="yv-btn" onClick={() => sessionStore.restart()} disabled={session.index <= 0}>↺ Restart</button>
+          <button className="yv-btn" onClick={() => sessionStore.prev()} disabled={session.index <= 0}>← Prev</button>
           <button className="yv-btn primary" onClick={() => sessionStore.togglePlay()} disabled={session.states.length < 2}>{session.playing ? "Pause" : "Play"}</button>
-          <button className="yv-btn" onClick={() => sessionStore.next()} disabled={session.index >= session.states.length - 1}>→</button>
+          <button className="yv-btn" onClick={() => sessionStore.next()} disabled={session.index >= session.states.length - 1}>Next →</button>
         </div>
       </footer>
     </div>

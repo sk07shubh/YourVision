@@ -13,7 +13,7 @@ function display(value: unknown): string {
 
 export function ArrayScene({ scene }: { scene: ArraySceneModel }) {
   return (
-    <div className="yv-array-scene" data-testid="yv-array-scene">
+    <div className="yv-array-scene yv-array" data-testid="yv-array-scene">
       {scene.arrays.map(array => (
         <section className="yv-array-block" key={array.id}>
           <div className="yv-array-name">{array.name}</div>
