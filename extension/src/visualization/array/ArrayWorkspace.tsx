@@ -16,6 +16,10 @@ import { createQueueScene } from "../queue/scene";
 import { compileQueueEvents } from "../queue/compiler";
 import { presentQueueScene } from "../queue/presentation";
 import { QueueScene } from "../queue/QueueScene";
+import { createLinkedListScene } from "../linked-list/scene";
+import { compileLinkedListEvents } from "../linked-list/compiler";
+import { presentLinkedListScene } from "../linked-list/presentation";
+import { LinkedListScene } from "../linked-list/LinkedListScene";
 
 export function ArrayWorkspace() {
   const session = useSession();
@@ -33,6 +37,9 @@ export function ArrayWorkspace() {
   const queueScene = current ? createQueueScene(current) : [];
   const queueEvents = current ? compileQueueEvents(current, previous) : [];
   const presentedQueueScene = presentQueueScene(queueScene, queueEvents);
+  const linkedListScene = current ? createLinkedListScene(current) : [];
+  const linkedListEvents = current ? compileLinkedListEvents(current, previous) : [];
+  const presentedLinkedListScene = presentLinkedListScene(linkedListScene, linkedListEvents);
 
   useEffect(() => {
     highlightEditorLine(current?.line, session.source);
@@ -89,7 +96,7 @@ export function ArrayWorkspace() {
           </div>
           <ArrayScene scene={presentedScene ?? step.scene} events={step.events}/>
           {presentedStackScene.length > 0 && <StackScene scene={presentedStackScene} events={stackEvents}/>}
-          {presentedQueueScene.length > 0 && <QueueScene scene={presentedQueueScene} events={queueEvents}/>}
+          {presentedQueueScene.length > 0 && <QueueScene scene={presentedQueueScene} events={queueEvents}/>}\n          {presentedLinkedListScene.length > 0 && <LinkedListScene scene={presentedLinkedListScene} events={linkedListEvents}/>}
         </section>
 
         <aside className="yv-inspector">
