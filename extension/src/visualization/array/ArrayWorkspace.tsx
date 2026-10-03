@@ -104,6 +104,7 @@ export function ArrayWorkspace() {
           <ArrayScene scene={presentedScene ?? step.scene} events={step.events}/>
           {presentedStackScene.length > 0 && <StackScene scene={presentedStackScene} events={stackEvents}/>}
           {presentedQueueScene.length > 0 && <QueueScene scene={presentedQueueScene} events={queueEvents}/>}\n          {presentedLinkedListScene.length > 0 && <LinkedListScene scene={presentedLinkedListScene} events={linkedListEvents}/>}
+          {presentedDequeScene.length > 0 && <DequeScene scene={presentedDequeScene} events={dequeEvents}/>}
         </section>
 
         <aside className="yv-inspector">
