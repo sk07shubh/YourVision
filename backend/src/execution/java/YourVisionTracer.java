@@ -890,7 +890,8 @@ public class YourVisionTracer {
                     snapshotValue(
                         frame.getValue(variable),
                         0,
-                        new HashSet<>()
+                        new HashSet<>(),
+                        variable.typeName()
                     )
                 );
             }
@@ -917,7 +918,8 @@ public class YourVisionTracer {
                         snapshotValue(
                             frame.getValue(variable),
                             0,
-                            new HashSet<>()
+                            new HashSet<>(),
+                            variable.typeName()
                         )
                     );
                 } catch (Exception ignored) {
@@ -950,6 +952,15 @@ public class YourVisionTracer {
         Value value,
         int depth,
         Set<Long> activeObjects
+    ) {
+        return snapshotValue(value,depth,activeObjects,null);
+    }
+
+    private static Object snapshotValue(
+        Value value,
+        int depth,
+        Set<Long> activeObjects,
+        String declaredType
     ) {
         if (value == null) {
             return null;
@@ -1071,7 +1082,8 @@ public class YourVisionTracer {
                 snapshotCollection(
                     object,
                     depth,
-                    activeObjects
+                    activeObjects,
+                    declaredType
                 );
 
             if (collectionSnapshot != null) {
@@ -1544,6 +1556,15 @@ public class YourVisionTracer {
         int depth,
         Set<Long> activeObjects
     ) {
+        return snapshotCollection(object,depth,activeObjects,null);
+    }
+
+    private static Object snapshotCollection(
+        ObjectReference object,
+        int depth,
+        Set<Long> activeObjects,
+        String declaredType
+    ) {
         String type =
             object.referenceType().name();
 
@@ -1584,6 +1605,7 @@ public class YourVisionTracer {
         result.put("$collectionId", String.valueOf(id));
         result.put("$type", type);
         result.put("$kind", kind);
+        if (declaredType != null && !declaredType.isBlank()) result.put("$declaredType",declaredType);
 
         if (!activeObjects.add(id)) {
             result.put("$ref", String.valueOf(id));
