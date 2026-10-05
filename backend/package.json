@@ -23,6 +23,7 @@
         "test:trace-replay": "tsx scripts/smoke-trace-replay.ts",
         "test:java-safety": "tsx scripts/smoke-java-safety.ts",
         "test:data-structures": "tsx scripts/smoke-java-data-structures.ts",
+        "test:visualization-traces": "tsx scripts/smoke-java-visualization-traces.ts",
         "test:leetcode-nodes": "tsx scripts/smoke-leetcode-nodes.ts"
     },
     "keywords": [],
