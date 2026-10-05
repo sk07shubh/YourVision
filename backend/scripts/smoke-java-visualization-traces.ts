@@ -133,6 +133,7 @@ const matrix=Object.values(structuresState?.arrays??{}).find(value=>{
     return Array.isArray(record.values)&&record.values.every((row:unknown)=>Array.isArray(row));
 }) as Record<string,any>|undefined;
 assert(matrix!==undefined,"matrix visualization snapshot missing");
+if(!matrix)throw new Error("matrix visualization snapshot missing");
 assert(JSON.stringify(matrix.values)==="[[1,2],[3,4]]","matrix visualization snapshot incorrect");
 
 console.log("PASS: Java graph visualization trace");
