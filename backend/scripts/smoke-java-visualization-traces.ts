@@ -99,7 +99,7 @@ assert(linked?.$kind==="linkedList"&&JSON.stringify(linked.values)==="[7,8]","li
 assert(heap?.$kind==="priorityQueue"&&JSON.stringify(heap.values)==="[2,9,5]","heap visualization snapshot incorrect");
 assert(map?.$mapId&&Array.isArray(map.entries)&&map.entries.length===2,"map visualization snapshot incorrect");
 assert(set?.$kind==="set"&&Array.isArray(set.values)&&set.values.length===2,"set visualization snapshot incorrect");
-const matrix=Object.values(structures).find(value=>{
+const matrix=Object.values(structuresState?.arrays??{}).find(value=>{
     const record=value as Record<string,any>;
     return Array.isArray(record.values)&&record.values.every((row:unknown)=>Array.isArray(row));
 }) as Record<string,any>|undefined;
