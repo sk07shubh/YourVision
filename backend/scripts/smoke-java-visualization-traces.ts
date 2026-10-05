@@ -31,6 +31,21 @@ class Solution {
         Graph(String name){this.name=name;}
     }
 
+    static class TreeNode {
+        int val;
+        TreeNode left;
+        TreeNode right;
+        TreeNode(int val){this.val=val;}
+    }
+
+    public int tree(){
+        TreeNode root=new TreeNode(10);
+        root.left=new TreeNode(5);
+        root.right=new TreeNode(15);
+        root.left.left=new TreeNode(2);
+        return root.val+root.left.val+root.right.val+root.left.left.val;
+    }
+
     public int collections(){
         Stack<Integer> stack=new Stack<>();
         stack.push(1); stack.push(2);
@@ -80,6 +95,20 @@ assert(graph.nodes[0].id==="a"&&graph.nodes[0].label==="A","graph node normaliza
 assert(graph.edges[0].from==="a"&&graph.edges[0].to==="b","graph edge endpoints incorrect");
 assert(graph.edges[0].directed===true,"directed edge flag incorrect");
 assert(graph.edges[1].directed===false,"undirected edge flag incorrect");
+
+const treeResult=await runJava(source,{method:"tree"});
+assert(treeResult.kind==="OK","tree visualization trace failed");
+const treeState=treeResult.states?.at(-1);
+const treeRoot=treeState?.variables?.root as Record<string,any>|undefined;
+assert(typeof treeRoot?.$objectId==="string","tree root object snapshot missing");
+const treeObjects=treeState?.objects??{};
+const treeLeftId=treeRoot?.fields?.left?.$ref??treeRoot?.fields?.left?.$objectId;
+const treeRightId=treeRoot?.fields?.right?.$ref??treeRoot?.fields?.right?.$objectId;
+assert(typeof treeLeftId==="string"&&typeof treeRightId==="string","tree child references missing");
+assert((treeObjects[treeLeftId] as Record<string,any>)?.fields?.val===5,"tree left node incorrect");
+assert((treeObjects[treeRightId] as Record<string,any>)?.fields?.val===15,"tree right node incorrect");
+const treeLeftLeft=(treeObjects[treeLeftId] as Record<string,any>)?.fields?.left?.$ref;
+assert(typeof treeLeftLeft==="string"&&(treeObjects[treeLeftLeft] as Record<string,any>)?.fields?.val===2,"tree nested node incorrect");
 
 const structuresResult=await runJava(source,{method:"collections"});
 assert(structuresResult.kind==="OK","collection visualization trace failed");
