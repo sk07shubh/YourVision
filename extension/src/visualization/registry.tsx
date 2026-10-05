@@ -29,7 +29,13 @@ import"./graph/graph-scene.css";
 interface VisualizationContext{state:TraceState;previous?:TraceState}
 interface VisualizationPipeline{ id:string; render(context:VisualizationContext):ReactNode }
 
-function pipeline<E,S extends unknown[]>(
+function hasSceneContent(scene:unknown):boolean{
+  if(Array.isArray(scene))return scene.length>0;
+  if(scene&&typeof scene==="object")return Object.keys(scene).length>0;
+  return scene!==undefined&&scene!==null;
+}
+
+function pipeline<E,S>(
   module:VisualizationModule<E,S>,
   View:ComponentType<{scene:S;events:E[]}>
 ):VisualizationPipeline{
@@ -39,7 +45,7 @@ function pipeline<E,S extends unknown[]>(
       const scene=module.createScene(state,undefined,previous);
       const events=module.compileEvents(state,previous);
       const presented=module.presentScene(scene,events);
-      if(Array.isArray(presented)&&presented.length===0)return null;
+      if(!hasSceneContent(presented))return null;
       return <View scene={presented} events={events}/>;
     }
   };
