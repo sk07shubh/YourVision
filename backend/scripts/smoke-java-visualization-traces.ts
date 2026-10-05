@@ -53,6 +53,7 @@ const graph=Object.values(state?.variables??{})
     }) as Record<string,any>|undefined;
 
 assert(graph!==undefined,"graph snapshot missing");
+if(!graph)throw new Error("graph snapshot missing");
 assert(graph.name==="demo","graph name missing");
 assert(Array.isArray(graph.nodes)&&graph.nodes.length===2,"graph nodes incorrect");
 assert(Array.isArray(graph.edges)&&graph.edges.length===2,"graph edges incorrect");
