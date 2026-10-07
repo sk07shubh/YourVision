@@ -531,8 +531,7 @@ const returnSource = [
     "    return new int[] {0, 1};",
     "  }",
     "}"
-].join("
-");
+].join("\n");
 const returnEnriched = enrichTrace(returnTrace, returnSource);
 const returnStep = returnEnriched.events.find(event => event.type === "STEP");
 if (
