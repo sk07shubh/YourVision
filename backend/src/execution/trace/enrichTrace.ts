@@ -178,13 +178,13 @@ function extractConditionExpression(statement: string): string | undefined {
             return balancedParenthesized(trimmed, trimmed.indexOf("("));
         }
     }
-    if (/^for\\s*\\(/.test(trimmed)) {
+    if (/^for\s*\(/.test(trimmed)) {
         const inside = balancedParenthesized(trimmed, trimmed.indexOf("("));
         if (!inside) return undefined;
         const parts = splitTopLevel(inside, ";");
         return parts.length === 3 ? parts[1].trim() : undefined;
     }
-    const doWhile = trimmed.match(/\\bwhile\\s*\\(/);
+    const doWhile = trimmed.match(/\bwhile\s*\(/);
     if (doWhile) return balancedParenthesized(trimmed, trimmed.indexOf("(", doWhile.index ?? 0));
     return undefined;
 }
@@ -257,7 +257,7 @@ function tokenizeCondition(source: string): ConditionToken[] {
     let i = 0;
     while (i < source.length) {
         const ch = source[i];
-        if (/\\s/.test(ch)) { i++; continue; }
+        if (/\s/.test(ch)) { i++; continue; }
         const two = source.slice(i, i + 2);
         if (["&&", "||", "==", "!=", "<=", ">="].includes(two)) {
             tokens.push({ type: "operator", value: two }); i += 2; continue;
