@@ -23,24 +23,41 @@ export function enrichTrace(
         if (event.type === "STEP") {
             event = annotateCondition(event, sourceLines);
             if (previousStep && previousStep.method === event.method) {
-                const executionEvents = [
+                const transitionEvents = [
                     ...deriveChanges(previousStep, event),
-                    ...deriveMapChanges(previousStep, event),
+                    ...deriveMapChanges(previousStep, event)
+                ];
+
+                // A normal state transition belongs to the previous line.
+                // A for-loop update is the important exception: Java executes
+                // the update expression before reaching the next condition
+                // checkpoint, so that variable change belongs to the next
+                // highlighted for-line.
+                const { previousLineEvents, currentLineEvents } =
+                    partitionLoopUpdateEvents(
+                        previousStep,
+                        event,
+                        transitionEvents,
+                        sourceLines
+                    );
+
+                const executionEvents = [
+                    ...previousLineEvents,
                     ...deriveArrayAccessEvents(previousStep, sourceLines)
                 ];
 
-                // JDI STEP events occur immediately before their source line
-                // executes. The next same-method STEP therefore observes the
-                // state produced by the current line. Attach that post-line
-                // snapshot to the current STEP so replay can show the effect
-                // while the current line is highlighted.
                 attachStepResult(previousStep, event, executionEvents);
+
+                if (currentLineEvents.length > 0) {
+                    appendExecutionEvents(event, currentLineEvents);
+                }
+
                 insertDerivedEvents(
                     enriched,
                     previousStep,
                     [
                         ...executionEvents,
-                        ...deriveArrayReferenceEvents(event)
+                        ...deriveArrayReferenceEvents(event, sourceLines)
                     ]
                 );
             }
@@ -145,6 +162,81 @@ export function enrichTrace(
     };
 }
 
+function appendExecutionEvents(
+    event: ExecutionEvent,
+    executionEvents: ExecutionEvent[]
+): void {
+    if (executionEvents.length === 0) return;
+
+    event.data = {
+        ...(event.data ?? {}),
+        executionEvents: [
+            ...(Array.isArray(event.data?.executionEvents)
+                ? event.data.executionEvents
+                : []),
+            ...executionEvents
+        ]
+    };
+}
+
+function partitionLoopUpdateEvents(
+    previous: ExecutionEvent,
+    current: ExecutionEvent,
+    events: ExecutionEvent[],
+    sourceLines: string[]
+): {
+    previousLineEvents: ExecutionEvent[];
+    currentLineEvents: ExecutionEvent[];
+} {
+    const statement =
+        typeof current.line === "number" && current.line > 0
+            ? sourceLines[current.line - 1]?.trim() ?? ""
+            : "";
+
+    if (!/^for\s*\(/.test(statement)) {
+        return { previousLineEvents: events, currentLineEvents: [] };
+    }
+
+    const inside = balancedParenthesized(statement, statement.indexOf("("));
+    if (!inside) {
+        return { previousLineEvents: events, currentLineEvents: [] };
+    }
+
+    const parts = splitTopLevel(inside, ";");
+    if (parts.length !== 3) {
+        return { previousLineEvents: events, currentLineEvents: [] };
+    }
+
+    const update = parts[2]?.trim() ?? "";
+    const updatedNames = new Set<string>();
+    for (const match of update.matchAll(/\b([A-Za-z_$][\w$]*)\b/g)) {
+        if (match[1]) updatedNames.add(match[1]);
+    }
+
+    if (updatedNames.size === 0) {
+        return { previousLineEvents: events, currentLineEvents: [] };
+    }
+
+    const previousVariables = getVariables(previous);
+    const currentLineEvents: ExecutionEvent[] = [];
+    const previousLineEvents: ExecutionEvent[] = [];
+
+    for (const event of events) {
+        if (
+            event.type === "VARIABLE_UPDATE" &&
+            typeof event.data?.name === "string" &&
+            updatedNames.has(event.data.name) &&
+            event.data.name in previousVariables
+        ) {
+            currentLineEvents.push(event);
+        } else {
+            previousLineEvents.push(event);
+        }
+    }
+
+    return { previousLineEvents, currentLineEvents };
+}
+
 function insertDerivedEvents(
     events: ExecutionEvent[],
     afterEvent: ExecutionEvent,
@@ -179,7 +271,12 @@ function attachStepResult(
     }
 
     if (executionEvents.length > 0) {
-        data.executionEvents = executionEvents;
+        data.executionEvents = [
+            ...(Array.isArray(data.executionEvents)
+                ? data.executionEvents
+                : []),
+            ...executionEvents
+        ];
     }
 
     if (postEvent.data && "returnValue" in postEvent.data) {
@@ -657,11 +754,48 @@ function evaluateExpression(
     }
 }
 
+function filterArrayReferencesForLine(
+    references: unknown,
+    line: number | undefined,
+    sourceLines: string[]
+): unknown[] {
+    if (!Array.isArray(references)) return [];
+    if (typeof line !== "number" || line < 1 || sourceLines.length === 0) {
+        return references;
+    }
+
+    const statement = sourceLines[line - 1] ?? "";
+    if (!statement.trim()) return references;
+
+    return references.filter((reference) => {
+        if (!reference || typeof reference !== "object") return false;
+        const record = reference as Record<string, unknown>;
+        const name =
+            typeof record.array === "string"
+                ? record.array
+                : typeof record.name === "string"
+                    ? record.name
+                    : undefined;
+        if (!name) return false;
+
+        const identifier = new RegExp(
+            "\\b" + name.replace(/[.*+?^()|[\\]\\]/g, "\\function deriveArrayReferenceEvents(
+") + "\\b"
+        );
+        return identifier.test(statement);
+    });
+}
+
 function deriveArrayReferenceEvents(
-    current: ExecutionEvent
+    current: ExecutionEvent,
+    sourceLines: string[]
 ): ExecutionEvent[] {
     const references =
-        current.data?.arrayReferences;
+        filterArrayReferencesForLine(
+            current.data?.arrayReferences,
+            current.line,
+            sourceLines
+        );
 
     if (
         !Array.isArray(references)
