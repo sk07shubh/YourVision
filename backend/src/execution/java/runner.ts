@@ -519,7 +519,7 @@ function parseTrace(
     const enriched = enrichTrace({
         version: 1,
         events
-    });
+    }, source);
 
     if (enriched.events.length <= MAX_TRACE_EVENTS) {
         return enriched;
