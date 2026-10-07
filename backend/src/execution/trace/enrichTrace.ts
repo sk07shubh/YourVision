@@ -394,8 +394,8 @@ class ConditionParser {
         return left;
     }
     private parseUnary(evaluate = true): unknown {
-        if (this.peek("!")) { this.index++; const value = this.parseUnary(evaluate); if (evaluate && typeof value !== "boolean") throw new Error("boolean expected"); return evaluate ? !value : undefined; }
-        if (this.peek("-")) { this.index++; const value = this.parseUnary(evaluate); if (evaluate && typeof value !== "number") throw new Error("numeric operand expected"); return evaluate ? -value : undefined; }
+        if (this.peek("!")) { this.index++; const value = this.parseUnary(evaluate); if (evaluate && typeof value !== "boolean") throw new Error("boolean expected"); return evaluate ? !(value as boolean) : undefined; }
+        if (this.peek("-")) { this.index++; const value = this.parseUnary(evaluate); if (evaluate && typeof value !== "number") throw new Error("numeric operand expected"); return evaluate ? -(value as number) : undefined; }
         if (this.peek("+")) { this.index++; const value = this.parseUnary(evaluate); if (evaluate && typeof value !== "number") throw new Error("numeric operand expected"); return evaluate ? value : undefined; }
         return this.parsePrimary(evaluate);
     }
