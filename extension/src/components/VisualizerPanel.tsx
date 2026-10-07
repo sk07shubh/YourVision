@@ -30,32 +30,6 @@ function isStructuralValue(value: unknown): boolean {
   return typeof value.$arrayId === 'string' || typeof value.$mapId === 'string' || typeof value.$collectionId === 'string';
 }
 
-function variableEffects(current?: TraceState, previous?: TraceState): ExecutionEffect[] {
-  if (!current) return [];
-  const before = previous?.variables ?? {};
-  const after = current.variables ?? {};
-  const effects: ExecutionEffect[] = [];
-
-  for (const [name, value] of Object.entries(after)) {
-    if (!(name in before)) {
-      effects.push({ kind: 'structural', text: name + ' = ' + compactValue(value) });
-      continue;
-    }
-
-    const old = before[name];
-    if (valueChanged(old, value) && !isStructuralValue(value)) {
-      effects.push({
-        kind: 'change',
-        text: name + '  ' + compactValue(old) + '  →  ' + compactValue(value)
-      });
-    }
-  }
-
-  // Scope-exit variables are intentionally omitted. They already disappear
-  // from the Variables section and do not describe the effect of the line.
-  return effects;
-}
-
 function accessEffects(data: Obj): ExecutionEffect[] {
   const effects: ExecutionEffect[] = [];
   const executionEvents = Array.isArray(data.executionEvents) ? data.executionEvents : [];
@@ -314,7 +288,7 @@ function ExecutionInspector({ state, previous, statement, index, total }: { stat
   const substatement = executionSubstatement(statement);
   const variableResults = variableResultChanges(state, previous);
   const newStructureResults = newDataStructureResults(state, previous);
-  const effects = [...variableEffects(state, previous), ...eventEffects(state)]
+  const effects = eventEffects(state)
     .filter((effect, i, all) => all.findIndex((x) => x.text === effect.text) === i);
 
 
@@ -361,7 +335,16 @@ function ExecutionInspector({ state, previous, statement, index, total }: { stat
               {variableResults}
               {newStructureResults}
             </div>
-
+          ) : effects.length > 0 ? (
+            <div className="yv-result-list">
+              {effects.slice(0, 3).map((effect, i) => (
+                <div className={'yv-result ' + (effect.kind ?? 'change')} key={effect.text + '-' + i}>
+                  {effect.text}
+                </div>
+              ))}
+              {effects.length > 3 && <div className="yv-result-more">+{effects.length - 3} more</div>}
+            </div>
+          ) : (
             <span className="yv-result-empty">—</span>
           )}
         </div>
