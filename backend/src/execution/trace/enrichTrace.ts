@@ -432,6 +432,17 @@ function parseBasicForStatement(statement: string): {
     };
 }
 
+function extractAssignmentNames(part: string): Set<string> {
+    const names = new Set<string>();
+    for (const match of part.matchAll(/\\b([A-Za-z_$][\\w$]*)\\s*(?:\\+\\+|--|[+\\-*/%&|^]?=)/g)) {
+        if (match[1]) names.add(match[1]);
+    }
+    for (const match of part.matchAll(/(?:\\+\\+|--)\\s*([A-Za-z_$][\\w$]*)\\b/g)) {
+        if (match[1]) names.add(match[1]);
+    }
+    return names;
+}
+
 function setExecutionPhase(
     event: ExecutionEvent,
     phase: "initialization" | "condition" | "update"
