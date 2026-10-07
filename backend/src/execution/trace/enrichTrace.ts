@@ -778,10 +778,10 @@ function filterArrayReferencesForLine(
                     : undefined;
         if (!name) return false;
 
-        const identifier = new RegExp(
-            "\\b" + name.replace(/[.*+?^()|[\\]\\]/g, "\\function deriveArrayReferenceEvents(
-") + "\\b"
-        );
+        // Java local-variable names are identifiers, so a word-boundary
+        // match is sufficient here and avoids treating every visible array
+        // local as a reference on every source line.
+        const identifier = new RegExp("\\b" + name + "\\b");
         return identifier.test(statement);
     });
 }
