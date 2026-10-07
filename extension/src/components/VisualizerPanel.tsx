@@ -215,6 +215,46 @@ function executionSubstatement(statement: string, current?: TraceState, previous
   return parts.condition || statement;
 }
 
+function debugValue(value: unknown): string {
+  try { return JSON.stringify(value, null, 2); } catch { return String(value); }
+}
+
+function buildDebugTrace(states: TraceState[], source: string): string {
+  const lines = source.split(/\r?\n/);
+  return states.map((state, index) => {
+    const lineNumber = state.line ?? 0;
+    const code = lineNumber > 0 ? (lines[lineNumber - 1] ?? '').trim() : '';
+    const data = isPlainObject(state.lastEvent?.data) ? state.lastEvent.data : {};
+    const condition = typeof data.conditionResult === 'boolean'
+      ? (data.conditionResult ? 'TRUE' : 'FALSE')
+      : '—';
+    const executionEvents = Array.isArray(data.executionEvents) ? data.executionEvents : [];
+    return [
+      'STEP ' + (index + 1) + ' / ' + states.length,
+      'LINE: ' + lineNumber,
+      'CODE: ' + code,
+      'EVENT: ' + (state.lastEvent?.type ?? '—'),
+      'METHOD: ' + (state.method ?? '—'),
+      'DEPTH: ' + (state.depth ?? 0),
+      'CONDITION: ' + condition,
+      'EXECUTION EVENTS:',
+      executionEvents.length ? debugValue(executionEvents) : '[]',
+      'VARIABLES:',
+      debugValue(state.variables ?? {}),
+      'ARRAYS:',
+      debugValue(state.arrays ?? {}),
+      'DATA STRUCTURES:',
+      debugValue(state.dataStructures ?? {}),
+      'OBJECTS:',
+      debugValue(state.objects ?? {}),
+      'CALL STACK:',
+      debugValue(state.callStack ?? []),
+      'LAST EVENT DATA:',
+      debugValue(data),
+      '\n' + '='.repeat(80) + '\n'
+    ].join('\n');
+  }).join('\n');
+}
 function ExecutionInspector({ state, previous, statement, index, total }: { state?: TraceState; previous?: TraceState; statement: string; index: number; total: number }) {
   const condition = executionCondition(state);
   const substatement = executionSubstatement(statement, state, previous);
@@ -229,6 +269,29 @@ function ExecutionInspector({ state, previous, statement, index, total }: { stat
       <div className="yv-execution-top">
         <div className="yv-execution-label">EXECUTED</div>
         <div className="yv-execution-step">{total ? (index + 1) + ' / ' + total : '—'}</div>
+        <button
+          className="yv-btn"
+          type="button"
+          tabIndex={-1}
+          onMouseDown={e => e.preventDefault()}
+          onClick={async () => {
+            const trace = buildDebugTrace(s.states, s.source);
+            try {
+              await navigator.clipboard.writeText(trace);
+            } catch {
+              const textarea = document.createElement('textarea');
+              textarea.value = trace;
+              textarea.style.position = 'fixed';
+              textarea.style.opacity = '0';
+              document.body.appendChild(textarea);
+              textarea.select();
+              document.execCommand('copy');
+              textarea.remove();
+            }
+          }}
+        >
+          Copy Debug Trace
+        </button>
       </div>
 
       <div className="yv-execution-row">
