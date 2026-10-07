@@ -23,25 +23,7 @@ export function enrichTrace(
         if (event.type === "STEP") {
             event = filterStepArrayReferences(event, sourceLines);
             event = annotateCondition(event, sourceLines);
-
-            if (!previousStep) {
-                const statement =
-                    typeof event.line === "number" && event.line > 0
-                        ? sourceLines[event.line - 1]?.trim() ?? ""
-                        : "";
-                const loop = parseBasicForStatement(statement);
-                if (loop) {
-                    const variables = getVariables(event);
-                    const initialized = [...loop.initNames].some(
-                        name => name in variables
-                    );
-                    if (initialized) {
-                        setExecutionPhase(event, "initialization");
-                        removeConditionResult(event);
-                    }
-                }
-            }
-
+            normalizeForLoopCheckpoint(event, previousStep, undefined, sourceLines);
             if (previousStep && previousStep.method === event.method) {
                 const transitionEvents = [
                     ...deriveChanges(previousStep, event),
@@ -61,32 +43,22 @@ export function enrichTrace(
                         sourceLines
                     );
 
-                const normalizedTransitionEvents = normalizeForLoopPhase(
-                    previousStep,
+                normalizeForLoopCheckpoint(
                     event,
-                    [
-                        ...previousLineEvents,
-                        ...currentLineEvents
-                    ],
+                    previousStep,
+                    currentLineEvents,
                     sourceLines
                 );
 
-                const normalizedPreviousEvents = normalizedTransitionEvents.filter(
-                    candidate => previousLineEvents.includes(candidate)
-                );
-                const normalizedCurrentEvents = normalizedTransitionEvents.filter(
-                    candidate => currentLineEvents.includes(candidate)
-                );
-
                 const executionEvents = [
-                    ...normalizedPreviousEvents,
+                    ...previousLineEvents,
                     ...deriveArrayAccessEvents(previousStep, sourceLines)
                 ];
 
                 attachStepResult(previousStep, event, executionEvents);
 
-                if (normalizedCurrentEvents.length > 0) {
-                    appendExecutionEvents(event, normalizedCurrentEvents);
+                if (currentLineEvents.length > 0) {
+                    appendExecutionEvents(event, currentLineEvents);
                 }
 
                 insertDerivedEvents(
@@ -230,8 +202,27 @@ function partitionLoopUpdateEvents(
             ? sourceLines[current.line - 1]?.trim() ?? ""
             : "";
 
-    const loop = parseBasicForStatement(statement);
-    if (!loop || loop.updateNames.size === 0) {
+    if (!/^for\s*\(/.test(statement)) {
+        return { previousLineEvents: events, currentLineEvents: [] };
+    }
+
+    const inside = balancedParenthesized(statement, statement.indexOf("("));
+    if (!inside) {
+        return { previousLineEvents: events, currentLineEvents: [] };
+    }
+
+    const parts = splitTopLevel(inside, ";");
+    if (parts.length !== 3) {
+        return { previousLineEvents: events, currentLineEvents: [] };
+    }
+
+    const update = parts[2]?.trim() ?? "";
+    const updatedNames = new Set<string>();
+    for (const match of update.matchAll(/\b([A-Za-z_$][\w$]*)\b/g)) {
+        if (match[1]) updatedNames.add(match[1]);
+    }
+
+    if (updatedNames.size === 0) {
         return { previousLineEvents: events, currentLineEvents: [] };
     }
 
@@ -242,7 +233,7 @@ function partitionLoopUpdateEvents(
         if (
             event.type === "VARIABLE_UPDATE" &&
             typeof event.data?.name === "string" &&
-            loop.updateNames.has(event.data.name)
+            updatedNames.has(event.data.name)
         ) {
             currentLineEvents.push(event);
         } else {
@@ -262,8 +253,7 @@ function parseBasicForStatement(statement: string): {
     updateNames: Set<string>;
 } | undefined {
     if (!/^for\s*\(/.test(statement.trim())) return undefined;
-    const open = statement.indexOf("(");
-    const inside = balancedParenthesized(statement, open);
+    const inside = balancedParenthesized(statement, statement.indexOf("("));
     if (inside === undefined) return undefined;
     const parts = splitTopLevel(inside, ";");
     if (parts.length !== 3) return undefined;
@@ -288,47 +278,6 @@ function parseBasicForStatement(statement: string): {
     };
 }
 
-function loopVariableUpdateEvents(events: unknown[], names: Set<string>): unknown[] {
-    return events.filter(event =>
-        isPlainObject(event) &&
-        event.type === "VARIABLE_UPDATE" &&
-        isPlainObject(event.data) &&
-        typeof event.data.name === "string" &&
-        names.has(event.data.name)
-    );
-}
-
-function appendUniqueExecutionEvents(target: ExecutionEvent, events: unknown[]): void {
-    if (events.length === 0) return;
-    const existing = Array.isArray(target.data?.executionEvents)
-        ? target.data.executionEvents
-        : [];
-
-    const signature = (event: unknown): string => {
-        if (!isPlainObject(event)) return "";
-        return JSON.stringify({
-            type: event.type,
-            name: isPlainObject(event.data) ? event.data.name : undefined,
-            value: isPlainObject(event.data) ? event.data.value : undefined
-        });
-    };
-
-    const merged = [...existing];
-    const seen = new Set(merged.map(signature));
-    for (const event of events) {
-        const key = signature(event);
-        if (!seen.has(key)) {
-            merged.push(event as ExecutionEvent);
-            seen.add(key);
-        }
-    }
-
-    target.data = {
-        ...(target.data ?? {}),
-        executionEvents: merged
-    };
-}
-
 function setExecutionPhase(
     event: ExecutionEvent,
     phase: "initialization" | "condition" | "update"
@@ -346,96 +295,154 @@ function removeConditionResult(event: ExecutionEvent): void {
     event.data = data;
 }
 
-function normalizeForLoopPhase(
-    previous: ExecutionEvent | undefined,
+function executionEventsFor(
+    event: ExecutionEvent
+): unknown[] {
+    return Array.isArray(event.data?.executionEvents)
+        ? event.data.executionEvents
+        : [];
+}
+
+function variableUpdateEvents(
+    events: unknown[],
+    names: Set<string>
+): unknown[] {
+    return events.filter(candidate =>
+        isPlainObject(candidate) &&
+        candidate.type === "VARIABLE_UPDATE" &&
+        isPlainObject(candidate.data) &&
+        typeof candidate.data.name === "string" &&
+        names.has(candidate.data.name)
+    );
+}
+
+function appendUniqueExecutionEvents(
+    event: ExecutionEvent,
+    additions: unknown[]
+): void {
+    if (additions.length === 0) return;
+
+    const existing = executionEventsFor(event);
+    const signature = (candidate: unknown): string => {
+        if (!isPlainObject(candidate)) return "";
+        const data = isPlainObject(candidate.data) ? candidate.data : {};
+        return JSON.stringify({
+            type: candidate.type,
+            name: data.name,
+            value: data.value,
+            before: data.before
+        });
+    };
+
+    const merged = [...existing];
+    const seen = new Set(merged.map(signature));
+    for (const addition of additions) {
+        const key = signature(addition);
+        if (!seen.has(key)) {
+            merged.push(addition);
+            seen.add(key);
+        }
+    }
+
+    event.data = {
+        ...(event.data ?? {}),
+        executionEvents: merged
+    };
+}
+
+function normalizeForLoopCheckpoint(
     current: ExecutionEvent,
-    transitionEvents: ExecutionEvent[],
+    previous: ExecutionEvent | undefined,
+    currentLineEvents: ExecutionEvent[] | undefined,
     sourceLines: string[]
-): ExecutionEvent[] {
+): void {
     const statement =
         typeof current.line === "number" && current.line > 0
             ? sourceLines[current.line - 1]?.trim() ?? ""
             : "";
     const loop = parseBasicForStatement(statement);
-    if (!loop || !previous || previous.method !== current.method) {
-        return transitionEvents;
-    }
+    if (!loop) return;
 
-    const currentRaw = Array.isArray(current.data?.executionEvents)
-        ? current.data.executionEvents
-        : [];
-    const previousVars = getVariables(previous);
-    const currentVars = getVariables(current);
+    const currentVariables = getVariables(current);
+    const previousVariables = previous ? getVariables(previous) : {};
+    const rawEvents = executionEventsFor(current);
 
-    // The first checkpoint at a basic-for location represents completion of
-    // the initializer when the loop variable becomes live at that location.
-    if (previous.line !== current.line) {
-        const initializedNames = [...loop.initNames].filter(
-            name => !(name in previousVars) && name in currentVars
-        );
-        if (initializedNames.length > 0) {
+    // First checkpoint at a for location: the initializer has completed.
+    if (!previous) {
+        if ([...loop.initNames].some(name => name in currentVariables)) {
             setExecutionPhase(current, "initialization");
             removeConditionResult(current);
-            return transitionEvents;
         }
+        return;
     }
 
-    const transitionUpdates = loopVariableUpdateEvents(
-        transitionEvents,
-        loop.updateNames
-    );
-
-    if (previous.line === current.line) {
-        const initRaw = loopVariableUpdateEvents(currentRaw, loop.initNames)
-            .filter(event => {
-                const data = isPlainObject(event) ? event.data : undefined;
-                const name = isPlainObject(data) && typeof data.name === "string"
-                    ? data.name
-                    : "";
-                return !(name in previousVars);
-            });
-
-        const updateRaw = loopVariableUpdateEvents(currentRaw, loop.updateNames)
-            .filter(event => {
-                const data = isPlainObject(event) ? event.data : undefined;
-                const name = isPlainObject(data) && typeof data.name === "string"
-                    ? data.name
-                    : "";
-                return name in previousVars;
-            });
-
-        if (initRaw.length > 0) {
-            appendUniqueExecutionEvents(previous, initRaw);
-            setExecutionPhase(previous, "initialization");
-            current.data = {
-                ...(current.data ?? {}),
-                executionEvents: currentRaw.filter(event => !initRaw.includes(event))
-            };
-            removeConditionResult(previous);
-            return transitionEvents;
-        }
-
-        if (updateRaw.length > 0) {
-            appendUniqueExecutionEvents(previous, updateRaw);
-            setExecutionPhase(previous, "update");
-            current.data = {
-                ...(current.data ?? {}),
-                executionEvents: currentRaw.filter(event => !updateRaw.includes(event))
-            };
-            removeConditionResult(previous);
-            setExecutionPhase(current, "condition");
-            return transitionEvents.filter(event => !updateRaw.includes(event));
-        }
-    }
-
-    if (transitionUpdates.length > 0) {
+    const updateEvents = currentLineEvents ?? [];
+    if (updateEvents.length > 0) {
         setExecutionPhase(current, "update");
         removeConditionResult(current);
-    } else {
-        setExecutionPhase(current, "condition");
+        return;
     }
 
-    return transitionEvents;
+    if (previous.line !== current.line) {
+        // If the loop variable appears here for the first time, this is the
+        // initializer checkpoint even when JDI emitted no explicit update.
+        if (
+            [...loop.initNames].some(
+                name => !(name in previousVariables) && name in currentVariables
+            )
+        ) {
+            setExecutionPhase(current, "initialization");
+            removeConditionResult(current);
+            return;
+        }
+
+        setExecutionPhase(current, "condition");
+        return;
+    }
+
+    const initEvents = variableUpdateEvents(rawEvents, loop.initNames).filter(candidate => {
+        const data = isPlainObject(candidate) ? candidate.data : undefined;
+        const name = isPlainObject(data) && typeof data.name === "string"
+            ? data.name
+            : "";
+        return !(name in previousVariables);
+    });
+
+    const rawUpdateEvents = variableUpdateEvents(rawEvents, loop.updateNames).filter(candidate => {
+        const data = isPlainObject(candidate) ? candidate.data : undefined;
+        const name = isPlainObject(data) && typeof data.name === "string"
+            ? data.name
+            : "";
+        return name in previousVariables;
+    });
+
+    if (initEvents.length > 0) {
+        appendUniqueExecutionEvents(previous, initEvents);
+        setExecutionPhase(previous, "initialization");
+        removeConditionResult(previous);
+
+        current.data = {
+            ...(current.data ?? {}),
+            executionEvents: rawEvents.filter(candidate => !initEvents.includes(candidate))
+        };
+        setExecutionPhase(current, "condition");
+        return;
+    }
+
+    if (rawUpdateEvents.length > 0) {
+        appendUniqueExecutionEvents(previous, rawUpdateEvents);
+        setExecutionPhase(previous, "update");
+        removeConditionResult(previous);
+
+        current.data = {
+            ...(current.data ?? {}),
+            executionEvents: rawEvents.filter(candidate => !rawUpdateEvents.includes(candidate))
+        };
+        setExecutionPhase(current, "condition");
+        return;
+    }
+
+    setExecutionPhase(current, "condition");
 }
 
 function insertDerivedEvents(
