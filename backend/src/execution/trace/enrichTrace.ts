@@ -21,6 +21,7 @@ export function enrichTrace(
 
     for (let event of trace.events) {
         if (event.type === "STEP") {
+            event = filterStepArrayReferences(event, sourceLines);
             event = annotateCondition(event, sourceLines);
             if (previousStep && previousStep.method === event.method) {
                 const transitionEvents = [
@@ -750,6 +751,25 @@ function evaluateExpression(
     } catch {
         return undefined;
     }
+}
+
+function filterStepArrayReferences(
+    event: ExecutionEvent,
+    sourceLines: string[]
+): ExecutionEvent {
+    if (!Array.isArray(event.data?.arrayReferences)) return event;
+    const filtered = filterArrayReferencesForLine(
+        event.data.arrayReferences,
+        event.line,
+        sourceLines
+    );
+    return {
+        ...event,
+        data: {
+            ...(event.data ?? {}),
+            arrayReferences: filtered
+        }
+    };
 }
 
 function filterArrayReferencesForLine(
