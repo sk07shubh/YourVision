@@ -267,7 +267,7 @@ const loopAttributionTrace: ExecutionTrace = {
             depth: 1,
             data: {
                 variables: {
-                    i: 1,
+                    i: 0,
                     nums: { $arrayId: "70", $type: "int[]", values: [2, 7] }
                 },
                 arrayReferences: [
