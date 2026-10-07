@@ -175,6 +175,8 @@ export function enrichTrace(
         enriched.push(event);
     }
 
+    normalizeForLoopSequence(enriched, sourceLines);
+
     return {
         version: 1,
         events: enriched.map((event, index) => ({
@@ -467,6 +469,126 @@ function normalizeForLoopCheckpoint(
     }
 
     setExecutionPhase(current, "condition");
+}
+
+function normalizeForLoopSequence(
+    events: ExecutionEvent[],
+    sourceLines: string[]
+): void {
+    const stepIndices = events
+        .map((event, index) => ({ event, index }))
+        .filter(({ event }) => event.type === "STEP");
+
+    for (let position = 0; position < stepIndices.length - 1; position++) {
+        const first = stepIndices[position]!;
+        const second = stepIndices[position + 1]!;
+
+        if (
+            first.event.method !== second.event.method ||
+            first.event.line !== second.event.line
+        ) {
+            continue;
+        }
+
+        const statement =
+            typeof first.event.line === "number" && first.event.line > 0
+                ? sourceLines[first.event.line - 1]?.trim() ?? ""
+                : "";
+        const loop = parseBasicForStatement(statement);
+        if (!loop) continue;
+
+        const firstData = first.event.data ?? {};
+        const secondData = second.event.data ?? {};
+        const firstEvents = executionEventsFor(first.event);
+        const secondEvents = executionEventsFor(second.event);
+
+        const changedUpdateEvents = secondEvents.filter(candidate => {
+            if (!isPlainObject(candidate) || candidate.type !== "VARIABLE_UPDATE") {
+                return false;
+            }
+            const data = isPlainObject(candidate.data) ? candidate.data : {};
+            if (
+                typeof data.name !== "string" ||
+                !loop.updateNames.has(data.name)
+            ) {
+                return false;
+            }
+            if ("before" in data) {
+                return !sameSnapshot(data.before, data.value);
+            }
+            return false;
+        });
+
+        const initEvents = secondEvents.filter(candidate => {
+            if (!isPlainObject(candidate) || candidate.type !== "VARIABLE_UPDATE") {
+                return false;
+            }
+            const data = isPlainObject(candidate.data) ? candidate.data : {};
+            return (
+                typeof data.name === "string" &&
+                loop.initNames.has(data.name) &&
+                !("before" in data)
+            );
+        });
+
+        // Some JDI line-step sequences expose the first for location twice:
+        // the first checkpoint already contains the initialized locals, while
+        // the second checkpoint carries the derived initialization update.
+        // The semantic order is initialization -> condition.
+        if (
+            initEvents.length > 0 &&
+            [...loop.initNames].some(name => name in getVariables(first.event)) &&
+            firstEvents.length === 0
+        ) {
+            appendUniqueExecutionEvents(first.event, initEvents);
+            setExecutionPhase(first.event, "initialization");
+            removeConditionResult(first.event);
+
+            second.event.data = {
+                ...(second.event.data ?? {}),
+                executionEvents: secondEvents.filter(candidate => !initEvents.includes(candidate))
+            };
+            annotateConditionInPlace(second.event, sourceLines);
+            setExecutionPhase(second.event, "condition");
+            continue;
+        }
+
+        // After a loop body, the runtime can expose the condition checkpoint
+        // before the update snapshot even though Java executes update first.
+        // Move the observed update result onto that highlighted checkpoint,
+        // then use the following same-line checkpoint as the condition with
+        // the updated state.
+        if (
+            changedUpdateEvents.length > 0 &&
+            typeof firstData.conditionResult === "boolean"
+        ) {
+            appendUniqueExecutionEvents(first.event, changedUpdateEvents);
+            setExecutionPhase(first.event, "update");
+            removeConditionResult(first.event);
+
+            if (secondData.variables && typeof secondData.variables === "object") {
+                first.event.data = {
+                    ...(first.event.data ?? {}),
+                    postVariables: secondData.variables
+                };
+            }
+
+            second.event.data = {
+                ...(second.event.data ?? {}),
+                executionEvents: secondEvents.filter(candidate => !changedUpdateEvents.includes(candidate))
+            };
+            annotateConditionInPlace(second.event, sourceLines);
+            setExecutionPhase(second.event, "condition");
+        }
+    }
+}
+
+function annotateConditionInPlace(
+    event: ExecutionEvent,
+    sourceLines: string[]
+): void {
+    const annotated = annotateCondition(event, sourceLines);
+    event.data = annotated.data;
 }
 
 function insertDerivedEvents(
