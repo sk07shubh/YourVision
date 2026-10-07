@@ -147,6 +147,13 @@ function attachStepResult(
         data.executionEvents = executionEvents;
     }
 
+    // Keep source/runtime metadata on the highlighted STEP. In particular,
+    // arrayReferences are structural metadata used by the visualizer and
+    // must survive post-line result attachment unchanged.
+    if (Array.isArray(step.data?.arrayReferences)) {
+        data.arrayReferences = step.data.arrayReferences;
+    }
+
     step.data = data;
 }
 
