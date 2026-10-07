@@ -558,10 +558,7 @@ function normalizeForLoopSequence(
         // Move the observed update result onto that highlighted checkpoint,
         // then use the following same-line checkpoint as the condition with
         // the updated state.
-        if (
-            changedUpdateEvents.length > 0 &&
-            typeof firstData.conditionResult === "boolean"
-        ) {
+        if (changedUpdateEvents.length > 0) {
             appendUniqueExecutionEvents(first.event, changedUpdateEvents);
             setExecutionPhase(first.event, "update");
             removeConditionResult(first.event);
