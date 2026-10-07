@@ -195,6 +195,7 @@ export function enrichTrace(
     }
 
     normalizeForLoopSequence(enriched, sourceLines);
+    canonicalizeForLoopExecutionPhases(enriched, sourceLines);
 
     return {
         version: 1,
@@ -203,6 +204,126 @@ export function enrichTrace(
             sequence: index + 1
         }))
     };
+}
+
+function canonicalizeForLoopExecutionPhases(
+    events: ExecutionEvent[],
+    sourceLines: string[]
+): void {
+    const steps = events.filter(event => event.type === "STEP");
+
+    for (let index = 0; index < steps.length; index++) {
+        const current = steps[index]!;
+        const statement =
+            typeof current.line === "number" && current.line > 0
+                ? sourceLines[current.line - 1]?.trim() ?? ""
+                : "";
+        const loop = parseBasicForStatement(statement);
+        if (!loop) continue;
+
+        const previous = steps[index - 1];
+        const currentVariables = getVariables(current);
+        const previousVariables = previous ? getVariables(previous) : {};
+        const currentEvents = executionEventsFor(current);
+
+        // The first checkpoint of a for-line is initialization when the loop
+        // variable appears for the first time. This is semantic, not based on
+        // whether JDI happened to attach the VARIABLE_UPDATE to this or the
+        // following same-line checkpoint.
+        const isFirstLoopCheckpoint =
+            !previous ||
+            previous.method !== current.method ||
+            previous.line !== current.line ||
+            ![...loop.initNames].some(name => name in previousVariables);
+
+        if (
+            isFirstLoopCheckpoint &&
+            [...loop.initNames].some(name => name in currentVariables)
+        ) {
+            setExecutionPhase(current, "initialization");
+            removeConditionResult(current);
+
+            // If JDI reported the initialization update on the next same-line
+            // checkpoint, move that evidence onto the initialization checkpoint.
+            const next = steps[index + 1];
+            if (
+                next &&
+                next.method === current.method &&
+                next.line === current.line
+            ) {
+                const nextEvents = executionEventsFor(next);
+                const initEvents = nextEvents.filter(candidate => {
+                    if (!isPlainObject(candidate) || candidate.type !== "VARIABLE_UPDATE") {
+                        return false;
+                    }
+                    const data = isPlainObject(candidate.data) ? candidate.data : {};
+                    return (
+                        typeof data.name === "string" &&
+                        loop.initNames.has(data.name) &&
+                        !("before" in data)
+                    );
+                });
+
+                if (initEvents.length > 0) {
+                    appendUniqueExecutionEvents(current, initEvents);
+                    next.data = {
+                        ...(next.data ?? {}),
+                        executionEvents: nextEvents.filter(
+                            candidate => !initEvents.includes(candidate)
+                        )
+                    };
+                }
+
+                setExecutionPhase(next, "condition");
+                annotateConditionInPlace(next, sourceLines);
+            }
+
+            continue;
+        }
+
+        // A changed loop-control variable is the update checkpoint. The next
+        // same-line checkpoint is the condition checkpoint. This rule wins over
+        // any stale conditionResult produced by the generic condition annotator.
+        const changedUpdate = currentEvents.some(candidate => {
+            if (!isPlainObject(candidate) || candidate.type !== "VARIABLE_UPDATE") {
+                return false;
+            }
+            const data = isPlainObject(candidate.data) ? candidate.data : {};
+            if (
+                typeof data.name !== "string" ||
+                !loop.updateNames.has(data.name)
+            ) {
+                return false;
+            }
+            return "before" in data && !sameSnapshot(data.before, data.value);
+        });
+
+        if (changedUpdate) {
+            setExecutionPhase(current, "update");
+            removeConditionResult(current);
+            const next = steps[index + 1];
+            if (
+                next &&
+                next.method === current.method &&
+                next.line === current.line
+            ) {
+                setExecutionPhase(next, "condition");
+                annotateConditionInPlace(next, sourceLines);
+            }
+            continue;
+        }
+
+        // Any same-line checkpoint after initialization/update is the loop
+        // condition checkpoint unless it is itself the initialization case above.
+        if (
+            previous &&
+            previous.method === current.method &&
+            previous.line === current.line
+        ) {
+            setExecutionPhase(current, "condition");
+            annotateConditionInPlace(current, sourceLines);
+        }
+    }
 }
 
 function appendExecutionEvents(
