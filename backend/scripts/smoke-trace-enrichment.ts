@@ -398,3 +398,29 @@ if (!objectWriteState?.objects["90"]) {
 console.log(
     "PASS: object mutation enrichment"
 );
+
+const conditionTrace: ExecutionTrace = {
+    version: 1,
+    events: [
+        { sequence: 1, type: "STEP", line: 4, method: "check", depth: 1, data: { variables: { i: 2, n: 5, nums: { $arrayId: "77", $type: "int[]", values: [3, 8, 13] } } } },
+        { sequence: 2, type: "STEP", line: 4, method: "check", depth: 1, data: { variables: { i: 6, n: 5, nums: { $arrayId: "77", $type: "int[]", values: [3, 8, 13] } } } }
+    ]
+};
+
+const conditionSource = [
+    "class Solution {",
+    "    boolean check(int[] nums) {",
+    "        for (int i = 0; i < n; i++) {",
+    "            if (i < n && nums[i] >= 0) return true;",
+    "        }",
+    "        return false;",
+    "    }",
+    "}"
+].join("\\n");
+
+const conditionEnriched = enrichTrace(conditionTrace, conditionSource);
+const conditionResults = conditionEnriched.events.filter(event => event.type === "STEP").map(event => event.data?.conditionResult);
+if (JSON.stringify(conditionResults) !== JSON.stringify([true, false])) {
+    throw new Error("condition result enrichment failed: " + JSON.stringify(conditionResults));
+}
+console.log("PASS: condition result enrichment");
