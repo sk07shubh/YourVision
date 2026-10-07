@@ -196,6 +196,7 @@ export function enrichTrace(
 
     normalizeForLoopSequence(enriched, sourceLines);
     canonicalizeForLoopExecutionPhases(enriched, sourceLines);
+    reorderForLoopSemanticCheckpoints(enriched, sourceLines);
 
     return {
         version: 1,
@@ -330,6 +331,27 @@ function canonicalizeForLoopExecutionPhases(
     }
 }
 
+
+function reorderForLoopSemanticCheckpoints(events: ExecutionEvent[], sourceLines: string[]): void {
+    const positions = () => events.map((event,index)=>({event,index})).filter(x=>x.event.type==="STEP");
+    const initEvidence = (step: ExecutionEvent, loop: ReturnType<typeof parseBasicForStatement>) => executionEventsFor(step).some(candidate => {
+        if (!isPlainObject(candidate) || candidate.type !== "VARIABLE_UPDATE") return false;
+        const data = isPlainObject(candidate.data) ? candidate.data : {};
+        return typeof data.name === "string" && loop.initNames.has(data.name) && !("before" in data);
+    });
+    const conditionEvidence = (step: ExecutionEvent) => typeof step.data?.conditionResult === "boolean" || step.data?.executionPhase === "condition";
+    for (let i=0; i<positions().length-1; i++) {
+        const ps=positions(), first=ps[i]!, second=ps[i+1]!;
+        if(first.event.method!==second.event.method || first.event.line!==second.event.line) continue;
+        const statement=typeof first.event.line==="number" && first.event.line>0 ? sourceLines[first.event.line-1]?.trim() ?? "" : "";
+        const loop=parseBasicForStatement(statement);
+        if(!loop || !conditionEvidence(first.event) || !initEvidence(second.event,loop)) continue;
+        const end=ps[i+2]?.index ?? events.length;
+        const a=events.slice(first.index,second.index), b=events.slice(second.index,end);
+        events.splice(first.index,end-first.index,...b,...a);
+        i=-1;
+    }
+}
 function appendExecutionEvents(
     event: ExecutionEvent,
     executionEvents: ExecutionEvent[]
