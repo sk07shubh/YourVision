@@ -295,7 +295,14 @@ const loopAttributionTrace: ExecutionTrace = {
 };
 
 const loopSource = [
-    "",\n    "",\n    "",\n    "",\n    "",\n    "",\n    "",\n    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
     "  for (int i = 0; i < 2; i++) {",
     "    use(nums[i]);",
     "  }",
