@@ -238,15 +238,14 @@ function executionSubstatement(statement: string, current?: TraceState, previous
     event.data.name === loopVariable
   );
 
-  if (updatedVariable) {
-    const sameLine = previous.line === current.line;
-    const previousHadVariable = loopVariable ? loopVariable in previousVars : false;
-
-    if (sameLine || (loopVariable && !previousHadVariable && currentVars[loopVariable] !== 0)) {
-      return parts.update || statement;
-    }
-
-    return parts.init || statement;
+  if (updatedVariable && loopVariable) {
+    // The first appearance of the loop variable is initialization. Once the
+    // variable already exists, a VARIABLE_UPDATE on the for-line is its
+    // update expression. This remains correct even when the previous
+    // checkpoint is the loop body rather than the same source line.
+    return loopVariable in previousVars
+      ? (parts.update || statement)
+      : (parts.init || statement);
   }
 
   return parts.condition || statement;
