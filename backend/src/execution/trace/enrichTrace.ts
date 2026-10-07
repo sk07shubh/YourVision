@@ -59,7 +59,16 @@ export function enrichTrace(
                     ...deriveArrayAccessEvents(previousStep, sourceLines)
                 ];
 
-                attachStepResult(previousStep, event, executionEvents);
+                const sameLineLoopUpdate =
+                    previousStep.line === event.line &&
+                    event.data?.executionPhase === "update";
+
+                attachStepResult(
+                    previousStep,
+                    event,
+                    executionEvents,
+                    sameLineLoopUpdate
+                );
 
                 if (currentLineEvents.length > 0) {
                     appendExecutionEvents(event, currentLineEvents);
@@ -206,38 +215,32 @@ function partitionLoopUpdateEvents(
             ? sourceLines[current.line - 1]?.trim() ?? ""
             : "";
 
-    if (!/^for\s*\(/.test(statement)) {
+    const loop = parseBasicForStatement(statement);
+    if (!loop) {
         return { previousLineEvents: events, currentLineEvents: [] };
     }
 
-    const inside = balancedParenthesized(statement, statement.indexOf("("));
-    if (!inside) {
-        return { previousLineEvents: events, currentLineEvents: [] };
-    }
-
-    const parts = splitTopLevel(inside, ";");
-    if (parts.length !== 3) {
-        return { previousLineEvents: events, currentLineEvents: [] };
-    }
-
-    const update = parts[2]?.trim() ?? "";
-    const updatedNames = new Set<string>();
-    for (const match of update.matchAll(/\b([A-Za-z_$][\w$]*)\b/g)) {
-        if (match[1]) updatedNames.add(match[1]);
-    }
-
-    if (updatedNames.size === 0) {
-        return { previousLineEvents: events, currentLineEvents: [] };
-    }
-
+    const previousVariables = getVariables(previous);
     const currentLineEvents: ExecutionEvent[] = [];
     const previousLineEvents: ExecutionEvent[] = [];
 
     for (const event of events) {
-        if (
+        const name =
             event.type === "VARIABLE_UPDATE" &&
-            typeof event.data?.name === "string" &&
-            updatedNames.has(event.data.name)
+            typeof event.data?.name === "string"
+                ? event.data.name
+                : undefined;
+
+        if (
+            name &&
+            (
+                // A variable first appearing at this for checkpoint belongs
+                // to ForInit, not to the line before the loop.
+                (loop.initNames.has(name) && !(name in previousVariables)) ||
+                // A variable that already existed and is modified by ForUpdate
+                // belongs to this loop checkpoint as well.
+                (loop.updateNames.has(name) && name in previousVariables)
+            )
         ) {
             currentLineEvents.push(event);
         } else {
@@ -371,25 +374,33 @@ function normalizeForLoopCheckpoint(
     const previousVariables = previous ? getVariables(previous) : {};
     const rawEvents = executionEventsFor(current);
 
-    // First checkpoint at a for location: the initializer has completed.
     if (!previous) {
         if ([...loop.initNames].some(name => name in currentVariables)) {
             setExecutionPhase(current, "initialization");
             removeConditionResult(current);
+        } else {
+            setExecutionPhase(current, "condition");
         }
         return;
     }
 
-    const updateEvents = currentLineEvents ?? [];
-    if (updateEvents.length > 0) {
-        setExecutionPhase(current, "update");
+    const checkpointEvents = currentLineEvents ?? [];
+    if (checkpointEvents.length > 0) {
+        const hasInitialization = checkpointEvents.some(candidate => {
+            const data = isPlainObject(candidate.data) ? candidate.data : {};
+            return typeof data.name === "string" &&
+                loop.initNames.has(data.name) &&
+                !(data.name in previousVariables);
+        });
+        setExecutionPhase(
+            current,
+            hasInitialization ? "initialization" : "update"
+        );
         removeConditionResult(current);
         return;
     }
 
     if (previous.line !== current.line) {
-        // If the loop variable appears here for the first time, this is the
-        // initializer checkpoint even when JDI emitted no explicit update.
         if (
             [...loop.initNames].some(
                 name => !(name in previousVariables) && name in currentVariables
@@ -404,34 +415,33 @@ function normalizeForLoopCheckpoint(
         return;
     }
 
-    const initEvents = variableUpdateEvents(rawEvents, loop.initNames).filter(candidate => {
-        const data = isPlainObject(candidate) ? candidate.data : undefined;
-        const name = isPlainObject(data) && typeof data.name === "string"
-            ? data.name
-            : "";
-        return !(name in previousVariables);
+    // A same-line STEP can contain a duplicate VARIABLE_UPDATE emitted by the
+    // tracer while the debugger is moving from initialization/update to the
+    // condition checkpoint. Only treat it as an update when the variable
+    // actually transitions at this checkpoint.
+    const rawUpdateEvents = variableUpdateEvents(
+        rawEvents,
+        loop.updateNames
+    ).filter(candidate => {
+        const data = isPlainObject(candidate.data) ? candidate.data : {};
+        if (typeof data.name !== "string" || !(data.name in previousVariables)) {
+            return false;
+        }
+
+        if ("before" in data) {
+            return !sameSnapshot(data.before, data.value);
+        }
+
+        return !sameSnapshot(
+            previousVariables[data.name],
+            currentVariables[data.name]
+        );
     });
 
-    const rawUpdateEvents = variableUpdateEvents(rawEvents, loop.updateNames).filter(candidate => {
-        const data = isPlainObject(candidate) ? candidate.data : undefined;
-        const name = isPlainObject(data) && typeof data.name === "string"
-            ? data.name
-            : "";
-        return name in previousVariables;
-    });
-
-    if (initEvents.length > 0) {
-        appendUniqueExecutionEvents(previous, initEvents);
-        setExecutionPhase(previous, "initialization");
-        removeConditionResult(previous);
-
-        current.data = {
-            ...(current.data ?? {}),
-            executionEvents: rawEvents.filter(candidate => !initEvents.includes(candidate))
-        };
-        setExecutionPhase(current, "condition");
-        return;
-    }
+    const duplicateLoopEvents = variableUpdateEvents(
+        rawEvents,
+        new Set([...loop.initNames, ...loop.updateNames])
+    ).filter(candidate => !rawUpdateEvents.includes(candidate));
 
     if (rawUpdateEvents.length > 0) {
         appendUniqueExecutionEvents(previous, rawUpdateEvents);
@@ -444,6 +454,15 @@ function normalizeForLoopCheckpoint(
         };
         setExecutionPhase(current, "condition");
         return;
+    }
+
+    // Do not surface a zero-delta loop variable update as a second execution
+    // result. The state already represents the condition checkpoint.
+    if (duplicateLoopEvents.length > 0) {
+        current.data = {
+            ...(current.data ?? {}),
+            executionEvents: rawEvents.filter(candidate => !duplicateLoopEvents.includes(candidate))
+        };
     }
 
     setExecutionPhase(current, "condition");
@@ -472,13 +491,18 @@ function insertDerivedEvents(
 function attachStepResult(
     step: ExecutionEvent,
     postEvent: ExecutionEvent,
-    executionEvents: ExecutionEvent[]
+    executionEvents: ExecutionEvent[],
+    preserveCurrentLoopCheckpoint = false
 ): void {
     const data = {
         ...(step.data ?? {})
     };
 
-    if (postEvent.data?.variables && typeof postEvent.data.variables === "object") {
+    if (
+        !preserveCurrentLoopCheckpoint &&
+        postEvent.data?.variables &&
+        typeof postEvent.data.variables === "object"
+    ) {
         data.postVariables = postEvent.data.variables;
     }
 
