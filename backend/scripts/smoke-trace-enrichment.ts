@@ -819,7 +819,7 @@ const misorderedInitEffects = Array.isArray(misorderedSteps[1]?.data?.executionE
     ? misorderedSteps[1].data.executionEvents
     : [];
 if (!misorderedInitEffects.some(event => event.type === "VARIABLE_UPDATE" && isRecord(event.data) && event.data.name === "i")) {
-    throw new Error("for-loop initialization result was not moved onto the initialization checkpoint");
+    throw new Error("for-loop initialization result was not moved onto the initialization checkpoint: " + JSON.stringify(misorderedSteps.slice(1, 3).map(step => step.data?.executionEvents)));
 }
 if (misorderedSteps[1]?.data?.conditionResult !== undefined) {
     throw new Error("initialization checkpoint still exposes a condition result");
