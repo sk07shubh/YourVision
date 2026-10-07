@@ -845,7 +845,13 @@ if (
     semanticSteps[4]?.data?.executionPhase !== "condition" ||
     semanticSteps[4]?.data?.conditionResult !== true
 ) {
-    throw new Error("for-loop semantic order was not normalized to initialization -> condition -> update -> condition");
+    throw new Error("for-loop semantic order was not normalized: " + JSON.stringify(semanticSteps.map(step => ({
+        phase: step.data?.executionPhase,
+        condition: step.data?.conditionResult,
+        variables: step.data?.variables,
+        postVariables: step.data?.postVariables,
+        events: step.data?.executionEvents
+    }))));
 }
 
 const semanticUpdate = Array.isArray(semanticSteps[3]?.data?.executionEvents)
