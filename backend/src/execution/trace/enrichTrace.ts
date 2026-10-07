@@ -870,6 +870,7 @@ function deriveChanges(
                     variableUpdate(
                         previous,
                         name,
+                        undefined,
                         currentValue
                     )
                 );
@@ -1011,6 +1012,7 @@ function deriveChanges(
                 variableUpdate(
                     previous,
                     name,
+                    previousValue,
                     currentValue
                 )
             );
@@ -1076,23 +1078,25 @@ function deriveMapChanges(
 function variableUpdate(
     source: ExecutionEvent,
     name: string,
+    before: unknown,
     value: unknown
 ): ExecutionEvent {
+    const data: Record<string, unknown> = {
+        name,
+        value
+    };
+
+    if (before !== undefined) {
+        data.before = before;
+    }
+
     return {
         sequence: 0,
-        type:
-            "VARIABLE_UPDATE",
-        line:
-            source.line,
-        method:
-            source.method,
-        depth:
-            source.depth,
-        data: {
-            name,
-            before: undefined,
-            value
-        }
+        type: "VARIABLE_UPDATE",
+        line: source.line,
+        method: source.method,
+        depth: source.depth,
+        data
     };
 }
 
