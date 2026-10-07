@@ -190,12 +190,12 @@ function extractConditionExpression(statement: string): string | undefined {
 }
 
 function balancedParenthesized(source: string, openIndex: number): string | undefined {
-    if (source[openIndex] !== "(") return undefined;
+    if (source.charAt(openIndex) !== "(") return undefined;
     let depth = 0;
     let quote = "";
     let escaped = false;
     for (let i = openIndex; i < source.length; i++) {
-        const ch = source[i];
+        const ch = source[i]!;
         if (quote) {
             if (escaped) escaped = false;
             else if (ch === "\\") escaped = true;
@@ -268,7 +268,7 @@ function tokenizeCondition(source: string): ConditionToken[] {
         if (ch === '"' || ch === "'") {
             const quote = ch; let value = ""; i++;
             while (i < source.length) {
-                const current = source[i];
+                const current = source[i]!;
                 if (current === "\\" && i + 1 < source.length) { value += source[i + 1]; i += 2; continue; }
                 if (current === quote) { i++; break; }
                 value += current; i++;
@@ -346,7 +346,7 @@ class ConditionParser {
     private parseEquality(evaluate = true): unknown {
         let left = this.parseRelational(evaluate);
         while (this.peek("==") || this.peek("!=")) {
-            const operator = this.tokens[this.index++].value;
+            const operator = this.tokens[this.index++]!.value;
             const right = this.parseRelational(evaluate);
             if (!evaluate) { left = undefined; continue; }
             const equal = sameConditionValue(left, right);
@@ -441,8 +441,9 @@ function conditionSnapshotValue(value: unknown): ConditionValue {
 function readIndexed(value: unknown, index: number): unknown {
     if (Array.isArray(value)) return value[index];
     if (value && typeof value === "object" && "snapshot" in value) {
-        const record = value.snapshot;
-        if (Array.isArray(record.values)) return record.values[index];
+        const record = value as { snapshot: Record<string, unknown> };
+        const snapshot = record.snapshot;
+        if (Array.isArray(snapshot.values)) return snapshot.values[index];
     }
     throw new Error("not indexable");
 }
@@ -451,9 +452,9 @@ function readLength(value: unknown): number {
     if (typeof value === "string" || Array.isArray(value)) return value.length;
     if (value && typeof value === "object" && "snapshot" in value) {
         const record = value.snapshot;
-        if (typeof record.length === "number") return record.length;
-        if (Array.isArray(record.values)) return record.values.length;
-        if (Array.isArray(record.entries)) return record.entries.length;
+        if (typeof snapshot.length === "number") return snapshot.length;
+        if (Array.isArray(snapshot.values)) return snapshot.values.length;
+        if (Array.isArray(snapshot.entries)) return snapshot.entries.length;
     }
     throw new Error("length unavailable");
 }
