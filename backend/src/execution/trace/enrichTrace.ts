@@ -234,6 +234,190 @@ function partitionLoopUpdateEvents(
     return { previousLineEvents, currentLineEvents };
 }
 
+
+function parseBasicForStatement(statement: string): {
+    init: string;
+    condition: string;
+    update: string;
+    initNames: Set<string>;
+    updateNames: Set<string>;
+} | undefined {
+    if (!/^for\s*\(/.test(statement.trim())) return undefined;
+    const open = statement.indexOf("(");
+    const inside = balancedParenthesized(statement, open);
+    if (inside === undefined) return undefined;
+    const parts = splitTopLevel(inside, ";");
+    if (parts.length !== 3) return undefined;
+
+    const assignmentNames = (part: string): Set<string> => {
+        const names = new Set<string>();
+        for (const match of part.matchAll(/\b([A-Za-z_$][\w$]*)\s*(?:\+\+|--|[+\-*/%&|^]?=)/g)) {
+            if (match[1]) names.add(match[1]);
+        }
+        for (const match of part.matchAll(/(?:\+\+|--)\s*([A-Za-z_$][\w$]*)\b/g)) {
+            if (match[1]) names.add(match[1]);
+        }
+        return names;
+    };
+
+    return {
+        init: parts[0]?.trim() ?? "",
+        condition: parts[1]?.trim() ?? "",
+        update: parts[2]?.trim() ?? "",
+        initNames: assignmentNames(parts[0] ?? ""),
+        updateNames: assignmentNames(parts[2] ?? "")
+    };
+}
+
+function loopVariableUpdateEvents(events: unknown[], names: Set<string>): unknown[] {
+    return events.filter(event =>
+        isPlainObject(event) &&
+        event.type === "VARIABLE_UPDATE" &&
+        isPlainObject(event.data) &&
+        typeof event.data.name === "string" &&
+        names.has(event.data.name)
+    );
+}
+
+function appendUniqueExecutionEvents(target: ExecutionEvent, events: unknown[]): void {
+    if (events.length === 0) return;
+    const existing = Array.isArray(target.data?.executionEvents)
+        ? target.data.executionEvents
+        : [];
+
+    const signature = (event: unknown): string => {
+        if (!isPlainObject(event)) return "";
+        return JSON.stringify({
+            type: event.type,
+            name: isPlainObject(event.data) ? event.data.name : undefined,
+            value: isPlainObject(event.data) ? event.data.value : undefined
+        });
+    };
+
+    const merged = [...existing];
+    const seen = new Set(merged.map(signature));
+    for (const event of events) {
+        const key = signature(event);
+        if (!seen.has(key)) {
+            merged.push(event as ExecutionEvent);
+            seen.add(key);
+        }
+    }
+
+    target.data = {
+        ...(target.data ?? {}),
+        executionEvents: merged
+    };
+}
+
+function setExecutionPhase(
+    event: ExecutionEvent,
+    phase: "initialization" | "condition" | "update"
+): void {
+    event.data = {
+        ...(event.data ?? {}),
+        executionPhase: phase
+    };
+}
+
+function removeConditionResult(event: ExecutionEvent): void {
+    if (!event.data || !("conditionResult" in event.data)) return;
+    const { conditionResult: _ignored, ...rest } = event.data;
+    event.data = rest;
+}
+
+function normalizeForLoopPhase(
+    previous: ExecutionEvent | undefined,
+    current: ExecutionEvent,
+    transitionEvents: ExecutionEvent[],
+    sourceLines: string[]
+): ExecutionEvent[] {
+    const statement =
+        typeof current.line === "number" && current.line > 0
+            ? sourceLines[current.line - 1]?.trim() ?? ""
+            : "";
+    const loop = parseBasicForStatement(statement);
+    if (!loop || !previous || previous.method !== current.method) {
+        return transitionEvents;
+    }
+
+    const currentRaw = Array.isArray(current.data?.executionEvents)
+        ? current.data.executionEvents
+        : [];
+    const previousVars = getVariables(previous);
+    const currentVars = getVariables(current);
+
+    // The first checkpoint at a basic-for location represents completion of
+    // the initializer when the loop variable becomes live at that location.
+    if (previous.line !== current.line) {
+        const initializedNames = [...loop.initNames].filter(
+            name => !(name in previousVars) && name in currentVars
+        );
+        if (initializedNames.length > 0) {
+            setExecutionPhase(current, "initialization");
+            removeConditionResult(current);
+            return transitionEvents;
+        }
+    }
+
+    const transitionUpdates = loopVariableUpdateEvents(
+        transitionEvents,
+        loop.updateNames
+    );
+
+    if (previous.line === current.line) {
+        const initRaw = loopVariableUpdateEvents(currentRaw, loop.initNames)
+            .filter(event => {
+                const data = isPlainObject(event) ? event.data : undefined;
+                const name = isPlainObject(data) && typeof data.name === "string"
+                    ? data.name
+                    : "";
+                return !(name in previousVars);
+            });
+
+        const updateRaw = loopVariableUpdateEvents(currentRaw, loop.updateNames)
+            .filter(event => {
+                const data = isPlainObject(event) ? event.data : undefined;
+                const name = isPlainObject(data) && typeof data.name === "string"
+                    ? data.name
+                    : "";
+                return name in previousVars;
+            });
+
+        if (initRaw.length > 0) {
+            appendUniqueExecutionEvents(previous, initRaw);
+            setExecutionPhase(previous, "initialization");
+            current.data = {
+                ...(current.data ?? {}),
+                executionEvents: currentRaw.filter(event => !initRaw.includes(event))
+            };
+            removeConditionResult(previous);
+            return transitionEvents;
+        }
+
+        if (updateRaw.length > 0) {
+            appendUniqueExecutionEvents(previous, updateRaw);
+            setExecutionPhase(previous, "update");
+            current.data = {
+                ...(current.data ?? {}),
+                executionEvents: currentRaw.filter(event => !updateRaw.includes(event))
+            };
+            removeConditionResult(previous);
+            setExecutionPhase(current, "condition");
+            return transitionEvents.filter(event => !updateRaw.includes(event));
+        }
+    }
+
+    if (transitionUpdates.length > 0) {
+        setExecutionPhase(current, "update");
+        removeConditionResult(current);
+    } else {
+        setExecutionPhase(current, "condition");
+    }
+
+    return transitionEvents;
+}
+
 function insertDerivedEvents(
     events: ExecutionEvent[],
     afterEvent: ExecutionEvent,
