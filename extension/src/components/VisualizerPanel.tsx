@@ -86,15 +86,7 @@ function eventEffects(state?: TraceState): ExecutionEffect[] {
     const eventData = isPlainObject(event.data) ? event.data : {};
     const eventType = typeof event.type === 'string' ? event.type : '';
 
-    if (eventType === 'VARIABLE_UPDATE' && typeof eventData.name === 'string') {
-      const name = eventData.name;
-      const before = 'before' in eventData ? compactValue(eventData.before) : '';
-      const after = compactValue(eventData.value);
-      effects.push({
-        kind: 'change',
-        text: before ? name + '  ' + before + '  →  ' + after : name + ' = ' + after
-      });
-    } else if (eventType === 'ARRAY_WRITE') {
+    if (eventType === 'ARRAY_WRITE') {
       const name = typeof eventData.name === 'string' ? eventData.name : 'array';
       const changes = Array.isArray(eventData.changes) ? eventData.changes : [];
       for (const change of changes.slice(0, 3)) {
@@ -211,43 +203,8 @@ function eventEffects(state?: TraceState): ExecutionEffect[] {
   return effects;
 }
 
-function loopParts(statement: string): { init: string; condition: string; update: string } | undefined {
-  const match = statement.match(/\bfor\s*\((.*?);(.*?);(.*?)\)\s*\{?\s*$/);
-  if (!match) return undefined;
-  return { init: match[1].trim(), condition: match[2].trim(), update: match[3].trim() };
-}
-
-function executionSubstatement(statement: string, current?: TraceState, previous?: TraceState): string {
-  const parts = loopParts(statement);
-  if (!parts || !current) return statement;
-
-  const data = current.lastEvent?.data;
-  if (isPlainObject(data) && typeof data.executionPhase === 'string') {
-    if (data.executionPhase === 'initialization') return parts.init || statement;
-    if (data.executionPhase === 'update') return parts.update || statement;
-    if (data.executionPhase === 'condition') return parts.condition || statement;
-  }
-
-  // Fallback for traces produced before executionPhase was introduced.
-  const previousVars = previous?.variables ?? {};
-  const executionEvents = isPlainObject(data) && Array.isArray(data.executionEvents)
-    ? data.executionEvents
-    : [];
-  const loopVariable = parts.init.match(/([A-Za-z_$][\\w$]*)\\s*=/)?.[1];
-  const updatedVariable = executionEvents.some((event) =>
-    isPlainObject(event) &&
-    event.type === 'VARIABLE_UPDATE' &&
-    isPlainObject(event.data) &&
-    event.data.name === loopVariable
-  );
-
-  if (updatedVariable && loopVariable) {
-    return loopVariable in previousVars
-      ? (parts.update || statement)
-      : (parts.init || statement);
-  }
-
-  return parts.condition || statement;
+function executionSubstatement(statement: string): string {
+  return statement;
 }
 
 function debugValue(value: unknown): string {
@@ -290,14 +247,76 @@ function buildDebugTrace(states: TraceState[], source: string): string {
     ].join('\n');
   }).join('\n');
 }
+function VariableResult({ name, oldValue, value, initialized }: {
+  name: string;
+  oldValue?: unknown;
+  value: unknown;
+  initialized: boolean;
+}) {
+  return (
+    <div className="yv-var changed">
+      <div className="yv-var-name">{name}</div>
+      <div className="yv-change">
+        <span className="yv-old yv-code">
+          {initialized ? 'undefined' : variableSummary(oldValue)}
+        </span>
+        <span className="yv-arrow">→</span>
+        <span className="yv-code">{variableSummary(value)}</span>
+      </div>
+    </div>
+  );
+}
+
+function variableResultChanges(current?: TraceState, previous?: TraceState): React.ReactNode[] {
+  if (!current) return [];
+  const before = previous?.variables ?? {};
+  return Object.entries(current.variables ?? {})
+    .filter(([, value]) => !isStructuralValue(value))
+    .filter(([name, value]) => !(name in before) || valueChanged(before[name], value))
+    .map(([name, value]) => (
+      <VariableResult
+        key={name}
+        name={name}
+        oldValue={before[name]}
+        value={value}
+        initialized={!(name in before)}
+      />
+    ));
+}
+
+function newDataStructureResults(current?: TraceState, previous?: TraceState): React.ReactNode[] {
+  if (!current) return [];
+  const beforeNames = new Set([
+    ...Object.keys(previous?.arrays ?? {}),
+    ...Object.keys(previous?.dataStructures ?? {})
+  ]);
+  const currentEntries = [
+    ...Object.entries(current.arrays ?? {}),
+    ...Object.entries(current.dataStructures ?? {})
+  ];
+  const seen = new Set<string>();
+  return currentEntries
+    .filter(([name]) => {
+      if (beforeNames.has(name) || seen.has(name)) return false;
+      seen.add(name);
+      return true;
+    })
+    .map(([name]) => (
+      <div className="yv-result structural" key={'new-ds-' + name}>
+        <span className="yv-condition true">NEW</span>
+        <span className="yv-code">{name}</span>
+      </div>
+    ));
+}
+
 function ExecutionInspector({ state, previous, statement, index, total }: { state?: TraceState; previous?: TraceState; statement: string; index: number; total: number }) {
   const condition = executionCondition(state);
-  const substatement = executionSubstatement(statement, state, previous);
+  const substatement = executionSubstatement(statement);
+  const variableResults = variableResultChanges(state, previous);
+  const newStructureResults = newDataStructureResults(state, previous);
   const effects = [...variableEffects(state, previous), ...eventEffects(state)]
     .filter((effect, i, all) => all.findIndex((x) => x.text === effect.text) === i);
 
-  const resultEffects = effects.slice(0, 3);
-  const resultOverflow = effects.length - resultEffects.length;
 
   return (
     <div className="yv-execution">
@@ -337,16 +356,12 @@ function ExecutionInspector({ state, previous, statement, index, total }: { stat
             <span className={'yv-condition ' + (condition ? 'true' : 'false')}>
               {condition ? 'TRUE' : 'FALSE'}
             </span>
-          ) : resultEffects.length > 0 ? (
+          ) : variableResults.length > 0 || newStructureResults.length > 0 ? (
             <div className="yv-result-list">
-              {resultEffects.map((effect, i) => (
-                <div className={'yv-result ' + (effect.kind ?? 'change')} key={effect.text + '-' + i}>
-                  {effect.text}
-                </div>
-              ))}
-              {resultOverflow > 0 && <div className="yv-result-more">+{resultOverflow} more</div>}
+              {variableResults}
+              {newStructureResults}
             </div>
-          ) : (
+
             <span className="yv-result-empty">—</span>
           )}
         </div>
@@ -614,6 +629,7 @@ function Variables({ state, previous }: { state?: TraceState; previous?: TraceSt
     <div className="yv-vars">
       {entries.map(([name, value]) => {
         const old = previous?.variables?.[name];
+        const initialized = !(name in (previous?.variables ?? {}));
         const changed =
           Boolean(previous) &&
           stableStringify(old) !== stableStringify(value);
@@ -625,7 +641,7 @@ function Variables({ state, previous }: { state?: TraceState; previous?: TraceSt
               {changed && (
                 <>
                   <span className="yv-old yv-code">
-                    {variableSummary(old)}
+                    {initialized ? 'undefined' : variableSummary(old)}
                   </span>
                   <span className="yv-arrow">→</span>
                 </>
