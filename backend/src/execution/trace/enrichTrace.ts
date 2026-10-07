@@ -239,10 +239,14 @@ function canonicalizeForLoopExecutionPhases(
         // with ForInit. Do not infer this from local-variable snapshots: JDI
         // snapshots can expose the loop variable before the initialization
         // checkpoint is semantically rendered.
-        const isFirstLoopCheckpoint =
-            !previous ||
-            previous.method !== current.method ||
-            previous.line !== current.line;
+        const hasSeenLoopCheckpoint = steps
+            .slice(0, index)
+            .some(
+                prior =>
+                    prior.method === current.method &&
+                    prior.line === current.line
+            );
+        const isFirstLoopCheckpoint = !hasSeenLoopCheckpoint;
 
         if (isFirstLoopCheckpoint) {
             setExecutionPhase(current, "initialization");
