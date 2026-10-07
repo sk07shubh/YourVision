@@ -228,15 +228,15 @@ function VariableResult({ name, oldValue, value, initialized }: {
   initialized: boolean;
 }) {
   return (
-    <div className="yv-var changed">
-      <div className="yv-var-name">{name}</div>
-      <div className="yv-change">
-        <span className="yv-old yv-code">
+    <div className="yv-variable-result">
+      <span className="yv-variable-name">{name}</span>
+      <span className="yv-variable-transition">
+        <span className="yv-variable-old">
           {initialized ? 'undefined' : variableSummary(oldValue)}
         </span>
-        <span className="yv-arrow">→</span>
-        <span className="yv-code">{variableSummary(value)}</span>
-      </div>
+        <span className="yv-variable-arrow">→</span>
+        <span className="yv-variable-new">{variableSummary(value)}</span>
+      </span>
     </div>
   );
 }
