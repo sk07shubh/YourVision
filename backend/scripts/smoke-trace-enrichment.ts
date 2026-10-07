@@ -542,7 +542,7 @@ if (
     throw new Error("return value was not attached to the executed return STEP");
 }
 
-const accessTrace: ExecutionTrace = {
+const derivedAccessTrace: ExecutionTrace = {
     version: 1,
     events: [
         {
