@@ -217,7 +217,6 @@ function partitionLoopUpdateEvents(
         return { previousLineEvents: events, currentLineEvents: [] };
     }
 
-    const previousVariables = getVariables(previous);
     const currentLineEvents: ExecutionEvent[] = [];
     const previousLineEvents: ExecutionEvent[] = [];
 
@@ -226,7 +225,6 @@ function partitionLoopUpdateEvents(
             event.type === "VARIABLE_UPDATE" &&
             typeof event.data?.name === "string" &&
             updatedNames.has(event.data.name) &&
-            event.data.name in previousVariables
         ) {
             currentLineEvents.push(event);
         } else {
