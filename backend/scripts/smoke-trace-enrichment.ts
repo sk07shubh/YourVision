@@ -731,3 +731,148 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 console.log("PASS: method-call conditions, return values, and array accesses");
 
+
+
+const semanticForTrace: ExecutionTrace = {
+    version: 1,
+    events: [
+        {
+            sequence: 1,
+            type: "STEP",
+            line: 9,
+            method: "loop",
+            depth: 1,
+            data: {
+                variables: { n: 4, i: 0 }
+            }
+        },
+        {
+            sequence: 2,
+            type: "STEP",
+            line: 9,
+            method: "loop",
+            depth: 1,
+            data: {
+                variables: { n: 4, i: 0 },
+                executionEvents: [
+                    {
+                        sequence: 0,
+                        type: "VARIABLE_UPDATE",
+                        line: 9,
+                        method: "loop",
+                        depth: 1,
+                        data: { name: "i", value: 0 }
+                    }
+                ]
+            }
+        },
+        {
+            sequence: 3,
+            type: "STEP",
+            line: 10,
+            method: "loop",
+            depth: 1,
+            data: {
+                variables: { n: 4, i: 0 }
+            }
+        },
+        {
+            sequence: 4,
+            type: "STEP",
+            line: 9,
+            method: "loop",
+            depth: 1,
+            data: {
+                variables: { n: 4, i: 0 },
+                conditionResult: true
+            }
+        },
+        {
+            sequence: 5,
+            type: "STEP",
+            line: 9,
+            method: "loop",
+            depth: 1,
+            data: {
+                variables: { n: 4, i: 1 },
+                executionEvents: [
+                    {
+                        sequence: 0,
+                        type: "VARIABLE_UPDATE",
+                        line: 9,
+                        method: "loop",
+                        depth: 1,
+                        data: { name: "i", value: 1, before: 0 }
+                    }
+                ]
+            }
+        },
+        {
+            sequence: 6,
+            type: "STEP",
+            line: 10,
+            method: "loop",
+            depth: 1,
+            data: {
+                variables: { n: 4, i: 1 }
+            }
+        }
+    ]
+};
+
+const semanticForSource = [
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "for (int i = 0; i < n; i++) {",
+    "    use(i);",
+    "}"
+].join("\n");
+
+const semanticFor = enrichTrace(semanticForTrace, semanticForSource);
+const semanticSteps = semanticFor.events.filter(event => event.type === "STEP");
+
+if (
+    semanticSteps[0]?.data?.executionPhase !== "initialization" ||
+    semanticSteps[1]?.data?.executionPhase !== "condition" ||
+    semanticSteps[1]?.data?.conditionResult !== true ||
+    semanticSteps[3]?.data?.executionPhase !== "update" ||
+    semanticSteps[4]?.data?.executionPhase !== "condition" ||
+    semanticSteps[4]?.data?.conditionResult !== true
+) {
+    throw new Error("for-loop semantic order was not normalized to initialization -> condition -> update -> condition");
+}
+
+const semanticUpdate = Array.isArray(semanticSteps[3]?.data?.executionEvents)
+    ? semanticSteps[3].data.executionEvents
+    : [];
+if (
+    !semanticUpdate.some(
+        event =>
+            event.type === "VARIABLE_UPDATE" &&
+            isRecord(event.data) &&
+            event.data.name === "i" &&
+            event.data.before === 0 &&
+            event.data.value === 1
+    )
+) {
+    throw new Error("for-loop update result was not attached to the update checkpoint");
+}
+
+const semanticUpdatePost = semanticSteps[3]?.data?.postVariables;
+const semanticConditionVariables = semanticSteps[4]?.data?.variables;
+if (
+    !isRecord(semanticUpdatePost) ||
+    semanticUpdatePost.i !== 1 ||
+    !isRecord(semanticConditionVariables) ||
+    semanticConditionVariables.i !== 1
+) {
+    throw new Error("for-loop update/condition state did not advance in semantic order");
+}
+
+console.log("PASS: semantic for-loop ordering");
