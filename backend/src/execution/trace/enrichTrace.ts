@@ -34,8 +34,9 @@ export function enrichTrace(
                     ...deriveArrayAccessEvents(previousStep, sourceLines)
                 ];
 
-                // Derived runtime effects stay attached to the state transition
-                // they came from. Loop ordering is no longer inferred here.
+                // Runtime checkpoints are authoritative. Keep derived effects
+                // attached to their state transition without loop-specific
+                // inference or checkpoint reordering.
                 attachStepResult(previousStep, event, executionEvents);
                 insertDerivedEvents(
                     enriched,
@@ -156,6 +157,8 @@ export function enrichTrace(
     };
 }
 
+
+
 function appendExecutionEvents(
     event: ExecutionEvent,
     executionEvents: ExecutionEvent[]
@@ -173,64 +176,10 @@ function appendExecutionEvents(
     };
 }
 
- {
-    const statement =
-        typeof current.line === "number" && current.line > 0
-            ? sourceLines[current.line - 1]?.trim() ?? ""
-            : "";
-
-    const loop = parseBasicForStatement(statement);
-    if (!loop) {
-        return { previousLineEvents: events, currentLineEvents: [] };
-    }
-
-    const previousVariables = getVariables(previous);
-    const currentLineEvents: ExecutionEvent[] = [];
-    const previousLineEvents: ExecutionEvent[] = [];
-
-    for (const event of events) {
-        const name =
-            event.type === "VARIABLE_UPDATE" &&
-            typeof event.data?.name === "string"
-                ? event.data.name
-                : undefined;
-
-        if (
-            name &&
-            (
-                // A variable first appearing at this for checkpoint belongs
-                // to ForInit, not to the line before the loop.
-                (loop.initNames.has(name) && !(name in previousVariables)) ||
-                // A variable that already existed and is modified by ForUpdate
-                // belongs to this loop checkpoint as well.
-                (loop.updateNames.has(name) && name in previousVariables)
-            )
-        ) {
-            currentLineEvents.push(event);
-        } else {
-            previousLineEvents.push(event);
-        }
-    }
-
-    return { previousLineEvents, currentLineEvents };
-}
 
 
- | undefined {
-    if (!/^for\s*\(/.test(statement.trim())) return undefined;
-    const inside = balancedParenthesized(statement, statement.indexOf("("));
-    if (inside === undefined) return undefined;
-    const parts = splitTopLevel(inside, ";");
-    if (parts.length !== 3) return undefined;
 
-    return {
-        init: parts[0]?.trim() ?? "",
-        condition: parts[1]?.trim() ?? "",
-        update: parts[2]?.trim() ?? "",
-        initNames: extractAssignmentNames(parts[0] ?? ""),
-        updateNames: extractAssignmentNames(parts[2] ?? "")
-    };
-}
+
 
 function executionEventsFor(
     event: ExecutionEvent
@@ -239,6 +188,10 @@ function executionEventsFor(
         ? event.data.executionEvents
         : [];
 }
+
+
+
+
 
 function insertDerivedEvents(
     events: ExecutionEvent[],
