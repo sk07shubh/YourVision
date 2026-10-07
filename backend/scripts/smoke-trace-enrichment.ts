@@ -240,6 +240,124 @@ if (declarationStates[0]?.line !== 2 || declarationStates[1]?.line !== 6) {
 
 console.log("PASS: execution line semantics");
 
+const loopAttributionTrace: ExecutionTrace = {
+    version: 1,
+    events: [
+        {
+            sequence: 1,
+            type: "STEP",
+            line: 9,
+            method: "loop",
+            depth: 1,
+            data: {
+                variables: {
+                    i: 0,
+                    nums: { $arrayId: "70", $type: "int[]", values: [2, 7] }
+                },
+                arrayReferences: [
+                    { array: "nums", arrayId: "70", length: 2, line: 9 }
+                ]
+            }
+        },
+        {
+            sequence: 2,
+            type: "STEP",
+            line: 10,
+            method: "loop",
+            depth: 1,
+            data: {
+                variables: {
+                    i: 1,
+                    nums: { $arrayId: "70", $type: "int[]", values: [2, 7] }
+                },
+                arrayReferences: [
+                    { array: "nums", arrayId: "70", length: 2, line: 10 }
+                ]
+            }
+        },
+        {
+            sequence: 3,
+            type: "STEP",
+            line: 9,
+            method: "loop",
+            depth: 1,
+            data: {
+                variables: {
+                    i: 1,
+                    nums: { $arrayId: "70", $type: "int[]", values: [2, 7] }
+                },
+                arrayReferences: [
+                    { array: "nums", arrayId: "70", length: 2, line: 9 }
+                ]
+            }
+        }
+    ]
+};
+
+const loopSource = [
+    "void loop() {",
+    "  for (int i = 0; i < nums.length; i++) {",
+    "    use(nums[i]);",
+    "  }",
+    "}"
+].join("\n");
+
+const loopAttribution = enrichTrace(loopAttributionTrace, loopSource);
+const loopFirstStep = loopAttribution.events.find(
+    event => event.type === "STEP" && event.line === 9
+);
+const loopFirstEffects = Array.isArray(loopFirstStep?.data?.executionEvents)
+    ? loopFirstStep.data.executionEvents
+    : [];
+
+if (
+    loopFirstEffects.some(
+        event =>
+            event &&
+            typeof event === "object" &&
+            (event as { type?: unknown }).type === "VARIABLE_UPDATE"
+    )
+) {
+    throw new Error("for-loop update was incorrectly attached to the preceding body line");
+}
+
+const loopUpdateStep = loopAttribution.events.find(
+    event =>
+        event.type === "STEP" &&
+        event.line === 9 &&
+        event !== loopFirstStep
+);
+const loopUpdateEffects = Array.isArray(loopUpdateStep?.data?.executionEvents)
+    ? loopUpdateStep.data.executionEvents
+    : [];
+
+if (
+    !loopUpdateEffects.some(
+        event =>
+            event &&
+            typeof event === "object" &&
+            (event as { type?: unknown }).type === "VARIABLE_UPDATE" &&
+            (event as { data?: { name?: unknown } }).data?.name === "i"
+    )
+) {
+    throw new Error("for-loop update was not attached to the next for checkpoint");
+}
+
+const filteredRefs = loopAttribution.events
+    .filter(event => event.type === "STEP" && event.line === 9)
+    .map(event => event.data?.arrayReferences);
+
+if (
+    !Array.isArray(filteredRefs[0]) ||
+    filteredRefs[0].length !== 0 ||
+    !Array.isArray(filteredRefs[1]) ||
+    filteredRefs[1].length !== 0
+) {
+    throw new Error("array reference metadata incorrectly treated visible arrays as line references");
+}
+
+console.log("PASS: loop attribution and array-reference filtering");
+
 const accessTrace: ExecutionTrace = {
     version: 1,
     events: [
