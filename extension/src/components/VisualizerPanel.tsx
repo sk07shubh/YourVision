@@ -218,13 +218,37 @@ function loopParts(statement: string): { init: string; condition: string; update
 }
 
 function executionSubstatement(statement: string, current?: TraceState, previous?: TraceState): string {
-  const parts = loopParts(statement); if (!parts || !current) return statement;
-  const currentVars = current.variables ?? {}; const previousVars = previous?.variables ?? {};
+  const parts = loopParts(statement);
+  if (!parts || !current) return statement;
+
+  const currentVars = current.variables ?? {};
+  const previousVars = previous?.variables ?? {};
+  const data = current.lastEvent?.data;
+  const executionEvents = isPlainObject(data) && Array.isArray(data.executionEvents)
+    ? data.executionEvents
+    : [];
+
   if (!previous) return parts.init || statement;
-  const created = Object.keys(currentVars).find((name) => !(name in previousVars) && parts.init.includes(name));
-  if (created) return parts.init || statement;
-  const changed = Object.keys(currentVars).find((name) => name in previousVars && valueChanged(previousVars[name], currentVars[name]));
-  if (changed && /(\+\+|--|\+=|-=|\*=|\/=)/.test(parts.update)) return parts.update;
+
+  const loopVariable = parts.init.match(/([A-Za-z_$][\\w$]*)\\s*=/)?.[1];
+  const updatedVariable = executionEvents.some((event) =>
+    isPlainObject(event) &&
+    event.type === 'VARIABLE_UPDATE' &&
+    isPlainObject(event.data) &&
+    event.data.name === loopVariable
+  );
+
+  if (updatedVariable) {
+    const sameLine = previous.line === current.line;
+    const previousHadVariable = loopVariable ? loopVariable in previousVars : false;
+
+    if (sameLine || (loopVariable && !previousHadVariable && currentVars[loopVariable] !== 0)) {
+      return parts.update || statement;
+    }
+
+    return parts.init || statement;
+  }
+
   return parts.condition || statement;
 }
 
