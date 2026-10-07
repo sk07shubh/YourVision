@@ -525,7 +525,14 @@ const returnTrace: ExecutionTrace = {
     ]
 };
 
-const returnEnriched = enrichTrace(returnTrace, "class Solution {\\n  int[] answer(int value) {\\n    return new int[] {0, 1};\\n  }\\n}");
+const returnSource = [
+    "class Solution {",
+    "  int[] answer(int value) {",
+    "    return new int[] {0, 1};",
+    "  }",
+    "}"
+].join("\\n");
+const returnEnriched = enrichTrace(returnTrace, returnSource);
 const returnStep = returnEnriched.events.find(event => event.type === "STEP");
 if (
     !returnStep?.data ||
