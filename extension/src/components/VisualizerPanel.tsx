@@ -637,6 +637,33 @@ function pointerLabels(state: TraceState | undefined, length: number, indexNames
   return map;
 }
 
+function accessedArrayIndices(state: TraceState | undefined, arrayName?: string): Set<number> {
+  const set = new Set<number>();
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data) || !Array.isArray(data.executionEvents)) return set;
+  for (const event of data.executionEvents) {
+    if (!isPlainObject(event) || event.type !== 'ARRAY_ACCESS' || !isPlainObject(event.data)) continue;
+    if (arrayName && event.data.name !== arrayName) continue;
+    if (!Array.isArray(event.data.indices)) continue;
+    const index = event.data.indices[0];
+    if (typeof index === 'number') set.add(index);
+  }
+  return set;
+}
+
+function accessedArrayPaths(state: TraceState | undefined, arrayName?: string): Set<string> {
+  const paths = new Set<string>();
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data) || !Array.isArray(data.executionEvents)) return paths;
+  for (const event of data.executionEvents) {
+    if (!isPlainObject(event) || event.type !== 'ARRAY_ACCESS' || !isPlainObject(event.data)) continue;
+    if (arrayName && event.data.name !== arrayName) continue;
+    if (!Array.isArray(event.data.indices) || !event.data.indices.every((x) => typeof x === 'number')) continue;
+    paths.add((event.data.indices as number[]).join(','));
+  }
+  return paths;
+}
+
 function changedArrayIndices(state?: TraceState): Set<number> {
   const set = new Set<number>();
   const data = state?.lastEvent?.data;
