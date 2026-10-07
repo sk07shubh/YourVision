@@ -56,12 +56,25 @@ function variableEffects(current?: TraceState, previous?: TraceState): Execution
   return effects;
 }
 
+function accessEffects(data: Obj): ExecutionEffect[] {
+  const effects: ExecutionEffect[] = [];
+  const executionEvents = Array.isArray(data.executionEvents) ? data.executionEvents : [];
+  for (const event of executionEvents) {
+    if (!isPlainObject(event) || event.type !== 'ARRAY_ACCESS' || !isPlainObject(event.data)) continue;
+    const eventData = event.data;
+    const name = typeof eventData.name === 'string' ? eventData.name : 'array';
+    const indices = Array.isArray(eventData.indices) ? eventData.indices.map((x) => '[' + x + ']').join('') : '';
+    effects.push({ kind: 'structural', text: name + indices + ' = ' + compactValue(eventData.value) });
+  }
+  return effects;
+}
+
 function eventEffects(state?: TraceState): ExecutionEffect[] {
   const data = state?.lastEvent?.data;
   if (!isPlainObject(data)) return [];
 
   const type = state?.lastEvent?.type;
-  const effects: ExecutionEffect[] = [];
+  const effects: ExecutionEffect[] = [...accessEffects(data)];
 
   // Replay checkpoints carry the operations observed between the current
   // STEP and the next runtime checkpoint. Those operations belong to the
@@ -191,8 +204,8 @@ function eventEffects(state?: TraceState): ExecutionEffect[] {
     }
   }
 
-  if (type === 'METHOD_EXIT' && 'returnValue' in data) {
-    effects.push({ kind: 'return', text: compactValue(data.returnValue) });
+  if ('returnValue' in data) {
+    effects.push({ kind: 'return', text: '↩  ' + compactValue(data.returnValue) });
   }
 
   return effects;
