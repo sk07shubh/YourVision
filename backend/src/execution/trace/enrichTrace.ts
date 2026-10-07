@@ -55,6 +55,7 @@ export function enrichTrace(
                     appendExecutionEvents(event, creationEvents);
                     insertDerivedEvents(enriched, event, creationEvents);
                 }
+            }
 
             if (pendingCallerResume) {
                 const isCaller =
