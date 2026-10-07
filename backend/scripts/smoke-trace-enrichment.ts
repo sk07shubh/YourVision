@@ -416,7 +416,7 @@ const conditionSource = [
     "        return false;",
     "    }",
     "}"
-].join("\\n");
+].join("\n");
 
 const conditionEnriched = enrichTrace(conditionTrace, conditionSource);
 const conditionResults = conditionEnriched.events.filter(event => event.type === "STEP").map(event => event.data?.conditionResult);
