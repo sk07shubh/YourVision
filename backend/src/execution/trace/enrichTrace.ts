@@ -23,9 +23,17 @@ export function enrichTrace(
         if (event.type === "STEP") {
             event = annotateCondition(event, sourceLines);
             if (previousStep && previousStep.method === event.method) {
-                enriched.push(...deriveArrayReferenceEvents(event));
-                enriched.push(...deriveChanges(previousStep, event));
-                enriched.push(...deriveMapChanges(previousStep, event));
+                const executionEvents = [
+                    ...deriveChanges(previousStep, event),
+                    ...deriveMapChanges(previousStep, event)
+                ];
+
+                // JDI STEP events occur immediately before their source line
+                // executes. The next same-method STEP therefore observes the
+                // state produced by the current line. Attach that post-line
+                // snapshot to the current STEP so replay can show the effect
+                // while the current line is highlighted.
+                attachStepResult(previousStep, event, executionEvents);
             }
 
             if (pendingCallerResume) {
@@ -72,11 +80,15 @@ export function enrichTrace(
         }
 
         if (event.type === "METHOD_EXIT") {
-            const derived: ExecutionEvent[] = [];
-
             if (previousStep && previousStep.method === event.method) {
-                derived.push(...deriveChanges(previousStep, event));
-                derived.push(...deriveMapChanges(previousStep, event));
+                const executionEvents = [
+                    ...deriveChanges(previousStep, event),
+                    ...deriveMapChanges(previousStep, event)
+                ];
+
+                // MethodExitEvent is emitted after the method body has
+                // executed, so it is the post-state source for the last STEP.
+                attachStepResult(previousStep, event, executionEvents);
             }
 
             if (typeof event.data?.callerLine === "number") {
@@ -90,46 +102,8 @@ export function enrichTrace(
                 };
             }
 
-            // A method can return before STEP_LINE gives us a second
-            // checkpoint. Compare the final frame against method entry so
-            // mutations to arguments are still visible.
-            const entry = methodEntries.pop();
-            if (entry && entry.method === event.method) {
-                const entryDerived = [
-                    ...deriveChanges(entry, event),
-                    ...deriveMapChanges(entry, event)
-                ];
+            methodEntries.pop();
 
-                const existing = new Set(
-                    derived.map(item =>
-                        JSON.stringify({
-                            type: item.type,
-                            data: item.data
-                        })
-                    )
-                );
-
-                for (const item of entryDerived) {
-                    const key = JSON.stringify({
-                        type: item.type,
-                        data: item.data
-                    });
-
-                    if (
-                        (
-                            item.type === "OBJECT_FIELD_WRITE" ||
-                            item.type === "ARRAY_WRITE" ||
-                            item.type === "MAP_WRITE"
-                        ) &&
-                        !existing.has(key)
-                    ) {
-                        derived.push(item);
-                        existing.add(key);
-                    }
-                }
-            }
-
-            enriched.push(...derived);
             previousStep = undefined;
             enriched.push(event);
             continue;
@@ -154,6 +128,26 @@ export function enrichTrace(
             sequence: index + 1
         }))
     };
+}
+
+function attachStepResult(
+    step: ExecutionEvent,
+    postEvent: ExecutionEvent,
+    executionEvents: ExecutionEvent[]
+): void {
+    const data = {
+        ...(step.data ?? {})
+    };
+
+    if (postEvent.data?.variables && typeof postEvent.data.variables === "object") {
+        data.postVariables = postEvent.data.variables;
+    }
+
+    if (executionEvents.length > 0) {
+        data.executionEvents = executionEvents;
+    }
+
+    step.data = data;
 }
 
 function annotateCondition(
