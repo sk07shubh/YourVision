@@ -531,7 +531,8 @@ const returnSource = [
     "    return new int[] {0, 1};",
     "  }",
     "}"
-].join("\\n");
+].join("
+");
 const returnEnriched = enrichTrace(returnTrace, returnSource);
 const returnStep = returnEnriched.events.find(event => event.type === "STEP");
 if (
@@ -584,18 +585,18 @@ const accessSource = [
     "}"
 ].join("\n");
 
-const accessEnriched = enrichTrace(accessTrace, accessSource);
-const accessStep = accessEnriched.events.find(event => event.type === "STEP");
-const accessEvents = Array.isArray(accessStep?.data?.executionEvents)
-    ? accessStep.data.executionEvents
+const derivedAccessEnriched = enrichTrace(derivedAccessTrace, accessSource);
+const derivedAccessStep = derivedAccessEnriched.events.find(event => event.type === "STEP");
+const derivedAccessEvents = Array.isArray(derivedAccessStep?.data?.executionEvents)
+    ? derivedAccessStep.data.executionEvents
     : [];
-const accessEvent = accessEvents.find(event => event.type === "ARRAY_ACCESS");
+const derivedAccessEvent = derivedAccessEvents.find(event => event.type === "ARRAY_ACCESS");
 
 if (
-    !accessEvent ||
-    !isRecord(accessEvent.data) ||
-    JSON.stringify(accessEvent.data.indices) !== JSON.stringify([1]) ||
-    accessEvent.data.value !== 7
+    !derivedAccessEvent ||
+    !isRecord(derivedAccessEvent.data) ||
+    JSON.stringify(derivedAccessEvent.data.indices) !== JSON.stringify([1]) ||
+    derivedAccessEvent.data.value !== 7
 ) {
     throw new Error("array access was not derived from the executed source line");
 }
