@@ -275,7 +275,7 @@ function ExecutionInspector({ state, previous, statement, index, total }: { stat
           tabIndex={-1}
           onMouseDown={e => e.preventDefault()}
           onClick={async () => {
-            const trace = buildDebugTrace(s.states, s.source);
+            const trace = buildDebugTrace(sessionStore.get().states, sessionStore.get().source);
             try {
               await navigator.clipboard.writeText(trace);
             } catch {
