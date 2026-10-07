@@ -411,23 +411,12 @@ function parseBasicForStatement(statement: string): {
     const parts = splitTopLevel(inside, ";");
     if (parts.length !== 3) return undefined;
 
-    const assignmentNames = (part: string): Set<string> => {
-        const names = new Set<string>();
-        for (const match of part.matchAll(/\b([A-Za-z_$][\w$]*)\s*(?:\+\+|--|[+\-*/%&|^]?=)/g)) {
-            if (match[1]) names.add(match[1]);
-        }
-        for (const match of part.matchAll(/(?:\+\+|--)\s*([A-Za-z_$][\w$]*)\b/g)) {
-            if (match[1]) names.add(match[1]);
-        }
-        return names;
-    };
-
     return {
         init: parts[0]?.trim() ?? "",
         condition: parts[1]?.trim() ?? "",
         update: parts[2]?.trim() ?? "",
-        initNames: assignmentNames(parts[0] ?? ""),
-        updateNames: assignmentNames(parts[2] ?? "")
+        initNames: extractAssignmentNames(parts[0] ?? ""),
+        updateNames: extractAssignmentNames(parts[2] ?? "")
     };
 }
 
