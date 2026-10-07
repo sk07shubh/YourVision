@@ -228,6 +228,10 @@ function canonicalizeForLoopExecutionPhases(
             initNames: new Set<string>(),
             updateNames: new Set<string>()
         };
+        const initializationNames = new Set<string>([
+            ...loop.initNames,
+            ...extractAssignmentNames(loop.init)
+        ]);
         const previous = steps[index - 1];
         const currentEvents = executionEventsFor(current);
 
@@ -260,7 +264,7 @@ function canonicalizeForLoopExecutionPhases(
                     const data = isPlainObject(candidate.data) ? candidate.data : {};
                     return (
                         typeof data.name === "string" &&
-                        loop.initNames.has(data.name) &&
+                        initializationNames.has(data.name) &&
                         !("before" in data)
                     );
                 });
