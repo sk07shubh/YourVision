@@ -219,7 +219,7 @@ function splitTopLevel(source: string, separator: string): string[] {
     let quote = "";
     let escaped = false;
     for (let i = 0; i < source.length; i++) {
-        const ch = source[i];
+        const ch = source[i]!;
         if (quote) {
             if (escaped) escaped = false;
             else if (ch === "\\") escaped = true;
@@ -256,7 +256,7 @@ function tokenizeCondition(source: string): ConditionToken[] {
     const tokens: ConditionToken[] = [];
     let i = 0;
     while (i < source.length) {
-        const ch = source[i];
+        const ch = source[i]!;
         if (/\s/.test(ch)) { i++; continue; }
         const two = source.slice(i, i + 2);
         if (["&&", "||", "==", "!=", "<=", ">="].includes(two)) {
@@ -282,7 +282,7 @@ function tokenizeCondition(source: string): ConditionToken[] {
         }
         if (/[A-Za-z_$]/.test(ch)) {
             let end = i + 1;
-            while (end < source.length && /[A-Za-z0-9_$]/.test(source[end])) end++;
+            while (end < source.length && /[A-Za-z0-9_$]/.test(source[end]!)) end++;
             tokens.push({ type: "identifier", value: source.slice(i, end) }); i = end; continue;
         }
         throw new Error("unsupported token");
@@ -371,7 +371,7 @@ class ConditionParser {
     private parseAdditive(evaluate = true): unknown {
         let left = this.parseMultiplicative(evaluate);
         while (this.peek("+") || this.peek("-")) {
-            const operator = this.tokens[this.index++].value;
+            const operator = this.tokens[this.index++]!.value;
             const right = this.parseMultiplicative(evaluate);
             if (!evaluate) { left = undefined; continue; }
             if (operator === "+" && (typeof left === "string" || typeof right === "string")) left = String(left) + String(right);
@@ -383,7 +383,7 @@ class ConditionParser {
     private parseMultiplicative(evaluate = true): unknown {
         let left = this.parseUnary(evaluate);
         while (this.peek("*") || this.peek("/") || this.peek("%")) {
-            const operator = this.tokens[this.index++].value;
+            const operator = this.tokens[this.index++]!.value;
             const right = this.parseUnary(evaluate);
             if (!evaluate) { left = undefined; continue; }
             if (typeof left !== "number" || typeof right !== "number") throw new Error("numeric operands expected");
