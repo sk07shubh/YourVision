@@ -218,7 +218,7 @@ function canonicalizeForLoopExecutionPhases(
             typeof current.line === "number" && current.line > 0
                 ? sourceLines[current.line - 1]?.trim() ?? ""
                 : "";
-        const isForStatement = /^for\\s*\\(/.test(statement);
+        const isForStatement = /^for\s*\(/.test(statement);
         if (!isForStatement) continue;
 
         const loop = parseBasicForStatement(statement);
