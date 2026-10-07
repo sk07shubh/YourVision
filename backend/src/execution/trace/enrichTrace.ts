@@ -339,13 +339,12 @@ function reorderForLoopSemanticCheckpoints(events: ExecutionEvent[], sourceLines
         const data = isPlainObject(candidate.data) ? candidate.data : {};
         return typeof data.name === "string" && loop.initNames.has(data.name) && !("before" in data);
     });
-    const conditionEvidence = (step: ExecutionEvent) => typeof step.data?.conditionResult === "boolean" || step.data?.executionPhase === "condition";
     for (let i=0; i<positions().length-1; i++) {
         const ps=positions(), first=ps[i]!, second=ps[i+1]!;
         if(first.event.method!==second.event.method || first.event.line!==second.event.line) continue;
         const statement=typeof first.event.line==="number" && first.event.line>0 ? sourceLines[first.event.line-1]?.trim() ?? "" : "";
         const loop=parseBasicForStatement(statement);
-        if(!loop || initEvidence(first.event) || !initEvidence(second.event,loop)) continue;
+        if(!loop || initEvidence(first.event, loop) || !initEvidence(second.event, loop)) continue;
         const end=ps[i+2]?.index ?? events.length;
         const a=events.slice(first.index,second.index), b=events.slice(second.index,end);
         events.splice(first.index,end-first.index,...b,...a);
