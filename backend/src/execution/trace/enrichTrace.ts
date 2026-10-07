@@ -221,7 +221,13 @@ function canonicalizeForLoopExecutionPhases(
         const isForStatement = /^for\s*\(/.test(statement);
         if (!isForStatement) continue;
 
-        const loop = parseBasicForStatement(statement);
+        const loop = parseBasicForStatement(statement) ?? {
+            init: "",
+            condition: "",
+            update: "",
+            initNames: new Set<string>(),
+            updateNames: new Set<string>()
+        };
         const previous = steps[index - 1];
         const currentEvents = executionEventsFor(current);
 
