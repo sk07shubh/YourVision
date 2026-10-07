@@ -25,7 +25,8 @@ export function enrichTrace(
             if (previousStep && previousStep.method === event.method) {
                 const executionEvents = [
                     ...deriveChanges(previousStep, event),
-                    ...deriveMapChanges(previousStep, event)
+                    ...deriveMapChanges(previousStep, event),
+                    ...deriveArrayAccessEvents(previousStep, sourceLines)
                 ];
 
                 // JDI STEP events occur immediately before their source line
@@ -91,7 +92,8 @@ export function enrichTrace(
             if (previousStep && previousStep.method === event.method) {
                 const executionEvents = [
                     ...deriveChanges(previousStep, event),
-                    ...deriveMapChanges(previousStep, event)
+                    ...deriveMapChanges(previousStep, event),
+                    ...deriveArrayAccessEvents(previousStep, sourceLines)
                 ];
 
                 // MethodExitEvent is emitted after the method body has
@@ -178,6 +180,10 @@ function attachStepResult(
 
     if (executionEvents.length > 0) {
         data.executionEvents = executionEvents;
+    }
+
+    if (postEvent.data && "returnValue" in postEvent.data) {
+        data.returnValue = postEvent.data.returnValue;
     }
 
     // Keep source/runtime metadata on the highlighted STEP. In particular,
@@ -296,7 +302,7 @@ function tokenizeCondition(source: string): ConditionToken[] {
         if (["&&", "||", "==", "!=", "<=", ">="].includes(two)) {
             tokens.push({ type: "operator", value: two }); i += 2; continue;
         }
-        if ("()[]!.+-*/%<>".includes(ch)) {
+        if ("()[]!.+-*/%<>,".includes(ch)) {
             tokens.push({ type: "operator", value: ch }); i++; continue;
         }
         if (ch === '"' || ch === "'") {
@@ -455,8 +461,24 @@ class ConditionParser {
             } else {
                 this.index++;
                 const property = this.tokens[this.index++];
-                if (!property || property.type !== "identifier" || property.value !== "length") throw new Error("unsupported property");
-                value = evaluate ? readLength(value) : undefined;
+                if (!property || property.type !== "identifier") throw new Error("unsupported property");
+
+                if (this.peek("(")) {
+                    this.index++;
+                    const args: unknown[] = [];
+                    if (!this.peek(")")) {
+                        args.push(this.parseOr(evaluate));
+                        while (this.peek(",")) {
+                            this.index++;
+                            args.push(this.parseOr(evaluate));
+                        }
+                    }
+                    this.consume(")");
+                    value = evaluate ? readMethod(value, property.value, args) : undefined;
+                } else {
+                    if (property.value !== "length") throw new Error("unsupported property");
+                    value = evaluate ? readLength(value) : undefined;
+                }
             }
         }
         return value;
@@ -482,6 +504,72 @@ function readIndexed(value: unknown, index: number): unknown {
     throw new Error("not indexable");
 }
 
+function readMethod(value: unknown, method: string, args: unknown[]): unknown {
+    if (!value || typeof value !== "object" || !("snapshot" in value)) {
+        throw new Error("method receiver unavailable");
+    }
+
+    const snapshot = (value as { snapshot: Record<string, unknown> }).snapshot;
+
+    if (method === "containsKey") {
+        const entries = Array.isArray(snapshot.entries) ? snapshot.entries : [];
+        return entries.some((entry) =>
+            entry &&
+            typeof entry === "object" &&
+            sameConditionValue(
+                (entry as Record<string, unknown>).key,
+                args[0]
+            )
+        );
+    }
+
+    if (method === "containsValue") {
+        const entries = Array.isArray(snapshot.entries) ? snapshot.entries : [];
+        return entries.some((entry) =>
+            entry &&
+            typeof entry === "object" &&
+            sameConditionValue(
+                (entry as Record<string, unknown>).value,
+                args[0]
+            )
+        );
+    }
+
+    if (method === "contains") {
+        const values = Array.isArray(snapshot.values) ? snapshot.values : [];
+        return values.some((item) => sameConditionValue(item, args[0]));
+    }
+
+    if (method === "isEmpty") {
+        if (typeof snapshot.size === "number") return snapshot.size === 0;
+        if (Array.isArray(snapshot.entries)) return snapshot.entries.length === 0;
+        if (Array.isArray(snapshot.values)) return snapshot.values.length === 0;
+    }
+
+    if (method === "size") {
+        if (typeof snapshot.size === "number") return snapshot.size;
+        if (Array.isArray(snapshot.entries)) return snapshot.entries.length;
+        if (Array.isArray(snapshot.values)) return snapshot.values.length;
+    }
+
+    if (method === "get") {
+        const entries = Array.isArray(snapshot.entries) ? snapshot.entries : [];
+        const found = entries.find((entry) =>
+            entry &&
+            typeof entry === "object" &&
+            sameConditionValue(
+                (entry as Record<string, unknown>).key,
+                args[0]
+            )
+        );
+        return found && typeof found === "object"
+            ? (found as Record<string, unknown>).value
+            : null;
+    }
+
+    throw new Error("unsupported method");
+}
+
 function readLength(value: unknown): number {
     if (typeof value === "string" || Array.isArray(value)) return value.length;
     if (value && typeof value === "object" && "snapshot" in value) {
@@ -499,6 +587,73 @@ function sameConditionValue(left: unknown, right: unknown): boolean {
         return JSON.stringify(left.snapshot) === JSON.stringify(right.snapshot);
     }
     return left === right;
+}
+
+function deriveArrayAccessEvents(
+    sourceEvent: ExecutionEvent,
+    sourceLines: string[]
+): ExecutionEvent[] {
+    if (typeof sourceEvent.line !== "number" || sourceEvent.line < 1) return [];
+
+    const statement = sourceLines[sourceEvent.line - 1] ?? "";
+    const variables = getVariables(sourceEvent);
+    const accesses: ExecutionEvent[] = [];
+
+    for (const match of statement.matchAll(/\b([A-Za-z_$][\w$]*)\s*(\[[^\]]+\])+/g)) {
+        const name = match[1];
+        const full = match[0];
+        const array = asArraySnapshot(variables[name]);
+        if (!array) continue;
+
+        const indices: number[] = [];
+        let current: unknown = variables[name];
+        let valid = true;
+
+        for (const bracket of full.matchAll(/\[([^\]]+)\]/g)) {
+            const index = evaluateExpression(bracket[1] ?? "", variables);
+            if (typeof index !== "number" || !Number.isInteger(index)) {
+                valid = false;
+                break;
+            }
+            indices.push(index);
+            const snapshot = asArraySnapshot(current);
+            if (!snapshot || index < 0 || index >= snapshot.values.length) {
+                valid = false;
+                break;
+            }
+            current = snapshot.values[index];
+        }
+
+        if (!valid || indices.length === 0) continue;
+
+        accesses.push({
+            sequence: 0,
+            type: "ARRAY_ACCESS",
+            line: sourceEvent.line,
+            method: sourceEvent.method,
+            depth: sourceEvent.depth,
+            data: {
+                name,
+                arrayId: array.$arrayId,
+                indices,
+                value: current,
+                kind: "read"
+            }
+        });
+    }
+
+    return accesses;
+}
+
+function evaluateExpression(
+    expression: string,
+    variables: Record<string, unknown>
+): unknown {
+    try {
+        return new ConditionParser(tokenizeCondition(expression), variables).parse();
+    } catch {
+        return undefined;
+    }
 }
 
 function deriveArrayReferenceEvents(
