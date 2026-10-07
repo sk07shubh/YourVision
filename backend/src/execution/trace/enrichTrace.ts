@@ -228,6 +228,10 @@ function canonicalizeForLoopExecutionPhases(
             initNames: new Set<string>(),
             updateNames: new Set<string>()
         };
+        const initializationNames = new Set<string>([
+            ...loop.initNames,
+            ...extractAssignmentNames(loop.init)
+        ]);
         const previous = steps[index - 1];
         const currentEvents = executionEventsFor(current);
 
@@ -260,7 +264,7 @@ function canonicalizeForLoopExecutionPhases(
                     const data = isPlainObject(candidate.data) ? candidate.data : {};
                     return (
                         typeof data.name === "string" &&
-                        loop.initNames.has(data.name) &&
+                        initializationNames.has(data.name) &&
                         !("before" in data)
                     );
                 });
@@ -426,6 +430,17 @@ function parseBasicForStatement(statement: string): {
         initNames: assignmentNames(parts[0] ?? ""),
         updateNames: assignmentNames(parts[2] ?? "")
     };
+}
+
+function extractAssignmentNames(part: string): Set<string> {
+    const names = new Set<string>();
+    for (const match of part.matchAll(/\\b([A-Za-z_$][\\w$]*)\\s*(?:\\+\\+|--|[+\\-*/%&|^]?=)/g)) {
+        if (match[1]) names.add(match[1]);
+    }
+    for (const match of part.matchAll(/(?:\\+\\+|--)\\s*([A-Za-z_$][\\w$]*)\\b/g)) {
+        if (match[1]) names.add(match[1]);
+    }
+    return names;
 }
 
 function setExecutionPhase(
