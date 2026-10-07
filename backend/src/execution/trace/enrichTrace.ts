@@ -5,8 +5,12 @@ import type {
 
 type SnapshotRecord = Record<string, unknown>;
 
-export function enrichTrace(trace: ExecutionTrace): ExecutionTrace {
+export function enrichTrace(
+    trace: ExecutionTrace,
+    source = ""
+): ExecutionTrace {
     const enriched: ExecutionEvent[] = [];
+    const sourceLines = source.split(/\r?\n/);
     let previousStep: ExecutionEvent | undefined;
     let pendingCallerResume: {
         method: string | undefined;
@@ -17,6 +21,7 @@ export function enrichTrace(trace: ExecutionTrace): ExecutionTrace {
 
     for (let event of trace.events) {
         if (event.type === "STEP") {
+            event = annotateCondition(event, sourceLines);
             if (previousStep && previousStep.method === event.method) {
                 enriched.push(...deriveArrayReferenceEvents(event));
                 enriched.push(...deriveChanges(previousStep, event));
@@ -149,6 +154,292 @@ export function enrichTrace(trace: ExecutionTrace): ExecutionTrace {
             sequence: index + 1
         }))
     };
+}
+
+function annotateCondition(
+    event: ExecutionEvent,
+    sourceLines: string[]
+): ExecutionEvent {
+    if (typeof event.line !== "number" || event.line < 1 || !event.data?.variables) return event;
+    const statement = sourceLines[event.line - 1]?.trim() ?? "";
+    const expression = extractConditionExpression(statement);
+    if (!expression) return event;
+    const variables = event.data.variables;
+    if (!variables || typeof variables !== "object" || Array.isArray(variables)) return event;
+    const result = evaluateCondition(expression, variables as Record<string, unknown>);
+    if (result === undefined) return event;
+    return { ...event, data: { ...event.data, conditionResult: result } };
+}
+
+function extractConditionExpression(statement: string): string | undefined {
+    const trimmed = statement.trim();
+    for (const keyword of ["if", "while"]) {
+        if (new RegExp("^" + keyword + "\\s*\\(").test(trimmed)) {
+            return balancedParenthesized(trimmed, trimmed.indexOf("("));
+        }
+    }
+    if (/^for\\s*\\(/.test(trimmed)) {
+        const inside = balancedParenthesized(trimmed, trimmed.indexOf("("));
+        if (!inside) return undefined;
+        const parts = splitTopLevel(inside, ";");
+        return parts.length === 3 ? parts[1].trim() : undefined;
+    }
+    const doWhile = trimmed.match(/\\bwhile\\s*\\(/);
+    if (doWhile) return balancedParenthesized(trimmed, trimmed.indexOf("(", doWhile.index ?? 0));
+    return undefined;
+}
+
+function balancedParenthesized(source: string, openIndex: number): string | undefined {
+    if (source[openIndex] !== "(") return undefined;
+    let depth = 0;
+    let quote = "";
+    let escaped = false;
+    for (let i = openIndex; i < source.length; i++) {
+        const ch = source[i];
+        if (quote) {
+            if (escaped) escaped = false;
+            else if (ch === "\\") escaped = true;
+            else if (ch === quote) quote = "";
+            continue;
+        }
+        if (ch === '"' || ch === "'") { quote = ch; continue; }
+        if (ch === "(") depth++;
+        if (ch === ")") {
+            depth--;
+            if (depth === 0) return source.slice(openIndex + 1, i);
+        }
+    }
+    return undefined;
+}
+
+function splitTopLevel(source: string, separator: string): string[] {
+    const parts: string[] = [];
+    let start = 0;
+    let depth = 0;
+    let quote = "";
+    let escaped = false;
+    for (let i = 0; i < source.length; i++) {
+        const ch = source[i];
+        if (quote) {
+            if (escaped) escaped = false;
+            else if (ch === "\\") escaped = true;
+            else if (ch === quote) quote = "";
+            continue;
+        }
+        if (ch === '"' || ch === "'") { quote = ch; continue; }
+        if ("([{".includes(ch)) depth++;
+        else if (")]}".includes(ch)) depth--;
+        if (depth === 0 && source.startsWith(separator, i)) {
+            parts.push(source.slice(start, i));
+            start = i + separator.length;
+            i += separator.length - 1;
+        }
+    }
+    parts.push(source.slice(start));
+    return parts;
+}
+
+type ConditionValue = number | string | boolean | null | ConditionValue[] | { snapshot: Record<string, unknown> };
+type ConditionToken = { type: "number" | "string" | "identifier" | "operator"; value: string };
+
+function evaluateCondition(expression: string, variables: Record<string, unknown>): boolean | undefined {
+    try {
+        const parser = new ConditionParser(tokenizeCondition(expression), variables);
+        const value = parser.parse();
+        return typeof value === "boolean" ? value : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+function tokenizeCondition(source: string): ConditionToken[] {
+    const tokens: ConditionToken[] = [];
+    let i = 0;
+    while (i < source.length) {
+        const ch = source[i];
+        if (/\\s/.test(ch)) { i++; continue; }
+        const two = source.slice(i, i + 2);
+        if (["&&", "||", "==", "!=", "<=", ">="].includes(two)) {
+            tokens.push({ type: "operator", value: two }); i += 2; continue;
+        }
+        if ("()[]!.+-*/%<>".includes(ch)) {
+            tokens.push({ type: "operator", value: ch }); i++; continue;
+        }
+        if (ch === '"' || ch === "'") {
+            const quote = ch; let value = ""; i++;
+            while (i < source.length) {
+                const current = source[i];
+                if (current === "\\" && i + 1 < source.length) { value += source[i + 1]; i += 2; continue; }
+                if (current === quote) { i++; break; }
+                value += current; i++;
+            }
+            tokens.push({ type: "string", value }); continue;
+        }
+        if (/[0-9]/.test(ch)) {
+            let end = i + 1;
+            while (end < source.length && /[0-9.]/.test(source[end])) end++;
+            tokens.push({ type: "number", value: source.slice(i, end) }); i = end; continue;
+        }
+        if (/[A-Za-z_$]/.test(ch)) {
+            let end = i + 1;
+            while (end < source.length && /[A-Za-z0-9_$]/.test(source[end])) end++;
+            tokens.push({ type: "identifier", value: source.slice(i, end) }); i = end; continue;
+        }
+        throw new Error("unsupported token");
+    }
+    return tokens;
+}
+
+class ConditionParser {
+    private index = 0;
+    constructor(private readonly tokens: ConditionToken[], private readonly variables: Record<string, unknown>) {}
+    parse(): unknown {
+        const value = this.parseOr();
+        if (this.index !== this.tokens.length) throw new Error("trailing tokens");
+        return value;
+    }
+    private peek(value?: string): ConditionToken | undefined {
+        const token = this.tokens[this.index];
+        return value === undefined || token?.value === value ? token : undefined;
+    }
+    private consume(value: string): void {
+        if (!this.peek(value)) throw new Error("expected " + value);
+        this.index++;
+    }
+    private parseOr(): unknown {
+        let left = this.parseAnd();
+        while (this.peek("||")) {
+            this.index++; const right = this.parseAnd();
+            if (typeof left !== "boolean" || typeof right !== "boolean") throw new Error("boolean expected");
+            left = left || right;
+        }
+        return left;
+    }
+    private parseAnd(): unknown {
+        let left = this.parseEquality();
+        while (this.peek("&&")) {
+            this.index++; const right = this.parseEquality();
+            if (typeof left !== "boolean" || typeof right !== "boolean") throw new Error("boolean expected");
+            left = left && right;
+        }
+        return left;
+    }
+    private parseEquality(): unknown {
+        let left = this.parseRelational();
+        while (this.peek("==") || this.peek("!=")) {
+            const operator = this.tokens[this.index++].value;
+            const right = this.parseRelational();
+            const equal = sameConditionValue(left, right);
+            left = operator === "==" ? equal : !equal;
+        }
+        return left;
+    }
+    private parseRelational(): unknown {
+        let left = this.parseAdditive();
+        while (this.peek("<") || this.peek("<=") || this.peek(">") || this.peek(">=")) {
+            const operator = this.tokens[this.index++].value;
+            const right = this.parseAdditive();
+            if (typeof left !== "number" || typeof right !== "number") throw new Error("numeric comparison expected");
+            if (operator === "<") left = left < right;
+            else if (operator === "<=") left = left <= right;
+            else if (operator === ">") left = left > right;
+            else left = left >= right;
+        }
+        return left;
+    }
+    private parseAdditive(): unknown {
+        let left = this.parseMultiplicative();
+        while (this.peek("+") || this.peek("-")) {
+            const operator = this.tokens[this.index++].value;
+            const right = this.parseMultiplicative();
+            if (operator === "+" && (typeof left === "string" || typeof right === "string")) left = String(left) + String(right);
+            else if (typeof left === "number" && typeof right === "number") left = operator === "+" ? left + right : left - right;
+            else throw new Error("numeric operands expected");
+        }
+        return left;
+    }
+    private parseMultiplicative(): unknown {
+        let left = this.parseUnary();
+        while (this.peek("*") || this.peek("/") || this.peek("%")) {
+            const operator = this.tokens[this.index++].value;
+            const right = this.parseUnary();
+            if (typeof left !== "number" || typeof right !== "number") throw new Error("numeric operands expected");
+            if (operator === "*") left = left * right;
+            else if (operator === "/") left = left / right;
+            else left = left % right;
+        }
+        return left;
+    }
+    private parseUnary(): unknown {
+        if (this.peek("!")) { this.index++; const value = this.parseUnary(); if (typeof value !== "boolean") throw new Error("boolean expected"); return !value; }
+        if (this.peek("-")) { this.index++; const value = this.parseUnary(); if (typeof value !== "number") throw new Error("numeric operand expected"); return -value; }
+        if (this.peek("+")) { this.index++; const value = this.parseUnary(); if (typeof value !== "number") throw new Error("numeric operand expected"); return value; }
+        return this.parsePrimary();
+    }
+    private parsePrimary(): unknown {
+        const token = this.tokens[this.index++];
+        if (!token) throw new Error("missing expression");
+        let value: unknown;
+        if (token.value === "(") { value = this.parseOr(); this.consume(")"); }
+        else if (token.type === "number") value = Number(token.value);
+        else if (token.type === "string") value = token.value;
+        else if (token.type === "identifier") {
+            if (token.value === "true") value = true;
+            else if (token.value === "false") value = false;
+            else if (token.value === "null") value = null;
+            else value = this.resolveVariable(token.value);
+        } else throw new Error("unsupported primary");
+
+        while (this.peek("[") || this.peek(".")) {
+            if (this.peek("[")) {
+                this.index++; const index = this.parseOr(); this.consume("]");
+                if (typeof index !== "number") throw new Error("array index expected");
+                value = readIndexed(value, index);
+            } else {
+                this.index++;
+                const property = this.tokens[this.index++];
+                if (!property || property.type !== "identifier" || property.value !== "length") throw new Error("unsupported property");
+                value = readLength(value);
+            }
+        }
+        return value;
+    }
+    private resolveVariable(name: string): unknown {
+        return conditionSnapshotValue(this.variables[name]);
+    }
+}
+
+function conditionSnapshotValue(value: unknown): ConditionValue {
+    if (Array.isArray(value)) return value.map(conditionSnapshotValue);
+    if (value && typeof value === "object") return { snapshot: value as Record<string, unknown> };
+    return value as ConditionValue;
+}
+
+function readIndexed(value: unknown, index: number): unknown {
+    if (Array.isArray(value)) return value[index];
+    if (value && typeof value === "object" && "snapshot" in value) {
+        const record = value.snapshot;
+        if (Array.isArray(record.values)) return record.values[index];
+    }
+    throw new Error("not indexable");
+}
+
+function readLength(value: unknown): number {
+    if (typeof value === "string" || Array.isArray(value)) return value.length;
+    if (value && typeof value === "object" && "snapshot" in value) {
+        const record = value.snapshot;
+        if (typeof record.length === "number") return record.length;
+        if (Array.isArray(record.values)) return record.values.length;
+        if (Array.isArray(record.entries)) return record.entries.length;
+    }
+    throw new Error("length unavailable");
+}
+
+function sameConditionValue(left: unknown, right: unknown): boolean {
+    if (left && typeof left === "object" && "snapshot" in left && right && typeof right === "object" && "snapshot" in right) {
+        return JSON.stringify(left.snapshot) === JSON.stringify(right.snapshot);
+    }
+    return left === right;
 }
 
 function deriveArrayReferenceEvents(
