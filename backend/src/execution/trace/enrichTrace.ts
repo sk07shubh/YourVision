@@ -218,27 +218,29 @@ function canonicalizeForLoopExecutionPhases(
             typeof current.line === "number" && current.line > 0
                 ? sourceLines[current.line - 1]?.trim() ?? ""
                 : "";
-        const loop = parseBasicForStatement(statement);
-        if (!loop) continue;
+        const isForStatement = /^for\s*\(/.test(statement);
+        if (!isForStatement) continue;
 
+        const loop = parseBasicForStatement(statement) ?? {
+            init: "",
+            condition: "",
+            update: "",
+            initNames: new Set<string>(),
+            updateNames: new Set<string>()
+        };
         const previous = steps[index - 1];
-        const currentVariables = getVariables(current);
-        const previousVariables = previous ? getVariables(previous) : {};
         const currentEvents = executionEventsFor(current);
 
-        // The first checkpoint of a for-line is initialization when the loop
-        // variable appears for the first time. This is semantic, not based on
-        // whether JDI happened to attach the VARIABLE_UPDATE to this or the
-        // following same-line checkpoint.
+        // Reaching a for source line from another source line always begins
+        // with ForInit. Do not infer this from local-variable snapshots: JDI
+        // snapshots can expose the loop variable before the initialization
+        // checkpoint is semantically rendered.
         const isFirstLoopCheckpoint =
             !previous ||
             previous.method !== current.method ||
             previous.line !== current.line;
 
-        if (
-            isFirstLoopCheckpoint &&
-            [...loop.initNames].some(name => name in currentVariables)
-        ) {
+        if (isFirstLoopCheckpoint) {
             setExecutionPhase(current, "initialization");
             removeConditionResult(current);
 
