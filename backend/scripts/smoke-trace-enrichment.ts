@@ -733,6 +733,99 @@ console.log("PASS: method-call conditions, return values, and array accesses");
 
 
 
+const misorderedForTrace: ExecutionTrace = {
+    version: 1,
+    events: [
+        {
+            sequence: 1,
+            type: "STEP",
+            line: 7,
+            method: "twoSum",
+            depth: 1,
+            data: { variables: { n: 4, i: 0 } }
+        },
+        {
+            sequence: 2,
+            type: "STEP",
+            line: 9,
+            method: "twoSum",
+            depth: 1,
+            data: {
+                variables: { n: 4, i: 0 },
+                conditionResult: true,
+                executionEvents: [
+                    {
+                        sequence: 0,
+                        type: "MAP_WRITE",
+                        line: 9,
+                        method: "twoSum",
+                        depth: 1,
+                        data: { name: "mp", mapId: "1", entries: [], size: 0, operation: "create" }
+                    }
+                ]
+            }
+        },
+        {
+            sequence: 3,
+            type: "STEP",
+            line: 9,
+            method: "twoSum",
+            depth: 1,
+            data: {
+                variables: { n: 4, i: 0 },
+                executionEvents: [
+                    {
+                        sequence: 0,
+                        type: "VARIABLE_UPDATE",
+                        line: 9,
+                        method: "twoSum",
+                        depth: 1,
+                        data: { name: "i", value: 0 }
+                    }
+                ]
+            }
+        }
+    ]
+};
+
+const misorderedSource = [
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "    for(int i=0;i<n+1;i++){",
+    "        use(i);"
+].join("\\n");
+
+const misorderedFor = enrichTrace(misorderedForTrace, misorderedSource);
+const misorderedSteps = misorderedFor.events.filter(event => event.type === "STEP");
+if (
+    misorderedSteps[1]?.data?.executionPhase !== "initialization" ||
+    misorderedSteps[2]?.data?.executionPhase !== "condition" ||
+    misorderedSteps[2]?.data?.conditionResult !== true
+) {
+    throw new Error("misordered for-loop initialization was not canonicalized: " + JSON.stringify(misorderedSteps.map(step => ({
+        phase: step.data?.executionPhase,
+        condition: step.data?.conditionResult,
+        events: step.data?.executionEvents
+    }))));
+}
+
+const misorderedInitEffects = Array.isArray(misorderedSteps[1]?.data?.executionEvents)
+    ? misorderedSteps[1].data.executionEvents
+    : [];
+if (!misorderedInitEffects.some(event => event.type === "VARIABLE_UPDATE" && isRecord(event.data) && event.data.name === "i")) {
+    throw new Error("for-loop initialization result was not moved onto the initialization checkpoint");
+}
+if (misorderedSteps[1]?.data?.conditionResult !== undefined) {
+    throw new Error("initialization checkpoint still exposes a condition result");
+}
+
+console.log("PASS: misordered for-loop initialization regression");
+
 const semanticForTrace: ExecutionTrace = {
     version: 1,
     events: [
