@@ -463,12 +463,26 @@ function changedArrayIndices(state?: TraceState): Set<number> {
   const set = new Set<number>();
   const data = state?.lastEvent?.data;
   if (!isPlainObject(data)) return set;
-  const changes = data.changes;
-  if (!Array.isArray(changes)) return set;
-  for (const c of changes) {
-    if (!isPlainObject(c) || !Array.isArray(c.indices)) continue;
-    const i = c.indices[0]; if (typeof i === 'number') set.add(i);
+
+  const collect = (changes: unknown) => {
+    if (!Array.isArray(changes)) return;
+    for (const c of changes) {
+      if (!isPlainObject(c) || !Array.isArray(c.indices)) continue;
+      const i = c.indices[0];
+      if (typeof i === 'number') set.add(i);
+    }
+  };
+
+  collect(data.changes);
+  if (Array.isArray(data.executionEvents)) {
+    for (const event of data.executionEvents) {
+      if (!isPlainObject(event)) continue;
+      if (event.type === 'ARRAY_WRITE' && isPlainObject(event.data)) {
+        collect(event.data.changes);
+      }
+    }
   }
+
   return set;
 }
 
@@ -485,9 +499,18 @@ function mapChanges(state?: TraceState): Array<{
   after?: unknown;
 }> {
   const data = state?.lastEvent?.data;
-  if (!isPlainObject(data) || !Array.isArray(data.changes)) return [];
+  if (!isPlainObject(data)) return [];
 
-  return data.changes.filter(
+  const changes: unknown[] = [];
+  if (Array.isArray(data.changes)) changes.push(...data.changes);
+  if (Array.isArray(data.executionEvents)) {
+    for (const event of data.executionEvents) {
+      if (!isPlainObject(event) || event.type !== 'MAP_WRITE' || !isPlainObject(event.data)) continue;
+      if (Array.isArray(event.data.changes)) changes.push(...event.data.changes);
+    }
+  }
+
+  return changes.filter(
     (change): change is {
       kind: 'insert' | 'update' | 'delete';
       key: unknown;
