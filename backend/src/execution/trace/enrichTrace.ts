@@ -601,6 +601,7 @@ function deriveArrayAccessEvents(
 
     for (const match of statement.matchAll(/\b([A-Za-z_$][\w$]*)\s*(\[[^\]]+\])+/g)) {
         const name = match[1];
+        if (!name) continue;
         const full = match[0];
         const array = asArraySnapshot(variables[name]);
         if (!array) continue;
