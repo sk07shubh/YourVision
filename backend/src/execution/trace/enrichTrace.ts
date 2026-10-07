@@ -306,39 +306,60 @@ class ConditionParser {
         if (!this.peek(value)) throw new Error("expected " + value);
         this.index++;
     }
-    private parseOr(): unknown {
-        let left = this.parseAnd();
+    private parseOr(evaluate = true): unknown {
+        let left = this.parseAnd(evaluate);
         while (this.peek("||")) {
-            this.index++; const right = this.parseAnd();
-            if (typeof left !== "boolean" || typeof right !== "boolean") throw new Error("boolean expected");
-            left = left || right;
+            this.index++;
+            if (evaluate && left === true) {
+                // Java short-circuits ||. Consume the RHS without evaluating it.
+                this.parseAnd(false);
+                left = true;
+                continue;
+            }
+            const right = this.parseAnd(evaluate);
+            if (evaluate && (typeof left !== "boolean" || typeof right !== "boolean")) {
+                throw new Error("boolean expected");
+            }
+            left = evaluate ? (left as boolean) || (right as boolean) : undefined;
         }
         return left;
     }
-    private parseAnd(): unknown {
-        let left = this.parseEquality();
+    private parseAnd(evaluate = true): unknown {
+        let left = this.parseEquality(evaluate);
         while (this.peek("&&")) {
-            this.index++; const right = this.parseEquality();
-            if (typeof left !== "boolean" || typeof right !== "boolean") throw new Error("boolean expected");
-            left = left && right;
+            this.index++;
+            if (evaluate && left === false) {
+                // Java short-circuits &&. Still consume the RHS so the
+                // parser remains synchronized, but do not evaluate it.
+                this.parseEquality(false);
+                left = false;
+                continue;
+            }
+            const right = this.parseEquality(evaluate);
+            if (evaluate && (typeof left !== "boolean" || typeof right !== "boolean")) {
+                throw new Error("boolean expected");
+            }
+            left = evaluate ? (left as boolean) && (right as boolean) : undefined;
         }
         return left;
     }
-    private parseEquality(): unknown {
-        let left = this.parseRelational();
+    private parseEquality(evaluate = true): unknown {
+        let left = this.parseRelational(evaluate);
         while (this.peek("==") || this.peek("!=")) {
             const operator = this.tokens[this.index++].value;
-            const right = this.parseRelational();
+            const right = this.parseRelational(evaluate);
+            if (!evaluate) { left = undefined; continue; }
             const equal = sameConditionValue(left, right);
             left = operator === "==" ? equal : !equal;
         }
         return left;
     }
-    private parseRelational(): unknown {
-        let left = this.parseAdditive();
+    private parseRelational(evaluate = true): unknown {
+        let left = this.parseAdditive(evaluate);
         while (this.peek("<") || this.peek("<=") || this.peek(">") || this.peek(">=")) {
             const operator = this.tokens[this.index++].value;
-            const right = this.parseAdditive();
+            const right = this.parseAdditive(evaluate);
+            if (!evaluate) { left = undefined; continue; }
             if (typeof left !== "number" || typeof right !== "number") throw new Error("numeric comparison expected");
             if (operator === "<") left = left < right;
             else if (operator === "<=") left = left <= right;
@@ -347,22 +368,24 @@ class ConditionParser {
         }
         return left;
     }
-    private parseAdditive(): unknown {
-        let left = this.parseMultiplicative();
+    private parseAdditive(evaluate = true): unknown {
+        let left = this.parseMultiplicative(evaluate);
         while (this.peek("+") || this.peek("-")) {
             const operator = this.tokens[this.index++].value;
-            const right = this.parseMultiplicative();
+            const right = this.parseMultiplicative(evaluate);
+            if (!evaluate) { left = undefined; continue; }
             if (operator === "+" && (typeof left === "string" || typeof right === "string")) left = String(left) + String(right);
             else if (typeof left === "number" && typeof right === "number") left = operator === "+" ? left + right : left - right;
             else throw new Error("numeric operands expected");
         }
         return left;
     }
-    private parseMultiplicative(): unknown {
-        let left = this.parseUnary();
+    private parseMultiplicative(evaluate = true): unknown {
+        let left = this.parseUnary(evaluate);
         while (this.peek("*") || this.peek("/") || this.peek("%")) {
             const operator = this.tokens[this.index++].value;
-            const right = this.parseUnary();
+            const right = this.parseUnary(evaluate);
+            if (!evaluate) { left = undefined; continue; }
             if (typeof left !== "number" || typeof right !== "number") throw new Error("numeric operands expected");
             if (operator === "*") left = left * right;
             else if (operator === "/") left = left / right;
@@ -370,36 +393,36 @@ class ConditionParser {
         }
         return left;
     }
-    private parseUnary(): unknown {
-        if (this.peek("!")) { this.index++; const value = this.parseUnary(); if (typeof value !== "boolean") throw new Error("boolean expected"); return !value; }
-        if (this.peek("-")) { this.index++; const value = this.parseUnary(); if (typeof value !== "number") throw new Error("numeric operand expected"); return -value; }
-        if (this.peek("+")) { this.index++; const value = this.parseUnary(); if (typeof value !== "number") throw new Error("numeric operand expected"); return value; }
-        return this.parsePrimary();
+    private parseUnary(evaluate = true): unknown {
+        if (this.peek("!")) { this.index++; const value = this.parseUnary(evaluate); if (evaluate && typeof value !== "boolean") throw new Error("boolean expected"); return evaluate ? !value : undefined; }
+        if (this.peek("-")) { this.index++; const value = this.parseUnary(evaluate); if (evaluate && typeof value !== "number") throw new Error("numeric operand expected"); return evaluate ? -value : undefined; }
+        if (this.peek("+")) { this.index++; const value = this.parseUnary(evaluate); if (evaluate && typeof value !== "number") throw new Error("numeric operand expected"); return evaluate ? value : undefined; }
+        return this.parsePrimary(evaluate);
     }
-    private parsePrimary(): unknown {
+    private parsePrimary(evaluate = true): unknown {
         const token = this.tokens[this.index++];
         if (!token) throw new Error("missing expression");
         let value: unknown;
-        if (token.value === "(") { value = this.parseOr(); this.consume(")"); }
-        else if (token.type === "number") value = Number(token.value);
-        else if (token.type === "string") value = token.value;
+        if (token.value === "(") { value = this.parseOr(evaluate); this.consume(")"); }
+        else if (token.type === "number") value = evaluate ? Number(token.value) : undefined;
+        else if (token.type === "string") value = evaluate ? token.value : undefined;
         else if (token.type === "identifier") {
-            if (token.value === "true") value = true;
-            else if (token.value === "false") value = false;
-            else if (token.value === "null") value = null;
-            else value = this.resolveVariable(token.value);
+            if (token.value === "true") value = evaluate ? true : undefined;
+            else if (token.value === "false") value = evaluate ? false : undefined;
+            else if (token.value === "null") value = evaluate ? null : undefined;
+            else value = evaluate ? this.resolveVariable(token.value) : undefined;
         } else throw new Error("unsupported primary");
 
         while (this.peek("[") || this.peek(".")) {
             if (this.peek("[")) {
-                this.index++; const index = this.parseOr(); this.consume("]");
-                if (typeof index !== "number") throw new Error("array index expected");
-                value = readIndexed(value, index);
+                this.index++; const index = this.parseOr(evaluate); this.consume("]");
+                if (evaluate && typeof index !== "number") throw new Error("array index expected");
+                value = evaluate ? readIndexed(value, index as number) : undefined;
             } else {
                 this.index++;
                 const property = this.tokens[this.index++];
                 if (!property || property.type !== "identifier" || property.value !== "length") throw new Error("unsupported property");
-                value = readLength(value);
+                value = evaluate ? readLength(value) : undefined;
             }
         }
         return value;
