@@ -296,7 +296,7 @@ const loopAttributionTrace: ExecutionTrace = {
 
 const loopSource = [
     "void loop() {",
-    "  for (int i = 0; i < nums.length; i++) {",
+    "  for (int i = 0; i < 2; i++) {",
     "    use(nums[i]);",
     "  }",
     "}"
