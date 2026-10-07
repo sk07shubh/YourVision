@@ -233,8 +233,7 @@ function canonicalizeForLoopExecutionPhases(
         const isFirstLoopCheckpoint =
             !previous ||
             previous.method !== current.method ||
-            previous.line !== current.line ||
-            ![...loop.initNames].some(name => name in previousVariables);
+            previous.line !== current.line;
 
         if (
             isFirstLoopCheckpoint &&
