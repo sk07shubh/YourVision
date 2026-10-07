@@ -423,6 +423,7 @@ function normalizeForLoopCheckpoint(
         rawEvents,
         loop.updateNames
     ).filter(candidate => {
+        if (!isPlainObject(candidate)) return false;
         const data = isPlainObject(candidate.data) ? candidate.data : {};
         if (typeof data.name !== "string" || !(data.name in previousVariables)) {
             return false;
