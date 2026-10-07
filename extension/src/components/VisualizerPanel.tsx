@@ -45,6 +45,53 @@ function variableEffects(current?: TraceState, previous?: TraceState): Execution
 function eventEffects(state?: TraceState): ExecutionEffect[] {
   const data = state?.lastEvent?.data; if (!isPlainObject(data)) return [];
   const type = state?.lastEvent?.type; const effects: ExecutionEffect[] = [];
+
+  // Replay checkpoints carry the operations observed between the current
+  // STEP and the next runtime checkpoint. Those operations belong to the
+  // currently highlighted line, not the following line.
+  const executionEvents = Array.isArray(data.executionEvents) ? data.executionEvents : [];
+  for (const event of executionEvents) {
+    if (!isPlainObject(event)) continue;
+    const eventData = isPlainObject(event.data) ? event.data : {};
+    const eventType = typeof event.type === 'string' ? event.type : '';
+    if (eventType === 'VARIABLE_UPDATE' && typeof eventData.name === 'string') {
+      effects.push({
+        icon: '→',
+        text: eventData.name + ' → ' + compactValue(eventData.value)
+      });
+    } else if (eventType === 'ARRAY_WRITE') {
+      const name = typeof eventData.name === 'string' ? eventData.name : 'array';
+      const changes = Array.isArray(eventData.changes) ? eventData.changes : [];
+      for (const change of changes.slice(0, 3)) {
+        if (!isPlainObject(change)) continue;
+        const indices = Array.isArray(change.indices) ? change.indices.map((x) => '[' + x + ']').join('') : '';
+        effects.push({
+          icon: '→',
+          text: name + indices + ' ' + compactValue(change.before) + ' → ' + compactValue(change.after)
+        });
+      }
+    } else if (eventType === 'MAP_WRITE') {
+      const changes = Array.isArray(eventData.changes) ? eventData.changes : [];
+      for (const change of changes.slice(0, 3)) {
+        if (!isPlainObject(change)) continue;
+        const key = compactValue(change.key);
+        if (change.kind === 'insert') effects.push({ icon: '+', text: key + ' = ' + compactValue(change.after) });
+        else if (change.kind === 'delete') effects.push({ icon: '−', text: key });
+        else effects.push({ icon: '→', text: key + ' ' + compactValue(change.before) + ' → ' + compactValue(change.after) });
+      }
+    } else if (eventType === 'OBJECT_FIELD_WRITE') {
+      const changes = Array.isArray(eventData.changes) ? eventData.changes : [];
+      for (const change of changes.slice(0, 3)) {
+        if (!isPlainObject(change)) continue;
+        const fields = Array.isArray(change.fields) ? change.fields.join('.') : 'field';
+        effects.push({
+          icon: '→',
+          text: fields + ' ' + compactValue(change.before) + ' → ' + compactValue(change.after)
+        });
+      }
+    }
+  }
+
   if (type === 'ARRAY_ACCESS') {
     const name = typeof data.array === 'string' ? data.array : typeof data.name === 'string' ? data.name : 'array';
     const index = typeof data.index === 'number' ? '[' + data.index + ']' : '';
@@ -97,6 +144,8 @@ function executionSubstatement(statement: string, current?: TraceState, previous
   const parts = loopParts(statement); if (!parts || !current) return statement;
   const currentVars = current.variables ?? {}; const previousVars = previous?.variables ?? {};
   if (!previous) return parts.init || statement;
+  const created = Object.keys(currentVars).find((name) => !(name in previousVars) && parts.init.includes(name));
+  if (created) return parts.init || statement;
   const changed = Object.keys(currentVars).find((name) => name in previousVars && valueChanged(previousVars[name], currentVars[name]));
   if (changed && /(\+\+|--|\+=|-=|\*=|\/=)/.test(parts.update)) return parts.update;
   return parts.condition || statement;
