@@ -845,7 +845,13 @@ if (
     semanticSteps[4]?.data?.executionPhase !== "condition" ||
     semanticSteps[4]?.data?.conditionResult !== true
 ) {
-    throw new Error("for-loop semantic order was not normalized to initialization -> condition -> update -> condition");
+    throw new Error("for-loop semantic order was not normalized: " + JSON.stringify(semanticSteps.map(step => ({
+        phase: step.data?.executionPhase,
+        condition: step.data?.conditionResult,
+        variables: step.data?.variables,
+        postVariables: step.data?.postVariables,
+        events: step.data?.executionEvents
+    }))));
 }
 
 const semanticUpdate = Array.isArray(semanticSteps[3]?.data?.executionEvents)
@@ -875,4 +881,5 @@ if (
     throw new Error("for-loop update/condition state did not advance in semantic order");
 }
 
+// The semantic loop fixture intentionally models JDI checkpoints whose source-line order is ambiguous.
 console.log("PASS: semantic for-loop ordering");
