@@ -211,6 +211,7 @@ function canonicalizeForLoopExecutionPhases(
     sourceLines: string[]
 ): void {
     const steps = events.filter(event => event.type === "STEP");
+    const seenLoopCheckpoints = new Set<string>();
 
     for (let index = 0; index < steps.length; index++) {
         const current = steps[index]!;
@@ -239,14 +240,9 @@ function canonicalizeForLoopExecutionPhases(
         // with ForInit. Do not infer this from local-variable snapshots: JDI
         // snapshots can expose the loop variable before the initialization
         // checkpoint is semantically rendered.
-        const hasSeenLoopCheckpoint = steps
-            .slice(0, index)
-            .some(
-                prior =>
-                    prior.method === current.method &&
-                    prior.line === current.line
-            );
-        const isFirstLoopCheckpoint = !hasSeenLoopCheckpoint;
+        const loopCheckpointKey = `${current.method ?? ""}:${current.line ?? 0}`;
+        const isFirstLoopCheckpoint = !seenLoopCheckpoints.has(loopCheckpointKey);
+        seenLoopCheckpoints.add(loopCheckpointKey);
 
         if (isFirstLoopCheckpoint) {
             setExecutionPhase(current, "initialization");
