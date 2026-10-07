@@ -246,7 +246,7 @@ function variableResultChanges(current?: TraceState, previous?: TraceState): Rea
   const before = previous?.variables ?? {};
   return Object.entries(current.variables ?? {})
     .filter(([, value]) => !isStructuralValue(value))
-    .filter(([name, value]) => !(name in before) || valueChanged(before[name], value))
+    .filter(([name, value]) => name !== 'this' && (!(name in before) || valueChanged(before[name], value)))
     .map(([name, value]) => (
       <VariableResult
         key={name}
@@ -258,27 +258,55 @@ function variableResultChanges(current?: TraceState, previous?: TraceState): Rea
     ));
 }
 
+function structureType(value: unknown, fallback: string): string {
+  if (isArraySnapshot(value)) return 'Array';
+  if (isMapSnapshot(value)) return 'Map';
+  if (isCollectionSnapshot(value)) {
+    if (typeof value.$kind === 'string' && value.$kind.trim()) {
+      return value.$kind.charAt(0).toUpperCase() + value.$kind.slice(1);
+    }
+    if (typeof value.$type === 'string') {
+      return value.$type.split('.').pop() ?? fallback;
+    }
+    return 'Collection';
+  }
+  if (isPlainObject(value) && typeof value.$type === 'string') {
+    return value.$type.split('.').pop() ?? fallback;
+  }
+  return fallback;
+}
+
 function newDataStructureResults(current?: TraceState, previous?: TraceState): React.ReactNode[] {
   if (!current) return [];
+
   const beforeNames = new Set([
     ...Object.keys(previous?.arrays ?? {}),
     ...Object.keys(previous?.dataStructures ?? {})
   ]);
+
   const currentEntries = [
-    ...Object.entries(current.arrays ?? {}),
-    ...Object.entries(current.dataStructures ?? {})
+    ...Object.entries(current.arrays ?? {}).map(([name, value]) => [name, value, 'Array'] as const),
+    ...Object.entries(current.dataStructures ?? {}).map(([name, value]) => [
+      name,
+      value,
+      structureType(value, 'Data Structure')
+    ] as const)
   ];
+
   const seen = new Set<string>();
+
   return currentEntries
     .filter(([name]) => {
-      if (beforeNames.has(name) || seen.has(name)) return false;
+      if (name === 'this' || beforeNames.has(name) || seen.has(name)) return false;
       seen.add(name);
       return true;
     })
-    .map(([name]) => (
-      <div className="yv-result structural" key={'new-ds-' + name}>
-        <span className="yv-condition true">NEW</span>
-        <span className="yv-code">{name}</span>
+    .map(([name, value, fallback]) => (
+      <div className="yv-new-result" key={'new-ds-' + name}>
+        <span className="yv-new-badge">[NEW]</span>
+        <span className="yv-new-type">{structureType(value, fallback)}</span>
+        <span className="yv-new-separator">—</span>
+        <span className="yv-new-name">{name}</span>
       </div>
     ));
 }
@@ -605,7 +633,8 @@ function variableSummary(value: unknown): string {
 }
 
 function Variables({ state, previous }: { state?: TraceState; previous?: TraceState }) {
-  const entries = Object.entries(state?.variables ?? {}).filter(([, value]) => !isStructuralObject(value));
+  const entries = Object.entries(state?.variables ?? {})
+    .filter(([name, value]) => name !== 'this' && !isStructuralObject(value));
   if (!entries.length) return <div className="yv-empty">No local variables yet.</div>;
 
   return (
@@ -875,6 +904,7 @@ function LinkedListView({
 }) {
   const pointerNames = new Map<string, string[]>();
   for (const [name, value] of Object.entries(variables)) {
+    if (name === 'this') continue;
     if (isPlainObject(value) && typeof value.$objectId === 'string') {
       const names = pointerNames.get(value.$objectId) ?? [];
       names.push(name);
@@ -1077,6 +1107,7 @@ function DataStructures({ state, source }: { state?: TraceState; source: string 
   const namedObjectIds = new Map<string, string[]>();
 
   for (const [name, value] of Object.entries(state?.variables ?? {})) {
+    if (name === 'this') continue;
     if (isPlainObject(value) && typeof value.$objectId === 'string') {
       const names = namedObjectIds.get(value.$objectId) ?? [];
       names.push(name);
