@@ -13,6 +13,110 @@ function eventLabel(state?: TraceState): string {
   return ({STEP:'Executed line',METHOD_ENTER:'Entered method',METHOD_EXIT:'Returned from method',ARRAY_WRITE:'Array updated',ARRAY_ACCESS:'Array accessed',ARRAY_REFERENCE:'Array referenced',OBJECT_FIELD_WRITE:'Object updated',OBJECT_CREATE:'Object created',VARIABLE_UPDATE:'Variable updated',MAP_WRITE:'Map updated',ERROR:'Runtime error',TIMEOUT:'Execution timed out',TRACE_LIMIT:'Trace limit reached',PROGRAM_START:'Started',PROGRAM_END:'Finished'} as Record<string,string>)[t] ?? 'Execution state';
 }
 
+type ExecutionEffect = { icon: '→' | '+' | '−' | '•' | '↗' | '↩'; text: string; };
+
+function executionCondition(state?: TraceState): boolean | undefined {
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data)) return undefined;
+  if (typeof data.conditionResult === 'boolean') return data.conditionResult;
+  return undefined;
+}
+
+function valueChanged(a: unknown, b: unknown): boolean { return stableStringify(a) !== stableStringify(b); }
+function compactValue(value: unknown): string { const text = displayValue(value); return text.length > 42 ? text.slice(0, 39) + '…' : text; }
+
+function isStructuralValue(value: unknown): boolean {
+  if (!isPlainObject(value)) return false;
+  return typeof value.$arrayId === 'string' || typeof value.$mapId === 'string' || typeof value.$collectionId === 'string';
+}
+
+function variableEffects(current?: TraceState, previous?: TraceState): ExecutionEffect[] {
+  if (!current) return [];
+  const before = previous?.variables ?? {}; const after = current.variables ?? {}; const effects: ExecutionEffect[] = [];
+  for (const [name, value] of Object.entries(after)) {
+    if (!(name in before)) { effects.push({ icon: '+', text: name + ' = ' + compactValue(value) }); continue; }
+    const old = before[name];
+    if (valueChanged(old, value) && !isStructuralValue(value)) effects.push({ icon: '→', text: name + ' ' + compactValue(old) + ' → ' + compactValue(value) });
+  }
+  for (const name of Object.keys(before)) if (!(name in after)) effects.push({ icon: '−', text: name });
+  return effects;
+}
+
+function eventEffects(state?: TraceState): ExecutionEffect[] {
+  const data = state?.lastEvent?.data; if (!isPlainObject(data)) return [];
+  const type = state?.lastEvent?.type; const effects: ExecutionEffect[] = [];
+  if (type === 'ARRAY_ACCESS') {
+    const name = typeof data.array === 'string' ? data.array : typeof data.name === 'string' ? data.name : 'array';
+    const index = typeof data.index === 'number' ? '[' + data.index + ']' : '';
+    const value = 'value' in data ? ' = ' + compactValue(data.value) : '';
+    effects.push({ icon: '•', text: name + index + value });
+  }
+  if (type === 'ARRAY_REFERENCE') {
+    const name = typeof data.array === 'string' ? data.array : typeof data.name === 'string' ? data.name : 'array';
+    effects.push({ icon: '↗', text: name });
+  }
+  if (type === 'OBJECT_CREATE') {
+    const name = typeof data.name === 'string' ? data.name : typeof data.type === 'string' ? data.type : 'object';
+    effects.push({ icon: '+', text: name });
+  }
+  if (type === 'OBJECT_FIELD_WRITE') {
+    const changes = Array.isArray(data.changes) ? data.changes : [];
+    for (const change of changes.slice(0, 3)) if (isPlainObject(change)) {
+      const fields = Array.isArray(change.fields) ? change.fields.join('.') : 'field';
+      effects.push({ icon: '→', text: fields + ' ' + compactValue(change.before) + ' → ' + compactValue(change.after) });
+    }
+  }
+  if (type === 'ARRAY_WRITE') {
+    const changes = Array.isArray(data.changes) ? data.changes : [];
+    for (const change of changes.slice(0, 3)) if (isPlainObject(change)) {
+      const indices = Array.isArray(change.indices) ? change.indices.map((x) => '[' + x + ']').join('') : '';
+      const name = typeof data.name === 'string' ? data.name : 'array';
+      effects.push({ icon: '→', text: name + indices + ' ' + compactValue(change.before) + ' → ' + compactValue(change.after) });
+    }
+  }
+  if (type === 'MAP_WRITE') {
+    const changes = Array.isArray(data.changes) ? data.changes : [];
+    for (const change of changes.slice(0, 3)) if (isPlainObject(change)) {
+      const key = compactValue(change.key);
+      if (change.kind === 'insert') effects.push({ icon: '+', text: key + ' = ' + compactValue(change.after) });
+      else if (change.kind === 'delete') effects.push({ icon: '−', text: key });
+      else effects.push({ icon: '→', text: key + ' ' + compactValue(change.before) + ' → ' + compactValue(change.after) });
+    }
+  }
+  if (type === 'METHOD_EXIT' && 'returnValue' in data) effects.push({ icon: '↩', text: compactValue(data.returnValue) });
+  return effects;
+}
+
+function loopParts(statement: string): { init: string; condition: string; update: string } | undefined {
+  const match = statement.match(/\bfor\s*\((.*?);(.*?);(.*?)\)\s*\{?\s*$/);
+  if (!match) return undefined;
+  return { init: match[1].trim(), condition: match[2].trim(), update: match[3].trim() };
+}
+
+function executionSubstatement(statement: string, current?: TraceState, previous?: TraceState): string {
+  const parts = loopParts(statement); if (!parts || !current) return statement;
+  const currentVars = current.variables ?? {}; const previousVars = previous?.variables ?? {};
+  if (!previous) return parts.init || statement;
+  const changed = Object.keys(currentVars).find((name) => name in previousVars && valueChanged(previousVars[name], currentVars[name]));
+  if (changed && /(\+\+|--|\+=|-=|\*=|\/=)/.test(parts.update)) return parts.update;
+  return parts.condition || statement;
+}
+
+function ExecutionInspector({ state, previous, statement, index, total }: { state?: TraceState; previous?: TraceState; statement: string; index: number; total: number }) {
+  const condition = executionCondition(state);
+  const substatement = executionSubstatement(statement, state, previous);
+  const effects = [...variableEffects(state, previous), ...eventEffects(state)].filter((effect, i, all) => all.findIndex((x) => x.icon === effect.icon && x.text === effect.text) === i);
+  return (
+    <div className="yv-execution">
+      <div className="yv-execution-top"><div className="yv-execution-label">EXECUTED</div><div className="yv-execution-step">{total ? (index + 1) + ' / ' + total : '—'}</div></div>
+      <div className="yv-execution-row">
+        <div className="yv-execution-code">{substatement || 'Select a testcase and press Visualize.'}</div>
+        {condition !== undefined && <div className={'yv-condition ' + (condition ? 'true' : 'false')}>{condition ? 'TRUE' : 'FALSE'}</div>}
+      </div>
+      {effects.length > 0 && <div className="yv-effects" aria-label="Execution effects">{effects.slice(0, 5).map((effect, i) => <div className="yv-effect" key={effect.icon + '-' + effect.text + '-' + i}><span className="yv-effect-icon">{effect.icon}</span><span>{effect.text}</span></div>)}{effects.length > 5 && <div className="yv-effect-more">+{effects.length - 5}</div>}</div>}
+    </div>
+  );
+}
 function Section({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
   const [open,setOpen]=useState(true);
   return <div className="yv-section"><button className="yv-section-head" onClick={()=>setOpen(x=>!x)}><span>{open?'▾':'▸'} {title}</span>{typeof count==='number'&&<span className="yv-count">{count}</span>}</button>{open&&<div className="yv-section-body">{children}</div>}</div>;
@@ -753,5 +857,5 @@ export function VisualizerPanel(){
     {tc&&<div className="yv-top"><div className="yv-title-row"><div className="yv-case">{tc.label}</div>{tc.source==='custom'&&<span className="yv-case-kind">Custom</span>}{tc.source==='failed'&&<span className="yv-case-kind">Failed testcase</span>}</div><div className="yv-inputs">{Object.keys(tc.inputs).length?Object.entries(tc.inputs).map(([k,v])=><div className="yv-input" key={k}><div className="yv-key">{k}</div><div className="yv-code">{v}</div></div>):<div className="yv-code">{tc.raw}</div>}</div><div className="yv-output-row"><div className={`yv-output ${finished&&s.response?.success?'good':''}`}><div className="yv-label">Output</div>{finished&&output!==undefined?<ReturnValueView text={displayValue(output)} value={lastEventData?.returnValue} state={current}/>:<div className="yv-code">—</div>}</div></div></div>}
     {s.loading&&<div className="yv-loading">Tracing your code…</div>}{s.error&&<div className="yv-error">{s.error}</div>}
     {!s.loading&&<><Section title="Variables"><Variables state={current} previous={prev}/></Section><Section title="Call Stack">{current?.callStack?.length?<div className="yv-stack-wrap"><div className="yv-stack-label">TOP</div><div className="yv-stack">{current.callStack.map((f:string,i:number)=><div className="yv-frame" key={`${f}-${i}`}>{f}</div>)}</div><div className="yv-stack-label bottom">BOTTOM</div></div>:<div className="yv-empty">No active method calls.</div>}</Section><Section title="Data Structures"><DataStructures state={current} source={s.source}/></Section></>}
-  </div><div className="yv-current"><div className="yv-current-head"><span>{eventLabel(current)}</span></div><div className="yv-statement">{statement||'Select a testcase and press Visualize.'}</div><div className="yv-controls"><div className="yv-buttons"><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.restart()} disabled={!s.states.length}>↺ Restart</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.prev()} disabled={s.index<=0}>← Prev</button><button className="yv-btn primary" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.togglePlay()} disabled={s.states.length<2}>{s.playing?'■ Stop':'▶ Play'}</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.next()} disabled={!s.states.length||s.index>=s.states.length-1}>Next →</button></div></div></div></div>;
+  </div><div className="yv-current"><ExecutionInspector state={current} previous={prev} statement={statement} index={s.index} total={s.states.length}/><div className="yv-controls"><div className="yv-buttons"><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.restart()} disabled={!s.states.length}>↺ Restart</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.prev()} disabled={s.index<=0}>← Prev</button><button className="yv-btn primary" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.togglePlay()} disabled={s.states.length<2}>{s.playing?'■ Stop':'▶ Play'}</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.next()} disabled={!s.states.length||s.index>=s.states.length-1}>Next →</button></div></div></div></div>;
 }
