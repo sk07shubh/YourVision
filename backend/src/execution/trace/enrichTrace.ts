@@ -42,15 +42,32 @@ export function enrichTrace(
                         sourceLines
                     );
 
+                const normalizedTransitionEvents = normalizeForLoopPhase(
+                    previousStep,
+                    event,
+                    [
+                        ...previousLineEvents,
+                        ...currentLineEvents
+                    ],
+                    sourceLines
+                );
+
+                const normalizedPreviousEvents = normalizedTransitionEvents.filter(
+                    candidate => previousLineEvents.includes(candidate)
+                );
+                const normalizedCurrentEvents = normalizedTransitionEvents.filter(
+                    candidate => currentLineEvents.includes(candidate)
+                );
+
                 const executionEvents = [
-                    ...previousLineEvents,
+                    ...normalizedPreviousEvents,
                     ...deriveArrayAccessEvents(previousStep, sourceLines)
                 ];
 
                 attachStepResult(previousStep, event, executionEvents);
 
-                if (currentLineEvents.length > 0) {
-                    appendExecutionEvents(event, currentLineEvents);
+                if (normalizedCurrentEvents.length > 0) {
+                    appendExecutionEvents(event, normalizedCurrentEvents);
                 }
 
                 insertDerivedEvents(
@@ -194,27 +211,8 @@ function partitionLoopUpdateEvents(
             ? sourceLines[current.line - 1]?.trim() ?? ""
             : "";
 
-    if (!/^for\s*\(/.test(statement)) {
-        return { previousLineEvents: events, currentLineEvents: [] };
-    }
-
-    const inside = balancedParenthesized(statement, statement.indexOf("("));
-    if (!inside) {
-        return { previousLineEvents: events, currentLineEvents: [] };
-    }
-
-    const parts = splitTopLevel(inside, ";");
-    if (parts.length !== 3) {
-        return { previousLineEvents: events, currentLineEvents: [] };
-    }
-
-    const update = parts[2]?.trim() ?? "";
-    const updatedNames = new Set<string>();
-    for (const match of update.matchAll(/\b([A-Za-z_$][\w$]*)\b/g)) {
-        if (match[1]) updatedNames.add(match[1]);
-    }
-
-    if (updatedNames.size === 0) {
+    const loop = parseBasicForStatement(statement);
+    if (!loop || loop.updateNames.size === 0) {
         return { previousLineEvents: events, currentLineEvents: [] };
     }
 
@@ -225,7 +223,7 @@ function partitionLoopUpdateEvents(
         if (
             event.type === "VARIABLE_UPDATE" &&
             typeof event.data?.name === "string" &&
-            updatedNames.has(event.data.name)
+            loop.updateNames.has(event.data.name)
         ) {
             currentLineEvents.push(event);
         } else {
@@ -1092,6 +1090,7 @@ function variableUpdate(
             source.depth,
         data: {
             name,
+            before: undefined,
             value
         }
     };
