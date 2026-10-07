@@ -97,7 +97,14 @@ function applyEvent(
 
     switch (event.type) {
         case "STEP":
-            applyVariableSnapshot(next, data.variables);
+            // STEP is a pre-execution JDI checkpoint. For replay,
+            // use the postVariables snapshot captured from the next runtime
+            // checkpoint so the state shown with this highlighted line is
+            // the state produced by this line.
+            applyVariableSnapshot(
+                next,
+                data.postVariables ?? data.variables
+            );
 
             if (typeof data.displayLine === "number") {
                 next.line = data.displayLine;
