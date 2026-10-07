@@ -5,6 +5,10 @@ import type {
 
 type SnapshotRecord = Record<string, unknown>;
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 export function enrichTrace(
     trace: ExecutionTrace,
     source = ""
