@@ -54,31 +54,36 @@ if (
     JSON.stringify(types) !==
     JSON.stringify([
         "STEP",
-        "VARIABLE_UPDATE",
-        "ARRAY_WRITE",
         "STEP"
     ])
 ) {
     throw new Error(
-        "unexpected enriched event order: " +
+        "post-line replay should keep runtime STEP checkpoints and attach effects to the executed STEP: " +
         JSON.stringify(types)
     );
 }
 
+const firstStepEvent = enriched.events[0];
+const executionEvents = Array.isArray(firstStepEvent?.data?.executionEvents)
+    ? firstStepEvent.data.executionEvents
+    : [];
+
 const write =
-    enriched.events.find(
+    executionEvents.find(
         (event) =>
-            event.type ===
-            "ARRAY_WRITE"
-    );
+            event &&
+            typeof event === "object" &&
+            (event as { type?: unknown }).type === "ARRAY_WRITE"
+    ) as { data?: Record<string, unknown> } | undefined;
 
 const changes =
-    write?.data?.changes as
-        Array<{
+    Array.isArray(write?.data?.changes)
+        ? write.data.changes as Array<{
             indices: number[];
             before: unknown;
             after: unknown;
-        }> | undefined;
+        }>
+        : undefined;
 
 const firstChange = changes?.[0];
 
@@ -104,7 +109,7 @@ const writeState =
         (state) =>
             state.lastEvent?.type ===
             "STEP" &&
-            state.line === 5 &&
+            state.line === 4 &&
             JSON.stringify(
                 (state.arrays.nums as { values?: unknown[] } | undefined)?.values
             ) === "[9,2,3]"
@@ -281,20 +286,19 @@ const accessTrace: ExecutionTrace = {
 const enrichedAccessTrace =
     enrichTrace(accessTrace);
 
-const referenceEvent =
-    enrichedAccessTrace.events.find(
-        (event) =>
-            event.type ===
-            "ARRAY_REFERENCE"
-    );
+const accessStep = enrichedAccessTrace.events.find(
+    (event) => event.type === "STEP"
+);
+
+const references = accessStep?.data?.arrayReferences;
 
 if (
-    !referenceEvent ||
-    referenceEvent.data?.array !== "nums" ||
-    referenceEvent.data?.arrayId !== "12"
+    !Array.isArray(references) ||
+    references[0]?.array !== "nums" ||
+    references[0]?.arrayId !== "12"
 ) {
     throw new Error(
-        "array reference event was not normalized"
+        "array reference metadata was not preserved on the current STEP"
     );
 }
 
@@ -352,18 +356,23 @@ const objectTrace: ExecutionTrace = {
 const enrichedObjectTrace =
     enrichTrace(objectTrace);
 
-const objectWrite =
-    enrichedObjectTrace.events.find(
+const objectStep = enrichedObjectTrace.events.find(
+    (event) => event.type === "STEP"
+);
+
+const objectWrite = Array.isArray(objectStep?.data?.executionEvents)
+    ? objectStep.data.executionEvents.find(
         (event) =>
-            event.type ===
-            "OBJECT_FIELD_WRITE"
-    );
+            event &&
+            typeof event === "object" &&
+            (event as { type?: unknown }).type === "OBJECT_FIELD_WRITE"
+    ) as { data?: Record<string, unknown> } | undefined
+    : undefined;
 
 const objectChanges =
-    objectWrite?.data?.changes as
-        Array<{
-            fields: string[];
-        }> | undefined;
+    Array.isArray(objectWrite?.data?.changes)
+        ? objectWrite.data.changes as Array<{ fields: string[] }>
+        : undefined;
 
 if (
     !objectWrite ||
@@ -372,7 +381,7 @@ if (
     objectChanges.length !== 2
 ) {
     throw new Error(
-        "object field mutations were not derived"
+        "object field mutations were not attached to the executed STEP"
     );
 }
 
@@ -391,7 +400,7 @@ const objectWriteState =
 
 if (!objectWriteState?.objects["90"]) {
     throw new Error(
-        "object mutation was not replayed into the next visible STEP state"
+        "object mutation was not replayed into the current highlighted STEP state"
     );
 }
 
