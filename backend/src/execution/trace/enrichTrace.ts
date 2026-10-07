@@ -341,8 +341,9 @@ function setExecutionPhase(
 
 function removeConditionResult(event: ExecutionEvent): void {
     if (!event.data || !("conditionResult" in event.data)) return;
-    const { conditionResult: _ignored, ...rest } = event.data;
-    event.data = rest;
+    const data = { ...event.data };
+    delete data.conditionResult;
+    event.data = data;
 }
 
 function normalizeForLoopPhase(
