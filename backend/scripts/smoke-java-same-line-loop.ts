@@ -85,13 +85,13 @@ assert(
     "The live JDI loop snapshots do not represent each pre-increment condition visit"
 );
 assert(
-    JSON.stringify(integrationLoopStates.map(state => state.variables.visits)) === JSON.stringify([0, 1, 2, 3]),
-    "stateBuilder did not preserve the live JDI loop snapshots"
+    JSON.stringify(integrationLoopStates.map(state => state.variables.visits)) === JSON.stringify([1, 2, 3, 4]),
+    "stateBuilder did not attach each loop line to its post-execution state"
 );
 assert(
     JSON.stringify(integrationLoopStates.map(state => (state.arrays.history as { values?: unknown[] } | undefined)?.values)) ===
-        JSON.stringify([[0, 0, 0], [1, 0, 0], [1, 2, 0], [1, 2, 3]]),
-    "The live array snapshot did not advance with each same-line iteration"
+        JSON.stringify([[1, 0, 0], [1, 2, 0], [1, 2, 3], [1, 2, 3]]),
+    "The post-line array state did not advance with each same-line iteration"
 );
 const helperExit = integration.states?.find(state => state.method === "helper" && state.lastEvent?.type === "METHOD_EXIT");
 assert(helperExit?.line === integrationReturnLine, `Expected helper return statement line ${integrationReturnLine}, got ${helperExit?.line}`);
