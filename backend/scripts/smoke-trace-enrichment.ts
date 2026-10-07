@@ -287,7 +287,9 @@ const enrichedAccessTrace =
     enrichTrace(accessTrace);
 
 const accessStep = enrichedAccessTrace.events.find(
-    (event) => event.type === "STEP"
+    (event) =>
+        event.type === "STEP" &&
+        Array.isArray(event.data?.arrayReferences)
 );
 
 const references = accessStep?.data?.arrayReferences;
