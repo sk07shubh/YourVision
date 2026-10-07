@@ -221,15 +221,18 @@ function executionSubstatement(statement: string, current?: TraceState, previous
   const parts = loopParts(statement);
   if (!parts || !current) return statement;
 
-  const currentVars = current.variables ?? {};
-  const previousVars = previous?.variables ?? {};
   const data = current.lastEvent?.data;
+  if (isPlainObject(data) && typeof data.executionPhase === 'string') {
+    if (data.executionPhase === 'initialization') return parts.init || statement;
+    if (data.executionPhase === 'update') return parts.update || statement;
+    if (data.executionPhase === 'condition') return parts.condition || statement;
+  }
+
+  // Fallback for traces produced before executionPhase was introduced.
+  const previousVars = previous?.variables ?? {};
   const executionEvents = isPlainObject(data) && Array.isArray(data.executionEvents)
     ? data.executionEvents
     : [];
-
-  if (!previous) return parts.init || statement;
-
   const loopVariable = parts.init.match(/([A-Za-z_$][\\w$]*)\\s*=/)?.[1];
   const updatedVariable = executionEvents.some((event) =>
     isPlainObject(event) &&
@@ -239,10 +242,6 @@ function executionSubstatement(statement: string, current?: TraceState, previous
   );
 
   if (updatedVariable && loopVariable) {
-    // The first appearance of the loop variable is initialization. Once the
-    // variable already exists, a VARIABLE_UPDATE on the for-line is its
-    // update expression. This remains correct even when the previous
-    // checkpoint is the loop body rather than the same source line.
     return loopVariable in previousVars
       ? (parts.update || statement)
       : (parts.init || statement);
