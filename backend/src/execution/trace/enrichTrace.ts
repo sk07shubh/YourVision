@@ -217,15 +217,13 @@ function insertDerivedEvents(
 function attachStepResult(
     step: ExecutionEvent,
     postEvent: ExecutionEvent,
-    executionEvents: ExecutionEvent[],
-    preserveCurrentLoopCheckpoint = false
+    executionEvents: ExecutionEvent[]
 ): void {
     const data = {
         ...(step.data ?? {})
     };
 
     if (
-        !preserveCurrentLoopCheckpoint &&
         postEvent.data?.variables &&
         typeof postEvent.data.variables === "object"
     ) {
