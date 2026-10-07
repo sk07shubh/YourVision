@@ -23,6 +23,25 @@ export function enrichTrace(
         if (event.type === "STEP") {
             event = filterStepArrayReferences(event, sourceLines);
             event = annotateCondition(event, sourceLines);
+
+            if (!previousStep) {
+                const statement =
+                    typeof event.line === "number" && event.line > 0
+                        ? sourceLines[event.line - 1]?.trim() ?? ""
+                        : "";
+                const loop = parseBasicForStatement(statement);
+                if (loop) {
+                    const variables = getVariables(event);
+                    const initialized = [...loop.initNames].some(
+                        name => name in variables
+                    );
+                    if (initialized) {
+                        setExecutionPhase(event, "initialization");
+                        removeConditionResult(event);
+                    }
+                }
+            }
+
             if (previousStep && previousStep.method === event.method) {
                 const transitionEvents = [
                     ...deriveChanges(previousStep, event),
