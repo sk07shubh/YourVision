@@ -1,4 +1,5 @@
-// CI verification: preserves the for-loop phase regression coverage.\nimport { enrichTrace } from "../src/execution/trace/enrichTrace.js";
+// CI verification: preserves the for-loop phase regression coverage.
+import { enrichTrace } from "../src/execution/trace/enrichTrace.js";
 import { buildStates } from "../src/execution/trace/stateBuilder.js";
 import type { ExecutionTrace } from "../src/execution/trace/schema.js";
 
