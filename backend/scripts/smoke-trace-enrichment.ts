@@ -875,4 +875,5 @@ if (
     throw new Error("for-loop update/condition state did not advance in semantic order");
 }
 
+// The semantic loop fixture intentionally models JDI checkpoints whose source-line order is ambiguous.
 console.log("PASS: semantic for-loop ordering");
