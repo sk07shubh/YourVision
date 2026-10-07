@@ -264,7 +264,6 @@ function canonicalizeForLoopExecutionPhases(
                     const data = isPlainObject(candidate.data) ? candidate.data : {};
                     return (
                         typeof data.name === "string" &&
-                        initializationNames.has(data.name) &&
                         !("before" in data)
                     );
                 });
