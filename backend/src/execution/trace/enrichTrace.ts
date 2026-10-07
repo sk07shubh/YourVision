@@ -588,7 +588,11 @@ function normalizeForLoopCheckpoint(
     const duplicateLoopEvents = variableUpdateEvents(
         rawEvents,
         loop.updateNames
-    ).filter(candidate => !rawUpdateEvents.includes(candidate));
+    ).filter(candidate => {
+        if (rawUpdateEvents.includes(candidate)) return false;
+        const data = isPlainObject(candidate.data) ? candidate.data : {};
+        return "before" in data;
+    });
 
     if (rawUpdateEvents.length > 0) {
         appendUniqueExecutionEvents(previous, rawUpdateEvents);
