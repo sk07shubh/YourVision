@@ -587,7 +587,7 @@ function normalizeForLoopCheckpoint(
 
     const duplicateLoopEvents = variableUpdateEvents(
         rawEvents,
-        new Set([...loop.initNames, ...loop.updateNames])
+        loop.updateNames
     ).filter(candidate => !rawUpdateEvents.includes(candidate));
 
     if (rawUpdateEvents.length > 0) {
