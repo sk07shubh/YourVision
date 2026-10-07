@@ -182,7 +182,7 @@ function extractConditionExpression(statement: string): string | undefined {
         const inside = balancedParenthesized(trimmed, trimmed.indexOf("("));
         if (!inside) return undefined;
         const parts = splitTopLevel(inside, ";");
-        return parts.length === 3 ? parts[1].trim() : undefined;
+        return parts.length === 3 ? parts[1]?.trim() : undefined;
     }
     const doWhile = trimmed.match(/\bwhile\s*\(/);
     if (doWhile) return balancedParenthesized(trimmed, trimmed.indexOf("(", doWhile.index ?? 0));
@@ -277,7 +277,7 @@ function tokenizeCondition(source: string): ConditionToken[] {
         }
         if (/[0-9]/.test(ch)) {
             let end = i + 1;
-            while (end < source.length && /[0-9.]/.test(source[end])) end++;
+            while (end < source.length && /[0-9.]/.test(source[end]!)) end++;
             tokens.push({ type: "number", value: source.slice(i, end) }); i = end; continue;
         }
         if (/[A-Za-z_$]/.test(ch)) {
@@ -357,7 +357,7 @@ class ConditionParser {
     private parseRelational(evaluate = true): unknown {
         let left = this.parseAdditive(evaluate);
         while (this.peek("<") || this.peek("<=") || this.peek(">") || this.peek(">=")) {
-            const operator = this.tokens[this.index++].value;
+            const operator = this.tokens[this.index++]!.value;
             const right = this.parseAdditive(evaluate);
             if (!evaluate) { left = undefined; continue; }
             if (typeof left !== "number" || typeof right !== "number") throw new Error("numeric comparison expected");
@@ -451,7 +451,8 @@ function readIndexed(value: unknown, index: number): unknown {
 function readLength(value: unknown): number {
     if (typeof value === "string" || Array.isArray(value)) return value.length;
     if (value && typeof value === "object" && "snapshot" in value) {
-        const record = value.snapshot;
+        const record = value as { snapshot: Record<string, unknown> };
+        const snapshot = record.snapshot;
         if (typeof snapshot.length === "number") return snapshot.length;
         if (Array.isArray(snapshot.values)) return snapshot.values.length;
         if (Array.isArray(snapshot.entries)) return snapshot.entries.length;
