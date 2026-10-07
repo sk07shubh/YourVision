@@ -34,6 +34,14 @@ export function enrichTrace(
                 // snapshot to the current STEP so replay can show the effect
                 // while the current line is highlighted.
                 attachStepResult(previousStep, event, executionEvents);
+                insertDerivedEvents(
+                    enriched,
+                    previousStep,
+                    [
+                        ...executionEvents,
+                        ...deriveArrayReferenceEvents(event)
+                    ]
+                );
             }
 
             if (pendingCallerResume) {
@@ -89,6 +97,11 @@ export function enrichTrace(
                 // MethodExitEvent is emitted after the method body has
                 // executed, so it is the post-state source for the last STEP.
                 attachStepResult(previousStep, event, executionEvents);
+                insertDerivedEvents(
+                    enriched,
+                    previousStep,
+                    executionEvents
+                );
             }
 
             if (typeof event.data?.callerLine === "number") {
@@ -128,6 +141,26 @@ export function enrichTrace(
             sequence: index + 1
         }))
     };
+}
+
+function insertDerivedEvents(
+    events: ExecutionEvent[],
+    afterEvent: ExecutionEvent,
+    derived: ExecutionEvent[]
+): void {
+    if (derived.length === 0) return;
+
+    const index = events.lastIndexOf(afterEvent);
+    if (index < 0) return;
+
+    events.splice(
+        index + 1,
+        0,
+        ...derived.map((event) => ({
+            ...event,
+            sequence: 0
+        }))
+    );
 }
 
 function attachStepResult(
