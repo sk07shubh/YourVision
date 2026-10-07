@@ -13,7 +13,7 @@ function eventLabel(state?: TraceState): string {
   return ({STEP:'Executed line',METHOD_ENTER:'Entered method',METHOD_EXIT:'Returned from method',ARRAY_WRITE:'Array updated',ARRAY_ACCESS:'Array accessed',ARRAY_REFERENCE:'Array referenced',OBJECT_FIELD_WRITE:'Object updated',OBJECT_CREATE:'Object created',VARIABLE_UPDATE:'Variable updated',MAP_WRITE:'Map updated',ERROR:'Runtime error',TIMEOUT:'Execution timed out',TRACE_LIMIT:'Trace limit reached',PROGRAM_START:'Started',PROGRAM_END:'Finished'} as Record<string,string>)[t] ?? 'Execution state';
 }
 
-type ExecutionEffect = { icon: '→' | '+' | '−' | '•' | '↗' | '↩'; text: string; };
+type ExecutionEffect = { text: string; kind?: 'change' | 'condition' | 'structural' | 'return'; };
 
 function executionCondition(state?: TraceState): boolean | undefined {
   const data = state?.lastEvent?.data;
@@ -32,42 +32,66 @@ function isStructuralValue(value: unknown): boolean {
 
 function variableEffects(current?: TraceState, previous?: TraceState): ExecutionEffect[] {
   if (!current) return [];
-  const before = previous?.variables ?? {}; const after = current.variables ?? {}; const effects: ExecutionEffect[] = [];
+  const before = previous?.variables ?? {};
+  const after = current.variables ?? {};
+  const effects: ExecutionEffect[] = [];
+
   for (const [name, value] of Object.entries(after)) {
-    if (!(name in before)) { effects.push({ icon: '+', text: name + ' = ' + compactValue(value) }); continue; }
+    if (!(name in before)) {
+      effects.push({ kind: 'structural', text: name + ' = ' + compactValue(value) });
+      continue;
+    }
+
     const old = before[name];
-    if (valueChanged(old, value) && !isStructuralValue(value)) effects.push({ icon: '→', text: name + ' ' + compactValue(old) + ' → ' + compactValue(value) });
+    if (valueChanged(old, value) && !isStructuralValue(value)) {
+      effects.push({
+        kind: 'change',
+        text: name + '  ' + compactValue(old) + '  →  ' + compactValue(value)
+      });
+    }
   }
-  for (const name of Object.keys(before)) if (!(name in after)) effects.push({ icon: '−', text: name });
+
+  // Scope-exit variables are intentionally omitted. They already disappear
+  // from the Variables section and do not describe the effect of the line.
   return effects;
 }
 
 function eventEffects(state?: TraceState): ExecutionEffect[] {
-  const data = state?.lastEvent?.data; if (!isPlainObject(data)) return [];
-  const type = state?.lastEvent?.type; const effects: ExecutionEffect[] = [];
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data)) return [];
+
+  const type = state?.lastEvent?.type;
+  const effects: ExecutionEffect[] = [];
 
   // Replay checkpoints carry the operations observed between the current
   // STEP and the next runtime checkpoint. Those operations belong to the
   // currently highlighted line, not the following line.
   const executionEvents = Array.isArray(data.executionEvents) ? data.executionEvents : [];
+
   for (const event of executionEvents) {
     if (!isPlainObject(event)) continue;
     const eventData = isPlainObject(event.data) ? event.data : {};
     const eventType = typeof event.type === 'string' ? event.type : '';
+
     if (eventType === 'VARIABLE_UPDATE' && typeof eventData.name === 'string') {
+      const name = eventData.name;
+      const before = 'before' in eventData ? compactValue(eventData.before) : '';
+      const after = compactValue(eventData.value);
       effects.push({
-        icon: '→',
-        text: eventData.name + ' → ' + compactValue(eventData.value)
+        kind: 'change',
+        text: before ? name + '  ' + before + '  →  ' + after : name + ' = ' + after
       });
     } else if (eventType === 'ARRAY_WRITE') {
       const name = typeof eventData.name === 'string' ? eventData.name : 'array';
       const changes = Array.isArray(eventData.changes) ? eventData.changes : [];
       for (const change of changes.slice(0, 3)) {
         if (!isPlainObject(change)) continue;
-        const indices = Array.isArray(change.indices) ? change.indices.map((x) => '[' + x + ']').join('') : '';
+        const indices = Array.isArray(change.indices)
+          ? change.indices.map((x) => '[' + x + ']').join('')
+          : '';
         effects.push({
-          icon: '→',
-          text: name + indices + ' ' + compactValue(change.before) + ' → ' + compactValue(change.after)
+          kind: 'change',
+          text: name + indices + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
         });
       }
     } else if (eventType === 'MAP_WRITE') {
@@ -75,9 +99,16 @@ function eventEffects(state?: TraceState): ExecutionEffect[] {
       for (const change of changes.slice(0, 3)) {
         if (!isPlainObject(change)) continue;
         const key = compactValue(change.key);
-        if (change.kind === 'insert') effects.push({ icon: '+', text: key + ' = ' + compactValue(change.after) });
-        else if (change.kind === 'delete') effects.push({ icon: '−', text: key });
-        else effects.push({ icon: '→', text: key + ' ' + compactValue(change.before) + ' → ' + compactValue(change.after) });
+        if (change.kind === 'insert') {
+          effects.push({ kind: 'structural', text: key + '  →  ' + compactValue(change.after) });
+        } else if (change.kind === 'delete') {
+          effects.push({ kind: 'structural', text: key + '  removed' });
+        } else {
+          effects.push({
+            kind: 'change',
+            text: key + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
+          });
+        }
       }
     } else if (eventType === 'OBJECT_FIELD_WRITE') {
       const changes = Array.isArray(eventData.changes) ? eventData.changes : [];
@@ -85,52 +116,85 @@ function eventEffects(state?: TraceState): ExecutionEffect[] {
         if (!isPlainObject(change)) continue;
         const fields = Array.isArray(change.fields) ? change.fields.join('.') : 'field';
         effects.push({
-          icon: '→',
-          text: fields + ' ' + compactValue(change.before) + ' → ' + compactValue(change.after)
+          kind: 'change',
+          text: fields + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
         });
       }
     }
   }
 
   if (type === 'ARRAY_ACCESS') {
-    const name = typeof data.array === 'string' ? data.array : typeof data.name === 'string' ? data.name : 'array';
+    const name = typeof data.array === 'string'
+      ? data.array
+      : typeof data.name === 'string' ? data.name : 'array';
     const index = typeof data.index === 'number' ? '[' + data.index + ']' : '';
     const value = 'value' in data ? ' = ' + compactValue(data.value) : '';
-    effects.push({ icon: '•', text: name + index + value });
+    effects.push({ kind: 'structural', text: name + index + value });
   }
+
   if (type === 'ARRAY_REFERENCE') {
-    const name = typeof data.array === 'string' ? data.array : typeof data.name === 'string' ? data.name : 'array';
-    effects.push({ icon: '↗', text: name });
+    const name = typeof data.array === 'string'
+      ? data.array
+      : typeof data.name === 'string' ? data.name : 'array';
+    effects.push({ kind: 'structural', text: name });
   }
+
   if (type === 'OBJECT_CREATE') {
-    const name = typeof data.name === 'string' ? data.name : typeof data.type === 'string' ? data.type : 'object';
-    effects.push({ icon: '+', text: name });
+    const name = typeof data.name === 'string'
+      ? data.name
+      : typeof data.type === 'string' ? data.type : 'object';
+    effects.push({ kind: 'structural', text: name });
   }
+
   if (type === 'OBJECT_FIELD_WRITE') {
     const changes = Array.isArray(data.changes) ? data.changes : [];
-    for (const change of changes.slice(0, 3)) if (isPlainObject(change)) {
+    for (const change of changes.slice(0, 3)) {
+      if (!isPlainObject(change)) continue;
       const fields = Array.isArray(change.fields) ? change.fields.join('.') : 'field';
-      effects.push({ icon: '→', text: fields + ' ' + compactValue(change.before) + ' → ' + compactValue(change.after) });
+      effects.push({
+        kind: 'change',
+        text: fields + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
+      });
     }
   }
+
   if (type === 'ARRAY_WRITE') {
     const changes = Array.isArray(data.changes) ? data.changes : [];
-    for (const change of changes.slice(0, 3)) if (isPlainObject(change)) {
-      const indices = Array.isArray(change.indices) ? change.indices.map((x) => '[' + x + ']').join('') : '';
+    for (const change of changes.slice(0, 3)) {
+      if (!isPlainObject(change)) continue;
+      const indices = Array.isArray(change.indices)
+        ? change.indices.map((x) => '[' + x + ']').join('')
+        : '';
       const name = typeof data.name === 'string' ? data.name : 'array';
-      effects.push({ icon: '→', text: name + indices + ' ' + compactValue(change.before) + ' → ' + compactValue(change.after) });
+      effects.push({
+        kind: 'change',
+        text: name + indices + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
+      });
     }
   }
+
   if (type === 'MAP_WRITE') {
     const changes = Array.isArray(data.changes) ? data.changes : [];
-    for (const change of changes.slice(0, 3)) if (isPlainObject(change)) {
+    for (const change of changes.slice(0, 3)) {
+      if (!isPlainObject(change)) continue;
       const key = compactValue(change.key);
-      if (change.kind === 'insert') effects.push({ icon: '+', text: key + ' = ' + compactValue(change.after) });
-      else if (change.kind === 'delete') effects.push({ icon: '−', text: key });
-      else effects.push({ icon: '→', text: key + ' ' + compactValue(change.before) + ' → ' + compactValue(change.after) });
+      if (change.kind === 'insert') {
+        effects.push({ kind: 'structural', text: key + '  →  ' + compactValue(change.after) });
+      } else if (change.kind === 'delete') {
+        effects.push({ kind: 'structural', text: key + '  removed' });
+      } else {
+        effects.push({
+          kind: 'change',
+          text: key + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
+        });
+      }
     }
   }
-  if (type === 'METHOD_EXIT' && 'returnValue' in data) effects.push({ icon: '↩', text: compactValue(data.returnValue) });
+
+  if (type === 'METHOD_EXIT' && 'returnValue' in data) {
+    effects.push({ kind: 'return', text: compactValue(data.returnValue) });
+  }
+
   return effects;
 }
 
@@ -154,18 +218,56 @@ function executionSubstatement(statement: string, current?: TraceState, previous
 function ExecutionInspector({ state, previous, statement, index, total }: { state?: TraceState; previous?: TraceState; statement: string; index: number; total: number }) {
   const condition = executionCondition(state);
   const substatement = executionSubstatement(statement, state, previous);
-  const effects = [...variableEffects(state, previous), ...eventEffects(state)].filter((effect, i, all) => all.findIndex((x) => x.icon === effect.icon && x.text === effect.text) === i);
+  const effects = [...variableEffects(state, previous), ...eventEffects(state)]
+    .filter((effect, i, all) => all.findIndex((x) => x.text === effect.text) === i);
+
+  const resultEffects = effects.slice(0, 3);
+  const resultOverflow = effects.length - resultEffects.length;
+
   return (
     <div className="yv-execution">
-      <div className="yv-execution-top"><div className="yv-execution-label">EXECUTED</div><div className="yv-execution-step">{total ? (index + 1) + ' / ' + total : '—'}</div></div>
+      <div className="yv-execution-top">
+        <div className="yv-execution-label">EXECUTED</div>
+        <div className="yv-execution-step">{total ? (index + 1) + ' / ' + total : '—'}</div>
+      </div>
+
       <div className="yv-execution-row">
         <div className="yv-execution-code">{substatement || 'Select a testcase and press Visualize.'}</div>
-        {condition !== undefined && <div className={'yv-condition ' + (condition ? 'true' : 'false')}>{condition ? 'TRUE' : 'FALSE'}</div>}
+
+        <div className="yv-execution-result" aria-label="Execution result">
+          {condition !== undefined ? (
+            <span className={'yv-condition ' + (condition ? 'true' : 'false')}>
+              {condition ? 'TRUE' : 'FALSE'}
+            </span>
+          ) : resultEffects.length > 0 ? (
+            <div className="yv-result-list">
+              {resultEffects.map((effect, i) => (
+                <div className={'yv-result ' + (effect.kind ?? 'change')} key={effect.text + '-' + i}>
+                  {effect.text}
+                </div>
+              ))}
+              {resultOverflow > 0 && <div className="yv-result-more">+{resultOverflow} more</div>}
+            </div>
+          ) : (
+            <span className="yv-result-empty">—</span>
+          )}
+        </div>
       </div>
-      {effects.length > 0 && <div className="yv-effects" aria-label="Execution effects">{effects.slice(0, 5).map((effect, i) => <div className="yv-effect" key={effect.icon + '-' + effect.text + '-' + i}><span className="yv-effect-icon">{effect.icon}</span><span>{effect.text}</span></div>)}{effects.length > 5 && <div className="yv-effect-more">+{effects.length - 5}</div>}</div>}
+
+      {effects.length > 3 && (
+        <div className="yv-effects" aria-label="Additional execution effects">
+          {effects.slice(3, 6).map((effect, i) => (
+            <div className={'yv-effect ' + (effect.kind ?? 'change')} key={effect.text + '-' + i}>
+              {effect.text}
+            </div>
+          ))}
+          {effects.length > 6 && <div className="yv-effect-more">+{effects.length - 6} more</div>}
+        </div>
+      )}
     </div>
   );
 }
+
 function Section({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
   const [open,setOpen]=useState(true);
   return <div className="yv-section"><button className="yv-section-head" onClick={()=>setOpen(x=>!x)}><span>{open?'▾':'▸'} {title}</span>{typeof count==='number'&&<span className="yv-count">{count}</span>}</button>{open&&<div className="yv-section-body">{children}</div>}</div>;
