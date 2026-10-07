@@ -224,7 +224,7 @@ function partitionLoopUpdateEvents(
         if (
             event.type === "VARIABLE_UPDATE" &&
             typeof event.data?.name === "string" &&
-            updatedNames.has(event.data.name) &&
+            updatedNames.has(event.data.name)
         ) {
             currentLineEvents.push(event);
         } else {
