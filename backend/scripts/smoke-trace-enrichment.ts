@@ -197,11 +197,11 @@ const lineStates = buildStates(lineSemantics).filter(state => state.lastEvent?.t
 if (
     lineStates[0]?.line !== 3 ||
     lineStates[0]?.variables?.target !== 9 ||
-    lineStates[0]?.variables?.i !== 0 ||
+    lineStates[0]?.variables?.i !== 1 ||
     lineStates[1]?.line !== 4 ||
     lineStates[1]?.variables?.i !== 1
 ) {
-    throw new Error("execution state does not align with its JDI source location");
+    throw new Error("execution state does not align with its highlighted-line post-state");
 }
 
 
