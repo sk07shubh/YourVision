@@ -437,3 +437,165 @@ if (JSON.stringify(conditionResults) !== JSON.stringify([true, false])) {
     throw new Error("condition result enrichment failed: " + JSON.stringify(conditionResults));
 }
 console.log("PASS: condition result enrichment");
+
+const mapConditionTrace: ExecutionTrace = {
+    version: 1,
+    events: [
+        {
+            sequence: 1,
+            type: "STEP",
+            line: 4,
+            method: "checkMap",
+            depth: 1,
+            data: {
+                variables: {
+                    need: 7,
+                    mp: {
+                        $mapId: "88",
+                        $type: "java.util.HashMap",
+                        size: 1,
+                        entries: [{ key: 2, value: 0 }]
+                    }
+                }
+            }
+        },
+        {
+            sequence: 2,
+            type: "STEP",
+            line: 4,
+            method: "checkMap",
+            depth: 1,
+            data: {
+                variables: {
+                    need: 2,
+                    mp: {
+                        $mapId: "88",
+                        $type: "java.util.HashMap",
+                        size: 1,
+                        entries: [{ key: 2, value: 0 }]
+                    }
+                }
+            }
+        }
+    ]
+};
+
+const mapConditionSource = [
+    "class Solution {",
+    "    boolean checkMap(Map<Integer,Integer> mp, int need) {",
+    "        return false;",
+    "        if (mp.containsKey(need)) return true;",
+    "    }",
+    "}"
+].join("\n");
+
+const mapCondition = enrichTrace(mapConditionTrace, mapConditionSource);
+const mapResults = mapCondition.events
+    .filter(event => event.type === "STEP")
+    .map(event => event.data?.conditionResult);
+
+if (JSON.stringify(mapResults) !== JSON.stringify([false, true])) {
+    throw new Error("map method condition result enrichment failed: " + JSON.stringify(mapResults));
+}
+
+const returnTrace: ExecutionTrace = {
+    version: 1,
+    events: [
+        {
+            sequence: 1,
+            type: "STEP",
+            line: 3,
+            method: "answer",
+            depth: 1,
+            data: {
+                variables: { value: 7 }
+            }
+        },
+        {
+            sequence: 2,
+            type: "METHOD_EXIT",
+            line: 3,
+            method: "answer",
+            depth: 1,
+            data: {
+                variables: { value: 7 },
+                returnValue: { $arrayId: "99", $type: "int[]", values: [0, 1] }
+            }
+        }
+    ]
+};
+
+const returnEnriched = enrichTrace(returnTrace, "class Solution {\\n  int[] answer(int value) {\\n    return new int[] {0, 1};\\n  }\\n}");
+const returnStep = returnEnriched.events.find(event => event.type === "STEP");
+if (
+    !returnStep?.data ||
+    !("returnValue" in returnStep.data) ||
+    JSON.stringify(returnStep.data.returnValue) !== JSON.stringify({ $arrayId: "99", $type: "int[]", values: [0, 1] })
+) {
+    throw new Error("return value was not attached to the executed return STEP");
+}
+
+const accessTrace: ExecutionTrace = {
+    version: 1,
+    events: [
+        {
+            sequence: 1,
+            type: "STEP",
+            line: 3,
+            method: "readArray",
+            depth: 1,
+            data: {
+                variables: {
+                    i: 1,
+                    nums: { $arrayId: "100", $type: "int[]", values: [2, 7, 11] }
+                }
+            }
+        },
+        {
+            sequence: 2,
+            type: "STEP",
+            line: 4,
+            method: "readArray",
+            depth: 1,
+            data: {
+                variables: {
+                    i: 1,
+                    value: 7,
+                    nums: { $arrayId: "100", $type: "int[]", values: [2, 7, 11] }
+                }
+            }
+        }
+    ]
+};
+
+const accessSource = [
+    "class Solution {",
+    "    int readArray(int[] nums) {",
+    "        int value = nums[i];",
+    "        return value;",
+    "    }",
+    "}"
+].join("\n");
+
+const accessEnriched = enrichTrace(accessTrace, accessSource);
+const accessStep = accessEnriched.events.find(event => event.type === "STEP");
+const accessEvents = Array.isArray(accessStep?.data?.executionEvents)
+    ? accessStep.data.executionEvents
+    : [];
+const accessEvent = accessEvents.find(event => event.type === "ARRAY_ACCESS");
+
+if (
+    !accessEvent ||
+    !isRecord(accessEvent.data) ||
+    JSON.stringify(accessEvent.data.indices) !== JSON.stringify([1]) ||
+    accessEvent.data.value !== 7
+) {
+    throw new Error("array access was not derived from the executed source line");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+console.log("PASS: method-call conditions, return values, and array accesses");
+
