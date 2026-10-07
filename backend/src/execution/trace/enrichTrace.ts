@@ -27,66 +27,16 @@ export function enrichTrace(
         if (event.type === "STEP") {
             event = filterStepArrayReferences(event, sourceLines);
             event = annotateCondition(event, sourceLines);
-            normalizeForLoopCheckpoint(event, previousStep, undefined, sourceLines);
             if (previousStep && previousStep.method === event.method) {
-                const transitionEvents = [
-                    ...deriveChanges(previousStep, event),
-                    ...deriveMapChanges(previousStep, event)
-                ];
-
-                // A normal state transition belongs to the previous line.
-                // A for-loop update is the important exception: Java executes
-                // the update expression before reaching the next condition
-                // checkpoint, so that variable change belongs to the next
-                // highlighted for-line.
-                const { previousLineEvents, currentLineEvents } =
-                    partitionLoopUpdateEvents(
-                        previousStep,
-                        event,
-                        transitionEvents,
-                        sourceLines
-                    );
-
-                normalizeForLoopCheckpoint(
-                    event,
-                    previousStep,
-                    currentLineEvents,
-                    sourceLines
-                );
-
                 const executionEvents = [
-                    ...previousLineEvents,
+                    ...deriveChanges(previousStep, event),
+                    ...deriveMapChanges(previousStep, event),
                     ...deriveArrayAccessEvents(previousStep, sourceLines)
                 ];
 
-                // A newly created collection/map is produced by the current
-                // source line. Unlike a mutation observed between two JDI
-                // checkpoints, its visual result must stay attached to the
-                // highlighted declaration line.
-                const creationEvents = deriveDataStructureCreationEvents(
-                    previousStep,
-                    event
-                );
-
-                const sameLineLoopUpdate =
-                    previousStep.line === event.line &&
-                    event.data?.executionPhase === "update";
-
-                attachStepResult(
-                    previousStep,
-                    event,
-                    executionEvents,
-                    sameLineLoopUpdate
-                );
-
-                if (currentLineEvents.length > 0) {
-                    appendExecutionEvents(event, currentLineEvents);
-                }
-
-                if (creationEvents.length > 0) {
-                    appendExecutionEvents(event, creationEvents);
-                }
-
+                // Derived runtime effects stay attached to the state transition
+                // they came from. Loop ordering is no longer inferred here.
+                attachStepResult(previousStep, event, executionEvents);
                 insertDerivedEvents(
                     enriched,
                     previousStep,
@@ -96,12 +46,14 @@ export function enrichTrace(
                     ]
                 );
 
-                insertDerivedEvents(
-                    enriched,
-                    event,
-                    creationEvents
+                const creationEvents = deriveDataStructureCreationEvents(
+                    previousStep,
+                    event
                 );
-            }
+                if (creationEvents.length > 0) {
+                    appendExecutionEvents(event, creationEvents);
+                    insertDerivedEvents(enriched, event, creationEvents);
+                }
 
             if (pendingCallerResume) {
                 const isCaller =
@@ -194,9 +146,6 @@ export function enrichTrace(
         enriched.push(event);
     }
 
-    normalizeForLoopSequence(enriched, sourceLines);
-    canonicalizeForLoopExecutionPhases(enriched, sourceLines);
-    reorderForLoopSemanticCheckpoints(enriched, sourceLines);
 
     return {
         version: 1,
@@ -207,151 +156,6 @@ export function enrichTrace(
     };
 }
 
-function canonicalizeForLoopExecutionPhases(
-    events: ExecutionEvent[],
-    sourceLines: string[]
-): void {
-    const steps = events.filter(event => event.type === "STEP");
-    const seenLoopCheckpoints = new Set<string>();
-
-    for (let index = 0; index < steps.length; index++) {
-        const current = steps[index]!;
-        const statement =
-            typeof current.line === "number" && current.line > 0
-                ? sourceLines[current.line - 1]?.trim() ?? ""
-                : "";
-        const isForStatement = /^for\s*\(/.test(statement);
-        if (!isForStatement) continue;
-
-        const loop = parseBasicForStatement(statement) ?? {
-            init: "",
-            condition: "",
-            update: "",
-            initNames: new Set<string>(),
-            updateNames: new Set<string>()
-        };
-        const initializationNames = new Set<string>([
-            ...loop.initNames,
-            ...extractAssignmentNames(loop.init)
-        ]);
-        const previous = steps[index - 1];
-        const currentEvents = executionEventsFor(current);
-
-        // Reaching a for source line from another source line always begins
-        // with ForInit. Do not infer this from local-variable snapshots: JDI
-        // snapshots can expose the loop variable before the initialization
-        // checkpoint is semantically rendered.
-        const loopCheckpointKey = `${current.method ?? ""}:${current.line ?? 0}`;
-        const isFirstLoopCheckpoint = !seenLoopCheckpoints.has(loopCheckpointKey);
-        seenLoopCheckpoints.add(loopCheckpointKey);
-
-        if (isFirstLoopCheckpoint) {
-            setExecutionPhase(current, "initialization");
-            removeConditionResult(current);
-
-            // If JDI reported the initialization update on the next same-line
-            // checkpoint, move that evidence onto the initialization checkpoint.
-            const next = steps[index + 1];
-            if (
-                next &&
-                next.method === current.method &&
-                next.line === current.line
-            ) {
-                const nextEvents = executionEventsFor(next);
-                const initEvents = nextEvents.filter(candidate => {
-                    if (!isPlainObject(candidate) || candidate.type !== "VARIABLE_UPDATE") {
-                        return false;
-                    }
-                    const data = isPlainObject(candidate.data) ? candidate.data : {};
-                    return (
-                        typeof data.name === "string" &&
-                        !("before" in data)
-                    );
-                });
-
-                if (initEvents.length > 0) {
-                    appendUniqueExecutionEvents(current, initEvents);
-                    next.data = {
-                        ...(next.data ?? {}),
-                        executionEvents: nextEvents.filter(
-                            candidate => !initEvents.includes(candidate)
-                        )
-                    };
-                }
-
-                setExecutionPhase(next, "condition");
-                annotateConditionInPlace(next, sourceLines);
-            }
-
-            continue;
-        }
-
-        // A changed loop-control variable is the update checkpoint. The next
-        // same-line checkpoint is the condition checkpoint. This rule wins over
-        // any stale conditionResult produced by the generic condition annotator.
-        const changedUpdate = currentEvents.some(candidate => {
-            if (!isPlainObject(candidate) || candidate.type !== "VARIABLE_UPDATE") {
-                return false;
-            }
-            const data = isPlainObject(candidate.data) ? candidate.data : {};
-            if (
-                typeof data.name !== "string" ||
-                !loop.updateNames.has(data.name)
-            ) {
-                return false;
-            }
-            return "before" in data && !sameSnapshot(data.before, data.value);
-        });
-
-        if (changedUpdate) {
-            setExecutionPhase(current, "update");
-            removeConditionResult(current);
-            const next = steps[index + 1];
-            if (
-                next &&
-                next.method === current.method &&
-                next.line === current.line
-            ) {
-                setExecutionPhase(next, "condition");
-                annotateConditionInPlace(next, sourceLines);
-            }
-            continue;
-        }
-
-        // Any same-line checkpoint after initialization/update is the loop
-        // condition checkpoint unless it is itself the initialization case above.
-        if (
-            previous &&
-            previous.method === current.method &&
-            previous.line === current.line
-        ) {
-            setExecutionPhase(current, "condition");
-            annotateConditionInPlace(current, sourceLines);
-        }
-    }
-}
-
-
-function reorderForLoopSemanticCheckpoints(events: ExecutionEvent[], sourceLines: string[]): void {
-    const positions = () => events.map((event,index)=>({event,index})).filter(x=>x.event.type==="STEP");
-    const initEvidence = (step: ExecutionEvent, loop: NonNullable<ReturnType<typeof parseBasicForStatement>>) => executionEventsFor(step).some(candidate => {
-        if (!isPlainObject(candidate) || candidate.type !== "VARIABLE_UPDATE") return false;
-        const data = isPlainObject(candidate.data) ? candidate.data : {};
-        return typeof data.name === "string" && loop.initNames.has(data.name) && !("before" in data);
-    });
-    for (let i=0; i<positions().length-1; i++) {
-        const ps=positions(), first=ps[i]!, second=ps[i+1]!;
-        if(first.event.method!==second.event.method || first.event.line!==second.event.line) continue;
-        const statement=typeof first.event.line==="number" && first.event.line>0 ? sourceLines[first.event.line-1]?.trim() ?? "" : "";
-        const loop=parseBasicForStatement(statement);
-        if(!loop) continue;
-        if(initEvidence(first.event, loop) || !initEvidence(second.event, loop)) continue;
-        const end=ps[i+2]?.index ?? events.length;
-        const a=events.slice(first.index,second.index), b=events.slice(second.index,end);
-        events.splice(first.index,end-first.index,...b,...a);
-        i=-1;
-    }
-}
 function appendExecutionEvents(
     event: ExecutionEvent,
     executionEvents: ExecutionEvent[]
@@ -369,15 +173,7 @@ function appendExecutionEvents(
     };
 }
 
-function partitionLoopUpdateEvents(
-    previous: ExecutionEvent,
-    current: ExecutionEvent,
-    events: ExecutionEvent[],
-    sourceLines: string[]
-): {
-    previousLineEvents: ExecutionEvent[];
-    currentLineEvents: ExecutionEvent[];
-} {
+ {
     const statement =
         typeof current.line === "number" && current.line > 0
             ? sourceLines[current.line - 1]?.trim() ?? ""
@@ -420,13 +216,7 @@ function partitionLoopUpdateEvents(
 }
 
 
-function parseBasicForStatement(statement: string): {
-    init: string;
-    condition: string;
-    update: string;
-    initNames: Set<string>;
-    updateNames: Set<string>;
-} | undefined {
+ | undefined {
     if (!/^for\s*\(/.test(statement.trim())) return undefined;
     const inside = balancedParenthesized(statement, statement.indexOf("("));
     if (inside === undefined) return undefined;
@@ -442,341 +232,12 @@ function parseBasicForStatement(statement: string): {
     };
 }
 
-function extractAssignmentNames(part: string): Set<string> {
-    const names = new Set<string>();
-    for (const match of part.matchAll(/\b([A-Za-z_$][\w$]*)\s*(?:\+\+|--|=)/g)) {
-        if (match[1]) names.add(match[1]);
-    }
-    for (const match of part.matchAll(/(?:\+\+|--)\s*([A-Za-z_$][\w$]*)\b/g)) {
-        if (match[1]) names.add(match[1]);
-    }
-    return names;
-}
-
-function setExecutionPhase(
-    event: ExecutionEvent,
-    phase: "initialization" | "condition" | "update"
-): void {
-    event.data = {
-        ...(event.data ?? {}),
-        executionPhase: phase
-    };
-}
-
-function removeConditionResult(event: ExecutionEvent): void {
-    if (!event.data || !("conditionResult" in event.data)) return;
-    const data = { ...event.data };
-    delete data.conditionResult;
-    event.data = data;
-}
-
 function executionEventsFor(
     event: ExecutionEvent
 ): unknown[] {
     return Array.isArray(event.data?.executionEvents)
         ? event.data.executionEvents
         : [];
-}
-
-function variableUpdateEvents(
-    events: unknown[],
-    names: Set<string>
-): unknown[] {
-    return events.filter(candidate =>
-        isPlainObject(candidate) &&
-        candidate.type === "VARIABLE_UPDATE" &&
-        isPlainObject(candidate.data) &&
-        typeof candidate.data.name === "string" &&
-        names.has(candidate.data.name)
-    );
-}
-
-function appendUniqueExecutionEvents(
-    event: ExecutionEvent,
-    additions: unknown[]
-): void {
-    if (additions.length === 0) return;
-
-    const existing = executionEventsFor(event);
-    const signature = (candidate: unknown): string => {
-        if (!isPlainObject(candidate)) return "";
-        const data = isPlainObject(candidate.data) ? candidate.data : {};
-        return JSON.stringify({
-            type: candidate.type,
-            name: data.name,
-            value: data.value,
-            before: data.before
-        });
-    };
-
-    const merged = [...existing];
-    const seen = new Set(merged.map(signature));
-    for (const addition of additions) {
-        const key = signature(addition);
-        if (!seen.has(key)) {
-            merged.push(addition);
-            seen.add(key);
-        }
-    }
-
-    event.data = {
-        ...(event.data ?? {}),
-        executionEvents: merged
-    };
-}
-
-function normalizeForLoopCheckpoint(
-    current: ExecutionEvent,
-    previous: ExecutionEvent | undefined,
-    currentLineEvents: ExecutionEvent[] | undefined,
-    sourceLines: string[]
-): void {
-    const statement =
-        typeof current.line === "number" && current.line > 0
-            ? sourceLines[current.line - 1]?.trim() ?? ""
-            : "";
-    const loop = parseBasicForStatement(statement);
-    if (!loop) return;
-
-    const currentVariables = getVariables(current);
-    const previousVariables = previous ? getVariables(previous) : {};
-    const rawEvents = executionEventsFor(current);
-
-    if (!previous) {
-        if ([...loop.initNames].some(name => name in currentVariables)) {
-            setExecutionPhase(current, "initialization");
-            removeConditionResult(current);
-        } else {
-            setExecutionPhase(current, "condition");
-        }
-        return;
-    }
-
-    const checkpointEvents = currentLineEvents ?? [];
-    if (checkpointEvents.length > 0) {
-        const hasInitialization = checkpointEvents.some(candidate => {
-            const data = isPlainObject(candidate.data) ? candidate.data : {};
-            return typeof data.name === "string" &&
-                loop.initNames.has(data.name) &&
-                !(data.name in previousVariables);
-        });
-        setExecutionPhase(
-            current,
-            hasInitialization ? "initialization" : "update"
-        );
-        removeConditionResult(current);
-        return;
-    }
-
-    if (previous.line !== current.line) {
-        if (
-            [...loop.initNames].some(
-                name => !(name in previousVariables) && name in currentVariables
-            )
-        ) {
-            setExecutionPhase(current, "initialization");
-            removeConditionResult(current);
-            return;
-        }
-
-        setExecutionPhase(current, "condition");
-        return;
-    }
-
-    // A same-line STEP can contain a duplicate VARIABLE_UPDATE emitted by the
-    // tracer while the debugger is moving from initialization/update to the
-    // condition checkpoint. Only treat it as an update when the variable
-    // actually transitions at this checkpoint.
-    const rawUpdateEvents = variableUpdateEvents(
-        rawEvents,
-        loop.updateNames
-    ).filter(candidate => {
-        if (!isPlainObject(candidate)) return false;
-        const data = isPlainObject(candidate.data) ? candidate.data : {};
-        if (typeof data.name !== "string" || !(data.name in previousVariables)) {
-            return false;
-        }
-
-        if ("before" in data) {
-            return !sameSnapshot(data.before, data.value);
-        }
-
-        return !sameSnapshot(
-            previousVariables[data.name],
-            currentVariables[data.name]
-        );
-    });
-
-    const duplicateLoopEvents = variableUpdateEvents(
-        rawEvents,
-        loop.updateNames
-    ).filter(candidate => {
-        if (!isPlainObject(candidate)) return false;
-        if (rawUpdateEvents.includes(candidate)) return false;
-        const data = isPlainObject(candidate.data) ? candidate.data : {};
-        return "before" in data;
-    });
-
-    if (rawUpdateEvents.length > 0) {
-        appendUniqueExecutionEvents(previous, rawUpdateEvents);
-        setExecutionPhase(previous, "update");
-        removeConditionResult(previous);
-
-        current.data = {
-            ...(current.data ?? {}),
-            executionEvents: rawEvents.filter(candidate => !rawUpdateEvents.includes(candidate))
-        };
-        setExecutionPhase(current, "condition");
-        return;
-    }
-
-    // Do not surface a zero-delta loop variable update as a second execution
-    // result. The state already represents the condition checkpoint.
-    if (duplicateLoopEvents.length > 0) {
-        current.data = {
-            ...(current.data ?? {}),
-            executionEvents: rawEvents.filter(candidate => !duplicateLoopEvents.includes(candidate))
-        };
-    }
-
-    setExecutionPhase(current, "condition");
-}
-
-function normalizeForLoopSequence(
-    events: ExecutionEvent[],
-    sourceLines: string[]
-): void {
-    const stepIndices = events
-        .map((event, index) => ({ event, index }))
-        .filter(({ event }) => event.type === "STEP");
-
-    for (let position = 0; position < stepIndices.length - 1; position++) {
-        const first = stepIndices[position]!;
-        const second = stepIndices[position + 1]!;
-
-        if (
-            first.event.method !== second.event.method ||
-            first.event.line !== second.event.line
-        ) {
-            continue;
-        }
-
-        const statement =
-            typeof first.event.line === "number" && first.event.line > 0
-                ? sourceLines[first.event.line - 1]?.trim() ?? ""
-                : "";
-        const loop = parseBasicForStatement(statement);
-        if (!loop) continue;
-
-        const firstData = first.event.data ?? {};
-        const secondData = second.event.data ?? {};
-        const firstEvents = executionEventsFor(first.event);
-        const secondEvents = executionEventsFor(second.event);
-
-        const changedUpdateEvents = secondEvents.filter(candidate => {
-            if (!isPlainObject(candidate) || candidate.type !== "VARIABLE_UPDATE") {
-                return false;
-            }
-            const data = isPlainObject(candidate.data) ? candidate.data : {};
-            if (
-                typeof data.name !== "string" ||
-                !loop.updateNames.has(data.name)
-            ) {
-                return false;
-            }
-            if ("before" in data) {
-                return !sameSnapshot(data.before, data.value);
-            }
-            return false;
-        });
-
-        const initEvents = secondEvents.filter(candidate => {
-            if (!isPlainObject(candidate) || candidate.type !== "VARIABLE_UPDATE") {
-                return false;
-            }
-            const data = isPlainObject(candidate.data) ? candidate.data : {};
-            return (
-                typeof data.name === "string" &&
-                loop.initNames.has(data.name) &&
-                !("before" in data)
-            );
-        });
-
-        // Some JDI line-step sequences expose the first for location twice:
-        // the first checkpoint already contains the initialized locals, while
-        // the second checkpoint carries the derived initialization update.
-        // The semantic order is initialization -> condition.
-        if (
-            initEvents.length > 0 &&
-            [...loop.initNames].some(name => name in getVariables(first.event)) &&
-            !firstEvents.some(candidate => {
-                if (!isPlainObject(candidate) || candidate.type !== "VARIABLE_UPDATE") {
-                    return false;
-                }
-                const data = isPlainObject(candidate.data) ? candidate.data : {};
-                return typeof data.name === "string" && loop.initNames.has(data.name);
-            })
-        ) {
-            // The first same-line checkpoint is the initialization location;
-            // the second is the condition checkpoint. JDI may report the
-            // initialization update only on the second stop, so relocate that
-            // runtime evidence without changing the actual state snapshots.
-            appendUniqueExecutionEvents(first.event, initEvents);
-            setExecutionPhase(first.event, "initialization");
-            removeConditionResult(first.event);
-
-            second.event.data = {
-                ...(second.event.data ?? {}),
-                executionEvents: secondEvents.filter(candidate => !initEvents.includes(candidate))
-            };
-            annotateConditionInPlace(second.event, sourceLines);
-            setExecutionPhase(second.event, "condition");
-
-            const firstVariables = getVariables(first.event);
-            first.event.data = {
-                ...(first.event.data ?? {}),
-                postVariables: firstVariables
-            };
-            second.event.data = {
-                ...(second.event.data ?? {}),
-                postVariables: getVariables(second.event)
-            };
-            continue;
-        }
-
-        // After a loop body, the runtime can expose the condition checkpoint
-        // before the update snapshot even though Java executes update first.
-        // Move the observed update result onto that highlighted checkpoint,
-        // then use the following same-line checkpoint as the condition with
-        // the updated state.
-        if (changedUpdateEvents.length > 0) {
-            appendUniqueExecutionEvents(first.event, changedUpdateEvents);
-            setExecutionPhase(first.event, "update");
-            removeConditionResult(first.event);
-
-            if (secondData.variables && typeof secondData.variables === "object") {
-                first.event.data = {
-                    ...(first.event.data ?? {}),
-                    postVariables: secondData.variables
-                };
-            }
-
-            second.event.data = {
-                ...(second.event.data ?? {}),
-                executionEvents: secondEvents.filter(candidate => !changedUpdateEvents.includes(candidate))
-            };
-            annotateConditionInPlace(second.event, sourceLines);
-            setExecutionPhase(second.event, "condition");
-        }
-    }
-}
-
-function annotateConditionInPlace(
-    event: ExecutionEvent,
-    sourceLines: string[]
-): void {
-    const annotated = annotateCondition(event, sourceLines);
-    event.data = annotated.data;
 }
 
 function insertDerivedEvents(
