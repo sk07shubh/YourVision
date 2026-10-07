@@ -345,7 +345,7 @@ function reorderForLoopSemanticCheckpoints(events: ExecutionEvent[], sourceLines
         if(first.event.method!==second.event.method || first.event.line!==second.event.line) continue;
         const statement=typeof first.event.line==="number" && first.event.line>0 ? sourceLines[first.event.line-1]?.trim() ?? "" : "";
         const loop=parseBasicForStatement(statement);
-        if(!loop || !conditionEvidence(first.event) || !initEvidence(second.event,loop)) continue;
+        if(!loop || initEvidence(first.event) || !initEvidence(second.event,loop)) continue;
         const end=ps[i+2]?.index ?? events.length;
         const a=events.slice(first.index,second.index), b=events.slice(second.index,end);
         events.splice(first.index,end-first.index,...b,...a);
