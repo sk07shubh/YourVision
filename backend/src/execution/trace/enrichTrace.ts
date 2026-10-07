@@ -59,6 +59,15 @@ export function enrichTrace(
                     ...deriveArrayAccessEvents(previousStep, sourceLines)
                 ];
 
+                // A newly created collection/map is produced by the current
+                // source line. Unlike a mutation observed between two JDI
+                // checkpoints, its visual result must stay attached to the
+                // highlighted declaration line.
+                const creationEvents = deriveDataStructureCreationEvents(
+                    previousStep,
+                    event
+                );
+
                 const sameLineLoopUpdate =
                     previousStep.line === event.line &&
                     event.data?.executionPhase === "update";
@@ -74,6 +83,10 @@ export function enrichTrace(
                     appendExecutionEvents(event, currentLineEvents);
                 }
 
+                if (creationEvents.length > 0) {
+                    appendExecutionEvents(event, creationEvents);
+                }
+
                 insertDerivedEvents(
                     enriched,
                     previousStep,
@@ -81,6 +94,12 @@ export function enrichTrace(
                         ...executionEvents,
                         ...deriveArrayReferenceEvents(event, sourceLines)
                     ]
+                );
+
+                insertDerivedEvents(
+                    enriched,
+                    event,
+                    creationEvents
                 );
             }
 
@@ -538,8 +557,18 @@ function normalizeForLoopSequence(
         if (
             initEvents.length > 0 &&
             [...loop.initNames].some(name => name in getVariables(first.event)) &&
-            firstEvents.length === 0
+            !firstEvents.some(candidate => {
+                if (!isPlainObject(candidate) || candidate.type !== "VARIABLE_UPDATE") {
+                    return false;
+                }
+                const data = isPlainObject(candidate.data) ? candidate.data : {};
+                return typeof data.name === "string" && loop.initNames.has(data.name);
+            })
         ) {
+            // The first same-line checkpoint is the initialization location;
+            // the second is the condition checkpoint. JDI may report the
+            // initialization update only on the second stop, so relocate that
+            // runtime evidence without changing the actual state snapshots.
             appendUniqueExecutionEvents(first.event, initEvents);
             setExecutionPhase(first.event, "initialization");
             removeConditionResult(first.event);
@@ -550,6 +579,16 @@ function normalizeForLoopSequence(
             };
             annotateConditionInPlace(second.event, sourceLines);
             setExecutionPhase(second.event, "condition");
+
+            const firstVariables = getVariables(first.event);
+            first.event.data = {
+                ...(first.event.data ?? {}),
+                postVariables: firstVariables
+            };
+            second.event.data = {
+                ...(second.event.data ?? {}),
+                postVariables: getVariables(second.event)
+            };
             continue;
         }
 
@@ -1380,6 +1419,40 @@ function deriveChanges(
 
     return derived;
 }
+function deriveDataStructureCreationEvents(
+    previous: ExecutionEvent,
+    current: ExecutionEvent
+): ExecutionEvent[] {
+    const before = getVariables(previous);
+    const after = getVariables(current);
+    const derived: ExecutionEvent[] = [];
+
+    for (const [name, value] of Object.entries(after)) {
+        if (name in before) continue;
+
+        const map = asMapSnapshot(value);
+        if (map) {
+            derived.push({
+                sequence: 0,
+                type: "MAP_WRITE",
+                line: current.line,
+                method: current.method,
+                depth: current.depth,
+                data: {
+                    name,
+                    mapId: map.$mapId,
+                    changes: [],
+                    entries: map.entries,
+                    size: map.size ?? map.entries.length,
+                    operation: "create"
+                }
+            });
+        }
+    }
+
+    return derived;
+}
+
 function deriveMapChanges(
     previous: ExecutionEvent,
     current: ExecutionEvent
