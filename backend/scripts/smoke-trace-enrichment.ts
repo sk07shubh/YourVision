@@ -733,14 +733,14 @@ console.log("PASS: method-call conditions, return values, and array accesses");
 
 
 
-const misorderedForTrace: ExecutionTrace = {
+const stateDrivenTrace: ExecutionTrace = {
     version: 1,
     events: [
         {
             sequence: 1,
             type: "STEP",
-            line: 7,
-            method: "twoSum",
+            line: 9,
+            method: "loop",
             depth: 1,
             data: { variables: { n: 4, i: 0 } }
         },
@@ -748,47 +748,56 @@ const misorderedForTrace: ExecutionTrace = {
             sequence: 2,
             type: "STEP",
             line: 9,
-            method: "twoSum",
+            method: "loop",
             depth: 1,
             data: {
                 variables: { n: 4, i: 0 },
-                conditionResult: true,
-                executionEvents: [
-                    {
-                        sequence: 0,
-                        type: "MAP_WRITE",
-                        line: 9,
-                        method: "twoSum",
-                        depth: 1,
-                        data: { name: "mp", mapId: "1", entries: [], size: 0, operation: "create" }
-                    }
-                ]
+                conditionResult: true
             }
         },
         {
             sequence: 3,
             type: "STEP",
+            line: 10,
+            method: "loop",
+            depth: 1,
+            data: { variables: { n: 4, i: 0 } }
+        },
+        {
+            sequence: 4,
+            type: "STEP",
             line: 9,
-            method: "twoSum",
+            method: "loop",
             depth: 1,
             data: {
-                variables: { n: 4, i: 0 },
+                variables: { n: 4, i: 1 },
                 executionEvents: [
                     {
                         sequence: 0,
                         type: "VARIABLE_UPDATE",
                         line: 9,
-                        method: "twoSum",
+                        method: "loop",
                         depth: 1,
-                        data: { name: "i", value: 0 }
+                        data: { name: "i", value: 1, before: 0 }
                     }
                 ]
+            }
+        },
+        {
+            sequence: 5,
+            type: "STEP",
+            line: 9,
+            method: "loop",
+            depth: 1,
+            data: {
+                variables: { n: 4, i: 1 },
+                conditionResult: true
             }
         }
     ]
 };
 
-const misorderedSource = [
+const stateDrivenSource = [
     "",
     "",
     "",
@@ -797,11 +806,12 @@ const misorderedSource = [
     "",
     "",
     "",
-    "    for(int i=0;i<n+1;i++){",
-    "        use(i);"
+    "for (int i = 0; i < n; i++) {",
+    "    use(i);",
+    "}"
 ].join("\n");
 
-const stateDrivenFor = enrichTrace(semanticForTrace, semanticForSource);
+const stateDrivenFor = enrichTrace(stateDrivenTrace, stateDrivenSource);
 const stateDrivenSteps = stateDrivenFor.events.filter(event => event.type === "STEP");
 
 if (
