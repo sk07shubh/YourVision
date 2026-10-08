@@ -207,7 +207,7 @@ function isEnhancedForHeader(
     if (typeof line !== "number" || line < 1) return false;
 
     const statement = sourceLines[line - 1]?.trim() ?? "";
-    if (!/^for\\s*\\(/.test(statement)) return false;
+    if (!/^for\s*\(/.test(statement)) return false;
 
     const inside = balancedParenthesized(
         statement,
@@ -233,7 +233,7 @@ function enhancedForVariableName(
     if (parts.length !== 2) return undefined;
 
     const left = parts[0]?.trim() ?? "";
-    const match = left.match(/([A-Za-z_$][\\w$]*)\\s*$/);
+    const match = left.match(/([A-Za-z_$][\w$]*)\s*$/);
     return match?.[1];
 }
 
