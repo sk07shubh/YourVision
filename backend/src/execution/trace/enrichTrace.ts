@@ -457,21 +457,27 @@ class ConditionParser {
     }
     private parseAnd(evaluate = true): unknown {
         let left = this.parseEquality(evaluate);
+
         while (this.peek("&&")) {
             this.index++;
+
             if (evaluate && left === false) {
-                // Java short-circuits &&. Consume the complete RHS of this
-                // AND chain without evaluating it, stopping before ||.
-                this.parseAnd(false);
+                // The RHS must still be consumed so parsing stays aligned,
+                // but it must not be evaluated because Java short-circuits.
+                // Consume only one equality operand at a time; the enclosing
+                // loop handles any additional && operators.
+                this.parseEquality(false);
                 left = false;
                 continue;
             }
+
             const right = this.parseEquality(evaluate);
             if (evaluate && (typeof left !== "boolean" || typeof right !== "boolean")) {
                 throw new Error("boolean expected");
             }
             left = evaluate ? (left as boolean) && (right as boolean) : undefined;
         }
+
         return left;
     }
     private parseEquality(evaluate = true): unknown {
