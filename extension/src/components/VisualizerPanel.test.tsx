@@ -91,10 +91,10 @@ describe('execution visualization feature matrix', () => {
   });
 
   it('keeps if/while conditions complete, including nested calls and negation', () => {
-    expect(executionSubstatement('if (!Character.isLetterOrDigit(ch))', state())).toBe(
+    expect(executionSubstatement('if (!Character.isLetterOrDigit(ch))', state({}))).toBe(
       'if(!Character.isLetterOrDigit(ch))'
     );
-    expect(executionSubstatement('while (i < n && !done)', state())).toBe(
+    expect(executionSubstatement('while (i < n && !done)', state({}))).toBe(
       'while(i < n && !done)'
     );
   });
