@@ -34,15 +34,71 @@ function accessEffects(data: Obj): ExecutionEffect[] {
   const effects: ExecutionEffect[] = [];
   const executionEvents = Array.isArray(data.executionEvents) ? data.executionEvents : [];
   for (const event of executionEvents) {
+    if (!isPlainObject(event) || event.type !== 'ARRAY_ACCESS' || !isPlainObject(event.data)) continue;
+    const eventData = event.data;
+    const name = typeof eventData.name === 'string' ? eventData.name : 'array';
+    const indices = Array.isArray(eventData.indices) ? eventData.indices.map((x) => '[' + x + ']').join('') : '';
+    effects.push({ kind: 'structural', text: name + indices + ' = ' + compactValue(eventData.value) });
+  }
+  return effects;
+}
+
+function eventEffects(state?: TraceState): ExecutionEffect[] {
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data)) return [];
+
+  const type = state?.lastEvent?.type;
+  const effects: ExecutionEffect[] = [...accessEffects(data)];
+
+  // Replay checkpoints carry the operations observed between the current
+  // STEP and the next runtime checkpoint. Those operations belong to the
+  // currently highlighted line, not the following line.
+  const executionEvents = Array.isArray(data.executionEvents) ? data.executionEvents : [];
+
+  for (const event of executionEvents) {
     if (!isPlainObject(event)) continue;
+    const eventData = isPlainObject(event.data) ? event.data : {};
     const eventType = typeof event.type === 'string' ? event.type : '';
-    if (eventType === 'ARRAY_ACCESS' && isPlainObject(event.data)) {
-      const eventData = event.data;
+
+    if (eventType === 'ARRAY_WRITE') {
       const name = typeof eventData.name === 'string' ? eventData.name : 'array';
-      const indices = Array.isArray(eventData.indices)
-        ? eventData.indices.map((x) => '[' + x + ']').join('')
-        : '';
-      effects.push({ kind: 'structural', text: name + indices + ' = ' + compactValue(eventData.value) });
+      const changes = Array.isArray(eventData.changes) ? eventData.changes : [];
+      for (const change of changes.slice(0, 3)) {
+        if (!isPlainObject(change)) continue;
+        const indices = Array.isArray(change.indices)
+          ? change.indices.map((x) => '[' + x + ']').join('')
+          : '';
+        effects.push({
+          kind: 'change',
+          text: name + indices + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
+        });
+      }
+    } else if (eventType === 'MAP_WRITE') {
+      const changes = Array.isArray(eventData.changes) ? eventData.changes : [];
+      for (const change of changes.slice(0, 3)) {
+        if (!isPlainObject(change)) continue;
+        const key = compactValue(change.key);
+        if (change.kind === 'insert') {
+          effects.push({ kind: 'structural', text: key + '  →  ' + compactValue(change.after) });
+        } else if (change.kind === 'delete') {
+          effects.push({ kind: 'structural', text: key + '  removed' });
+        } else {
+          effects.push({
+            kind: 'change',
+            text: key + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
+          });
+        }
+      }
+    } else if (eventType === 'OBJECT_FIELD_WRITE') {
+      const changes = Array.isArray(eventData.changes) ? eventData.changes : [];
+      for (const change of changes.slice(0, 3)) {
+        if (!isPlainObject(change)) continue;
+        const fields = Array.isArray(change.fields) ? change.fields.join('.') : 'field';
+        effects.push({
+          kind: 'change',
+          text: fields + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
+        });
+      }
     }
   }
 
@@ -69,11 +125,50 @@ function accessEffects(data: Obj): ExecutionEffect[] {
     effects.push({ kind: 'structural', text: name });
   }
 
+  if (type === 'OBJECT_FIELD_WRITE') {
+    const changes = Array.isArray(data.changes) ? data.changes : [];
+    for (const change of changes.slice(0, 3)) {
+      if (!isPlainObject(change)) continue;
+      const fields = Array.isArray(change.fields) ? change.fields.join('.') : 'field';
+      effects.push({
+        kind: 'change',
+        text: fields + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
+      });
+    }
+  }
 
+  if (type === 'ARRAY_WRITE') {
+    const changes = Array.isArray(data.changes) ? data.changes : [];
+    for (const change of changes.slice(0, 3)) {
+      if (!isPlainObject(change)) continue;
+      const indices = Array.isArray(change.indices)
+        ? change.indices.map((x) => '[' + x + ']').join('')
+        : '';
+      const name = typeof data.name === 'string' ? data.name : 'array';
+      effects.push({
+        kind: 'change',
+        text: name + indices + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
+      });
+    }
+  }
 
-
-
-
+  if (type === 'MAP_WRITE') {
+    const changes = Array.isArray(data.changes) ? data.changes : [];
+    for (const change of changes.slice(0, 3)) {
+      if (!isPlainObject(change)) continue;
+      const key = compactValue(change.key);
+      if (change.kind === 'insert') {
+        effects.push({ kind: 'structural', text: key + '  →  ' + compactValue(change.after) });
+      } else if (change.kind === 'delete') {
+        effects.push({ kind: 'structural', text: key + '  removed' });
+      } else {
+        effects.push({
+          kind: 'change',
+          text: key + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
+        });
+      }
+    }
+  }
 
   if ('returnValue' in data) {
     effects.push({ kind: 'return', text: '↩  ' + compactValue(data.returnValue) });
@@ -216,13 +311,173 @@ function newDataStructureResults(current?: TraceState, previous?: TraceState): R
     ));
 }
 
+
+function DataStructureResult({
+  name, operation, value, oldValue, position, showOld = oldValue !== undefined
+}: {
+  name: string; operation: string; value: unknown; oldValue?: unknown; position: string; showOld?: boolean;
+}) {
+  return (
+    <div className="yv-ds-result">
+      <span className="yv-ds-result-name">{name}</span>
+      <span className="yv-ds-result-arrow">→</span>
+      <span className="yv-ds-result-operation">[{operation}]</span>
+      <span className="yv-ds-result-value">
+        {showOld && <span className="yv-ds-result-old">{compactValue(oldValue)}</span>}
+        {showOld && <span className="yv-ds-result-transition">→</span>}
+        <span className={showOld ? 'yv-ds-result-new' : ''}>{compactValue(value)}</span>
+      </span>
+      <span className="yv-ds-result-position">[{position}]</span>
+    </div>
+  );
+}
+
+function sourceCall(statement: string, name: string): string | undefined {
+  if (!name || name === 'this') return undefined;
+  const escaped = name.replace(/[\\^$.*+?()[\]{}|]/g, '\\
+function ExecutionInspector(');
+  return statement.match(new RegExp('\\b' + escaped + '\\s*\\.\\s*([A-Za-z_$][\\w$]*)\\s*\\('))?.[1];
+}
+
+function collectionDelta(before: unknown[], after: unknown[]) {
+  if (before.length === after.length) {
+    for (let i = 0; i < before.length; i++) {
+      if (!valueChanged(before[i], after[i])) return { added: after[i], removed: before[i], index: i };
+    }
+    return undefined;
+  }
+  if (after.length === before.length + 1) {
+    for (let i = 0; i < after.length; i++) {
+      if (before.slice(i).every((x, j) => valueChanged(x, after[i + j + 1]))) {
+        return { added: after[i], index: i };
+      }
+    }
+  }
+  if (before.length === after.length + 1) {
+    for (let i = 0; i < before.length; i++) {
+      if (after.slice(i).every((x, j) => valueChanged(x, before[i + j + 1]))) {
+        return { removed: before[i], index: i };
+      }
+    }
+  }
+  return undefined;
+}
+
+function collectionOperation(kind: string, method: string | undefined, delta: {added?: unknown; removed?: unknown; index?: number}) {
+  if (!method) return undefined;
+  const m = method.toLowerCase();
+
+  if (kind === 'stack') {
+    if (['push','add','addlast','offer','offerlast'].includes(m)) return {operation:'Push',value:delta.added,position:'Top'};
+    if (['pop','remove','removelast','poll','polllast'].includes(m)) return {operation:'Pop',value:delta.removed,position:'Top'};
+  }
+  if (kind === 'queue') {
+    if (['add','offer','enqueue'].includes(m)) return {operation:'Enqueue',value:delta.added,position:'Rear'};
+    if (['remove','poll','dequeue'].includes(m)) return {operation:'Dequeue',value:delta.removed,position:'Front'};
+  }
+  if (kind === 'deque') {
+    if (['addfirst','offerfirst','push'].includes(m)) return {operation:m === 'push' ? 'Push' : 'addFirst',value:delta.added,position:'Front'};
+    if (['addlast','offerlast','add','offer'].includes(m)) return {operation:'addLast',value:delta.added,position:'Back'};
+    if (['removefirst','pollfirst','pop'].includes(m)) return {operation:m === 'pop' ? 'Pop' : 'removeFirst',value:delta.removed,position:'Front'};
+    if (['removelast','polllast','remove'].includes(m)) return {operation:'removeLast',value:delta.removed,position:'Back'};
+  }
+  if (kind === 'priorityQueue') {
+    if (['add','offer'].includes(m)) return {operation:'Offer',value:delta.added,position:'Queue'};
+    if (['poll','remove'].includes(m)) return {operation:'Poll',value:delta.removed,position:'Priority'};
+  }
+  if (kind === 'list') {
+    if (['add','addlast','offer'].includes(m)) return {operation:'Add',value:delta.added,position:'End'};
+    if (['remove','removelast','poll'].includes(m)) return {operation:'Remove',value:delta.removed,position:typeof delta.index === 'number' ? 'Index: ' + delta.index : 'End'};
+    if (m === 'set') return {operation:'Set',value:delta.added,oldValue:delta.removed,position:'Index: ' + (delta.index ?? '?'),showOld:true};
+  }
+  if (kind === 'set') {
+    if (m === 'add') return {operation:'Add',value:delta.added,position:'Element'};
+    if (m === 'remove') return {operation:'Remove',value:delta.removed,position:'Element'};
+  }
+  return undefined;
+}
+
+function dataStructureResults(current?: TraceState, previous?: TraceState, statement = ''): React.ReactNode[] {
+  if (!current) return [];
+  const rows: React.ReactNode[] = [];
+  const seen = new Set<string>();
+  const add = (key:string,name:string,operation:string,value:unknown,position:string,oldValue?:unknown,showOld=oldValue!==undefined) => {
+    if (seen.has(key) || name === 'this' || value === undefined) return;
+    seen.add(key);
+    rows.push(<DataStructureResult key={key} name={name} operation={operation} value={value} oldValue={oldValue} position={position} showOld={showOld}/>);
+  };
+
+  const before = previous?.variables ?? {};
+  const after = current.variables ?? {};
+
+  for (const [name,value] of Object.entries(after)) {
+    if (name === 'this') continue;
+    const oldValue = before[name];
+
+    const bm = asMapSnapshot(oldValue), am = asMapSnapshot(value);
+    if (bm && am && bm.$mapId === am.$mapId) {
+      for (const change of compareMapEntries(bm.entries,am.entries)) {
+        const key=compactValue(change.key);
+        if(change.kind==='insert') add('map-i-'+name+'-'+key,name,'Put',change.after,'Key: '+key,undefined,true);
+        else if(change.kind==='update') add('map-u-'+name+'-'+key,name,'Update',change.after,'Key: '+key,change.before,true);
+        else add('map-r-'+name+'-'+key,name,'Remove',change.before,'Key: '+key);
+      }
+      continue;
+    }
+
+    const bc=isCollectionSnapshot(oldValue)?oldValue:undefined;
+    const ac=isCollectionSnapshot(value)?value:undefined;
+    if(bc && ac && bc.$collectionId===ac.$collectionId){
+      const delta=collectionDelta(bc.values,ac.values);
+      const op=delta ? collectionOperation(ac.$kind ?? '',sourceCall(statement,name),delta) : undefined;
+      if(delta && op) add('col-'+name+'-'+stableStringify([delta.added,delta.removed,delta.index]),name,op.operation,op.value,op.position,op.oldValue,op.showOld);
+      continue;
+    }
+
+    const ba=asArraySnapshot(oldValue), aa=asArraySnapshot(value);
+    if(ba && aa && ba.$arrayId===aa.$arrayId){
+      const changes:Array<{indices:number[];before:unknown;after:unknown}>=[];
+      compareArrayValues(ba.values,aa.values,[],changes);
+      for(const change of changes) add('arr-'+name+'-'+JSON.stringify(change.indices),name,'Set',change.after,'Index: '+change.indices.join('.'),change.before,change.before===undefined);
+    }
+  }
+
+  const data=isPlainObject(current.lastEvent?.data)?current.lastEvent.data:{};
+  const events=Array.isArray(data.executionEvents)?data.executionEvents:[];
+  for(const event of events){
+    if(!isPlainObject(event)||!isPlainObject(event.data)) continue;
+    const d=event.data;
+    if(event.type==='MAP_WRITE'){
+      const name=typeof d.name==='string'?d.name:'map';
+      const changes=Array.isArray(d.changes)?d.changes:[];
+      for(const change of changes){
+        if(!isPlainObject(change)) continue;
+        const key=compactValue(change.key);
+        if(change.kind==='insert') add('event-map-i-'+name+'-'+key,name,'Put',change.after,'Key: '+key,undefined,true);
+        else if(change.kind==='update') add('event-map-u-'+name+'-'+key,name,'Update',change.after,'Key: '+key,change.before,true);
+        else if(change.kind==='delete') add('event-map-r-'+name+'-'+key,name,'Remove',change.before,'Key: '+key);
+      }
+    } else if(event.type==='ARRAY_WRITE'){
+      const name=typeof d.name==='string'?d.name:'array';
+      const changes=Array.isArray(d.changes)?d.changes:[];
+      for(const change of changes){
+        if(!isPlainObject(change)) continue;
+        const indices=Array.isArray(change.indices)?change.indices:[];
+        add('event-arr-'+name+'-'+JSON.stringify(indices),name,'Set',change.after,'Index: '+indices.join('.'),change.before,change.before===undefined);
+      }
+    }
+  }
+  return rows;
+}
+
 function ExecutionInspector({ state, previous, statement, index, total }: { state?: TraceState; previous?: TraceState; statement: string; index: number; total: number }) {
   const condition = executionCondition(state);
   const substatement = executionSubstatement(statement);
   const variableResults = variableResultChanges(state, previous);
   const dataStructureResultRows = dataStructureResults(state, previous, statement);
   const newStructureResults = newDataStructureResults(state, previous);
-  const effects = eventEffects(state, statement)
+  const effects = eventEffects(state);
+  const showEffects = dataStructureResultRows.length === 0
     .filter((effect, i, all) => all.findIndex((x) => x.text === effect.text) === i);
 
 
@@ -285,7 +540,7 @@ function ExecutionInspector({ state, previous, statement, index, total }: { stat
         </div>
       </div>
 
-      {effects.length > 3 && (
+      {showEffects && effects.length > 3 && (
         <div className="yv-effects" aria-label="Additional execution effects">
           {effects.slice(3, 6).map((effect, i) => (
             <div className={'yv-effect ' + (effect.kind ?? 'change')} key={effect.text + '-' + i}>
