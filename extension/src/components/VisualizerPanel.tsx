@@ -430,6 +430,123 @@ function collectionOperation(kind: string, method: string | undefined, delta: {a
   return undefined;
 }
 
+
+function asArraySnapshot(
+  value: unknown
+): Obj & { $arrayId: string; values: unknown[] } | undefined {
+  return isArraySnapshot(value) ? value : undefined;
+}
+
+function asMapSnapshot(
+  value: unknown
+): Obj & {
+  $mapId: string;
+  entries: Array<{ key: unknown; value: unknown }>;
+} | undefined {
+  return isMapSnapshot(value) ? value : undefined;
+}
+
+function compareArrayValues(
+  before: unknown[],
+  after: unknown[],
+  path: number[],
+  changes: Array<{ indices: number[]; before: unknown; after: unknown }>
+): void {
+  const length = Math.max(before.length, after.length);
+
+  for (let i = 0; i < length; i++) {
+    const beforeValue = before[i];
+    const afterValue = after[i];
+
+    const beforeNested = asArraySnapshot(beforeValue);
+    const afterNested = asArraySnapshot(afterValue);
+
+    if (
+      beforeNested &&
+      afterNested &&
+      beforeNested.$arrayId === afterNested.$arrayId
+    ) {
+      compareArrayValues(
+        beforeNested.values,
+        afterNested.values,
+        [...path, i],
+        changes
+      );
+      continue;
+    }
+
+    if (!valueChanged(beforeValue, afterValue)) continue;
+
+    changes.push({
+      indices: [...path, i],
+      before: beforeValue,
+      after: afterValue
+    });
+  }
+}
+
+function compareMapEntries(
+  before: Array<{ key: unknown; value: unknown }>,
+  after: Array<{ key: unknown; value: unknown }>
+): Array<{
+  kind: 'insert' | 'update' | 'delete';
+  key: unknown;
+  before?: unknown;
+  after?: unknown;
+}> {
+  const changes: Array<{
+    kind: 'insert' | 'update' | 'delete';
+    key: unknown;
+    before?: unknown;
+    after?: unknown;
+  }> = [];
+
+  const beforeMap = new Map<string, { key: unknown; value: unknown }>();
+  const afterMap = new Map<string, { key: unknown; value: unknown }>();
+
+  for (const entry of before) {
+    beforeMap.set(stableStringify(entry.key), entry);
+  }
+
+  for (const entry of after) {
+    afterMap.set(stableStringify(entry.key), entry);
+  }
+
+  for (const [key, entry] of afterMap) {
+    const previous = beforeMap.get(key);
+
+    if (!previous) {
+      changes.push({
+        kind: 'insert',
+        key: entry.key,
+        after: entry.value
+      });
+      continue;
+    }
+
+    if (valueChanged(previous.value, entry.value)) {
+      changes.push({
+        kind: 'update',
+        key: entry.key,
+        before: previous.value,
+        after: entry.value
+      });
+    }
+  }
+
+  for (const [key, entry] of beforeMap) {
+    if (!afterMap.has(key)) {
+      changes.push({
+        kind: 'delete',
+        key: entry.key,
+        before: entry.value
+      });
+    }
+  }
+
+  return changes;
+}
+
 function dataStructureResults(current?: TraceState, previous?: TraceState, statement = ''): React.ReactNode[] {
   if (!current) return [];
   const rows: React.ReactNode[] = [];
@@ -518,9 +635,9 @@ function ExecutionInspector({ state, previous, statement, index, total }: { stat
   const variableResults = variableResultChanges(state, previous);
   const dataStructureResultRows = dataStructureResults(state, previous, statement);
   const newStructureResults = newDataStructureResults(state, previous);
-  const effects = eventEffects(state);
-  const showEffects = dataStructureResultRows.length === 0
+  const effects = eventEffects(state)
     .filter((effect, i, all) => all.findIndex((x) => x.text === effect.text) === i);
+  const showEffects = dataStructureResultRows.length === 0;
 
 
   return (
