@@ -90,6 +90,26 @@ describe('execution visualization feature matrix', () => {
     expect(isForLoopUpdateStep(statement, condition, update)).toBe(false);
   });
 
+  it('renders enhanced-for bindings including char variables', () => {
+    const statement = 'for (char ch : s.toCharArray())';
+    const current = state({
+      lastEvent: {
+        type: 'STEP',
+        line: 8,
+        data: {
+          variables: { ch: 'A' },
+          executionEvents: [
+            { type: 'VARIABLE_UPDATE', data: { name: 'ch', value: 'A' } },
+          ],
+        },
+      },
+    });
+
+    expect(executionSubstatement(statement, current)).toBe(
+      'char ch : s.toCharArray()'
+    );
+  });
+
   it('keeps if/while conditions complete, including nested calls and negation', () => {
     expect(executionSubstatement('if (!Character.isLetterOrDigit(ch))', state({}))).toBe(
       'if(!Character.isLetterOrDigit(ch))'
