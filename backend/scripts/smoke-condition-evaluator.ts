@@ -114,10 +114,22 @@ const directPeek = evaluateCondition(
         }
     }
 );
-if (directChar !== true || directPeek !== true) {
+const directFullPeekCondition = evaluateCondition(
+    "st.peek() == '(' && ch != ')' || st.peek() == '{' && ch != '}' || st.peek() == '[' && ch != ']'",
+    {
+        ch: "]",
+        st: {
+            $collectionId: "stack-1",
+            $type: "java.util.Stack",
+            $kind: "stack",
+            values: ["(", "{", "(", "{", "[", "{"]
+        }
+    }
+);
+if (directChar !== true || directPeek !== true || directFullPeekCondition !== true) {
     throw new Error(
         "Direct condition evaluator regression: " +
-        JSON.stringify({ directChar, directPeek })
+        JSON.stringify({ directChar, directPeek, directFullPeekCondition })
     );
 }
 
