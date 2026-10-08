@@ -25,7 +25,8 @@
         "test:data-structures": "tsx scripts/smoke-java-data-structures.ts",
         "test:leetcode-nodes": "tsx scripts/smoke-leetcode-nodes.ts",
         "test:condition-evaluator": "tsx scripts/smoke-condition-evaluator.ts",
-        "test:feature-matrix": "tsx scripts/smoke-feature-matrix.ts"
+        "test:feature-matrix": "tsx scripts/smoke-feature-matrix.ts",
+        "test:leetcode-execution-corpus": "tsx scripts/smoke-leetcode-execution-corpus.ts"
     },
     "keywords": [],
     "author": "",
