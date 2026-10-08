@@ -15,7 +15,7 @@ function eventLabel(state?: TraceState): string {
 
 type ExecutionEffect = { text: string; kind?: 'change' | 'condition' | 'structural' | 'return'; };
 
-function executionCondition(state?: TraceState): boolean | undefined {
+export function executionCondition(state?: TraceState): boolean | undefined {
   const data = state?.lastEvent?.data;
   if (!isPlainObject(data)) return undefined;
   if (typeof data.conditionResult === 'boolean') return data.conditionResult;
@@ -43,7 +43,7 @@ function accessEffects(data: Obj): ExecutionEffect[] {
   return effects;
 }
 
-function eventEffects(state?: TraceState): ExecutionEffect[] {
+export function eventEffects(state?: TraceState): ExecutionEffect[] {
   const data = state?.lastEvent?.data;
   if (!isPlainObject(data)) return [];
 
@@ -177,7 +177,7 @@ function eventEffects(state?: TraceState): ExecutionEffect[] {
   return effects;
 }
 
-function executionSubstatement(
+export function executionSubstatement(
   statement: string,
   state?: TraceState,
   previous?: TraceState
@@ -507,7 +507,7 @@ function sourceCall(statement: string, name: string): string | undefined {
   return statement.match(new RegExp('\\b' + escaped + '\\s*\\.\\s*([A-Za-z_$][\\w$]*)\\s*\\('))?.[1];
 }
 
-function collectionDelta(
+export function collectionDelta(
   before: unknown[],
   after: unknown[]
 ): { added?: unknown; removed?: unknown; index?: number } | undefined {
@@ -534,7 +534,7 @@ function collectionDelta(
   return undefined;
 }
 
-function unorderedCollectionDelta(
+export function unorderedCollectionDelta(
   before: unknown[],
   after: unknown[]
 ): { added?: unknown; removed?: unknown } | undefined {
@@ -562,7 +562,7 @@ function sourceCallArgs(statement: string, name: string): string[] {
   return match[1].split(',').map(part => part.trim()).filter(Boolean);
 }
 
-function collectionOperation(kind: string, method: string | undefined, delta: {added?: unknown; removed?: unknown; index?: number}, argCount = 0) {
+export function collectionOperation(kind: string, method: string | undefined, delta: {added?: unknown; removed?: unknown; index?: number}, argCount = 0) {
   if (!method) return undefined;
   const m = method.toLowerCase();
 
@@ -615,7 +615,7 @@ function asMapSnapshot(
   return isMapSnapshot(value) ? value : undefined;
 }
 
-function compareArrayValues(
+export function compareArrayValues(
   before: unknown[],
   after: unknown[],
   path: number[],
@@ -654,7 +654,7 @@ function compareArrayValues(
   }
 }
 
-function compareMapEntries(
+export function compareMapEntries(
   before: Array<{ key: unknown; value: unknown }>,
   after: Array<{ key: unknown; value: unknown }>
 ): Array<{
@@ -716,7 +716,7 @@ function compareMapEntries(
   return changes;
 }
 
-function dataStructureResults(current?: TraceState, previous?: TraceState, statement = ''): React.ReactNode[] {
+export function dataStructureResults(current?: TraceState, previous?: TraceState, statement = ''): React.ReactNode[] {
   if (!current) return [];
   const rows: React.ReactNode[] = [];
   const seen = new Set<string>();
@@ -798,7 +798,7 @@ function dataStructureResults(current?: TraceState, previous?: TraceState, state
   return rows;
 }
 
-function isForLoopUpdateStep(statement: string, state?: TraceState, previous?: TraceState): boolean {
+export function isForLoopUpdateStep(statement: string, state?: TraceState, previous?: TraceState): boolean {
   const trimmed = statement.trim();
   if (!/^for\s*\(/.test(trimmed)) return false;
 
