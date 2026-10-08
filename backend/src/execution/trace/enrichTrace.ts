@@ -174,6 +174,11 @@ function collapseEnhancedForLoopCheckpoints(
         const next = events[index + 1];
 
         if (!current) continue;
+        const line = current.line;
+        if (typeof line !== "number") {
+            normalized.push(current);
+            continue;
+        }
 
         if (
             current.type === "STEP" &&
@@ -181,9 +186,9 @@ function collapseEnhancedForLoopCheckpoints(
             current.method === next.method &&
             current.depth === next.depth &&
             current.line === next.line &&
-            isEnhancedForHeader(sourceLines, current.line) &&
-            !hasEnhancedForVariable(current, sourceLines, current.line) &&
-            hasEnhancedForVariable(next, sourceLines, current.line)
+            isEnhancedForHeader(sourceLines, line) &&
+            !hasEnhancedForVariable(current, sourceLines, line) &&
+            hasEnhancedForVariable(next, sourceLines, line)
         ) {
             // JDI can suspend twice on an enhanced-for header:
             // first before the loop variable is assigned and again after
