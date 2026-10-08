@@ -344,7 +344,7 @@ function collectionDelta(
 ): { added?: unknown; removed?: unknown; index?: number } | undefined {
   if (before.length === after.length) {
     for (let i = 0; i < before.length; i++) {
-      if (!valueChanged(before[i], after[i])) return { added: after[i], removed: before[i], index: i };
+      if (valueChanged(before[i], after[i])) return { added: after[i], removed: before[i], index: i };
     }
     return undefined;
   }
