@@ -114,6 +114,30 @@ const directPeek = evaluateCondition(
         }
     }
 );
+const directAnd = evaluateCondition(
+    "st.peek() == '{' && ch != '}'",
+    {
+        ch: "]",
+        st: {
+            $collectionId: "stack-1",
+            $type: "java.util.Stack",
+            $kind: "stack",
+            values: ["(", "{"]
+        }
+    }
+);
+const directTwoClauses = evaluateCondition(
+    "st.peek() == '(' && ch != ')' || st.peek() == '{' && ch != '}'",
+    {
+        ch: "]",
+        st: {
+            $collectionId: "stack-1",
+            $type: "java.util.Stack",
+            $kind: "stack",
+            values: ["(", "{"]
+        }
+    }
+);
 const directFullPeekCondition = evaluateCondition(
     "st.peek() == '(' && ch != ')' || st.peek() == '{' && ch != '}' || st.peek() == '[' && ch != ']'",
     {
@@ -126,10 +150,16 @@ const directFullPeekCondition = evaluateCondition(
         }
     }
 );
-if (directChar !== true || directPeek !== true || directFullPeekCondition !== true) {
+if (
+    directChar !== true ||
+    directPeek !== true ||
+    directAnd !== true ||
+    directTwoClauses !== true ||
+    directFullPeekCondition !== true
+) {
     throw new Error(
         "Direct condition evaluator regression: " +
-        JSON.stringify({ directChar, directPeek, directFullPeekCondition })
+        JSON.stringify({ directChar, directPeek, directAnd, directTwoClauses, directFullPeekCondition })
     );
 }
 
