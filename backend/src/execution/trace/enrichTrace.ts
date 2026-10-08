@@ -336,7 +336,14 @@ function splitTopLevel(source: string, separator: string): string[] {
     return parts;
 }
 
-type ConditionValue = number | string | boolean | null | ConditionValue[] | { snapshot: Record<string, unknown> };
+type ConditionValue =
+    | number
+    | string
+    | boolean
+    | null
+    | ConditionValue[]
+    | { snapshot: Record<string, unknown> }
+    | { staticClass: string };
 type ConditionToken = { type: "number" | "string" | "identifier" | "operator"; value: string };
 
 function evaluateCondition(expression: string, variables: Record<string, unknown>): boolean | undefined {
@@ -507,7 +514,14 @@ class ConditionParser {
             if (token.value === "true") value = evaluate ? true : undefined;
             else if (token.value === "false") value = evaluate ? false : undefined;
             else if (token.value === "null") value = evaluate ? null : undefined;
-            else value = evaluate ? this.resolveVariable(token.value) : undefined;
+            else if (isConditionStaticClass(token.value)) {
+                // Preserve known Java static utility classes until the
+                // following ".method(...)" is parsed. This is intentionally
+                // class/method based, not tied to any LeetCode problem.
+                value = evaluate ? { staticClass: token.value } : undefined;
+            } else {
+                value = evaluate ? this.resolveVariable(token.value) : undefined;
+            }
         } else throw new Error("unsupported primary");
 
         while (this.peek("[") || this.peek(".")) {
@@ -551,6 +565,17 @@ function conditionSnapshotValue(value: unknown): ConditionValue {
     return value as ConditionValue;
 }
 
+function isConditionStaticClass(name: string): boolean {
+    return new Set([
+        "Character",
+        "Math",
+        "Integer",
+        "Long",
+        "Double",
+        "String"
+    ]).has(name);
+}
+
 function readIndexed(value: unknown, index: number): unknown {
     if (Array.isArray(value)) return value[index];
     if (value && typeof value === "object" && "snapshot" in value) {
@@ -562,6 +587,14 @@ function readIndexed(value: unknown, index: number): unknown {
 }
 
 function readMethod(value: unknown, method: string, args: unknown[]): unknown {
+    if (value && typeof value === "object" && "staticClass" in value) {
+        return readStaticMethod(
+            (value as { staticClass: string }).staticClass,
+            method,
+            args
+        );
+    }
+
     // Java String methods are invoked on the raw string value.
     if (method === "length" && typeof value === "string") {
         return value.length;
@@ -571,6 +604,13 @@ function readMethod(value: unknown, method: string, args: unknown[]): unknown {
             throw new Error("charAt index expected");
         }
         return value.charAt(args[0]);
+    }
+    if (typeof value === "string") {
+        if (method === "equals") return args.length === 1 && value === String(args[0]);
+        if (method === "equalsIgnoreCase") return args.length === 1 && value.toLowerCase() === String(args[0]).toLowerCase();
+        if (method === "contains") return args.length === 1 && value.includes(String(args[0]));
+        if (method === "startsWith") return args.length === 1 && value.startsWith(String(args[0]));
+        if (method === "endsWith") return args.length === 1 && value.endsWith(String(args[0]));
     }
 
     if (!value || typeof value !== "object" || !("snapshot" in value)) {
@@ -654,6 +694,68 @@ function readMethod(value: unknown, method: string, args: unknown[]): unknown {
     }
 
     throw new Error("unsupported method");
+}
+
+function readStaticMethod(
+    className: string,
+    method: string,
+    args: unknown[]
+): unknown {
+    if (className === "Character") {
+        if (args.length !== 1) throw new Error("Character method expects one argument");
+        const value = args[0];
+        const character =
+            typeof value === "string"
+                ? value.charAt(0)
+                : typeof value === "number"
+                    ? String.fromCharCode(value)
+                    : undefined;
+
+        if (character === undefined) throw new Error("Character argument unavailable");
+
+        switch (method) {
+            case "isLetterOrDigit":
+                return /[\\p{L}\\p{N}]/u.test(character);
+            case "isLetter":
+                return /[\\p{L}]/u.test(character);
+            case "isDigit":
+                return /[0-9]/.test(character);
+            case "isWhitespace":
+                return /\\s/u.test(character);
+            case "isSpaceChar":
+                return /\\s/u.test(character);
+            case "isUpperCase":
+                return character !== character.toLowerCase() && character === character.toUpperCase();
+            case "isLowerCase":
+                return character !== character.toUpperCase() && character === character.toLowerCase();
+            case "toLowerCase":
+                return character.toLowerCase();
+            case "toUpperCase":
+                return character.toUpperCase();
+            default:
+                throw new Error("unsupported Character method");
+        }
+    }
+
+    if (className === "Math") {
+        if (method === "abs" && args.length === 1 && typeof args[0] === "number") return Math.abs(args[0]);
+        if (method === "min" && args.length === 2 && typeof args[0] === "number" && typeof args[1] === "number") return Math.min(args[0], args[1]);
+        if (method === "max" && args.length === 2 && typeof args[0] === "number" && typeof args[1] === "number") return Math.max(args[0], args[1]);
+        throw new Error("unsupported Math method");
+    }
+
+    if (className === "Integer" || className === "Long" || className === "Double") {
+        if (method === "compare" && args.length === 2 && typeof args[0] === "number" && typeof args[1] === "number") {
+            return args[0] < args[1] ? -1 : args[0] > args[1] ? 1 : 0;
+        }
+        throw new Error("unsupported numeric utility method");
+    }
+
+    if (className === "String" && method === "valueOf" && args.length === 1) {
+        return String(args[0]);
+    }
+
+    throw new Error("unsupported static method");
 }
 
 function readLength(value: unknown): number {
