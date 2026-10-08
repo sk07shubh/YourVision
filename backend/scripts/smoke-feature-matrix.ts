@@ -81,6 +81,8 @@ const cases: Case[] = [
     { name: "or-false", sourceLine: "if (a || b)", variables: { a: false, b: false }, expected: false },
     { name: "precedence", sourceLine: "if (a || b && c)", variables: { a: false, b: true, c: true }, expected: true },
     { name: "parentheses", sourceLine: "if ((a || b) && c)", variables: { a: false, b: true, c: true }, expected: true },
+    { name: "nested-false-and", sourceLine: "if ((a && b) || c)", variables: { a: false, b: true, c: false }, expected: false },
+    { name: "nested-false-and-or", sourceLine: "if ((a && b) || c)", variables: { a: false, b: true, c: true }, expected: true },
     { name: "arithmetic", sourceLine: "if (x + 2 * y == 10)", variables: { x: 4, y: 3 }, expected: true },
     { name: "unary-minus", sourceLine: "if (-x < 0)", variables: { x: 2 }, expected: true },
 
