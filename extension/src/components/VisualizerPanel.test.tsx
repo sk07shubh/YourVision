@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import type { ReactNode } from 'react';
 import type { TraceState } from '../types/trace';
 import {
   collectionDelta,
@@ -9,6 +10,7 @@ import {
   executionCondition,
   executionSubstatement,
   eventEffects,
+  dataStructureResults,
   isForLoopUpdateStep,
   unorderedCollectionDelta,
 } from './VisualizerPanel';
@@ -26,7 +28,7 @@ function state(patch: Partial<TraceState>): TraceState {
   };
 }
 
-function markup(nodes: React.ReactNode[]): string {
+function markup(nodes: ReactNode[]): string {
   return renderToStaticMarkup(<>{nodes}</>);
 }
 
@@ -252,10 +254,13 @@ describe('execution visualization feature matrix', () => {
       },
     });
 
-    // Importing the full inspector would require mounting the complete panel;
-    // these assertions exercise the same pure transition helpers used by it.
-    expect(markup([])).toBe('');
-    expect(current.arrays.nums).toBeDefined();
-    expect(previous.dataStructures.mp).toBeDefined();
+    const rows = dataStructureResults(current, previous, 'mp.put(4, 9);');
+    const html = markup(rows);
+    expect(html).toContain('mp');
+    expect(html).toContain('[Put]');
+    expect(html).toContain('Key: 4');
+    expect(html).toContain('nums');
+    expect(html).toContain('[Set]');
+    expect(html).toContain('Index: 1');
   });
 });
