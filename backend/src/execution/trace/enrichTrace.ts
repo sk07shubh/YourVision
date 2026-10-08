@@ -788,7 +788,7 @@ function readStaticMethod(
             case "isWhitespace":
                 return /\s/u.test(character);
             case "isSpaceChar":
-                return /[\\u0020\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]/u.test(character);
+                return /[\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]/u.test(character);
             case "isUpperCase":
                 return character !== character.toLowerCase() && character === character.toUpperCase();
             case "isLowerCase":
