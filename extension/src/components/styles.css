@@ -54,3 +54,14 @@
 .yv-variable-old{color:var(--yv-muted);text-decoration:line-through}
 .yv-variable-new{color:var(--yv-text);font-weight:700}
 .yv-variable-arrow{color:var(--yv-accent);font-weight:700}
+
+/* Compact state-driven data-structure mutation results */
+.yv-ds-result{display:flex;align-items:center;gap:6px;min-width:0;width:100%;font:13px ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap;overflow:hidden}
+.yv-ds-result-name{color:var(--yv-muted);font-weight:600;flex:0 0 auto}
+.yv-ds-result-arrow{color:var(--yv-muted);flex:0 0 auto}
+.yv-ds-result-operation{color:var(--yv-accent);font-weight:800;flex:0 0 auto}
+.yv-ds-result-value{display:flex;align-items:center;gap:5px;min-width:0}
+.yv-ds-result-old{color:var(--yv-muted);text-decoration:line-through}
+.yv-ds-result-transition{color:var(--yv-accent);font-weight:700}
+.yv-ds-result-new{color:var(--yv-text);font-weight:700}
+.yv-ds-result-position{color:var(--yv-muted);font-size:11px;overflow:hidden;text-overflow:ellipsis}
