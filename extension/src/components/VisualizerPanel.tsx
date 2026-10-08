@@ -238,6 +238,31 @@ export function executionSubstatement(
     const inside = balanced(trimmed, trimmed.indexOf('('));
     if (inside) {
       const parts = splitTopLevel(inside);
+
+      // Enhanced-for: for (Type name : iterable)
+      // Unlike a classic for-loop, this has no init/condition/update triplet.
+      // JDI stops at the header when the iteration variable is bound, so the
+      // executed clause is the binding itself.
+      if (parts.length === 2) {
+        const [declaration, iterable] = parts;
+        const variableMatch = declaration.match(
+          /(?:final\s+)?(?:byte|short|int|long|float|double|char|boolean|var|[A-Za-z_$][\w$]*(?:\s*<[^>]+>)?)\s+([A-Za-z_$][\w$]*)\s*$/
+        );
+        const variableName = variableMatch?.[1];
+        const events = Array.isArray(data?.executionEvents) ? data.executionEvents : [];
+        const variableEvents = events.filter(
+          e => isPlainObject(e) && e.type === 'VARIABLE_UPDATE'
+        );
+        const assignedVariable = variableEvents.some(event => {
+          const d = isPlainObject(event.data) ? event.data : undefined;
+          return !!variableName && d?.name === variableName && 'value' in (d ?? {});
+        });
+
+        if (assignedVariable || variableName) {
+          return declaration.trim() + ' : ' + iterable.trim();
+        }
+      }
+
       if (parts.length === 3) {
         const [initialization, condition, update] = parts;
         const initNames = [...initialization.matchAll(
