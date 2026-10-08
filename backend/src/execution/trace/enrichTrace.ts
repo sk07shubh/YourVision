@@ -346,7 +346,7 @@ type ConditionValue =
     | { staticClass: string };
 type ConditionToken = { type: "number" | "string" | "identifier" | "operator"; value: string };
 
-function evaluateCondition(expression: string, variables: Record<string, unknown>): boolean | undefined {
+export function evaluateCondition(expression: string, variables: Record<string, unknown>): boolean | undefined {
     try {
         const parser = new ConditionParser(tokenizeCondition(expression), variables);
         const value = parser.parse();
