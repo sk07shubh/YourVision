@@ -562,6 +562,17 @@ function readIndexed(value: unknown, index: number): unknown {
 }
 
 function readMethod(value: unknown, method: string, args: unknown[]): unknown {
+    // Java String methods are invoked on the raw string value.
+    if (method === "length" && typeof value === "string") {
+        return value.length;
+    }
+    if (method === "charAt" && typeof value === "string") {
+        if (args.length !== 1 || typeof args[0] !== "number") {
+            throw new Error("charAt index expected");
+        }
+        return value.charAt(args[0]);
+    }
+
     if (!value || typeof value !== "object" || !("snapshot" in value)) {
         throw new Error("method receiver unavailable");
     }
@@ -622,13 +633,8 @@ function readMethod(value: unknown, method: string, args: unknown[]): unknown {
             throw new Error("charAt index expected");
         }
         const index = args[0];
-        if (typeof value === "string") return value.charAt(index);
-        if (value && typeof value === "object" && "snapshot" in value) {
-            const record = value as { snapshot: Record<string, unknown> };
-            const snapshot = record.snapshot;
-            if (typeof snapshot.value === "string") return snapshot.value.charAt(index);
-            if (Array.isArray(snapshot.values)) return String(snapshot.values[index] ?? "");
-        }
+        if (typeof snapshot.value === "string") return snapshot.value.charAt(index);
+        if (Array.isArray(snapshot.values)) return String(snapshot.values[index] ?? "");
         throw new Error("charAt receiver unavailable");
     }
 
