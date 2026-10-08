@@ -196,6 +196,17 @@ assert(
     "Enhanced-for duplicate loop should produce exactly one header checkpoint per iteration"
 );
 
+const validParenthesesCharLoop = await runJava(source, {
+    method: "isValid",
+    arguments: ["\"({[]})\""]
+});
+assert(validParenthesesCharLoop.kind === "OK", "Valid Parentheses char enhanced-for execution failed");
+const validParenthesesLoopLine = lineContaining("for (char ch : s.toCharArray())");
+assert(
+    stepCountAtLine(validParenthesesCharLoop, validParenthesesLoopLine) === 6,
+    "char enhanced-for loop should produce exactly one header checkpoint per iteration"
+);
+
 const parenthesesFalse = await runJava(source, {
     method: "isValid",
     arguments: ["\"([)]\""]
