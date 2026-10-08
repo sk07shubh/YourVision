@@ -609,6 +609,29 @@ function readMethod(value: unknown, method: string, args: unknown[]): unknown {
         if (Array.isArray(snapshot.values)) return snapshot.values.length;
     }
 
+    // Java String uses method calls for these operations. The condition
+    // evaluator already supports the equivalent length/property path, but
+    // "s.length()" and "s.charAt(i)" must also be evaluable so annotateCondition
+    // can attach the runtime TRUE/FALSE result to the STEP.
+    if (method === "length") {
+        return readLength(value);
+    }
+
+    if (method === "charAt") {
+        if (args.length !== 1 || typeof args[0] !== "number") {
+            throw new Error("charAt index expected");
+        }
+        const index = args[0];
+        if (typeof value === "string") return value.charAt(index);
+        if (value && typeof value === "object" && "snapshot" in value) {
+            const record = value as { snapshot: Record<string, unknown> };
+            const snapshot = record.snapshot;
+            if (typeof snapshot.value === "string") return snapshot.value.charAt(index);
+            if (Array.isArray(snapshot.values)) return String(snapshot.values[index] ?? "");
+        }
+        throw new Error("charAt receiver unavailable");
+    }
+
     if (method === "get") {
         const entries = Array.isArray(snapshot.entries) ? snapshot.entries : [];
         const found = entries.find((entry) =>
