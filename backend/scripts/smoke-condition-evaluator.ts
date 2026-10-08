@@ -9,6 +9,16 @@ const source = [
     "        }",
     "        return true;",
     "    }",
+    "    boolean valid(Stack<Character> st, char ch) {",
+    "        if (ch == '(' || ch == '{' || ch == '[') {",
+    "            return true;",
+    "        }",
+    "        if (st.isEmpty()) return false;",
+    "        if (st.peek() == '(' && ch != ')' || st.peek() == '{' && ch != '}' || st.peek() == '[' && ch != ']') {",
+    "            return false;",
+    "        }",
+    "        return true;",
+    "    }",
     "}"
 ].join("\n");
 
@@ -48,6 +58,42 @@ const trace: ExecutionTrace = {
                     }
                 }
             }
+        },
+        {
+            sequence: 3,
+            type: "STEP",
+            line: 10,
+            method: "valid",
+            depth: 1,
+            data: {
+                variables: {
+                    ch: "(",
+                    st: {
+                        $collectionId: "stack-1",
+                        $type: "java.util.Stack",
+                        $kind: "stack",
+                        values: []
+                    }
+                }
+            }
+        },
+        {
+            sequence: 4,
+            type: "STEP",
+            line: 13,
+            method: "valid",
+            depth: 1,
+            data: {
+                variables: {
+                    ch: "]",
+                    st: {
+                        $collectionId: "stack-1",
+                        $type: "java.util.Stack",
+                        $kind: "stack",
+                        values: ["(", "{", "(", "{", "[", "{"]
+                    }
+                }
+            }
         }
     ]
 };
@@ -57,10 +103,14 @@ const results = enriched.events
     .filter((event) => event.type === "STEP")
     .map((event) => event.data?.conditionResult);
 
-if (results.length !== 2 || results[0] !== false || results[1] !== true) {
+const expected = [false, true, true, true];
+if (
+    results.length !== expected.length ||
+    results.some((result, index) => result !== expected[index])
+) {
     throw new Error(
-        "Character negation condition evaluation is incorrect: " +
-        JSON.stringify(results)
+        "Generic condition evaluation is incorrect: " +
+        JSON.stringify({ results, expected })
     );
 }
 
