@@ -1,4 +1,4 @@
-import { enrichTrace } from "../src/execution/trace/enrichTrace.js";
+import { enrichTrace, evaluateCondition } from "../src/execution/trace/enrichTrace.js";
 import type { ExecutionTrace } from "../src/execution/trace/schema.js";
 
 const source = [
@@ -97,6 +97,29 @@ const trace: ExecutionTrace = {
         }
     ]
 };
+
+const directChar = evaluateCondition(
+    "ch == '(' || ch == '{' || ch == '['",
+    { ch: "(" }
+);
+const directPeek = evaluateCondition(
+    "st.peek() == '{'",
+    {
+        ch: "]",
+        st: {
+            $collectionId: "stack-1",
+            $type: "java.util.Stack",
+            $kind: "stack",
+            values: ["(", "{"]
+        }
+    }
+);
+if (directChar !== true || directPeek !== true) {
+    throw new Error(
+        "Direct condition evaluator regression: " +
+        JSON.stringify({ directChar, directPeek })
+    );
+}
 
 const enriched = enrichTrace(trace, source);
 const results = enriched.events
