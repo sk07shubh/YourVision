@@ -864,7 +864,7 @@ function isForLoopUpdateStep(statement: string, state?: TraceState, previous?: T
 
 function ExecutionInspector({ state, previous, statement, index, total }: { state?: TraceState; previous?: TraceState; statement: string; index: number; total: number }) {
   const substatement = executionSubstatement(statement, state, previous);
-  const condition = isForLoopUpdateStep(statement, state, previous) ? undefined : executionCondition(state);
+  const condition = isForLoopUpdateStep(statement, state, previous) || dataStructureResultRows.length > 0 || variableResults.length > 0 || newStructureResults.length > 0 ? undefined : executionCondition(state);
   const variableResults = variableResultChanges(state, previous);
   const dataStructureResultRows = dataStructureResults(state, previous, statement);
   const newStructureResults = newDataStructureResults(state, previous);
