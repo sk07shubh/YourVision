@@ -826,7 +826,6 @@ function ExecutionInspector({ state, previous, statement, index, total }: { stat
             <span className="yv-result-empty">—</span>
           )}
         </div>
-      </div>
 
       {showEffects && effects.length > 3 && (
         <div className="yv-effects" aria-label="Additional execution effects">
