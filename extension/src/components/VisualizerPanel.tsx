@@ -495,9 +495,9 @@ function dataStructureResults(current?: TraceState, previous?: TraceState, state
       for(const change of changes){
         if(!isPlainObject(change)) continue;
         const key=compactValue(change.key);
-        if(change.kind==='insert') add('event-map-i-'+name+'-'+key,name,'Put',change.after,'Key: '+key,undefined,true);
-        else if(change.kind==='update') add('event-map-u-'+name+'-'+key,name,'Update',change.after,'Key: '+key,change.before,true);
-        else if(change.kind==='delete') add('event-map-r-'+name+'-'+key,name,'Remove',change.before,'Key: '+key);
+        if(change.kind==='insert') add('map-i-' + name + '-' + key,name,'Put',change.after,'Key: '+key,undefined,true);
+        else if(change.kind==='update') add('map-u-' + name + '-' + key,name,'Update',change.after,'Key: '+key,change.before,true);
+        else if(change.kind==='delete') add('map-r-' + name + '-' + key,name,'Remove',change.before,'Key: '+key);
       }
     } else if(event.type==='ARRAY_WRITE'){
       const name=typeof d.name==='string'?d.name:'array';
@@ -505,7 +505,7 @@ function dataStructureResults(current?: TraceState, previous?: TraceState, state
       for(const change of changes){
         if(!isPlainObject(change)) continue;
         const indices=Array.isArray(change.indices)?change.indices:[];
-        add('event-arr-'+name+'-'+JSON.stringify(indices),name,'Set',change.after,'Index: '+indices.join('.'),change.before,change.before===undefined);
+        add('arr-' + name + '-' + JSON.stringify(indices),name,'Set',change.after,'Index: '+indices.join('.'),change.before,change.before===undefined);
       }
     }
   }
