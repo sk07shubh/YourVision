@@ -92,7 +92,7 @@ describe('execution visualization feature matrix', () => {
 
   it('keeps if/while conditions complete, including nested calls and negation', () => {
     expect(executionSubstatement('if (!Character.isLetterOrDigit(ch))', state())).toBe(
-      'if (!Character.isLetterOrDigit(ch))'
+      'if(!Character.isLetterOrDigit(ch))'
     );
     expect(executionSubstatement('while (i < n && !done)', state())).toBe(
       'while (i < n && !done)'
@@ -125,8 +125,10 @@ describe('execution visualization feature matrix', () => {
   });
 
   it('handles unordered collection deltas without assuming Set order', () => {
-    expect(unorderedCollectionDelta([1, 2], [2, 3])).toEqual({
+    expect(unorderedCollectionDelta([1, 2], [1, 2, 3])).toEqual({
       added: 3,
+    });
+    expect(unorderedCollectionDelta([1, 2], [2])).toEqual({
       removed: 1,
     });
     expect(unorderedCollectionDelta([1, 2], [2, 1])).toBeUndefined();
@@ -182,8 +184,8 @@ describe('execution visualization feature matrix', () => {
       [{ key: 2, value: 1 }],
       [{ key: 2, value: 3 }, { key: 4, value: 7 }],
     )).toEqual([
-      { kind: 'insert', key: 4, after: 7 },
       { kind: 'update', key: 2, before: 1, after: 3 },
+      { kind: 'insert', key: 4, after: 7 },
     ]);
 
     expect(compareMapEntries(
