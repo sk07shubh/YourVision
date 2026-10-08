@@ -261,12 +261,6 @@ function executionSubstatement(
       if (parts.length === 3) {
         const [initialization, condition, update] = parts;
 
-        // The runtime conditionResult is authoritative: when present this
-        // checkpoint is the condition phase of the for-loop.
-        if (conditionResult !== undefined) {
-          return condition;
-        }
-
         // A variable appearing for the first time in the current runtime
         // snapshot identifies the initialization checkpoint.
         const initNames = [...initialization.matchAll(
@@ -279,12 +273,39 @@ function executionSubstatement(
           return initialization + ';';
         }
 
-        // Otherwise, a changed variable referenced by the update expression
-        // identifies the update checkpoint. This uses only consecutive
-        // runtime snapshots; it does not invent or reorder loop events.
+        // A runtime VARIABLE_UPDATE on a variable referenced by the update
+        // expression is the authoritative signal for the update checkpoint.
+        // A for-loop checkpoint can carry both conditionResult and the
+        // VARIABLE_UPDATE that performs i++ (as in JDI traces where the
+        // update and the next condition share the same source line). The
+        // update must win here; the following checkpoint is then the actual
+        // condition evaluation.
         const updateNames = [...update.matchAll(/\b[A-Za-z_$][\w$]*\b/g)]
           .map(match => match[0])
           .filter(name => name in variables && name in previousVariables);
+
+        const executionEvents = Array.isArray(data?.executionEvents)
+          ? data.executionEvents
+          : [];
+        const hasRuntimeUpdate = executionEvents.some(event => {
+          if (!isPlainObject(event)) return false;
+          if (event.type !== 'VARIABLE_UPDATE') return false;
+          const eventData = isPlainObject(event.data) ? event.data : undefined;
+          const name = typeof eventData?.name === 'string' ? eventData.name : undefined;
+          return !!name &&
+            updateNames.includes(name) &&
+            valueChanged(previousVariables[name], variables[name]);
+        });
+
+        if (hasRuntimeUpdate) {
+          return update;
+        }
+
+        // Only after ruling out an update checkpoint does the runtime
+        // conditionResult identify this as the condition phase.
+        if (conditionResult !== undefined) {
+          return condition;
+        }
 
         if (
           updateNames.some(name => valueChanged(previousVariables[name], variables[name]))
@@ -292,7 +313,7 @@ function executionSubstatement(
           return update;
         }
 
-        return conditionResult === undefined ? update : condition;
+        return update;
       }
     }
   }
