@@ -198,7 +198,7 @@ assert(
 
 const parenthesesFalse = await runJava(source, {
     method: "isValid",
-    arguments: ["\"([)]\"]
+    arguments: ["\"([)]\""]
 });
 assert(parenthesesFalse.kind === "OK" && parenthesesFalse.result === "false", "Valid Parentheses false case returned the wrong result");
 assert(hasCondition(parenthesesFalse, false), "Valid Parentheses false case produced no FALSE condition checkpoint");
