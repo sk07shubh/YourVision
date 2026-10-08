@@ -348,6 +348,19 @@ type ConditionToken = { type: "number" | "string" | "identifier" | "operator"; v
 
 export function evaluateCondition(expression: string, variables: Record<string, unknown>): boolean | undefined {
     try {
+        // Evaluate top-level OR clauses independently. This preserves Java's
+        // short-circuit semantics while avoiding parser-state loss when a
+        // false AND clause is followed by another || clause.
+        const orParts = splitTopLevel(expression, "||").map(part => part.trim()).filter(Boolean);
+        if (orParts.length > 1) {
+            for (const part of orParts) {
+                const value = new ConditionParser(tokenizeCondition(part), variables).parse();
+                if (typeof value !== "boolean") throw new Error("boolean expected");
+                if (value) return true;
+            }
+            return false;
+        }
+
         const parser = new ConditionParser(tokenizeCondition(expression), variables);
         const value = parser.parse();
         return typeof value === "boolean" ? value : undefined;
