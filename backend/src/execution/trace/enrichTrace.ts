@@ -704,13 +704,32 @@ function readStaticMethod(
     if (className === "Character") {
         if (args.length !== 1) throw new Error("Character method expects one argument");
         const value = args[0];
-        const character =
-            typeof value === "string"
-                ? value.charAt(0)
-                : typeof value === "number"
-                    ? String.fromCharCode(value)
-                    : undefined;
 
+        // JDI can represent a char/Character array element either as the
+        // primitive character or as a small object snapshot. Normalize both
+        // forms before applying the Java Character predicate. This keeps
+        // condition evaluation independent of the particular problem or
+        // trace serializer shape.
+        const unwrapCharacter = (candidate: unknown): string | undefined => {
+            if (typeof candidate === "string") return candidate.charAt(0);
+            if (typeof candidate === "number") return String.fromCharCode(candidate);
+
+            if (candidate && typeof candidate === "object" && "snapshot" in candidate) {
+                const snapshot = (candidate as {
+                    snapshot: Record<string, unknown>;
+                }).snapshot;
+
+                for (const key of ["value", "character", "char", "string"]) {
+                    const nested = snapshot[key];
+                    const result = unwrapCharacter(nested);
+                    if (result !== undefined) return result;
+                }
+            }
+
+            return undefined;
+        };
+
+        const character = unwrapCharacter(value);
         if (character === undefined) throw new Error("Character argument unavailable");
 
         switch (method) {
