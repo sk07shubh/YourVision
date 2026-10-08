@@ -177,7 +177,136 @@ function eventEffects(state?: TraceState): ExecutionEffect[] {
   return effects;
 }
 
-function executionSubstatement(statement: string): string {
+function executionSubstatement(
+  statement: string,
+  state?: TraceState,
+  previous?: TraceState
+): string {
+  const trimmed = statement.trim();
+  const data = isPlainObject(state?.lastEvent?.data) ? state.lastEvent.data : undefined;
+
+  const balanced = (source: string, openIndex: number): string | undefined => {
+    if (source.charAt(openIndex) !== '(') return undefined;
+    let depth = 0;
+    let quote = '';
+    let escaped = false;
+
+    for (let i = openIndex; i < source.length; i++) {
+      const ch = source[i]!;
+      if (quote) {
+        if (escaped) escaped = false;
+        else if (ch === '\\\\') escaped = true;
+        else if (ch === quote) quote = '';
+        continue;
+      }
+      if (ch === '"' || ch === "'") {
+        quote = ch;
+        continue;
+      }
+      if (ch === '(') depth++;
+      else if (ch === ')') {
+        depth--;
+        if (depth === 0) return source.slice(openIndex + 1, i);
+      }
+    }
+    return undefined;
+  };
+
+  const splitTopLevel = (source: string): string[] => {
+    const parts: string[] = [];
+    let start = 0;
+    let depth = 0;
+    let quote = '';
+    let escaped = false;
+
+    for (let i = 0; i < source.length; i++) {
+      const ch = source[i]!;
+      if (quote) {
+        if (escaped) escaped = false;
+        else if (ch === '\\\\') escaped = true;
+        else if (ch === quote) quote = '';
+        continue;
+      }
+      if (ch === '"' || ch === "'") {
+        quote = ch;
+        continue;
+      }
+      if ('([{'.includes(ch)) depth++;
+      else if (')]}'.includes(ch)) depth--;
+      else if (ch === ';' && depth === 0) {
+        parts.push(source.slice(start, i).trim());
+        start = i + 1;
+      }
+    }
+
+    parts.push(source.slice(start).trim());
+    return parts;
+  };
+
+  const variables = state?.variables ?? {};
+  const previousVariables = previous?.variables ?? {};
+
+  const conditionResult =
+    typeof data?.conditionResult === 'boolean'
+      ? data.conditionResult
+      : undefined;
+
+  const forMatch = trimmed.match(/^for\\s*\\(/);
+  if (forMatch) {
+    const open = trimmed.indexOf('(');
+    const inside = balanced(trimmed, open);
+    if (inside) {
+      const parts = splitTopLevel(inside);
+
+      if (parts.length === 3) {
+        const [initialization, condition, update] = parts;
+
+        // The runtime conditionResult is authoritative: when present this
+        // checkpoint is the condition phase of the for-loop.
+        if (conditionResult !== undefined) {
+          return condition;
+        }
+
+        // A variable appearing for the first time in the current runtime
+        // snapshot identifies the initialization checkpoint.
+        const initNames = [...initialization.matchAll(
+          /(?:^|[,\\s])(?:final\\s+)?(?:byte|short|int|long|float|double|char|boolean|var)\\s+([A-Za-z_$][\\w$]*)/g
+        )].map(match => match[1]);
+
+        if (
+          initNames.some(name => !(name in previousVariables) && name in variables)
+        ) {
+          return initialization + ';';
+        }
+
+        // Otherwise, a changed variable referenced by the update expression
+        // identifies the update checkpoint. This uses only consecutive
+        // runtime snapshots; it does not invent or reorder loop events.
+        const updateNames = [...update.matchAll(/\\b[A-Za-z_$][\\w$]*\\b/g)]
+          .map(match => match[0])
+          .filter(name => name in variables && name in previousVariables);
+
+        if (
+          updateNames.some(name => valueChanged(previousVariables[name], variables[name]))
+        ) {
+          return update;
+        }
+
+        return conditionResult === undefined ? update : condition;
+      }
+    }
+  }
+
+  // For ordinary condition checkpoints, display the evaluated expression
+  // instead of repeating the entire if/while source line.
+  if (conditionResult !== undefined) {
+    const open = trimmed.indexOf('(');
+    const inside = open >= 0 ? balanced(trimmed, open) : undefined;
+    if (inside && /^(if|while)\\s*\\(/.test(trimmed)) {
+      return inside;
+    }
+  }
+
   return statement;
 }
 
@@ -631,7 +760,7 @@ function dataStructureResults(current?: TraceState, previous?: TraceState, state
 
 function ExecutionInspector({ state, previous, statement, index, total }: { state?: TraceState; previous?: TraceState; statement: string; index: number; total: number }) {
   const condition = executionCondition(state);
-  const substatement = executionSubstatement(statement);
+  const substatement = executionSubstatement(statement, state, previous);
   const variableResults = variableResultChanges(state, previous);
   const dataStructureResultRows = dataStructureResults(state, previous, statement);
   const newStructureResults = newDataStructureResults(state, previous);
