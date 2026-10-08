@@ -346,15 +346,30 @@ type ConditionValue =
     | { staticClass: string };
 type ConditionToken = { type: "number" | "string" | "identifier" | "operator"; value: string };
 
-function evaluateCondition(expression: string, variables: Record<string, unknown>): boolean | undefined {
+export function evaluateCondition(expression: string, variables: Record<string, unknown>): boolean | undefined {
     try {
-        const parser = new ConditionParser(tokenizeCondition(expression), variables);
-        const value = parser.parse();
-        return typeof value === "boolean" ? value : undefined;
+        const evaluateBoolean = (source: string): boolean => {
+            const orParts = splitTopLevel(source, "||").map(part => part.trim()).filter(Boolean);
+            if (orParts.length > 1) {
+                return orParts.some(part => evaluateBoolean(part));
+            }
+
+            const andParts = splitTopLevel(source, "&&").map(part => part.trim()).filter(Boolean);
+            if (andParts.length > 1) {
+                return andParts.every(part => evaluateBoolean(part));
+            }
+
+            const value = new ConditionParser(tokenizeCondition(source), variables).parse();
+            if (typeof value !== "boolean") throw new Error("boolean expected");
+            return value;
+        };
+
+        return evaluateBoolean(expression);
     } catch {
         return undefined;
     }
 }
+
 
 function tokenizeCondition(source: string): ConditionToken[] {
     const tokens: ConditionToken[] = [];
@@ -430,21 +445,27 @@ class ConditionParser {
     }
     private parseAnd(evaluate = true): unknown {
         let left = this.parseEquality(evaluate);
+
         while (this.peek("&&")) {
             this.index++;
+
             if (evaluate && left === false) {
-                // Java short-circuits &&. Still consume the RHS so the
-                // parser remains synchronized, but do not evaluate it.
+                // The RHS must still be consumed so parsing stays aligned,
+                // but it must not be evaluated because Java short-circuits.
+                // Consume only one equality operand at a time; the enclosing
+                // loop handles any additional && operators.
                 this.parseEquality(false);
                 left = false;
                 continue;
             }
+
             const right = this.parseEquality(evaluate);
             if (evaluate && (typeof left !== "boolean" || typeof right !== "boolean")) {
                 throw new Error("boolean expected");
             }
             left = evaluate ? (left as boolean) && (right as boolean) : undefined;
         }
+
         return left;
     }
     private parseEquality(evaluate = true): unknown {
@@ -507,9 +528,12 @@ class ConditionParser {
         const token = this.tokens[this.index++];
         if (!token) throw new Error("missing expression");
         let value: unknown;
-        if (token.value === "(") { value = this.parseOr(evaluate); this.consume(")"); }
+        if (token.type === "string") value = evaluate ? token.value : undefined;
         else if (token.type === "number") value = evaluate ? Number(token.value) : undefined;
-        else if (token.type === "string") value = evaluate ? token.value : undefined;
+        else if (token.type === "operator" && token.value === "(") {
+            value = this.parseOr(evaluate);
+            this.consume(")");
+        }
         else if (token.type === "identifier") {
             if (token.value === "true") value = evaluate ? true : undefined;
             else if (token.value === "false") value = evaluate ? false : undefined;
@@ -751,7 +775,7 @@ function readStaticMethod(
             case "isWhitespace":
                 return /\s/u.test(character);
             case "isSpaceChar":
-                return /\\s/u.test(character);
+                return /[\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]/u.test(character);
             case "isUpperCase":
                 return character !== character.toLowerCase() && character === character.toUpperCase();
             case "isLowerCase":

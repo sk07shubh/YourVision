@@ -1,4 +1,4 @@
-import { enrichTrace } from "../src/execution/trace/enrichTrace.js";
+import { enrichTrace, evaluateCondition } from "../src/execution/trace/enrichTrace.js";
 import type { ExecutionTrace } from "../src/execution/trace/schema.js";
 
 const source = [
@@ -62,7 +62,7 @@ const trace: ExecutionTrace = {
         {
             sequence: 3,
             type: "STEP",
-            line: 10,
+            line: 9,
             method: "valid",
             depth: 1,
             data: {
@@ -97,6 +97,99 @@ const trace: ExecutionTrace = {
         }
     ]
 };
+
+const directChar = evaluateCondition(
+    "ch == '(' || ch == '{' || ch == '['",
+    { ch: "(" }
+);
+const directPeek = evaluateCondition(
+    "st.peek() == '{'",
+    {
+        ch: "]",
+        st: {
+            $collectionId: "stack-1",
+            $type: "java.util.Stack",
+            $kind: "stack",
+            values: ["(", "{"]
+        }
+    }
+);
+const directCharNotParen = evaluateCondition("ch != ')'", { ch: "]" });
+const directPeekFalse = evaluateCondition(
+    "st.peek() == '('",
+    {
+        st: {
+            $collectionId: "stack-1",
+            $type: "java.util.Stack",
+            $kind: "stack",
+            values: ["(", "{"]
+        }
+    }
+);
+
+const directFalseAnd = evaluateCondition(
+    "st.peek() == '(' && ch != ')'",
+    {
+        ch: "]",
+        st: {
+            $collectionId: "stack-1",
+            $type: "java.util.Stack",
+            $kind: "stack",
+            values: ["(", "{"]
+        }
+    }
+);
+const directAnd = evaluateCondition(
+    "st.peek() == '{' && ch != '}'",
+    {
+        ch: "]",
+        st: {
+            $collectionId: "stack-1",
+            $type: "java.util.Stack",
+            $kind: "stack",
+            values: ["(", "{"]
+        }
+    }
+);
+const directTwoClauses = evaluateCondition(
+    "st.peek() == '(' && ch != ')' || st.peek() == '{' && ch != '}'",
+    {
+        ch: "]",
+        st: {
+            $collectionId: "stack-1",
+            $type: "java.util.Stack",
+            $kind: "stack",
+            values: ["(", "{"]
+        }
+    }
+);
+const directFullPeekCondition = evaluateCondition(
+    "st.peek() == '(' && ch != ')' || st.peek() == '{' && ch != '}' || st.peek() == '[' && ch != ']'",
+    {
+        ch: "]",
+        st: {
+            $collectionId: "stack-1",
+            $type: "java.util.Stack",
+            $kind: "stack",
+            values: ["(", "{", "(", "{", "[", "{"]
+        }
+    }
+);
+if (
+    directChar !== true ||
+    directPeek !== true ||
+    directCharNotParen !== true ||
+    directPeekFalse !== false ||
+    directFalseAnd !== false ||
+    directAnd !== true ||
+    directTwoClauses !== true ||
+    directFullPeekCondition !== true
+) {
+    throw new Error(
+        "Direct condition evaluator regression: " +
+        JSON.stringify({ directChar, directPeek, directCharNotParen, directPeekFalse, directFalseAnd, directAnd, directTwoClauses, directFullPeekCondition })
+    );
+}
 
 const enriched = enrichTrace(trace, source);
 const results = enriched.events
