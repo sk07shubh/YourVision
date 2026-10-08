@@ -30,32 +30,6 @@ function isStructuralValue(value: unknown): boolean {
   return typeof value.$arrayId === 'string' || typeof value.$mapId === 'string' || typeof value.$collectionId === 'string';
 }
 
-function variableEffects(current?: TraceState, previous?: TraceState): ExecutionEffect[] {
-  if (!current) return [];
-  const before = previous?.variables ?? {};
-  const after = current.variables ?? {};
-  const effects: ExecutionEffect[] = [];
-
-  for (const [name, value] of Object.entries(after)) {
-    if (!(name in before)) {
-      effects.push({ kind: 'structural', text: name + ' = ' + compactValue(value) });
-      continue;
-    }
-
-    const old = before[name];
-    if (valueChanged(old, value) && !isStructuralValue(value)) {
-      effects.push({
-        kind: 'change',
-        text: name + '  ' + compactValue(old) + '  →  ' + compactValue(value)
-      });
-    }
-  }
-
-  // Scope-exit variables are intentionally omitted. They already disappear
-  // from the Variables section and do not describe the effect of the line.
-  return effects;
-}
-
 function accessEffects(data: Obj): ExecutionEffect[] {
   const effects: ExecutionEffect[] = [];
   const executionEvents = Array.isArray(data.executionEvents) ? data.executionEvents : [];
@@ -86,15 +60,7 @@ function eventEffects(state?: TraceState): ExecutionEffect[] {
     const eventData = isPlainObject(event.data) ? event.data : {};
     const eventType = typeof event.type === 'string' ? event.type : '';
 
-    if (eventType === 'VARIABLE_UPDATE' && typeof eventData.name === 'string') {
-      const name = eventData.name;
-      const before = 'before' in eventData ? compactValue(eventData.before) : '';
-      const after = compactValue(eventData.value);
-      effects.push({
-        kind: 'change',
-        text: before ? name + '  ' + before + '  →  ' + after : name + ' = ' + after
-      });
-    } else if (eventType === 'ARRAY_WRITE') {
+    if (eventType === 'ARRAY_WRITE') {
       const name = typeof eventData.name === 'string' ? eventData.name : 'array';
       const changes = Array.isArray(eventData.changes) ? eventData.changes : [];
       for (const change of changes.slice(0, 3)) {
@@ -211,43 +177,173 @@ function eventEffects(state?: TraceState): ExecutionEffect[] {
   return effects;
 }
 
-function loopParts(statement: string): { init: string; condition: string; update: string } | undefined {
-  const match = statement.match(/\bfor\s*\((.*?);(.*?);(.*?)\)\s*\{?\s*$/);
-  if (!match) return undefined;
-  return { init: match[1].trim(), condition: match[2].trim(), update: match[3].trim() };
-}
+function executionSubstatement(
+  statement: string,
+  state?: TraceState,
+  previous?: TraceState
+): string {
+  const trimmed = statement.trim();
+  const data = isPlainObject(state?.lastEvent?.data) ? state.lastEvent.data : undefined;
 
-function executionSubstatement(statement: string, current?: TraceState, previous?: TraceState): string {
-  const parts = loopParts(statement);
-  if (!parts || !current) return statement;
+  const balanced = (source: string, openIndex: number): string | undefined => {
+    if (source.charAt(openIndex) !== '(') return undefined;
+    let depth = 0;
+    let quote = '';
+    let escaped = false;
 
-  const data = current.lastEvent?.data;
-  if (isPlainObject(data) && typeof data.executionPhase === 'string') {
-    if (data.executionPhase === 'initialization') return parts.init || statement;
-    if (data.executionPhase === 'update') return parts.update || statement;
-    if (data.executionPhase === 'condition') return parts.condition || statement;
+    for (let i = openIndex; i < source.length; i++) {
+      const ch = source[i]!;
+      if (quote) {
+        if (escaped) escaped = false;
+        else if (ch === '\\') escaped = true;
+        else if (ch === quote) quote = '';
+        continue;
+      }
+      if (ch === '"' || ch === "'") {
+        quote = ch;
+        continue;
+      }
+      if (ch === '(') depth++;
+      else if (ch === ')') {
+        depth--;
+        if (depth === 0) return source.slice(openIndex + 1, i);
+      }
+    }
+    return undefined;
+  };
+
+  const splitTopLevel = (source: string): string[] => {
+    const parts: string[] = [];
+    let start = 0;
+    let depth = 0;
+    let quote = '';
+    let escaped = false;
+
+    for (let i = 0; i < source.length; i++) {
+      const ch = source[i]!;
+      if (quote) {
+        if (escaped) escaped = false;
+        else if (ch === '\\') escaped = true;
+        else if (ch === quote) quote = '';
+        continue;
+      }
+      if (ch === '"' || ch === "'") {
+        quote = ch;
+        continue;
+      }
+      if ('([{'.includes(ch)) depth++;
+      else if (')]}'.includes(ch)) depth--;
+      else if (ch === ';' && depth === 0) {
+        parts.push(source.slice(start, i).trim());
+        start = i + 1;
+      }
+    }
+
+    parts.push(source.slice(start).trim());
+    return parts;
+  };
+
+  // IMPORTANT: TraceState.variables is the post-line replay state. Phase
+  // detection must use the raw JDI snapshot belonging to the STEP itself.
+  // Otherwise an initialization checkpoint can see the next checkpoint's
+  // i=1 and incorrectly render i++ before the first condition.
+  const rawVariables = isPlainObject(data?.variables) ? data.variables : {};
+  const previousData = isPlainObject(previous?.lastEvent?.data) ? previous.lastEvent.data : undefined;
+  const rawPreviousVariables = isPlainObject(previousData?.variables)
+    ? previousData.variables
+    : {};
+
+  const conditionResult =
+    typeof data?.conditionResult === 'boolean'
+      ? data.conditionResult
+      : undefined;
+
+  if (/^for\\s*\\(/.test(trimmed)) {
+    const open = trimmed.indexOf('(');
+    const inside = balanced(trimmed, open);
+    if (inside) {
+      const parts = splitTopLevel(inside);
+
+      if (parts.length === 3) {
+        const [initialization, condition, update] = parts;
+
+        const initNames = [...initialization.matchAll(
+          /(?:^|[,\\s])(?:final\\s+)?(?:byte|short|int|long|float|double|char|boolean|var)\\s+([A-Za-z_$][\\w$]*)/g
+        )].map(match => match[1]);
+
+        // Initialization is identified from the raw runtime snapshots, never
+        // from post-line replay values.
+        if (
+          initNames.some(name =>
+            !(name in rawPreviousVariables) &&
+            name in rawVariables
+          )
+        ) {
+          return initialization + ';';
+        }
+
+        const updateNames = [...update.matchAll(/\\b[A-Za-z_$][\\w$]*\\b/g)]
+          .map(match => match[0])
+          .filter(name => name in rawVariables || name in rawPreviousVariables);
+
+        const executionEvents = Array.isArray(data?.executionEvents)
+          ? data.executionEvents
+          : [];
+
+        const hasRuntimeUpdate = executionEvents.some(event => {
+          if (!isPlainObject(event) || event.type !== 'VARIABLE_UPDATE') return false;
+          const eventData = isPlainObject(event.data) ? event.data : undefined;
+          const name = typeof eventData?.name === 'string' ? eventData.name : undefined;
+          if (!name || !updateNames.includes(name)) return false;
+
+          const before = eventData?.before;
+          const after = eventData?.value;
+          return valueChanged(
+            before !== undefined ? before : rawPreviousVariables[name],
+            after !== undefined ? after : rawVariables[name]
+          );
+        });
+
+        if (hasRuntimeUpdate) {
+          return update;
+        }
+
+        // A condition result is authoritative. It must win over a mere
+        // post-state variable difference, because post-state values can
+        // already contain the update that led to this checkpoint.
+        if (conditionResult !== undefined) {
+          return condition;
+        }
+
+        // Fallback for runtimes that expose the update only through raw
+        // consecutive snapshots.
+        if (
+          updateNames.some(name =>
+            name in rawVariables &&
+            name in rawPreviousVariables &&
+            valueChanged(rawPreviousVariables[name], rawVariables[name])
+          )
+        ) {
+          return update;
+        }
+
+        return update;
+      }
+    }
   }
 
-  // Fallback for traces produced before executionPhase was introduced.
-  const previousVars = previous?.variables ?? {};
-  const executionEvents = isPlainObject(data) && Array.isArray(data.executionEvents)
-    ? data.executionEvents
-    : [];
-  const loopVariable = parts.init.match(/([A-Za-z_$][\\w$]*)\\s*=/)?.[1];
-  const updatedVariable = executionEvents.some((event) =>
-    isPlainObject(event) &&
-    event.type === 'VARIABLE_UPDATE' &&
-    isPlainObject(event.data) &&
-    event.data.name === loopVariable
-  );
-
-  if (updatedVariable && loopVariable) {
-    return loopVariable in previousVars
-      ? (parts.update || statement)
-      : (parts.init || statement);
+  // Keep the complete control statement visible. The result belongs in the
+  // separate EXECUTION RESULT area, so never strip "if" / "while" here.
+  if (conditionResult !== undefined) {
+    const open = trimmed.indexOf('(');
+    const inside = open >= 0 ? balanced(trimmed, open) : undefined;
+    if (inside && /^(if|while)\\s*\\(/.test(trimmed)) {
+      const keyword = trimmed.match(/^(if|while)\\b/)?.[1] ?? 'if';
+      return keyword + '(' + inside + ')';
+    }
   }
 
-  return parts.condition || statement;
+  return statement || '';
 }
 
 function debugValue(value: unknown): string {
@@ -290,14 +386,464 @@ function buildDebugTrace(states: TraceState[], source: string): string {
     ].join('\n');
   }).join('\n');
 }
+function VariableResult({ name, oldValue, value, initialized }: {
+  name: string;
+  oldValue?: unknown;
+  value: unknown;
+  initialized: boolean;
+}) {
+  return (
+    <div className="yv-variable-result">
+      <span className="yv-variable-name">{name}</span>
+      <span className="yv-variable-transition">
+        <span className="yv-variable-old">
+          {initialized ? 'undefined' : variableSummary(oldValue)}
+        </span>
+        <span className="yv-variable-arrow">→</span>
+        <span className="yv-variable-new">{variableSummary(value)}</span>
+      </span>
+    </div>
+  );
+}
+
+function variableResultChanges(current?: TraceState, previous?: TraceState): React.ReactNode[] {
+  if (!current) return [];
+
+  const before = previous?.variables ?? {};
+  const results = Object.entries(current.variables ?? {})
+    .filter(([, value]) => !isStructuralValue(value))
+    .filter(([name, value]) =>
+      name !== 'this' &&
+      (!(name in before) || valueChanged(before[name], value))
+    )
+    .map(([name, value]) => (
+      <VariableResult
+        key={name}
+        name={name}
+        oldValue={before[name]}
+        value={value}
+        initialized={!(name in before)}
+      />
+    ));
+
+  // STEP is a pre-execution JDI checkpoint, so the mutation caused by that
+  // source line can also be represented by a derived VARIABLE_UPDATE attached
+  // to the checkpoint. Use that as a fallback when the replay snapshots are
+  // identical (notably assignments such as "right = i + 1;" and "start = left;").
+  if (results.length > 0) return results;
+
+  const data = isPlainObject(current.lastEvent?.data) ? current.lastEvent.data : undefined;
+  const events = Array.isArray(data?.executionEvents) ? data.executionEvents : [];
+  const fallback: React.ReactNode[] = [];
+
+  for (const event of events) {
+    if (!isPlainObject(event) || event.type !== 'VARIABLE_UPDATE') continue;
+    const eventData = isPlainObject(event.data) ? event.data : undefined;
+    const name = typeof eventData?.name === 'string' ? eventData.name : undefined;
+    if (!name || name === 'this' || !('value' in (eventData ?? {}))) continue;
+
+    const value = eventData.value;
+    if (isStructuralValue(value)) continue;
+
+    const oldValue = 'before' in (eventData ?? {})
+      ? eventData?.before
+      : before[name];
+
+    fallback.push(
+      <VariableResult
+        key={'event-variable-' + name}
+        name={name}
+        oldValue={oldValue}
+        value={value}
+        initialized={oldValue === undefined}
+      />
+    );
+  }
+
+  return fallback;
+}
+
+function structureType(value: unknown, fallback: string): string {
+  if (isArraySnapshot(value)) return 'Array';
+  if (isMapSnapshot(value)) return 'Map';
+  if (isCollectionSnapshot(value)) {
+    if (typeof value.$kind === 'string' && value.$kind.trim()) {
+      return value.$kind.charAt(0).toUpperCase() + value.$kind.slice(1);
+    }
+    if (typeof value.$type === 'string') {
+      return value.$type.split('.').pop() ?? fallback;
+    }
+    return 'Collection';
+  }
+  if (isPlainObject(value) && typeof value.$type === 'string') {
+    return value.$type.split('.').pop() ?? fallback;
+  }
+  return fallback;
+}
+
+function newDataStructureResults(current?: TraceState, previous?: TraceState): React.ReactNode[] {
+  if (!current) return [];
+
+  const beforeNames = new Set([
+    ...Object.keys(previous?.arrays ?? {}),
+    ...Object.keys(previous?.dataStructures ?? {})
+  ]);
+
+  const currentEntries = [
+    ...Object.entries(current.arrays ?? {}).map(([name, value]) => [name, value, 'Array'] as const),
+    ...Object.entries(current.dataStructures ?? {}).map(([name, value]) => [
+      name,
+      value,
+      structureType(value, 'Data Structure')
+    ] as const)
+  ];
+
+  const seen = new Set<string>();
+
+  return currentEntries
+    .filter(([name]) => {
+      if (name === 'this' || beforeNames.has(name) || seen.has(name)) return false;
+      seen.add(name);
+      return true;
+    })
+    .map(([name, value, fallback]) => (
+      <div className="yv-new-result" key={'new-ds-' + name}>
+        <span className="yv-new-badge">[NEW]</span>
+        <span className="yv-new-type">{structureType(value, fallback)}</span>
+        <span className="yv-new-separator">—</span>
+        <span className="yv-new-name">{name}</span>
+      </div>
+    ));
+}
+
+
+function DataStructureResult({
+  name, operation, value, oldValue, position, showOld = oldValue !== undefined
+}: {
+  name: string; operation: string; value: unknown; oldValue?: unknown; position: string; showOld?: boolean;
+}) {
+  return (
+    <div className="yv-ds-result">
+      <span className="yv-ds-result-name">{name}</span>
+      <span className="yv-ds-result-arrow">→</span>
+      <span className="yv-ds-result-operation">[{operation}]</span>
+      <span className="yv-ds-result-value">
+        {showOld && <span className="yv-ds-result-old">{compactValue(oldValue)}</span>}
+        {showOld && <span className="yv-ds-result-transition">→</span>}
+        <span className={showOld ? 'yv-ds-result-new' : ''}>{compactValue(value)}</span>
+      </span>
+      <span className="yv-ds-result-position">[{position}]</span>
+    </div>
+  );
+}
+
+function sourceCall(statement: string, name: string): string | undefined {
+  if (!name || name === 'this') return undefined;
+  const escaped = name.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
+  return statement.match(new RegExp('\\b' + escaped + '\\s*\\.\\s*([A-Za-z_$][\\w$]*)\\s*\\('))?.[1];
+}
+
+function collectionDelta(
+  before: unknown[],
+  after: unknown[]
+): { added?: unknown; removed?: unknown; index?: number } | undefined {
+  if (before.length === after.length) {
+    for (let i = 0; i < before.length; i++) {
+      if (valueChanged(before[i], after[i])) return { added: after[i], removed: before[i], index: i };
+    }
+    return undefined;
+  }
+  if (after.length === before.length + 1) {
+    for (let i = 0; i < after.length; i++) {
+      if (before.slice(i).every((x, j) => valueChanged(x, after[i + j + 1]))) {
+        return { added: after[i], index: i };
+      }
+    }
+  }
+  if (before.length === after.length + 1) {
+    for (let i = 0; i < before.length; i++) {
+      if (after.slice(i).every((x, j) => valueChanged(x, before[i + j + 1]))) {
+        return { removed: before[i], index: i };
+      }
+    }
+  }
+  return undefined;
+}
+
+function unorderedCollectionDelta(
+  before: unknown[],
+  after: unknown[]
+): { added?: unknown; removed?: unknown } | undefined {
+  const remaining = before.map(value => ({ key: stableStringify(value), value }));
+  const added: unknown[] = [];
+  for (const value of after) {
+    const key = stableStringify(value);
+    const index = remaining.findIndex(entry => entry.key === key);
+    if (index >= 0) remaining.splice(index, 1);
+    else added.push(value);
+  }
+  const removed = remaining.map(entry => entry.value);
+  if (added.length === 1 && removed.length === 0) return { added: added[0] };
+  if (removed.length === 1 && added.length === 0) return { removed: removed[0] };
+  return undefined;
+}
+
+function sourceCallArgs(statement: string, name: string): string[] {
+  if (!name || name === 'this') return [];
+  const escaped = name.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
+  const match = statement.match(
+    new RegExp('\\b' + escaped + '\\s*\\.\\s*[A-Za-z_$][\\w$]*\\s*\\((.*)\\)')
+  );
+  if (!match?.[1]?.trim()) return [];
+  return match[1].split(',').map(part => part.trim()).filter(Boolean);
+}
+
+function collectionOperation(kind: string, method: string | undefined, delta: {added?: unknown; removed?: unknown; index?: number}, argCount = 0) {
+  if (!method) return undefined;
+  const m = method.toLowerCase();
+
+  if (kind === 'stack') {
+    if (['push','add','addlast','offer','offerlast'].includes(m)) return {operation:'Push',value:delta.added,position:'Top'};
+    if (['pop','remove','removelast','poll','polllast'].includes(m)) return {operation:'Pop',value:delta.removed,position:'Top'};
+  }
+  if (kind === 'queue') {
+    if (['add','offer','enqueue'].includes(m)) return {operation:'Enqueue',value:delta.added,position:'Rear'};
+    if (['remove','poll','dequeue'].includes(m)) return {operation:'Dequeue',value:delta.removed,position:'Front'};
+  }
+  if (kind === 'deque') {
+    if (['addfirst','offerfirst','push'].includes(m)) return {operation:m === 'push' ? 'Push' : 'addFirst',value:delta.added,position:'Front'};
+    if (['addlast','offerlast','add','offer'].includes(m)) return {operation:'addLast',value:delta.added,position:'Back'};
+    if (['removefirst','pollfirst','remove','poll','pop'].includes(m)) return {operation:m === 'pop' ? 'Pop' : 'removeFirst',value:delta.removed,position:'Front'};
+    if (['removelast','polllast'].includes(m)) return {operation:'removeLast',value:delta.removed,position:'Back'};
+  }
+  if (kind === 'priorityQueue') {
+    if (['add','offer'].includes(m)) return {operation:'Offer',value:delta.added,position:'Queue'};
+    if (['poll','remove'].includes(m)) return {operation:'Poll',value:delta.removed,position:'Priority'};
+  }
+  if (kind === 'list') {
+    if (m === 'add') return argCount >= 2
+      ? {operation:'Insert',value:delta.added,position:'Index: ' + (delta.index ?? '?')}
+      : {operation:'Add',value:delta.added,position:'End'};
+    if (['addlast','offer'].includes(m)) return {operation:'Add',value:delta.added,position:'End'};
+    if (['remove','removelast','poll'].includes(m)) return {operation:'Remove',value:delta.removed,position:typeof delta.index === 'number' ? 'Index: ' + delta.index : 'End'};
+    if (m === 'set') return {operation:'Set',value:delta.added,oldValue:delta.removed,position:'Index: ' + (delta.index ?? '?'),showOld:true};
+  }
+  if (kind === 'set') {
+    if (m === 'add') return {operation:'Add',value:delta.added,position:'Element'};
+    if (m === 'remove') return {operation:'Remove',value:delta.removed,position:'Element'};
+  }
+  return undefined;
+}
+
+
+function asArraySnapshot(
+  value: unknown
+): Obj & { $arrayId: string; values: unknown[] } | undefined {
+  return isArraySnapshot(value) ? value : undefined;
+}
+
+function asMapSnapshot(
+  value: unknown
+): Obj & {
+  $mapId: string;
+  entries: Array<{ key: unknown; value: unknown }>;
+} | undefined {
+  return isMapSnapshot(value) ? value : undefined;
+}
+
+function compareArrayValues(
+  before: unknown[],
+  after: unknown[],
+  path: number[],
+  changes: Array<{ indices: number[]; before: unknown; after: unknown }>
+): void {
+  const length = Math.max(before.length, after.length);
+
+  for (let i = 0; i < length; i++) {
+    const beforeValue = before[i];
+    const afterValue = after[i];
+
+    const beforeNested = asArraySnapshot(beforeValue);
+    const afterNested = asArraySnapshot(afterValue);
+
+    if (
+      beforeNested &&
+      afterNested &&
+      beforeNested.$arrayId === afterNested.$arrayId
+    ) {
+      compareArrayValues(
+        beforeNested.values,
+        afterNested.values,
+        [...path, i],
+        changes
+      );
+      continue;
+    }
+
+    if (!valueChanged(beforeValue, afterValue)) continue;
+
+    changes.push({
+      indices: [...path, i],
+      before: beforeValue,
+      after: afterValue
+    });
+  }
+}
+
+function compareMapEntries(
+  before: Array<{ key: unknown; value: unknown }>,
+  after: Array<{ key: unknown; value: unknown }>
+): Array<{
+  kind: 'insert' | 'update' | 'delete';
+  key: unknown;
+  before?: unknown;
+  after?: unknown;
+}> {
+  const changes: Array<{
+    kind: 'insert' | 'update' | 'delete';
+    key: unknown;
+    before?: unknown;
+    after?: unknown;
+  }> = [];
+
+  const beforeMap = new Map<string, { key: unknown; value: unknown }>();
+  const afterMap = new Map<string, { key: unknown; value: unknown }>();
+
+  for (const entry of before) {
+    beforeMap.set(stableStringify(entry.key), entry);
+  }
+
+  for (const entry of after) {
+    afterMap.set(stableStringify(entry.key), entry);
+  }
+
+  for (const [key, entry] of afterMap) {
+    const previous = beforeMap.get(key);
+
+    if (!previous) {
+      changes.push({
+        kind: 'insert',
+        key: entry.key,
+        after: entry.value
+      });
+      continue;
+    }
+
+    if (valueChanged(previous.value, entry.value)) {
+      changes.push({
+        kind: 'update',
+        key: entry.key,
+        before: previous.value,
+        after: entry.value
+      });
+    }
+  }
+
+  for (const [key, entry] of beforeMap) {
+    if (!afterMap.has(key)) {
+      changes.push({
+        kind: 'delete',
+        key: entry.key,
+        before: entry.value
+      });
+    }
+  }
+
+  return changes;
+}
+
+function dataStructureResults(current?: TraceState, previous?: TraceState, statement = ''): React.ReactNode[] {
+  if (!current) return [];
+  const rows: React.ReactNode[] = [];
+  const seen = new Set<string>();
+  const add = (key:string,name:string,operation:string,value:unknown,position:string,oldValue?:unknown,showOld=oldValue!==undefined) => {
+    if (seen.has(key) || name === 'this' || value === undefined) return;
+    seen.add(key);
+    rows.push(<DataStructureResult key={key} name={name} operation={operation} value={value} oldValue={oldValue} position={position} showOld={showOld}/>);
+  };
+
+  const before = {
+    ...(previous?.arrays ?? {}),
+    ...(previous?.dataStructures ?? {})
+  };
+  const after = {
+    ...(current.arrays ?? {}),
+    ...(current.dataStructures ?? {})
+  };
+
+  for (const [name,value] of Object.entries(after)) {
+    if (name === 'this') continue;
+    const oldValue = before[name];
+
+    const bm = asMapSnapshot(oldValue), am = asMapSnapshot(value);
+    if (bm && am && bm.$mapId === am.$mapId) {
+      for (const change of compareMapEntries(bm.entries,am.entries)) {
+        const key=compactValue(change.key);
+        if(change.kind==='insert') add('map-i-'+name+'-'+key,name,'Put',change.after,'Key: '+key,undefined,true);
+        else if(change.kind==='update') add('map-u-'+name+'-'+key,name,'Update',change.after,'Key: '+key,change.before,true);
+        else add('map-r-'+name+'-'+key,name,'Remove',change.before,'Key: '+key);
+      }
+      continue;
+    }
+
+    const bc=isCollectionSnapshot(oldValue)?oldValue:undefined;
+    const ac=isCollectionSnapshot(value)?value:undefined;
+    if(bc && ac && bc.$collectionId===ac.$collectionId){
+      const method=sourceCall(statement,name);
+      const args=sourceCallArgs(statement,name);
+      let delta=collectionDelta(bc.values,ac.values);
+      if (!delta && ac.$kind === 'priorityQueue') delta=unorderedCollectionDelta(bc.values,ac.values);
+      const op=delta ? collectionOperation(ac.$kind ?? '',method,delta,args.length) : undefined;
+      if(delta && op) add('col-'+name+'-'+stableStringify([delta.added,delta.removed,delta.index]),name,op.operation,op.value,op.position,op.oldValue,op.showOld);
+      continue;
+    }
+
+    const ba=asArraySnapshot(oldValue), aa=asArraySnapshot(value);
+    if(ba && aa && ba.$arrayId===aa.$arrayId){
+      const changes:Array<{indices:number[];before:unknown;after:unknown}>=[];
+      compareArrayValues(ba.values,aa.values,[],changes);
+      for(const change of changes) add('arr-'+name+'-'+JSON.stringify(change.indices),name,'Set',change.after,'Index: '+change.indices.join('.'),change.before,change.before===undefined);
+    }
+  }
+
+  const data=isPlainObject(current.lastEvent?.data)?current.lastEvent.data:{};
+  const events=Array.isArray(data.executionEvents)?data.executionEvents:[];
+  for(const event of events){
+    if(!isPlainObject(event)||!isPlainObject(event.data)) continue;
+    const d=event.data;
+    if(event.type==='MAP_WRITE'){
+      const name=typeof d.name==='string'?d.name:'map';
+      const changes=Array.isArray(d.changes)?d.changes:[];
+      for(const change of changes){
+        if(!isPlainObject(change)) continue;
+        const key=compactValue(change.key);
+        if(change.kind==='insert') add('map-i-' + name + '-' + key,name,'Put',change.after,'Key: '+key,undefined,true);
+        else if(change.kind==='update') add('map-u-' + name + '-' + key,name,'Update',change.after,'Key: '+key,change.before,true);
+        else if(change.kind==='delete') add('map-r-' + name + '-' + key,name,'Remove',change.before,'Key: '+key);
+      }
+    } else if(event.type==='ARRAY_WRITE'){
+      const name=typeof d.name==='string'?d.name:'array';
+      const changes=Array.isArray(d.changes)?d.changes:[];
+      for(const change of changes){
+        if(!isPlainObject(change)) continue;
+        const indices=Array.isArray(change.indices)?change.indices:[];
+        add('arr-' + name + '-' + JSON.stringify(indices),name,'Set',change.after,'Index: '+indices.join('.'),change.before,change.before===undefined);
+      }
+    }
+  }
+  return rows;
+}
+
 function ExecutionInspector({ state, previous, statement, index, total }: { state?: TraceState; previous?: TraceState; statement: string; index: number; total: number }) {
   const condition = executionCondition(state);
   const substatement = executionSubstatement(statement, state, previous);
-  const effects = [...variableEffects(state, previous), ...eventEffects(state)]
+  const variableResults = variableResultChanges(state, previous);
+  const dataStructureResultRows = dataStructureResults(state, previous, statement);
+  const newStructureResults = newDataStructureResults(state, previous);
+  const effects = eventEffects(state)
     .filter((effect, i, all) => all.findIndex((x) => x.text === effect.text) === i);
+  const showEffects = dataStructureResultRows.length === 0;
 
-  const resultEffects = effects.slice(0, 3);
-  const resultOverflow = effects.length - resultEffects.length;
 
   return (
     <div className="yv-execution">
@@ -329,30 +875,35 @@ function ExecutionInspector({ state, previous, statement, index, total }: { stat
         </button>
       </div>
 
-      <div className="yv-execution-row">
-        <div className="yv-execution-code">{substatement || 'Select a testcase and press Visualize.'}</div>
+      <div className="yv-execution-code">{substatement || 'Select a testcase and press Visualize.'}</div>
 
-        <div className="yv-execution-result" aria-label="Execution result">
+      <div className="yv-execution-result-label">EXECUTION RESULT</div>
+      <div className="yv-execution-result" aria-label="Execution result">
           {condition !== undefined ? (
             <span className={'yv-condition ' + (condition ? 'true' : 'false')}>
               {condition ? 'TRUE' : 'FALSE'}
             </span>
-          ) : resultEffects.length > 0 ? (
+          ) : dataStructureResultRows.length > 0 || variableResults.length > 0 || newStructureResults.length > 0 ? (
             <div className="yv-result-list">
-              {resultEffects.map((effect, i) => (
+              {dataStructureResultRows}
+              {variableResults}
+              {newStructureResults}
+            </div>
+          ) : effects.length > 0 ? (
+            <div className="yv-result-list">
+              {effects.slice(0, 3).map((effect, i) => (
                 <div className={'yv-result ' + (effect.kind ?? 'change')} key={effect.text + '-' + i}>
                   {effect.text}
                 </div>
               ))}
-              {resultOverflow > 0 && <div className="yv-result-more">+{resultOverflow} more</div>}
+              {effects.length > 3 && <div className="yv-result-more">+{effects.length - 3} more</div>}
             </div>
           ) : (
             <span className="yv-result-empty">—</span>
           )}
         </div>
-      </div>
 
-      {effects.length > 3 && (
+      {showEffects && effects.length > 3 && (
         <div className="yv-effects" aria-label="Additional execution effects">
           {effects.slice(3, 6).map((effect, i) => (
             <div className={'yv-effect ' + (effect.kind ?? 'change')} key={effect.text + '-' + i}>
@@ -607,13 +1158,15 @@ function variableSummary(value: unknown): string {
 }
 
 function Variables({ state, previous }: { state?: TraceState; previous?: TraceState }) {
-  const entries = Object.entries(state?.variables ?? {}).filter(([, value]) => !isStructuralObject(value));
+  const entries = Object.entries(state?.variables ?? {})
+    .filter(([name, value]) => name !== 'this' && !isStructuralObject(value));
   if (!entries.length) return <div className="yv-empty">No local variables yet.</div>;
 
   return (
     <div className="yv-vars">
       {entries.map(([name, value]) => {
         const old = previous?.variables?.[name];
+        const initialized = !(name in (previous?.variables ?? {}));
         const changed =
           Boolean(previous) &&
           stableStringify(old) !== stableStringify(value);
@@ -625,7 +1178,7 @@ function Variables({ state, previous }: { state?: TraceState; previous?: TraceSt
               {changed && (
                 <>
                   <span className="yv-old yv-code">
-                    {variableSummary(old)}
+                    {initialized ? 'undefined' : variableSummary(old)}
                   </span>
                   <span className="yv-arrow">→</span>
                 </>
@@ -876,6 +1429,7 @@ function LinkedListView({
 }) {
   const pointerNames = new Map<string, string[]>();
   for (const [name, value] of Object.entries(variables)) {
+    if (name === 'this') continue;
     if (isPlainObject(value) && typeof value.$objectId === 'string') {
       const names = pointerNames.get(value.$objectId) ?? [];
       names.push(name);
@@ -1078,6 +1632,7 @@ function DataStructures({ state, source }: { state?: TraceState; source: string 
   const namedObjectIds = new Map<string, string[]>();
 
   for (const [name, value] of Object.entries(state?.variables ?? {})) {
+    if (name === 'this') continue;
     if (isPlainObject(value) && typeof value.$objectId === 'string') {
       const names = namedObjectIds.get(value.$objectId) ?? [];
       names.push(name);

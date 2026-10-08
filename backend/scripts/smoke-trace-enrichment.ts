@@ -240,131 +240,6 @@ if (declarationStates[0]?.line !== 2 || declarationStates[1]?.line !== 6) {
 
 console.log("PASS: execution line semantics");
 
-const loopAttributionTrace: ExecutionTrace = {
-    version: 1,
-    events: [
-        {
-            sequence: 1,
-            type: "STEP",
-            line: 9,
-            method: "loop",
-            depth: 1,
-            data: {
-                variables: {
-                    i: 0,
-                    nums: { $arrayId: "70", $type: "int[]", values: [2, 7] }
-                },
-                arrayReferences: [
-                    { array: "nums", arrayId: "70", length: 2, line: 9 }
-                ]
-            }
-        },
-        {
-            sequence: 2,
-            type: "STEP",
-            line: 10,
-            method: "loop",
-            depth: 1,
-            data: {
-                variables: {
-                    i: 0,
-                    nums: { $arrayId: "70", $type: "int[]", values: [2, 7] }
-                },
-                arrayReferences: [
-                    { array: "nums", arrayId: "70", length: 2, line: 10 }
-                ]
-            }
-        },
-        {
-            sequence: 3,
-            type: "STEP",
-            line: 9,
-            method: "loop",
-            depth: 1,
-            data: {
-                variables: {
-                    i: 1,
-                    nums: { $arrayId: "70", $type: "int[]", values: [2, 7] }
-                },
-                arrayReferences: [
-                    { array: "nums", arrayId: "70", length: 2, line: 9 }
-                ]
-            }
-        }
-    ]
-};
-
-const loopSource = [
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "  for (int i = 0; i < 2; i++) {",
-    "    use(nums[i]);",
-    "  }",
-    "}"
-].join("\n");
-
-const loopAttribution = enrichTrace(loopAttributionTrace, loopSource);
-const loopFirstStep = loopAttribution.events.find(
-    event => event.type === "STEP" && event.line === 9
-);
-const loopFirstEffects = Array.isArray(loopFirstStep?.data?.executionEvents)
-    ? loopFirstStep.data.executionEvents
-    : [];
-
-if (
-    loopFirstEffects.some(
-        event =>
-            event &&
-            typeof event === "object" &&
-            (event as { type?: unknown }).type === "VARIABLE_UPDATE"
-    )
-) {
-    throw new Error("for-loop update was incorrectly attached to the preceding body line");
-}
-
-const loopUpdateStep = loopAttribution.events.find(
-    event =>
-        event.type === "STEP" &&
-        event.line === 9 &&
-        event !== loopFirstStep
-);
-const loopUpdateEffects = Array.isArray(loopUpdateStep?.data?.executionEvents)
-    ? loopUpdateStep.data.executionEvents
-    : [];
-
-if (
-    !loopUpdateEffects.some(
-        event =>
-            event &&
-            typeof event === "object" &&
-            (event as { type?: unknown }).type === "VARIABLE_UPDATE" &&
-            (event as { data?: { name?: unknown } }).data?.name === "i"
-    )
-) {
-    throw new Error("for-loop update was not attached to the next for checkpoint");
-}
-
-const filteredRefs = loopAttribution.events
-    .filter(event => event.type === "STEP" && event.line === 9)
-    .map(event => event.data?.arrayReferences);
-
-if (
-    !Array.isArray(filteredRefs[0]) ||
-    filteredRefs[0].length !== 0 ||
-    !Array.isArray(filteredRefs[1]) ||
-    filteredRefs[1].length !== 0
-) {
-    throw new Error("array reference metadata incorrectly treated visible arrays as line references");
-}
-
-console.log("PASS: loop attribution and array-reference filtering");
-
 const accessTrace: ExecutionTrace = {
     version: 1,
     events: [
@@ -733,144 +608,19 @@ console.log("PASS: method-call conditions, return values, and array accesses");
 
 
 
-const misorderedForTrace: ExecutionTrace = {
+const stateDrivenTrace: ExecutionTrace = {
     version: 1,
     events: [
         {
             sequence: 1,
             type: "STEP",
-            line: 7,
-            method: "twoSum",
+            line: 9,
+            method: "loop",
             depth: 1,
             data: { variables: { n: 4, i: 0 } }
         },
         {
             sequence: 2,
-            type: "STEP",
-            line: 9,
-            method: "twoSum",
-            depth: 1,
-            data: {
-                variables: { n: 4, i: 0 },
-                conditionResult: true,
-                executionEvents: [
-                    {
-                        sequence: 0,
-                        type: "MAP_WRITE",
-                        line: 9,
-                        method: "twoSum",
-                        depth: 1,
-                        data: { name: "mp", mapId: "1", entries: [], size: 0, operation: "create" }
-                    }
-                ]
-            }
-        },
-        {
-            sequence: 3,
-            type: "STEP",
-            line: 9,
-            method: "twoSum",
-            depth: 1,
-            data: {
-                variables: { n: 4, i: 0 },
-                executionEvents: [
-                    {
-                        sequence: 0,
-                        type: "VARIABLE_UPDATE",
-                        line: 9,
-                        method: "twoSum",
-                        depth: 1,
-                        data: { name: "i", value: 0 }
-                    }
-                ]
-            }
-        }
-    ]
-};
-
-const misorderedSource = [
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "    for(int i=0;i<n+1;i++){",
-    "        use(i);"
-].join("\n");
-
-const misorderedFor = enrichTrace(misorderedForTrace, misorderedSource);
-const misorderedSteps = misorderedFor.events.filter(event => event.type === "STEP");
-if (
-    misorderedSteps[1]?.data?.executionPhase !== "initialization" ||
-    misorderedSteps[2]?.data?.executionPhase !== "condition" ||
-    misorderedSteps[2]?.data?.conditionResult !== true
-) {
-    throw new Error("misordered for-loop initialization was not canonicalized: " + JSON.stringify(misorderedSteps.map(step => ({
-        phase: step.data?.executionPhase,
-        condition: step.data?.conditionResult,
-        events: step.data?.executionEvents
-    }))));
-}
-
-const misorderedInitEffects = Array.isArray(misorderedSteps[1]?.data?.executionEvents)
-    ? misorderedSteps[1].data.executionEvents
-    : [];
-if (!misorderedInitEffects.some(event => event.type === "VARIABLE_UPDATE" && isRecord(event.data) && event.data.name === "i")) {
-    throw new Error("for-loop initialization result was not moved onto the initialization checkpoint");
-}
-if (misorderedSteps[1]?.data?.conditionResult !== undefined) {
-    throw new Error("initialization checkpoint still exposes a condition result");
-}
-
-console.log("PASS: misordered for-loop initialization regression");
-
-const semanticForTrace: ExecutionTrace = {
-    version: 1,
-    events: [
-        {
-            sequence: 1,
-            type: "STEP",
-            line: 9,
-            method: "loop",
-            depth: 1,
-            data: {
-                variables: { n: 4, i: 0 }
-            }
-        },
-        {
-            sequence: 2,
-            type: "STEP",
-            line: 9,
-            method: "loop",
-            depth: 1,
-            data: {
-                variables: { n: 4, i: 0 },
-                executionEvents: [
-                    {
-                        sequence: 0,
-                        type: "VARIABLE_UPDATE",
-                        line: 9,
-                        method: "loop",
-                        depth: 1,
-                        data: { name: "i", value: 0 }
-                    }
-                ]
-            }
-        },
-        {
-            sequence: 3,
-            type: "STEP",
-            line: 10,
-            method: "loop",
-            depth: 1,
-            data: {
-                variables: { n: 4, i: 0 }
-            }
-        },
-        {
-            sequence: 4,
             type: "STEP",
             line: 9,
             method: "loop",
@@ -881,7 +631,15 @@ const semanticForTrace: ExecutionTrace = {
             }
         },
         {
-            sequence: 5,
+            sequence: 3,
+            type: "STEP",
+            line: 10,
+            method: "loop",
+            depth: 1,
+            data: { variables: { n: 4, i: 0 } }
+        },
+        {
+            sequence: 4,
             type: "STEP",
             line: 9,
             method: "loop",
@@ -901,19 +659,20 @@ const semanticForTrace: ExecutionTrace = {
             }
         },
         {
-            sequence: 6,
+            sequence: 5,
             type: "STEP",
-            line: 10,
+            line: 9,
             method: "loop",
             depth: 1,
             data: {
-                variables: { n: 4, i: 1 }
+                variables: { n: 4, i: 1 },
+                conditionResult: true
             }
         }
     ]
 };
 
-const semanticForSource = [
+const stateDrivenSource = [
     "",
     "",
     "",
@@ -927,52 +686,42 @@ const semanticForSource = [
     "}"
 ].join("\n");
 
-const semanticFor = enrichTrace(semanticForTrace, semanticForSource);
-const semanticSteps = semanticFor.events.filter(event => event.type === "STEP");
+const stateDrivenFor = enrichTrace(stateDrivenTrace, stateDrivenSource);
+const stateDrivenSteps = stateDrivenFor.events.filter(event => event.type === "STEP");
 
 if (
-    semanticSteps[0]?.data?.executionPhase !== "initialization" ||
-    semanticSteps[1]?.data?.executionPhase !== "condition" ||
-    semanticSteps[1]?.data?.conditionResult !== true ||
-    semanticSteps[3]?.data?.executionPhase !== "update" ||
-    semanticSteps[4]?.data?.executionPhase !== "condition" ||
-    semanticSteps[4]?.data?.conditionResult !== true
+    stateDrivenSteps[0]?.data?.executionPhase !== undefined ||
+    stateDrivenSteps[1]?.data?.executionPhase !== undefined ||
+    stateDrivenSteps[3]?.data?.executionPhase !== undefined
 ) {
-    throw new Error("for-loop semantic order was not normalized: " + JSON.stringify(semanticSteps.map(step => ({
-        phase: step.data?.executionPhase,
+    throw new Error("loop-specific execution phases should no longer be synthesized");
+}
+
+const firstLoopVariables = stateDrivenSteps[0]?.data?.variables;
+const firstConditionVariables = stateDrivenSteps[1]?.data?.variables;
+const updateVariables = stateDrivenSteps[3]?.data?.variables;
+const secondConditionVariables = stateDrivenSteps[4]?.data?.variables;
+
+if (
+    !isRecord(firstLoopVariables) ||
+    firstLoopVariables.i !== 0 ||
+    !isRecord(firstConditionVariables) ||
+    firstConditionVariables.i !== 0 ||
+    stateDrivenSteps[1]?.data?.conditionResult !== true ||
+    !isRecord(updateVariables) ||
+    updateVariables.i !== 1 ||
+    !isRecord(secondConditionVariables) ||
+    secondConditionVariables.i !== 1 ||
+    stateDrivenSteps[4]?.data?.conditionResult !== true
+) {
+    throw new Error("for-loop runtime state was not preserved: " + JSON.stringify(stateDrivenSteps.map(step => ({
         condition: step.data?.conditionResult,
         variables: step.data?.variables,
-        postVariables: step.data?.postVariables,
         events: step.data?.executionEvents
     }))));
 }
 
-const semanticUpdate = Array.isArray(semanticSteps[3]?.data?.executionEvents)
-    ? semanticSteps[3].data.executionEvents
-    : [];
-if (
-    !semanticUpdate.some(
-        event =>
-            event.type === "VARIABLE_UPDATE" &&
-            isRecord(event.data) &&
-            event.data.name === "i" &&
-            event.data.before === 0 &&
-            event.data.value === 1
-    )
-) {
-    throw new Error("for-loop update result was not attached to the update checkpoint");
-}
-
-const semanticUpdatePost = semanticSteps[3]?.data?.postVariables;
-const semanticConditionVariables = semanticSteps[4]?.data?.variables;
-if (
-    !isRecord(semanticUpdatePost) ||
-    semanticUpdatePost.i !== 1 ||
-    !isRecord(semanticConditionVariables) ||
-    semanticConditionVariables.i !== 1
-) {
-    throw new Error("for-loop update/condition state did not advance in semantic order");
-}
+console.log("PASS: for-loop visualization uses runtime state directly");
 
 // The semantic loop fixture intentionally models JDI checkpoints whose source-line order is ambiguous.
 console.log("PASS: semantic for-loop ordering");
