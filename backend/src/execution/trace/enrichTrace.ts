@@ -171,14 +171,26 @@ function collapseEnhancedForLoopCheckpoints(
 
     for (let index = 0; index < events.length; index++) {
         const current = events[index];
-        const next = events[index + 1];
-
         if (!current) continue;
+
         const line = current.line;
         if (typeof line !== "number") {
             normalized.push(current);
             continue;
         }
+
+        // Derived execution events are inserted between STEP checkpoints.
+        // Do not assume the next array entry is the next STEP; otherwise the
+        // duplicate enhanced-for header checkpoints are never collapsed.
+        let nextStepIndex = index + 1;
+        while (
+            nextStepIndex < events.length &&
+            events[nextStepIndex]?.type !== "STEP"
+        ) {
+            nextStepIndex++;
+        }
+
+        const next = events[nextStepIndex];
 
         if (
             current.type === "STEP" &&
@@ -190,12 +202,17 @@ function collapseEnhancedForLoopCheckpoints(
             !hasEnhancedForVariable(current, sourceLines, line) &&
             hasEnhancedForVariable(next, sourceLines, line)
         ) {
-            // JDI can suspend twice on an enhanced-for header:
-            // first before the loop variable is assigned and again after
-            // assigning the next element. The first checkpoint is not a
-            // meaningful execution state for the visualizer. Keep the
-            // assignment checkpoint so the UI can show the variable
-            // transition and then enter the loop body.
+            // The first header checkpoint is pre-assignment. Transfer its
+            // derived effects to the meaningful assignment checkpoint, then
+            // remove the pre-assignment checkpoint and any derived events
+            // that were attached to it.
+            const currentExecutionEvents = executionEventsFor(current);
+            if (currentExecutionEvents.length > 0) {
+                appendExecutionEvents(next, currentExecutionEvents);
+            }
+
+            normalized.push(next);
+            index = nextStepIndex;
             continue;
         }
 
