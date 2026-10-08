@@ -34,71 +34,15 @@ function accessEffects(data: Obj): ExecutionEffect[] {
   const effects: ExecutionEffect[] = [];
   const executionEvents = Array.isArray(data.executionEvents) ? data.executionEvents : [];
   for (const event of executionEvents) {
-    if (!isPlainObject(event) || event.type !== 'ARRAY_ACCESS' || !isPlainObject(event.data)) continue;
-    const eventData = event.data;
-    const name = typeof eventData.name === 'string' ? eventData.name : 'array';
-    const indices = Array.isArray(eventData.indices) ? eventData.indices.map((x) => '[' + x + ']').join('') : '';
-    effects.push({ kind: 'structural', text: name + indices + ' = ' + compactValue(eventData.value) });
-  }
-  return effects;
-}
-
-function eventEffects(state?: TraceState): ExecutionEffect[] {
-  const data = state?.lastEvent?.data;
-  if (!isPlainObject(data)) return [];
-
-  const type = state?.lastEvent?.type;
-  const effects: ExecutionEffect[] = [...accessEffects(data)];
-
-  // Replay checkpoints carry the operations observed between the current
-  // STEP and the next runtime checkpoint. Those operations belong to the
-  // currently highlighted line, not the following line.
-  const executionEvents = Array.isArray(data.executionEvents) ? data.executionEvents : [];
-
-  for (const event of executionEvents) {
     if (!isPlainObject(event)) continue;
-    const eventData = isPlainObject(event.data) ? event.data : {};
     const eventType = typeof event.type === 'string' ? event.type : '';
-
-    if (eventType === 'ARRAY_WRITE') {
+    if (eventType === 'ARRAY_ACCESS' && isPlainObject(event.data)) {
+      const eventData = event.data;
       const name = typeof eventData.name === 'string' ? eventData.name : 'array';
-      const changes = Array.isArray(eventData.changes) ? eventData.changes : [];
-      for (const change of changes.slice(0, 3)) {
-        if (!isPlainObject(change)) continue;
-        const indices = Array.isArray(change.indices)
-          ? change.indices.map((x) => '[' + x + ']').join('')
-          : '';
-        effects.push({
-          kind: 'change',
-          text: name + indices + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
-        });
-      }
-    } else if (eventType === 'MAP_WRITE') {
-      const changes = Array.isArray(eventData.changes) ? eventData.changes : [];
-      for (const change of changes.slice(0, 3)) {
-        if (!isPlainObject(change)) continue;
-        const key = compactValue(change.key);
-        if (change.kind === 'insert') {
-          effects.push({ kind: 'structural', text: key + '  →  ' + compactValue(change.after) });
-        } else if (change.kind === 'delete') {
-          effects.push({ kind: 'structural', text: key + '  removed' });
-        } else {
-          effects.push({
-            kind: 'change',
-            text: key + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
-          });
-        }
-      }
-    } else if (eventType === 'OBJECT_FIELD_WRITE') {
-      const changes = Array.isArray(eventData.changes) ? eventData.changes : [];
-      for (const change of changes.slice(0, 3)) {
-        if (!isPlainObject(change)) continue;
-        const fields = Array.isArray(change.fields) ? change.fields.join('.') : 'field';
-        effects.push({
-          kind: 'change',
-          text: fields + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
-        });
-      }
+      const indices = Array.isArray(eventData.indices)
+        ? eventData.indices.map((x) => '[' + x + ']').join('')
+        : '';
+      effects.push({ kind: 'structural', text: name + indices + ' = ' + compactValue(eventData.value) });
     }
   }
 
@@ -125,50 +69,11 @@ function eventEffects(state?: TraceState): ExecutionEffect[] {
     effects.push({ kind: 'structural', text: name });
   }
 
-  if (type === 'OBJECT_FIELD_WRITE') {
-    const changes = Array.isArray(data.changes) ? data.changes : [];
-    for (const change of changes.slice(0, 3)) {
-      if (!isPlainObject(change)) continue;
-      const fields = Array.isArray(change.fields) ? change.fields.join('.') : 'field';
-      effects.push({
-        kind: 'change',
-        text: fields + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
-      });
-    }
-  }
 
-  if (type === 'ARRAY_WRITE') {
-    const changes = Array.isArray(data.changes) ? data.changes : [];
-    for (const change of changes.slice(0, 3)) {
-      if (!isPlainObject(change)) continue;
-      const indices = Array.isArray(change.indices)
-        ? change.indices.map((x) => '[' + x + ']').join('')
-        : '';
-      const name = typeof data.name === 'string' ? data.name : 'array';
-      effects.push({
-        kind: 'change',
-        text: name + indices + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
-      });
-    }
-  }
 
-  if (type === 'MAP_WRITE') {
-    const changes = Array.isArray(data.changes) ? data.changes : [];
-    for (const change of changes.slice(0, 3)) {
-      if (!isPlainObject(change)) continue;
-      const key = compactValue(change.key);
-      if (change.kind === 'insert') {
-        effects.push({ kind: 'structural', text: key + '  →  ' + compactValue(change.after) });
-      } else if (change.kind === 'delete') {
-        effects.push({ kind: 'structural', text: key + '  removed' });
-      } else {
-        effects.push({
-          kind: 'change',
-          text: key + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
-        });
-      }
-    }
-  }
+
+
+
 
   if ('returnValue' in data) {
     effects.push({ kind: 'return', text: '↩  ' + compactValue(data.returnValue) });
@@ -315,8 +220,9 @@ function ExecutionInspector({ state, previous, statement, index, total }: { stat
   const condition = executionCondition(state);
   const substatement = executionSubstatement(statement);
   const variableResults = variableResultChanges(state, previous);
+  const dataStructureResultRows = dataStructureResults(state, previous, statement);
   const newStructureResults = newDataStructureResults(state, previous);
-  const effects = eventEffects(state)
+  const effects = eventEffects(state, statement)
     .filter((effect, i, all) => all.findIndex((x) => x.text === effect.text) === i);
 
 
@@ -358,8 +264,9 @@ function ExecutionInspector({ state, previous, statement, index, total }: { stat
             <span className={'yv-condition ' + (condition ? 'true' : 'false')}>
               {condition ? 'TRUE' : 'FALSE'}
             </span>
-          ) : variableResults.length > 0 || newStructureResults.length > 0 ? (
+          ) : dataStructureResultRows.length > 0 || variableResults.length > 0 || newStructureResults.length > 0 ? (
             <div className="yv-result-list">
+              {dataStructureResultRows}
               {variableResults}
               {newStructureResults}
             </div>
