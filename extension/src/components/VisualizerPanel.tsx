@@ -402,10 +402,10 @@ function variableResultChanges(current?: TraceState, previous?: TraceState): Rea
     if (!isPlainObject(event) || event.type !== 'VARIABLE_UPDATE') continue;
     const eventData = isPlainObject(event.data) ? event.data : undefined;
     const name = typeof eventData?.name === 'string' ? eventData.name : undefined;
-    if (!name || name === 'this' || !('value' in (eventData ?? {}))) continue;
+    if (!eventData || !name || name === 'this' || !('value' in eventData)) continue;
     const value = eventData.value;
     if (isStructuralValue(value)) continue;
-    const oldValue = 'before' in (eventData ?? {}) ? eventData?.before : before[name];
+    const oldValue = 'before' in eventData ? eventData.before : before[name];
     fallback.push(
       <VariableResult
         key={'event-variable-' + name}
