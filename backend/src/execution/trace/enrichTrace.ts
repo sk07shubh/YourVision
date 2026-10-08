@@ -173,6 +173,8 @@ function collapseEnhancedForLoopCheckpoints(
         const current = events[index];
         const next = events[index + 1];
 
+        if (!current) continue;
+
         if (
             current.type === "STEP" &&
             next?.type === "STEP" &&
