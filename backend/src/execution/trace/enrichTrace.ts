@@ -619,6 +619,15 @@ function readMethod(value: unknown, method: string, args: unknown[]): unknown {
 
     const snapshot = (value as { snapshot: Record<string, unknown> }).snapshot;
 
+    if (method === "peek") {
+        if (args.length !== 0) throw new Error("peek expects no arguments");
+        if (Array.isArray(snapshot.values)) {
+            if (snapshot.values.length === 0) throw new Error("peek on empty collection");
+            return snapshot.values[snapshot.values.length - 1];
+        }
+        throw new Error("peek receiver unavailable");
+    }
+
     if (method === "containsKey") {
         const entries = Array.isArray(snapshot.entries) ? snapshot.entries : [];
         return entries.some((entry) =>
