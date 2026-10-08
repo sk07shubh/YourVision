@@ -670,10 +670,10 @@ function ExecutionInspector({ state, previous, statement, index, total }: { stat
         </button>
       </div>
 
-      <div className="yv-execution-row">
-        <div className="yv-execution-code">{substatement || 'Select a testcase and press Visualize.'}</div>
+      <div className="yv-execution-code">{substatement || 'Select a testcase and press Visualize.'}</div>
 
-        <div className="yv-execution-result" aria-label="Execution result">
+      <div className="yv-execution-result-label">EXECUTION RESULT</div>
+      <div className="yv-execution-result" aria-label="Execution result">
           {condition !== undefined ? (
             <span className={'yv-condition ' + (condition ? 'true' : 'false')}>
               {condition ? 'TRUE' : 'FALSE'}
