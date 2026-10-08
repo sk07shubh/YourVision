@@ -15,7 +15,7 @@ import {
   unorderedCollectionDelta,
 } from './VisualizerPanel';
 
-function state(patch: Partial<TraceState>): TraceState {
+function state(patch: Partial<TraceState> = {}): TraceState {
   return {
     sequence: 1,
     depth: 1,
