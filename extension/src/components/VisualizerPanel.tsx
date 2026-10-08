@@ -408,8 +408,8 @@ function collectionOperation(kind: string, method: string | undefined, delta: {a
   if (kind === 'deque') {
     if (['addfirst','offerfirst','push'].includes(m)) return {operation:m === 'push' ? 'Push' : 'addFirst',value:delta.added,position:'Front'};
     if (['addlast','offerlast','add','offer'].includes(m)) return {operation:'addLast',value:delta.added,position:'Back'};
-    if (['removefirst','pollfirst','pop'].includes(m)) return {operation:m === 'pop' ? 'Pop' : 'removeFirst',value:delta.removed,position:'Front'};
-    if (['removelast','polllast','remove'].includes(m)) return {operation:'removeLast',value:delta.removed,position:'Back'};
+    if (['removefirst','pollfirst','remove','poll','pop'].includes(m)) return {operation:m === 'pop' ? 'Pop' : 'removeFirst',value:delta.removed,position:'Front'};
+    if (['removelast','polllast'].includes(m)) return {operation:'removeLast',value:delta.removed,position:'Back'};
   }
   if (kind === 'priorityQueue') {
     if (['add','offer'].includes(m)) return {operation:'Offer',value:delta.added,position:'Queue'};
