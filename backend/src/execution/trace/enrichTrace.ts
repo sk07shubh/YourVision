@@ -356,6 +356,20 @@ export function evaluateCondition(expression: string, variables: Record<string, 
     }
 }
 
+export function debugEvaluateCondition(
+    expression: string,
+    variables: Record<string, unknown>
+): { value?: unknown; error?: string } {
+    try {
+        const parser = new ConditionParser(tokenizeCondition(expression), variables);
+        return { value: parser.parse() };
+    } catch (error) {
+        return {
+            error: error instanceof Error ? error.message : String(error)
+        };
+    }
+}
+
 function tokenizeCondition(source: string): ConditionToken[] {
     const tokens: ConditionToken[] = [];
     let i = 0;
