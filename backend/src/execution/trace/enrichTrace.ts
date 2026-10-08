@@ -199,8 +199,12 @@ function collapseEnhancedForLoopCheckpoints(
             current.depth === next.depth &&
             current.line === next.line &&
             isEnhancedForHeader(sourceLines, line) &&
-            !hasEnhancedForVariable(current, sourceLines, line) &&
-            hasEnhancedForVariable(next, sourceLines, line)
+            enhancedForCheckpointIsDuplicate(
+                current,
+                next,
+                sourceLines,
+                line
+            )
         ) {
             // The first header checkpoint is pre-assignment. Transfer its
             // derived effects to the meaningful assignment checkpoint, then
@@ -274,6 +278,66 @@ function hasEnhancedForVariable(
         !Array.isArray(variables) &&
         name in variables
     );
+}
+
+function enhancedForVariableValue(
+    event: ExecutionEvent,
+    sourceLines: string[],
+    line: number
+): unknown {
+    const name = enhancedForVariableName(sourceLines, line);
+    if (!name) return undefined;
+
+    const variables = event.data?.variables;
+    if (
+        !variables ||
+        typeof variables !== "object" ||
+        Array.isArray(variables) ||
+        !(name in variables)
+    ) {
+        return undefined;
+    }
+
+    return variables[name];
+}
+
+function hasEnhancedForVariableUpdate(
+    event: ExecutionEvent,
+    sourceLines: string[],
+    line: number
+): boolean {
+    const name = enhancedForVariableName(sourceLines, line);
+    if (!name) return false;
+
+    const events = executionEventsFor(event);
+    return events.some((candidate) => {
+        if (candidate.type !== "VARIABLE_UPDATE") return false;
+        return candidate.data?.name === name && "value" in (candidate.data ?? {});
+    });
+}
+
+function enhancedForCheckpointIsDuplicate(
+    current: ExecutionEvent,
+    next: ExecutionEvent,
+    sourceLines: string[],
+    line: number
+): boolean {
+    // JDI may expose two STEP checkpoints at the same source header:
+    // one before the enhanced-for binding and one after the element has been
+    // assigned. Keep the latter. Do not depend on the element type; compare
+    // the iteration variable itself so char/int/String/object/generic loops
+    // all use exactly the same rule.
+    const currentHasVariable = hasEnhancedForVariable(current, sourceLines, line);
+    const nextHasVariable = hasEnhancedForVariable(next, sourceLines, line);
+
+    if (!nextHasVariable) return false;
+    if (!currentHasVariable) return true;
+
+    if (hasEnhancedForVariableUpdate(next, sourceLines, line)) return true;
+
+    const before = enhancedForVariableValue(current, sourceLines, line);
+    const after = enhancedForVariableValue(next, sourceLines, line);
+    return !sameSnapshot(before, after);
 }
 
 
