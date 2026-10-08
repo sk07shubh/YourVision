@@ -90,6 +90,22 @@ describe('execution visualization feature matrix', () => {
     expect(isForLoopUpdateStep(statement, condition, update)).toBe(false);
   });
 
+  it('renders every enhanced-for header generically', () => {
+    const cases = [
+      ['for (char ch : s.toCharArray())', 'char ch : s.toCharArray()'],
+      ['for (int n : nums)', 'int n : nums'],
+      ['for (String word : words)', 'String word : words'],
+      ['for (Node node : nodes)', 'Node node : nodes'],
+      ['for (List<String> row : rows)', 'List<String> row : rows'],
+      ['for (Map.Entry<Integer, String> entry : map.entrySet())', 'Map.Entry<Integer, String> entry : map.entrySet()'],
+      ['for (final var value : values)', 'final var value : values'],
+    ] as const;
+
+    for (const [statement, expected] of cases) {
+      expect(executionSubstatement(statement, state())).toBe(expected);
+    }
+  });
+
   it('keeps if/while conditions complete, including nested calls and negation', () => {
     expect(executionSubstatement('if (!Character.isLetterOrDigit(ch))', state({}))).toBe(
       'if(!Character.isLetterOrDigit(ch))'
