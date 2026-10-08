@@ -798,9 +798,73 @@ function dataStructureResults(current?: TraceState, previous?: TraceState, state
   return rows;
 }
 
+function isForLoopUpdateStep(statement: string, state?: TraceState, previous?: TraceState): boolean {
+  const trimmed = statement.trim();
+  if (!/^for\s*\(/.test(trimmed)) return false;
+
+  const data = isPlainObject(state?.lastEvent?.data) ? state.lastEvent.data : undefined;
+  const previousData = isPlainObject(previous?.lastEvent?.data) ? previous.lastEvent.data : undefined;
+  const rawVariables = isPlainObject(data?.variables) ? data.variables : {};
+  const rawPreviousVariables = isPlainObject(previousData?.variables) ? previousData.variables : {};
+
+  const openIndex = trimmed.indexOf('(');
+  let depth = 0, quote = '', escaped = false, inside: string | undefined;
+  for (let i = openIndex; i < trimmed.length; i++) {
+    const ch = trimmed[i]!;
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'") { quote = ch; continue; }
+    if (ch === '(') depth++;
+    else if (ch === ')') {
+      depth--;
+      if (depth === 0) { inside = trimmed.slice(openIndex + 1, i); break; }
+    }
+  }
+  if (inside === undefined) return false;
+
+  const parts: string[] = [];
+  let start = 0; depth = 0; quote = ''; escaped = false;
+  for (let i = 0; i < inside.length; i++) {
+    const ch = inside[i]!;
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'") { quote = ch; continue; }
+    if ('([{'.includes(ch)) depth++;
+    else if (')]}'.includes(ch)) depth--;
+    else if (ch === ';' && depth === 0) {
+      parts.push(inside.slice(start, i).trim());
+      start = i + 1;
+    }
+  }
+  parts.push(inside.slice(start).trim());
+  if (parts.length !== 3) return false;
+
+  const updateNames = [...parts[2].matchAll(/\b[A-Za-z_$][\w$]*\b/g)]
+    .map(m => m[0])
+    .filter(name => name in rawVariables || name in rawPreviousVariables);
+  if (!updateNames.length) return false;
+
+  const events = Array.isArray(data?.executionEvents) ? data.executionEvents : [];
+  return events.some(event => {
+    const d = isPlainObject(event.data) ? event.data : undefined;
+    const name = typeof d?.name === 'string' ? d.name : undefined;
+    return isPlainObject(event) && event.type === 'VARIABLE_UPDATE' &&
+      !!name && updateNames.includes(name) &&
+      ('before' in (d ?? {}) || name in rawPreviousVariables);
+  });
+}
+
 function ExecutionInspector({ state, previous, statement, index, total }: { state?: TraceState; previous?: TraceState; statement: string; index: number; total: number }) {
-  const condition = executionCondition(state);
   const substatement = executionSubstatement(statement, state, previous);
+  const condition = isForLoopUpdateStep(statement, state, previous) ? undefined : executionCondition(state);
   const variableResults = variableResultChanges(state, previous);
   const dataStructureResultRows = dataStructureResults(state, previous, statement);
   const newStructureResults = newDataStructureResults(state, previous);
