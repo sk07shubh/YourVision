@@ -258,7 +258,13 @@ function executionSubstatement(
         });
         if (isInitialization) return initialization + ';';
 
-        // An explicit update event is authoritative, even when the value is unchanged.
+        // A runtime condition result is authoritative: if this checkpoint
+        // actually evaluated the loop condition, display the condition rather
+        // than the preceding update that may be attached to the same checkpoint.
+        if (conditionResult !== undefined) return condition;
+
+        // Without a condition result, an explicit update event is authoritative,
+        // including updates whose value happens to remain unchanged.
         const isUpdate = variableEvents.some(event => {
           const d = isPlainObject(event.data) ? event.data : undefined;
           const name = typeof d?.name === 'string' ? d.name : undefined;
