@@ -519,16 +519,18 @@ export function collectionDelta(
   }
   if (after.length === before.length + 1) {
     for (let i = 0; i < after.length; i++) {
-      if (before.slice(i).every((x, j) => valueChanged(x, after[i + j + 1]))) {
-        return { added: after[i], index: i };
-      }
+      const matches = before.every((value, j) =>
+        valueChanged(value, after[j + (j >= i ? 1 : 0)]) === false
+      );
+      if (matches) return { added: after[i], index: i };
     }
   }
   if (before.length === after.length + 1) {
     for (let i = 0; i < before.length; i++) {
-      if (after.slice(i).every((x, j) => valueChanged(x, before[i + j + 1]))) {
-        return { removed: before[i], index: i };
-      }
+      const matches = after.every((value, j) =>
+        valueChanged(value, before[j + (j >= i ? 1 : 0)]) === false
+      );
+      if (matches) return { removed: before[i], index: i };
     }
   }
   return undefined;
