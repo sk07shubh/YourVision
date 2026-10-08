@@ -251,7 +251,7 @@ function executionSubstatement(
       ? data.conditionResult
       : undefined;
 
-  const forMatch = trimmed.match(/^for\\s*\\(/);
+  const forMatch = trimmed.match(/^for\s*\(/);
   if (forMatch) {
     const open = trimmed.indexOf('(');
     const inside = balanced(trimmed, open);
@@ -270,7 +270,7 @@ function executionSubstatement(
         // A variable appearing for the first time in the current runtime
         // snapshot identifies the initialization checkpoint.
         const initNames = [...initialization.matchAll(
-          /(?:^|[,\\s])(?:final\\s+)?(?:byte|short|int|long|float|double|char|boolean|var)\\s+([A-Za-z_$][\\w$]*)/g
+          /(?:^|[,\s])(?:final\s+)?(?:byte|short|int|long|float|double|char|boolean|var)\s+([A-Za-z_$][\w$]*)/g
         )].map(match => match[1]);
 
         if (
@@ -282,7 +282,7 @@ function executionSubstatement(
         // Otherwise, a changed variable referenced by the update expression
         // identifies the update checkpoint. This uses only consecutive
         // runtime snapshots; it does not invent or reorder loop events.
-        const updateNames = [...update.matchAll(/\\b[A-Za-z_$][\\w$]*\\b/g)]
+        const updateNames = [...update.matchAll(/\b[A-Za-z_$][\w$]*\b/g)]
           .map(match => match[0])
           .filter(name => name in variables && name in previousVariables);
 
@@ -302,7 +302,7 @@ function executionSubstatement(
   if (conditionResult !== undefined) {
     const open = trimmed.indexOf('(');
     const inside = open >= 0 ? balanced(trimmed, open) : undefined;
-    if (inside && /^(if|while)\\s*\\(/.test(trimmed)) {
+    if (inside && /^(if|while)\s*\(/.test(trimmed)) {
       return inside;
     }
   }
