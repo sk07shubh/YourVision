@@ -715,13 +715,13 @@ function readStaticMethod(
 
         switch (method) {
             case "isLetterOrDigit":
-                return /[\\p{L}\\p{N}]/u.test(character);
+                return /[\p{L}\p{N}]/u.test(character);
             case "isLetter":
-                return /[\\p{L}]/u.test(character);
+                return /[\p{L}]/u.test(character);
             case "isDigit":
                 return /[0-9]/.test(character);
             case "isWhitespace":
-                return /\\s/u.test(character);
+                return /\s/u.test(character);
             case "isSpaceChar":
                 return /\\s/u.test(character);
             case "isUpperCase":
