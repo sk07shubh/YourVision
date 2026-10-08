@@ -541,9 +541,12 @@ class ConditionParser {
         const token = this.tokens[this.index++];
         if (!token) throw new Error("missing expression");
         let value: unknown;
-        if (token.value === "(") { value = this.parseOr(evaluate); this.consume(")"); }
+        if (token.type === "string") value = evaluate ? token.value : undefined;
         else if (token.type === "number") value = evaluate ? Number(token.value) : undefined;
-        else if (token.type === "string") value = evaluate ? token.value : undefined;
+        else if (token.type === "operator" && token.value === "(") {
+            value = this.parseOr(evaluate);
+            this.consume(")");
+        }
         else if (token.type === "identifier") {
             if (token.value === "true") value = evaluate ? true : undefined;
             else if (token.value === "false") value = evaluate ? false : undefined;
