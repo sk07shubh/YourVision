@@ -258,13 +258,10 @@ function executionSubstatement(
         });
         if (isInitialization) return initialization + ';';
 
-        // A runtime condition result is authoritative: if this checkpoint
-        // actually evaluated the loop condition, display the condition rather
-        // than the preceding update that may be attached to the same checkpoint.
-        if (conditionResult !== undefined) return condition;
-
-        // Without a condition result, an explicit update event is authoritative,
-        // including updates whose value happens to remain unchanged.
+        // The runtime trace can attach the following conditionResult to the
+        // same checkpoint as the for-loop increment. The variable-update event
+        // is the authoritative phase marker: render i++ first, then let the
+        // next clean checkpoint render i < n.
         const isUpdate = variableEvents.some(event => {
           const d = isPlainObject(event.data) ? event.data : undefined;
           const name = typeof d?.name === 'string' ? d.name : undefined;
@@ -272,6 +269,11 @@ function executionSubstatement(
             ('before' in (d ?? {}) || name in rawPreviousVariables);
         });
         if (isUpdate) return update;
+
+        // Only a checkpoint without a runtime update event is a condition
+        // checkpoint, even when the trace carries a conditionResult on the
+        // preceding update checkpoint.
+        if (conditionResult !== undefined) return condition;
 
         // Last-resort runtime snapshot delta.
         if (updateNames.some(name =>
