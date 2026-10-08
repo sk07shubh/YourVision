@@ -95,7 +95,7 @@ describe('execution visualization feature matrix', () => {
       'if(!Character.isLetterOrDigit(ch))'
     );
     expect(executionSubstatement('while (i < n && !done)', state())).toBe(
-      'while (i < n && !done)'
+      'while(i < n && !done)'
     );
   });
 
