@@ -440,8 +440,14 @@ function dataStructureResults(current?: TraceState, previous?: TraceState, state
     rows.push(<DataStructureResult key={key} name={name} operation={operation} value={value} oldValue={oldValue} position={position} showOld={showOld}/>);
   };
 
-  const before = previous?.variables ?? {};
-  const after = current.variables ?? {};
+  const before = {
+    ...(previous?.arrays ?? {}),
+    ...(previous?.dataStructures ?? {})
+  };
+  const after = {
+    ...(current.arrays ?? {}),
+    ...(current.dataStructures ?? {})
+  };
 
   for (const [name,value] of Object.entries(after)) {
     if (name === 'this') continue;
