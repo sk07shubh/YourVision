@@ -1,4 +1,4 @@
-import { enrichTrace, evaluateCondition, debugEvaluateCondition } from "../src/execution/trace/enrichTrace.js";
+import { enrichTrace, evaluateCondition } from "../src/execution/trace/enrichTrace.js";
 import type { ExecutionTrace } from "../src/execution/trace/schema.js";
 
 const source = [
@@ -115,7 +115,6 @@ const directPeek = evaluateCondition(
     }
 );
 const directCharNotParen = evaluateCondition("ch != ')'", { ch: "]" });
-const debugPeekFalse = debugEvaluateCondition("st.peek() == '('", { st: { $collectionId: "stack-1", $type: "java.util.Stack", $kind: "stack", values: ["(", "{"] } });
 const directPeekFalse = evaluateCondition(
     "st.peek() == '('",
     {
@@ -188,7 +187,7 @@ if (
 ) {
     throw new Error(
         "Direct condition evaluator regression: " +
-        JSON.stringify({ debugPeekFalse, directChar, directPeek, directCharNotParen, directPeekFalse, directFalseAnd, directAnd, directTwoClauses, directFullPeekCondition })
+        JSON.stringify({ directChar, directPeek, directCharNotParen, directPeekFalse, directFalseAnd, directAnd, directTwoClauses, directFullPeekCondition })
     );
 }
 
