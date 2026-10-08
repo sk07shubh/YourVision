@@ -62,7 +62,7 @@ const trace: ExecutionTrace = {
         {
             sequence: 3,
             type: "STEP",
-            line: 10,
+            line: 9,
             method: "valid",
             depth: 1,
             data: {
