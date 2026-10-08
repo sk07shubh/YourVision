@@ -149,13 +149,114 @@ export function enrichTrace(
     }
 
 
+    const normalized = collapseEnhancedForLoopCheckpoints(
+        enriched,
+        sourceLines
+    );
+
     return {
         version: 1,
-        events: enriched.map((event, index) => ({
+        events: normalized.map((event, index) => ({
             ...event,
             sequence: index + 1
         }))
     };
+}
+
+function collapseEnhancedForLoopCheckpoints(
+    events: ExecutionEvent[],
+    sourceLines: string[]
+): ExecutionEvent[] {
+    const normalized: ExecutionEvent[] = [];
+
+    for (let index = 0; index < events.length; index++) {
+        const current = events[index];
+        const next = events[index + 1];
+
+        if (!current) continue;
+        const line = current.line;
+        if (typeof line !== "number") {
+            normalized.push(current);
+            continue;
+        }
+
+        if (
+            current.type === "STEP" &&
+            next?.type === "STEP" &&
+            current.method === next.method &&
+            current.depth === next.depth &&
+            current.line === next.line &&
+            isEnhancedForHeader(sourceLines, line) &&
+            !hasEnhancedForVariable(current, sourceLines, line) &&
+            hasEnhancedForVariable(next, sourceLines, line)
+        ) {
+            // JDI can suspend twice on an enhanced-for header:
+            // first before the loop variable is assigned and again after
+            // assigning the next element. The first checkpoint is not a
+            // meaningful execution state for the visualizer. Keep the
+            // assignment checkpoint so the UI can show the variable
+            // transition and then enter the loop body.
+            continue;
+        }
+
+        normalized.push(current);
+    }
+
+    return normalized;
+}
+
+function isEnhancedForHeader(
+    sourceLines: string[],
+    line: number | undefined
+): boolean {
+    if (typeof line !== "number" || line < 1) return false;
+
+    const statement = sourceLines[line - 1]?.trim() ?? "";
+    if (!/^for\s*\(/.test(statement)) return false;
+
+    const inside = balancedParenthesized(
+        statement,
+        statement.indexOf("(")
+    );
+    if (!inside) return false;
+
+    return splitTopLevel(inside, ":").length === 2;
+}
+
+function enhancedForVariableName(
+    sourceLines: string[],
+    line: number
+): string | undefined {
+    const statement = sourceLines[line - 1]?.trim() ?? "";
+    const inside = balancedParenthesized(
+        statement,
+        statement.indexOf("(")
+    );
+    if (!inside) return undefined;
+
+    const parts = splitTopLevel(inside, ":");
+    if (parts.length !== 2) return undefined;
+
+    const left = parts[0]?.trim() ?? "";
+    const match = left.match(/([A-Za-z_$][\w$]*)\s*$/);
+    return match?.[1];
+}
+
+function hasEnhancedForVariable(
+    event: ExecutionEvent,
+    sourceLines: string[],
+    line: number
+): boolean {
+    const name = enhancedForVariableName(sourceLines, line);
+    if (!name) return false;
+
+    const variables = event.data?.variables;
+    return !!(
+        variables &&
+        typeof variables === "object" &&
+        !Array.isArray(variables) &&
+        name in variables
+    );
 }
 
 

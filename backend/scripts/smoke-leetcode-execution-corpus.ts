@@ -20,6 +20,20 @@ function hasEvent(result: Result, type: string): boolean {
     return result.trace?.events.some((event) => event.type === type) === true;
 }
 
+function lineContaining(fragment: string): number {
+    const index = source.split(/\r?\n/).findIndex((line) => line.includes(fragment));
+    assert(index >= 0, "missing source line for " + fragment);
+    return index + 1;
+}
+
+function stepCountAtLine(result: Result, line: number): number {
+    return result.trace?.events.filter(
+        (event) => event.type === "STEP" && event.line === line
+    ).length ?? 0;
+}
+
+
+
 const source = `
 import java.util.*;
 
@@ -101,6 +115,9 @@ class Solution {
 }
 `;
 
+const maxProfitLoopLine = lineContaining("for (int price : prices)");
+const containsDuplicateLoopLine = lineContaining("for (int n : nums)");
+
 const cases = [
     {
         name: "Two Sum",
@@ -159,9 +176,29 @@ for (const test of cases) {
     assert(hasEvent(result, "STEP"), `${test.name}: trace has no STEP events`);
 }
 
+const maxProfit = await runJava(source, {
+    method: "maxProfit",
+    arguments: ["[7,1,5,3,6,4]"]
+});
+assert(maxProfit.kind === "OK", "Best Time enhanced-for execution failed");
+assert(
+    stepCountAtLine(maxProfit, maxProfitLoopLine) === 6,
+    "Enhanced-for loop should produce exactly one header checkpoint per iteration"
+);
+
+const containsDuplicate = await runJava(source, {
+    method: "containsDuplicate",
+    arguments: ["[1,2,3,1]"]
+});
+assert(containsDuplicate.kind === "OK", "Contains Duplicate enhanced-for execution failed");
+assert(
+    stepCountAtLine(containsDuplicate, containsDuplicateLoopLine) === 4,
+    "Enhanced-for duplicate loop should produce exactly one header checkpoint per iteration"
+);
+
 const parenthesesFalse = await runJava(source, {
     method: "isValid",
-    arguments: ["\"([)]\"]
+    arguments: ["\"([)]\""]
 });
 assert(parenthesesFalse.kind === "OK" && parenthesesFalse.result === "false", "Valid Parentheses false case returned the wrong result");
 assert(hasCondition(parenthesesFalse, false), "Valid Parentheses false case produced no FALSE condition checkpoint");
