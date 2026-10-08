@@ -334,8 +334,7 @@ function DataStructureResult({
 
 function sourceCall(statement: string, name: string): string | undefined {
   if (!name || name === 'this') return undefined;
-  const escaped = name.replace(/[\\^$.*+?()[\]{}|]/g, '\\
-function ExecutionInspector(');
+  const escaped = name.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
   return statement.match(new RegExp('\\b' + escaped + '\\s*\\.\\s*([A-Za-z_$][\\w$]*)\\s*\\('))?.[1];
 }
 
