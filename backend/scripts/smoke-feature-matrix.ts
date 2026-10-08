@@ -120,25 +120,25 @@ const cases: Case[] = [
     },
     {
         name: "string-equals",
-        sourceLine: "if (s.equals("abc"))",
+        sourceLine: 'if (s.equals("abc"))',
         variables: { s: "abc" },
         expected: true
     },
     {
         name: "string-contains",
-        sourceLine: "if (s.contains("bc"))",
+        sourceLine: 'if (s.contains("bc"))',
         variables: { s: "abc" },
         expected: true
     },
     {
         name: "string-starts-with",
-        sourceLine: "if (s.startsWith("ab"))",
+        sourceLine: 'if (s.startsWith("ab"))',
         variables: { s: "abc" },
         expected: true
     },
     {
         name: "string-ends-with",
-        sourceLine: "if (s.endsWith("bc"))",
+        sourceLine: 'if (s.endsWith("bc"))',
         variables: { s: "abc" },
         expected: true
     },
