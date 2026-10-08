@@ -447,9 +447,9 @@ class ConditionParser {
         while (this.peek("&&")) {
             this.index++;
             if (evaluate && left === false) {
-                // Java short-circuits &&. Still consume the RHS so the
-                // parser remains synchronized, but do not evaluate it.
-                this.parseEquality(false);
+                // Java short-circuits &&. Consume the complete RHS of this
+                // AND chain without evaluating it, stopping before ||.
+                this.parseAnd(false);
                 left = false;
                 continue;
             }
