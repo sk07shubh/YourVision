@@ -1,0 +1,69 @@
+name: Full Regression Lab
+
+on:
+  push:
+    branches:
+      - main
+      - automation/comprehensive-regression-lab
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  backend:
+    name: Backend feature matrix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Run complete backend regression matrix
+        working-directory: backend
+        run: npm run test:all
+
+  extension:
+    name: Extension feature matrix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+
+      - name: Install extension dependencies
+        working-directory: extension
+        run: npm ci
+
+      - name: Run extension tests
+        working-directory: extension
+        run: npm test
+
+      - name: Typecheck extension
+        working-directory: extension
+        run: npm run typecheck
+
+      - name: Build extension
+        working-directory: extension
+        run: npm run build
