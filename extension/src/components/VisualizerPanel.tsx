@@ -339,7 +339,10 @@ function ExecutionInspector(');
   return statement.match(new RegExp('\\b' + escaped + '\\s*\\.\\s*([A-Za-z_$][\\w$]*)\\s*\\('))?.[1];
 }
 
-function collectionDelta(before: unknown[], after: unknown[]) {
+function collectionDelta(
+  before: unknown[],
+  after: unknown[]
+): { added?: unknown; removed?: unknown; index?: number } | undefined {
   if (before.length === after.length) {
     for (let i = 0; i < before.length; i++) {
       if (!valueChanged(before[i], after[i])) return { added: after[i], removed: before[i], index: i };
@@ -363,7 +366,35 @@ function collectionDelta(before: unknown[], after: unknown[]) {
   return undefined;
 }
 
-function collectionOperation(kind: string, method: string | undefined, delta: {added?: unknown; removed?: unknown; index?: number}) {
+function unorderedCollectionDelta(
+  before: unknown[],
+  after: unknown[]
+): { added?: unknown; removed?: unknown } | undefined {
+  const remaining = before.map(value => ({ key: stableStringify(value), value }));
+  const added: unknown[] = [];
+  for (const value of after) {
+    const key = stableStringify(value);
+    const index = remaining.findIndex(entry => entry.key === key);
+    if (index >= 0) remaining.splice(index, 1);
+    else added.push(value);
+  }
+  const removed = remaining.map(entry => entry.value);
+  if (added.length === 1 && removed.length === 0) return { added: added[0] };
+  if (removed.length === 1 && added.length === 0) return { removed: removed[0] };
+  return undefined;
+}
+
+function sourceCallArgs(statement: string, name: string): string[] {
+  if (!name || name === 'this') return [];
+  const escaped = name.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
+  const match = statement.match(
+    new RegExp('\\b' + escaped + '\\s*\\.\\s*[A-Za-z_$][\\w$]*\\s*\\((.*)\\)')
+  );
+  if (!match?.[1]?.trim()) return [];
+  return match[1].split(',').map(part => part.trim()).filter(Boolean);
+}
+
+function collectionOperation(kind: string, method: string | undefined, delta: {added?: unknown; removed?: unknown; index?: number}, argCount = 0) {
   if (!method) return undefined;
   const m = method.toLowerCase();
 
@@ -386,7 +417,10 @@ function collectionOperation(kind: string, method: string | undefined, delta: {a
     if (['poll','remove'].includes(m)) return {operation:'Poll',value:delta.removed,position:'Priority'};
   }
   if (kind === 'list') {
-    if (['add','addlast','offer'].includes(m)) return {operation:'Add',value:delta.added,position:'End'};
+    if (m === 'add') return argCount >= 2
+      ? {operation:'Insert',value:delta.added,position:'Index: ' + (delta.index ?? '?')}
+      : {operation:'Add',value:delta.added,position:'End'};
+    if (['addlast','offer'].includes(m)) return {operation:'Add',value:delta.added,position:'End'};
     if (['remove','removelast','poll'].includes(m)) return {operation:'Remove',value:delta.removed,position:typeof delta.index === 'number' ? 'Index: ' + delta.index : 'End'};
     if (m === 'set') return {operation:'Set',value:delta.added,oldValue:delta.removed,position:'Index: ' + (delta.index ?? '?'),showOld:true};
   }
@@ -428,8 +462,11 @@ function dataStructureResults(current?: TraceState, previous?: TraceState, state
     const bc=isCollectionSnapshot(oldValue)?oldValue:undefined;
     const ac=isCollectionSnapshot(value)?value:undefined;
     if(bc && ac && bc.$collectionId===ac.$collectionId){
-      const delta=collectionDelta(bc.values,ac.values);
-      const op=delta ? collectionOperation(ac.$kind ?? '',sourceCall(statement,name),delta) : undefined;
+      const method=sourceCall(statement,name);
+      const args=sourceCallArgs(statement,name);
+      let delta=collectionDelta(bc.values,ac.values);
+      if (!delta && ac.$kind === 'priorityQueue') delta=unorderedCollectionDelta(bc.values,ac.values);
+      const op=delta ? collectionOperation(ac.$kind ?? '',method,delta,args.length) : undefined;
       if(delta && op) add('col-'+name+'-'+stableStringify([delta.added,delta.removed,delta.index]),name,op.operation,op.value,op.position,op.oldValue,op.showOld);
       continue;
     }
