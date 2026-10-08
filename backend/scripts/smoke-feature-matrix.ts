@@ -116,7 +116,7 @@ const cases: Case[] = [
         name: "string-charAt",
         sourceLine: "if (s.charAt(i) == 'a')",
         variables: { s: "cat", i: 1 },
-        expected: false
+        expected: true
     },
     {
         name: "string-equals",
