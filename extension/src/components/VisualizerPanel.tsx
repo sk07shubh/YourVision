@@ -243,16 +243,22 @@ function executionSubstatement(
     return parts;
   };
 
-  const variables = state?.variables ?? {};
-  const previousVariables = previous?.variables ?? {};
+  // IMPORTANT: TraceState.variables is the post-line replay state. Phase
+  // detection must use the raw JDI snapshot belonging to the STEP itself.
+  // Otherwise an initialization checkpoint can see the next checkpoint's
+  // i=1 and incorrectly render i++ before the first condition.
+  const rawVariables = isPlainObject(data?.variables) ? data.variables : {};
+  const previousData = isPlainObject(previous?.lastEvent?.data) ? previous.lastEvent.data : undefined;
+  const rawPreviousVariables = isPlainObject(previousData?.variables)
+    ? previousData.variables
+    : {};
 
   const conditionResult =
     typeof data?.conditionResult === 'boolean'
       ? data.conditionResult
       : undefined;
 
-  const forMatch = trimmed.match(/^for\s*\(/);
-  if (forMatch) {
+  if (/^for\\s*\\(/.test(trimmed)) {
     const open = trimmed.indexOf('(');
     const inside = balanced(trimmed, open);
     if (inside) {
@@ -261,54 +267,62 @@ function executionSubstatement(
       if (parts.length === 3) {
         const [initialization, condition, update] = parts;
 
-        // A variable appearing for the first time in the current runtime
-        // snapshot identifies the initialization checkpoint.
         const initNames = [...initialization.matchAll(
-          /(?:^|[,\s])(?:final\s+)?(?:byte|short|int|long|float|double|char|boolean|var)\s+([A-Za-z_$][\w$]*)/g
+          /(?:^|[,\\s])(?:final\\s+)?(?:byte|short|int|long|float|double|char|boolean|var)\\s+([A-Za-z_$][\\w$]*)/g
         )].map(match => match[1]);
 
+        // Initialization is identified from the raw runtime snapshots, never
+        // from post-line replay values.
         if (
-          initNames.some(name => !(name in previousVariables) && name in variables)
+          initNames.some(name =>
+            !(name in rawPreviousVariables) &&
+            name in rawVariables
+          )
         ) {
           return initialization + ';';
         }
 
-        // A runtime VARIABLE_UPDATE on a variable referenced by the update
-        // expression is the authoritative signal for the update checkpoint.
-        // A for-loop checkpoint can carry both conditionResult and the
-        // VARIABLE_UPDATE that performs i++ (as in JDI traces where the
-        // update and the next condition share the same source line). The
-        // update must win here; the following checkpoint is then the actual
-        // condition evaluation.
-        const updateNames = [...update.matchAll(/\b[A-Za-z_$][\w$]*\b/g)]
+        const updateNames = [...update.matchAll(/\\b[A-Za-z_$][\\w$]*\\b/g)]
           .map(match => match[0])
-          .filter(name => name in variables && name in previousVariables);
+          .filter(name => name in rawVariables || name in rawPreviousVariables);
 
         const executionEvents = Array.isArray(data?.executionEvents)
           ? data.executionEvents
           : [];
+
         const hasRuntimeUpdate = executionEvents.some(event => {
-          if (!isPlainObject(event)) return false;
-          if (event.type !== 'VARIABLE_UPDATE') return false;
+          if (!isPlainObject(event) || event.type !== 'VARIABLE_UPDATE') return false;
           const eventData = isPlainObject(event.data) ? event.data : undefined;
           const name = typeof eventData?.name === 'string' ? eventData.name : undefined;
-          return !!name &&
-            updateNames.includes(name) &&
-            valueChanged(previousVariables[name], variables[name]);
+          if (!name || !updateNames.includes(name)) return false;
+
+          const before = eventData?.before;
+          const after = eventData?.value;
+          return valueChanged(
+            before !== undefined ? before : rawPreviousVariables[name],
+            after !== undefined ? after : rawVariables[name]
+          );
         });
 
         if (hasRuntimeUpdate) {
           return update;
         }
 
-        // Only after ruling out an update checkpoint does the runtime
-        // conditionResult identify this as the condition phase.
+        // A condition result is authoritative. It must win over a mere
+        // post-state variable difference, because post-state values can
+        // already contain the update that led to this checkpoint.
         if (conditionResult !== undefined) {
           return condition;
         }
 
+        // Fallback for runtimes that expose the update only through raw
+        // consecutive snapshots.
         if (
-          updateNames.some(name => valueChanged(previousVariables[name], variables[name]))
+          updateNames.some(name =>
+            name in rawVariables &&
+            name in rawPreviousVariables &&
+            valueChanged(rawPreviousVariables[name], rawVariables[name])
+          )
         ) {
           return update;
         }
@@ -318,17 +332,18 @@ function executionSubstatement(
     }
   }
 
-  // For ordinary condition checkpoints, display the evaluated expression
-  // instead of repeating the entire if/while source line.
+  // Keep the complete control statement visible. The result belongs in the
+  // separate EXECUTION RESULT area, so never strip "if" / "while" here.
   if (conditionResult !== undefined) {
     const open = trimmed.indexOf('(');
     const inside = open >= 0 ? balanced(trimmed, open) : undefined;
-    if (inside && /^(if|while)\s*\(/.test(trimmed)) {
-      return inside;
+    if (inside && /^(if|while)\\s*\\(/.test(trimmed)) {
+      const keyword = trimmed.match(/^(if|while)\\b/)?.[1] ?? 'if';
+      return keyword + '(' + inside + ')';
     }
   }
 
-  return statement;
+  return statement || '';
 }
 
 function debugValue(value: unknown): string {
@@ -393,10 +408,14 @@ function VariableResult({ name, oldValue, value, initialized }: {
 
 function variableResultChanges(current?: TraceState, previous?: TraceState): React.ReactNode[] {
   if (!current) return [];
+
   const before = previous?.variables ?? {};
-  return Object.entries(current.variables ?? {})
+  const results = Object.entries(current.variables ?? {})
     .filter(([, value]) => !isStructuralValue(value))
-    .filter(([name, value]) => name !== 'this' && (!(name in before) || valueChanged(before[name], value)))
+    .filter(([name, value]) =>
+      name !== 'this' &&
+      (!(name in before) || valueChanged(before[name], value))
+    )
     .map(([name, value]) => (
       <VariableResult
         key={name}
@@ -406,6 +425,42 @@ function variableResultChanges(current?: TraceState, previous?: TraceState): Rea
         initialized={!(name in before)}
       />
     ));
+
+  // STEP is a pre-execution JDI checkpoint, so the mutation caused by that
+  // source line can also be represented by a derived VARIABLE_UPDATE attached
+  // to the checkpoint. Use that as a fallback when the replay snapshots are
+  // identical (notably assignments such as "right = i + 1;" and "start = left;").
+  if (results.length > 0) return results;
+
+  const data = isPlainObject(current.lastEvent?.data) ? current.lastEvent.data : undefined;
+  const events = Array.isArray(data?.executionEvents) ? data.executionEvents : [];
+  const fallback: React.ReactNode[] = [];
+
+  for (const event of events) {
+    if (!isPlainObject(event) || event.type !== 'VARIABLE_UPDATE') continue;
+    const eventData = isPlainObject(event.data) ? event.data : undefined;
+    const name = typeof eventData?.name === 'string' ? eventData.name : undefined;
+    if (!name || name === 'this' || !('value' in (eventData ?? {}))) continue;
+
+    const value = eventData.value;
+    if (isStructuralValue(value)) continue;
+
+    const oldValue = 'before' in (eventData ?? {})
+      ? eventData?.before
+      : before[name];
+
+    fallback.push(
+      <VariableResult
+        key={'event-variable-' + name}
+        name={name}
+        oldValue={oldValue}
+        value={value}
+        initialized={oldValue === undefined}
+      />
+    );
+  }
+
+  return fallback;
 }
 
 function structureType(value: unknown, fallback: string): string {
