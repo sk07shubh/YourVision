@@ -187,10 +187,7 @@ function executionSubstatement(
 
   const balanced = (source: string, openIndex: number): string | undefined => {
     if (source.charAt(openIndex) !== '(') return undefined;
-    let depth = 0;
-    let quote = '';
-    let escaped = false;
-
+    let depth = 0, quote = '', escaped = false;
     for (let i = openIndex; i < source.length; i++) {
       const ch = source[i]!;
       if (quote) {
@@ -199,10 +196,7 @@ function executionSubstatement(
         else if (ch === quote) quote = '';
         continue;
       }
-      if (ch === '"' || ch === "'") {
-        quote = ch;
-        continue;
-      }
+      if (ch === '"' || ch === "'") { quote = ch; continue; }
       if (ch === '(') depth++;
       else if (ch === ')') {
         depth--;
@@ -214,11 +208,7 @@ function executionSubstatement(
 
   const splitTopLevel = (source: string): string[] => {
     const parts: string[] = [];
-    let start = 0;
-    let depth = 0;
-    let quote = '';
-    let escaped = false;
-
+    let start = 0, depth = 0, quote = '', escaped = false;
     for (let i = 0; i < source.length; i++) {
       const ch = source[i]!;
       if (quote) {
@@ -227,10 +217,7 @@ function executionSubstatement(
         else if (ch === quote) quote = '';
         continue;
       }
-      if (ch === '"' || ch === "'") {
-        quote = ch;
-        continue;
-      }
+      if (ch === '"' || ch === "'") { quote = ch; continue; }
       if ('([{'.includes(ch)) depth++;
       else if (')]}'.includes(ch)) depth--;
       else if (ch === ';' && depth === 0) {
@@ -238,107 +225,65 @@ function executionSubstatement(
         start = i + 1;
       }
     }
-
     parts.push(source.slice(start).trim());
     return parts;
   };
 
-  // IMPORTANT: TraceState.variables is the post-line replay state. Phase
-  // detection must use the raw JDI snapshot belonging to the STEP itself.
-  // Otherwise an initialization checkpoint can see the next checkpoint's
-  // i=1 and incorrectly render i++ before the first condition.
   const rawVariables = isPlainObject(data?.variables) ? data.variables : {};
   const previousData = isPlainObject(previous?.lastEvent?.data) ? previous.lastEvent.data : undefined;
-  const rawPreviousVariables = isPlainObject(previousData?.variables)
-    ? previousData.variables
-    : {};
+  const rawPreviousVariables = isPlainObject(previousData?.variables) ? previousData.variables : {};
+  const conditionResult = typeof data?.conditionResult === 'boolean' ? data.conditionResult : undefined;
 
-  const conditionResult =
-    typeof data?.conditionResult === 'boolean'
-      ? data.conditionResult
-      : undefined;
-
-  if (/^for\\s*\\(/.test(trimmed)) {
-    const open = trimmed.indexOf('(');
-    const inside = balanced(trimmed, open);
+  if (/^for\s*\(/.test(trimmed)) {
+    const inside = balanced(trimmed, trimmed.indexOf('('));
     if (inside) {
       const parts = splitTopLevel(inside);
-
       if (parts.length === 3) {
         const [initialization, condition, update] = parts;
-
         const initNames = [...initialization.matchAll(
-          /(?:^|[,\\s])(?:final\\s+)?(?:byte|short|int|long|float|double|char|boolean|var)\\s+([A-Za-z_$][\\w$]*)/g
-        )].map(match => match[1]);
-
-        // Initialization is identified from the raw runtime snapshots, never
-        // from post-line replay values.
-        if (
-          initNames.some(name =>
-            !(name in rawPreviousVariables) &&
-            name in rawVariables
-          )
-        ) {
-          return initialization + ';';
-        }
-
-        const updateNames = [...update.matchAll(/\\b[A-Za-z_$][\\w$]*\\b/g)]
-          .map(match => match[0])
+          /(?:^|[,\s])(?:final\s+)?(?:byte|short|int|long|float|double|char|boolean|var)\s+([A-Za-z_$][\w$]*)/g
+        )].map(m => m[1]);
+        const updateNames = [...update.matchAll(/\b[A-Za-z_$][\w$]*\b/g)]
+          .map(m => m[0])
           .filter(name => name in rawVariables || name in rawPreviousVariables);
+        const events = Array.isArray(data?.executionEvents) ? data.executionEvents : [];
+        const variableEvents = events.filter(e => isPlainObject(e) && e.type === 'VARIABLE_UPDATE');
 
-        const executionEvents = Array.isArray(data?.executionEvents)
-          ? data.executionEvents
-          : [];
-
-        const hasRuntimeUpdate = executionEvents.some(event => {
-          if (!isPlainObject(event) || event.type !== 'VARIABLE_UPDATE') return false;
-          const eventData = isPlainObject(event.data) ? event.data : undefined;
-          const name = typeof eventData?.name === 'string' ? eventData.name : undefined;
-          if (!name || !updateNames.includes(name)) return false;
-
-          const before = eventData?.before;
-          const after = eventData?.value;
-          return valueChanged(
-            before !== undefined ? before : rawPreviousVariables[name],
-            after !== undefined ? after : rawVariables[name]
-          );
+        // Declaration/update event without a previous value = first entry into this for-loop.
+        const isInitialization = variableEvents.some(event => {
+          const d = isPlainObject(event.data) ? event.data : undefined;
+          const name = typeof d?.name === 'string' ? d.name : undefined;
+          return !!name && initNames.includes(name) &&
+            (!('before' in (d ?? {})) || !(name in rawPreviousVariables));
         });
+        if (isInitialization) return initialization + ';';
 
-        if (hasRuntimeUpdate) {
-          return update;
-        }
+        // An explicit update event is authoritative, even when the value is unchanged.
+        const isUpdate = variableEvents.some(event => {
+          const d = isPlainObject(event.data) ? event.data : undefined;
+          const name = typeof d?.name === 'string' ? d.name : undefined;
+          return !!name && updateNames.includes(name) &&
+            ('before' in (d ?? {}) || name in rawPreviousVariables);
+        });
+        if (isUpdate) return update;
 
-        // A condition result is authoritative. It must win over a mere
-        // post-state variable difference, because post-state values can
-        // already contain the update that led to this checkpoint.
-        if (conditionResult !== undefined) {
-          return condition;
-        }
+        // Last-resort runtime snapshot delta.
+        if (updateNames.some(name =>
+          name in rawVariables && name in rawPreviousVariables &&
+          valueChanged(rawPreviousVariables[name], rawVariables[name])
+        )) return update;
 
-        // Fallback for runtimes that expose the update only through raw
-        // consecutive snapshots.
-        if (
-          updateNames.some(name =>
-            name in rawVariables &&
-            name in rawPreviousVariables &&
-            valueChanged(rawPreviousVariables[name], rawVariables[name])
-          )
-        ) {
-          return update;
-        }
-
-        return update;
+        // Only now is this a condition checkpoint.
+        return condition;
       }
     }
   }
 
-  // Keep the complete control statement visible. The result belongs in the
-  // separate EXECUTION RESULT area, so never strip "if" / "while" here.
-  if (conditionResult !== undefined) {
-    const open = trimmed.indexOf('(');
-    const inside = open >= 0 ? balanced(trimmed, open) : undefined;
-    if (inside && /^(if|while)\\s*\\(/.test(trimmed)) {
-      const keyword = trimmed.match(/^(if|while)\\b/)?.[1] ?? 'if';
+  // Always preserve complete if/while syntax. TRUE/FALSE is rendered separately.
+  if (/^(if|while)\s*\(/.test(trimmed)) {
+    const inside = balanced(trimmed, trimmed.indexOf('('));
+    if (inside) {
+      const keyword = trimmed.match(/^(if|while)\b/)?.[1] ?? 'if';
       return keyword + '(' + inside + ')';
     }
   }
@@ -406,49 +351,61 @@ function VariableResult({ name, oldValue, value, initialized }: {
   );
 }
 
+function statementFromState(state: TraceState): string {
+  const source = sessionStore.get().source;
+  const line = state.line;
+  return line && line > 0 ? (source.split(/\r?\n/)[line - 1] ?? '').trim() : '';
+}
+
 function variableResultChanges(current?: TraceState, previous?: TraceState): React.ReactNode[] {
   if (!current) return [];
 
   const before = previous?.variables ?? {};
   const results = Object.entries(current.variables ?? {})
     .filter(([, value]) => !isStructuralValue(value))
-    .filter(([name, value]) =>
-      name !== 'this' &&
-      (!(name in before) || valueChanged(before[name], value))
-    )
+    .filter(([name, value]) => name !== 'this' && (!(name in before) || valueChanged(before[name], value)))
     .map(([name, value]) => (
-      <VariableResult
-        key={name}
-        name={name}
-        oldValue={before[name]}
-        value={value}
-        initialized={!(name in before)}
-      />
+      <VariableResult key={name} name={name} oldValue={before[name]} value={value} initialized={!(name in before)} />
     ));
 
-  // STEP is a pre-execution JDI checkpoint, so the mutation caused by that
-  // source line can also be represented by a derived VARIABLE_UPDATE attached
-  // to the checkpoint. Use that as a fallback when the replay snapshots are
-  // identical (notably assignments such as "right = i + 1;" and "start = left;").
   if (results.length > 0) return results;
 
   const data = isPlainObject(current.lastEvent?.data) ? current.lastEvent.data : undefined;
+  const rawVariables = isPlainObject(data?.variables) ? data.variables : {};
   const events = Array.isArray(data?.executionEvents) ? data.executionEvents : [];
   const fallback: React.ReactNode[] = [];
+
+  // Runtime may omit a VARIABLE_UPDATE when an assignment writes the same value.
+  // Use the executed source statement so these lines never collapse to "—".
+  const source = statementFromState(current);
+  const assignment = source.match(
+    /^(?:final\s+)?(?:(?:byte|short|int|long|float|double|char|boolean|var)\s+)?([A-Za-z_$][\w$]*)\s*=\s*(?!=|>)/
+  );
+  if (assignment) {
+    const name = assignment[1];
+    if (name in rawVariables && name !== 'this' && !isStructuralValue(rawVariables[name])) {
+      fallback.push(
+        <VariableResult
+          key={'source-variable-' + name}
+          name={name}
+          oldValue={before[name]}
+          value={rawVariables[name]}
+          initialized={!(name in before)}
+        />
+      );
+    }
+  }
+
+  if (fallback.length > 0) return fallback;
 
   for (const event of events) {
     if (!isPlainObject(event) || event.type !== 'VARIABLE_UPDATE') continue;
     const eventData = isPlainObject(event.data) ? event.data : undefined;
     const name = typeof eventData?.name === 'string' ? eventData.name : undefined;
     if (!name || name === 'this' || !('value' in (eventData ?? {}))) continue;
-
     const value = eventData.value;
     if (isStructuralValue(value)) continue;
-
-    const oldValue = 'before' in (eventData ?? {})
-      ? eventData?.before
-      : before[name];
-
+    const oldValue = 'before' in (eventData ?? {}) ? eventData?.before : before[name];
     fallback.push(
       <VariableResult
         key={'event-variable-' + name}
@@ -459,7 +416,6 @@ function variableResultChanges(current?: TraceState, previous?: TraceState): Rea
       />
     );
   }
-
   return fallback;
 }
 
