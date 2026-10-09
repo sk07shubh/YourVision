@@ -374,8 +374,15 @@ function variableRoleHints(line: string, event: ExecutionEvent): SemanticVariabl
 function localProposal(source: string, trace: ExecutionTrace): SemanticTraceProposal {
     const lines = source.split(/\r?\n/);
     const annotations: SemanticTraceProposal["annotations"] = [];
+    let previousStep: ExecutionEvent | undefined;
     for (const event of trace.events) {
-        if (event.type !== "STEP") continue;
+        if (event.type !== "STEP") {
+            if (event.type === "METHOD_ENTER" || event.type === "METHOD_EXIT" ||
+                event.type === "ERROR" || event.type === "TIMEOUT" || event.type === "TRACE_LIMIT") {
+                previousStep = undefined;
+            }
+            continue;
+        }
         const data = event.data ?? {};
         const line = sourceLineFor(event, lines);
         const variableRoles = variableRoleHints(line, event);
@@ -390,10 +397,10 @@ function localProposal(source: string, trace: ExecutionTrace): SemanticTraceProp
             animationIntents: animationIntentsFrom(event, targets, variableRoles)
         };
         if (typeof data.conditionResult === "boolean") annotation.conditionResult = data.conditionResult;
-        if (typeof data.executionPhase === "string" && EXECUTION_PHASES.has(data.executionPhase)) {
-            annotation.executionPhase = data.executionPhase as "initialization" | "condition" | "increment" | "body" | "unknown";
-        }
+        const phase = inferExecutionPhase(source, event, previousStep);
+        if (phase) annotation.executionPhase = phase;
         annotations.push({ eventSequence: event.sequence, annotation });
+        previousStep = event;
     }
     return { schemaVersion: SEMANTIC_TRACE_SCHEMA_VERSION, annotations };
 }
@@ -509,12 +516,24 @@ function validateProposal(value: unknown, trace: ExecutionTrace, source: string)
         if (typeof sourceEvent.data?.conditionResult === "boolean" &&
             annotation.conditionResult !== sourceEvent.data.conditionResult) return undefined;
 
-        if (annotation.executionPhase !== undefined &&
-            (typeof annotation.executionPhase !== "string" ||
-                !EXECUTION_PHASES.has(annotation.executionPhase) ||
-                sourceEvent.data?.executionPhase !== annotation.executionPhase)) return undefined;
-        if (sourceEvent.data?.executionPhase !== undefined &&
-            annotation.executionPhase !== sourceEvent.data.executionPhase) return undefined;
+        if (annotation.executionPhase !== undefined) {
+            if (typeof annotation.executionPhase !== "string" || !EXECUTION_PHASES.has(annotation.executionPhase)) {
+                return undefined;
+            }
+            if (sourceEvent.data?.executionPhase !== undefined) {
+                if (annotation.executionPhase !== sourceEvent.data.executionPhase) return undefined;
+            } else {
+                const previousStep = trace.events.slice(0, trace.events.indexOf(sourceEvent))
+                    .reverse().find((candidate) =>
+                        candidate.type === "STEP" && candidate.method === sourceEvent.method
+                    );
+                if (inferExecutionPhase(source, sourceEvent, previousStep) !== annotation.executionPhase) {
+                    return undefined;
+                }
+            }
+        } else if (sourceEvent.data?.executionPhase !== undefined) {
+            return undefined;
+        }
 
         const expectedTargets = targetsFromRuntimeEvents(sourceEvent)
             .map((target) => stableJson(target)).sort();
