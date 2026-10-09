@@ -196,6 +196,46 @@ function targetsFromRuntimeEvents(event: ExecutionEvent): SemanticVisualTarget[]
     });
 }
 
+
+function animationIntentsFrom(
+    event: ExecutionEvent,
+    targets: SemanticVisualTarget[],
+    roles: SemanticVariableRoleHint[]
+): SemanticAnimationIntent[] {
+    const intents: SemanticAnimationIntent[] = [];
+    const variables = isRecord(event.data?.variables) ? event.data.variables : {};
+    const add = (action: SemanticAnimationAction, targetIndex: number, evidence: string, variableName?: string) => {
+        intents.push({
+            action,
+            targetIndex,
+            confidence: action === "pointer-move" ? 0.78 : 0.9,
+            evidence: evidence.slice(0, 240),
+            ...(variableName ? { variableName } : {})
+        });
+    };
+    targets.forEach((target, targetIndex) => {
+        if (target.eventType === "ARRAY_ACCESS") {
+            add("highlight-read", targetIndex, "Runtime trace recorded this array read.");
+        } else if (target.eventType === "ARRAY_WRITE") {
+            add("highlight-write", targetIndex, "Runtime trace recorded this array write.");
+        } else if (target.eventType === "OBJECT_FIELD_WRITE") {
+            add("update", targetIndex, "Runtime trace recorded an object-field mutation.");
+        } else if (target.eventType === "OBJECT_CREATE") {
+            add("create", targetIndex, "Runtime trace recorded object creation.");
+        } else if (target.eventType === "MAP_WRITE" && target.changeKind) {
+            add(target.changeKind, targetIndex, "Runtime trace recorded this map mutation.");
+        }
+        if (target.eventType !== "ARRAY_ACCESS" || !target.name || !target.indices || target.indices.length !== 1) return;
+        for (const role of roles) {
+            if (role.role !== "array-index" || role.structureName !== target.name) continue;
+            if (typeof variables[role.name] === "number" && variables[role.name] === target.indices[0]) {
+                add("pointer-move", targetIndex, "The current index variable matches the concrete runtime array index.", role.name);
+            }
+        }
+    });
+    return intents;
+}
+
 function variableRoleHints(line: string, event: ExecutionEvent): SemanticVariableRoleHint[] {
     const variables = isRecord(event.data?.variables) ? event.data.variables : {};
     const names = new Set(Object.keys(variables));
