@@ -65,7 +65,7 @@ export function inferSemanticRoles(source:string):SemanticVariableRoleHint[]{
    const first=cmp[1],second=cmp[3];const fu=updateDirection(first,loop.body),su=updateDirection(second,loop.body);
    const fh=nameHint(first),sh=nameHint(second);
    const named=fh==="left-bound"||fh==="right-bound"||sh==="left-bound"||sh==="right-bound";
-   const opposing=fu.updated&&su.updated&&(fu.increasing!==su.increasing||fu.decreasing!==su.decreasing);
+   const opposing=fu.updated&&su.updated&&((fu.increasing&&su.decreasing)||(fu.decreasing&&su.increasing));
    if((named&&(fu.updated||su.updated))||opposing){
     let left=first,right=second;
     if(fh==="right-bound"||sh==="left-bound"){left=second;right=first;}
