@@ -214,7 +214,7 @@ function inferSemanticRolesInScope(source:string,methodName?:string):SemanticVar
 interface MethodRegion { name:string; body:string; }
 function findMethodRegions(source:string):MethodRegion[]{
  const code=maskCommentsAndStrings(source);
- const pattern=/(?:\\b(?:public|protected|private)\\s+)?(?:(?:static|final|synchronized|native|abstract|default)\\s+)*(?:<[^>{}]+>\\s*)?[\\w$<>\\[\\].?, ]+\\s+([A-Za-z_$][\\w$]*)\\s*\\([^;{}]*\\)\\s*(?:throws\\s+[\\w$., ]+\\s*)?\\{/g;
+ const pattern=/(?:\b(?:public|protected|private)\s+)?(?:(?:static|final|synchronized|native|abstract|default)\s+)*(?:<[^>{}]+>\s*)?[\w$<>\[\].?, ]+\s+([A-Za-z_$][\w$]*)\s*\([^;{}]*\)\s*(?:throws\s+[\w$., ]+\s*)?\{/g;
  const methods:MethodRegion[]=[];let match:RegExpExecArray|null;
  while((match=pattern.exec(code))!==null){
   const name=match[1];const open=code.indexOf("{",match.index);const close=matchingDelimiter(code,open,"{","}");
