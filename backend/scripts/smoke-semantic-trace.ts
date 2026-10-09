@@ -186,6 +186,80 @@ if (!scopedRoles.some((hint) => hint.name === "i" && hint.structureName === "num
     throw new Error("multiple array indices were not scoped to their own structures");
 }
 
+const phaseSource = [
+    "class Solution {",
+    "  void loop(int n) {",
+    "    for (int i = 0; i < n; i++) {",
+    "      consume(i);",
+    "    }",
+    "  }",
+    "}"
+].join("\n");
+const phaseTrace: ExecutionTrace = {
+    version: 1,
+    events: [
+        {
+            sequence: 30, type: "STEP", line: 3, method: "loop", depth: 1,
+            data: {
+                variables: { n: 2, i: 0 },
+                executionEvents: [{ sequence: 0, type: "VARIABLE_UPDATE", line: 3, method: "loop", depth: 1,
+                    data: { name: "i", value: 0 } }]
+            }
+        },
+        {
+            sequence: 31, type: "STEP", line: 3, method: "loop", depth: 1,
+            data: { variables: { n: 2, i: 0 }, conditionResult: true, executionEvents: [] }
+        },
+        {
+            sequence: 32, type: "STEP", line: 3, method: "loop", depth: 1,
+            data: {
+                variables: { n: 2, i: 1 },
+                executionEvents: [{ sequence: 0, type: "VARIABLE_UPDATE", line: 3, method: "loop", depth: 1,
+                    data: { name: "i", before: 0, value: 1 } }]
+            }
+        }
+    ]
+};
+const phasePrepared = await prepareSemanticTrace(phaseTrace, phaseSource);
+const phases = phasePrepared.events.map((event) =>
+    (event.data?.visualization as { executionPhase?: string } | undefined)?.executionPhase
+);
+if (JSON.stringify(phases) !== JSON.stringify(["initialization", "condition", "increment"])) {
+    throw new Error("loop initialization, condition, and increment phases were not distinguished from runtime events");
+}
+
+const validAiAnalyzer: SemanticTraceAnalyzer = {
+    async analyze() {
+        return {
+            schemaVersion: 1,
+            annotations: multiArrayPrepared.events.filter((event) => event.type === "STEP").map((event) => {
+                const annotation = event.data?.visualization as Record<string, unknown>;
+                const roles = annotation.variableRoles as Array<Record<string, unknown>>;
+                return {
+                    eventSequence: event.sequence,
+                    annotation: {
+                        ...annotation,
+                        provider: "ai",
+                        variableRoles: [
+                            ...roles,
+                            { name: "i", role: "pointer", confidence: 0.77, evidence: "This variable tracks the current array position." }
+                        ]
+                    }
+                };
+            })
+        };
+    }
+};
+const acceptedAi = await prepareSemanticTrace(multiArrayTrace, multiArraySource, validAiAnalyzer);
+const acceptedAnnotation = acceptedAi.events[0]?.data?.visualization as {
+    provider?: string;
+    variableRoles?: Array<{ name: string; role: string }>;
+} | undefined;
+if (acceptedAnnotation?.provider !== "ai" ||
+    !acceptedAnnotation.variableRoles?.some((role) => role.name === "i" && role.role === "pointer")) {
+    throw new Error("a valid grounded semantic proposal was not accepted");
+}
+
 const misScopedAnalyzer: SemanticTraceAnalyzer = {
     async analyze() {
         return {
