@@ -185,7 +185,7 @@ const maxProfit = await runJava(source, {
 assert(maxProfit.kind === "OK", "Best Time enhanced-for execution failed");
 assert(
     stepCountAtLine(maxProfit, maxProfitLoopLine) === 6,
-    "Enhanced-for loop should produce exactly one header checkpoint per iteration"
+    `Enhanced-for loop expected 6 header checkpoints, got ${stepCountAtLine(maxProfit, maxProfitLoopLine)}; trace: ${JSON.stringify(maxProfit.trace?.events.filter(event => event.type === "STEP" && (event.line === maxProfitLoopLine || event.line === maxProfitLoopLine + 1)).map(event => ({ line: event.line, method: event.method, variables: event.data?.variables, postVariables: event.data?.postVariables })))}
 );
 
 const containsDuplicate = await runJava(source, {
