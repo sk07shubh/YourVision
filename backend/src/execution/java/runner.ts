@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 import type { ExecutionTrace, ExecutionEvent, TraceState } from "../trace/schema.js";
 import { buildStates } from "../trace/stateBuilder.js";
 import { enrichTrace } from "../trace/enrichTrace.js";
+import { prepareSemanticTrace, type SemanticTraceAnalyzer } from "../trace/semanticTrace.js";
 
 const MAX_TRACE_EVENTS = 5000;
 
@@ -101,7 +102,8 @@ function declaresType(source: string, typeName: string): boolean {
 }
 export async function runJava(
     source: string,
-    testcase?: JavaTestcase
+    testcase?: JavaTestcase,
+    semanticAnalyzer?: SemanticTraceAnalyzer
 ): Promise<JavaExecutionResult> {
 
     if (
@@ -297,7 +299,7 @@ await fs.writeFile(
                     }
                 );
             const trace =
-                parseTrace(stdout, source);
+                await parseTrace(stdout, source, semanticAnalyzer);
 
             const traceLimited =
                 trace.events.some(
@@ -342,7 +344,7 @@ await fs.writeFile(
                     error.stdout ?? "";
 
                 const trace =
-                    parseTrace(stdout, source);
+                    await parseTrace(stdout, source, semanticAnalyzer);
 
                 if (
                     !trace.events.some(
@@ -402,7 +404,7 @@ await fs.writeFile(
                 );
 
             const trace =
-                    parseTrace(stdout, source);
+                    await parseTrace(stdout, source, semanticAnalyzer);
 
             return {
                 success: false,
@@ -475,10 +477,11 @@ function isTimeout(
 }
 
 
-function parseTrace(
+async function parseTrace(
     stdout: string,
-    source: string
-): ExecutionTrace {
+    source: string,
+    semanticAnalyzer?: SemanticTraceAnalyzer
+): Promise<ExecutionTrace> {
     const events: ExecutionEvent[] = [];
 
     for (const line of stdout.split(/\r?\n/)) {
@@ -516,10 +519,10 @@ function parseTrace(
 
     attachMethodDisplayLines(events, source);
 
-    const enriched = enrichTrace({
+    const enriched = await prepareSemanticTrace(enrichTrace({
         version: 1,
         events
-    }, source);
+    }, source), source, semanticAnalyzer);
 
     if (enriched.events.length <= MAX_TRACE_EVENTS) {
         return enriched;
