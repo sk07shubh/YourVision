@@ -285,28 +285,40 @@ function inferExecutionPhase(
 
 function isInsideLoopBody(source: string, targetLine?: number): boolean {
     if (!targetLine || targetLine < 1) return false;
-    const lines = source.replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\r\n]/g, " "))
+    const lines = source
+        .replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\r\n]/g, " "))
         .split(/\r?\n/);
     const stripNoise = (line: string) => line
         .replace(/"(?:\\.|[^"\\])*"/g, '""')
         .replace(/'(?:\\.|[^'\\])*'/g, "''")
         .replace(/\/\/.*$/, "");
-    for (let start = 0; start < targetLine - 1; start++) {
-        if (!/\b(?:for|while)\s*\(/.test(lines[start] ?? "")) continue;
-        let started = false;
-        let depth = 0;
-        for (let index = start; index < targetLine - 1; index++) {
-            const clean = stripNoise(lines[index] ?? "");
-            for (const char of clean) {
-                if (char === "{") { started = true; depth++; }
-                else if (char === "}" && started) depth--;
-                if (started && depth === 0) break;
+    const braceStack: boolean[] = [];
+    let activeLoopBraces = 0;
+    let pendingLoopBrace = false;
+
+    // Scan once up to the highlighted line. The stack distinguishes loop
+    // braces from ordinary method/if/nested-block braces, avoiding an O(n²)
+    // source scan for every STEP in a long execution trace.
+    for (let lineIndex = 0; lineIndex < targetLine - 1; lineIndex++) {
+        const clean = stripNoise(lines[lineIndex] ?? "");
+        const isLoopHeader = /\b(?:for|while)\s*\(|^\s*do\b/.test(clean);
+        if (isLoopHeader) pendingLoopBrace = true;
+        for (const char of clean) {
+            if (char === "{") {
+                const isLoopBrace = pendingLoopBrace;
+                braceStack.push(isLoopBrace);
+                if (isLoopBrace) activeLoopBraces++;
+                pendingLoopBrace = false;
+            } else if (char === "}") {
+                const wasLoopBrace = braceStack.pop();
+                if (wasLoopBrace) activeLoopBraces--;
             }
-            if (started && depth === 0) break;
         }
-        if (started && depth > 0) return true;
+        if (pendingLoopBrace && !isLoopHeader && clean.includes(";")) {
+            pendingLoopBrace = false;
+        }
     }
-    return false;
+    return activeLoopBraces > 0;
 }
 
 function animationIntentsFrom(
