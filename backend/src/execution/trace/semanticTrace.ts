@@ -250,23 +250,6 @@ function localProposal(source: string, trace: ExecutionTrace): SemanticTraceProp
     return { schemaVersion: SEMANTIC_TRACE_SCHEMA_VERSION, annotations };
 }
 
-function targetMatchesRuntime(target: SemanticVisualTarget, event: ExecutionEvent): boolean {
-    return nestedExecutionEvents(event).some((nested) => {
-        if (nested.type !== target.eventType ||
-            target.operation !== targetOperation(String(nested.type))) return false;
-        const data = isRecord(nested.data) ? nested.data : {};
-        if (target.name !== undefined && data.name !== target.name) return false;
-
-        const changes = Array.isArray(data.changes) ? data.changes.filter(isRecord) : [];
-        const candidates = [data, ...changes];
-        const locationKeys = (["indices", "key", "path"] as const)
-            .filter((key) => target[key] !== undefined);
-        if (locationKeys.length === 0) return true;
-        return candidates.some((candidate) => locationKeys.every((key) =>
-            JSON.stringify(candidate[key]) === JSON.stringify(target[key])
-        ));
-    });
-}
 
 function stableJson(value: unknown): string {
     if (Array.isArray(value)) return "[" + value.map(stableJson).join(",") + "]";
@@ -321,8 +304,7 @@ function validateProposal(value: unknown, trace: ExecutionTrace): SemanticTraceP
                 typeof target.operation !== "string" || !TARGET_OPERATIONS.has(target.operation as SemanticTargetOperation) ||
                 (target.name !== undefined && typeof target.name !== "string") ||
                 (target.indices !== undefined && (!Array.isArray(target.indices) ||
-                    !target.indices.every((index) => typeof index === "number" && Number.isFinite(index))) ) ||
-                !targetMatchesRuntime(target as unknown as SemanticVisualTarget, sourceEvent)) return undefined;
+                    !target.indices.every((index) => typeof index === "number" && Number.isFinite(index))) )) return undefined;
         }
         if (annotation.conditionResult !== undefined &&
             (typeof annotation.conditionResult !== "boolean" ||
