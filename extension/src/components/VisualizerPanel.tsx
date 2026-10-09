@@ -206,7 +206,7 @@ export function executionSubstatement(
     return undefined;
   };
 
-  const splitTopLevel = (source: string): string[] => {
+  const splitTopLevel = (source: string, delimiter = ';'): string[] => {
     const parts: string[] = [];
     let start = 0, depth = 0, quote = '', escaped = false;
     for (let i = 0; i < source.length; i++) {
@@ -220,7 +220,7 @@ export function executionSubstatement(
       if (ch === '"' || ch === "'") { quote = ch; continue; }
       if ('([{'.includes(ch)) depth++;
       else if (')]}'.includes(ch)) depth--;
-      else if (ch === ';' && depth === 0) {
+      else if (ch === delimiter && depth === 0) {
         parts.push(source.slice(start, i).trim());
         start = i + 1;
       }
@@ -237,16 +237,15 @@ export function executionSubstatement(
   if (/^for\s*\(/.test(trimmed)) {
     const inside = balanced(trimmed, trimmed.indexOf('('));
     if (inside) {
-      const parts = splitTopLevel(inside);
-
-      // Enhanced-for: for (Type name : iterable)
-      // It has no init/condition/update triplet. The complete declaration
-      // before ':' is the binding, regardless of whether the element is a
-      // primitive, String, array, object, generic type, or nested generic.
-      if (parts.length === 2) {
-        const [declaration, iterable] = parts;
+      // Enhanced-for has one top-level colon, unlike classic for's two semicolons.
+      // The delimiter-aware splitter ignores nested generic and call expressions.
+      const enhancedParts = splitTopLevel(inside, ':');
+      if (enhancedParts.length === 2) {
+        const [declaration, iterable] = enhancedParts;
         return declaration.trim() + ' : ' + iterable.trim();
       }
+
+      const parts = splitTopLevel(inside);
 
       if (parts.length === 3) {
         const [initialization, condition, update] = parts;
