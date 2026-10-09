@@ -1245,7 +1245,8 @@ export function Variables({ state, previous }: { state?: TraceState; previous?: 
 function arrayIndexVariableNames(source: string, arrayName?: string): Set<string> {
   const names = new Set<string>();
   if (!arrayName) return names;
-  const pattern = new RegExp(arrayName + '\\s*\\[([^\\]]+)\\]', 'g');
+  const escapedArrayName = arrayName.replace(/[\\^$.*+?()[\]{}|]/g, '\\  const pattern = new RegExp(arrayName + '\\s*\\[([^\\]]+)\\]', 'g');');
+  const pattern = new RegExp('\\b' + escapedArrayName + '\\s*\\[([^\\]]+)\\]', 'g');
   for (const match of source.matchAll(pattern)) {
     for (const identifier of match[1].matchAll(/\b[A-Za-z_$][\w$]*\b/g)) names.add(identifier[0]);
   }
