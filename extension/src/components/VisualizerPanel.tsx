@@ -1318,7 +1318,20 @@ function changedArrayIndices(state?: TraceState): Set<number> {
 }
 
 export function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<string>() }: { value: unknown[]; state?: TraceState; source?: string; arrayName?: string; depth?: number; seen?: Set<string> }) {
-  if (value.every(Array.isArray)) return <div className="yv-matrix">{value.map((row,r)=><div className="yv-array" key={r}>{(row as unknown[]).map((v,i)=><div className="yv-cell" key={i}><div className="yv-cell-value"><DataValue value={v} state={state} source={source ?? ''} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">[{r},{i}]</div></div>)}</div>)}</div>;
+  if (value.every(Array.isArray)) {
+    const matrixRoles = stateSemanticRoles(state).filter(role =>
+      role.role === 'pointer' && role.structureName === arrayName
+    );
+    const rowRole = matrixRoles.find(role => role.evidence?.includes('first index of a two-dimensional array access'));
+    const colRole = matrixRoles.find(role => role.evidence?.includes('second index of a two-dimensional array access'));
+    const rowValue = rowRole ? state?.variables?.[rowRole.name] : undefined;
+    const colValue = colRole ? state?.variables?.[colRole.name] : undefined;
+    const hasActiveCoordinate = Number.isInteger(rowValue) && Number.isInteger(colValue);
+    return <div className="yv-matrix">{value.map((row,r)=><div className="yv-array" key={r}>{(row as unknown[]).map((v,i)=>{
+      const active = hasActiveCoordinate && rowValue === r && colValue === i;
+      return <div className="yv-cell" key={i}>{active&&rowRole&&colRole&&<div className="yv-pointer">{rowRole.name} · {colRole.name}</div>}<div className="yv-cell-value"><DataValue value={v} state={state} source={source ?? ''} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">[{r},{i}]</div></div>;
+    })}</div>)}</div>;
+  }
   const labels=pointerLabels(state,value.length,arrayIndexVariableNames(source ?? '', arrayName),arrayName); const changed=changedArrayIndices(state); const accessed=accessedArrayIndices(state,arrayName);
   return <div className="yv-array">{value.map((v,i)=><div className="yv-cell" key={i}>{labels.has(i)&&<div className="yv-pointer">{labels.get(i)!.join(' · ')}</div>}<div className={`yv-cell-value ${changed.has(i)?'yv-cell-changed ':''}${accessed.has(i)?'yv-cell-accessed':''}`}><DataValue value={v} state={state} source={source ?? ''} name={arrayName} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">{i}</div></div>)}</div>;
 }
