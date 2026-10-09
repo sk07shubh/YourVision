@@ -62,7 +62,21 @@ const trace: ExecutionTrace = {
                 executionEvents: []
             }
         },
-        { sequence: 5, type: "METHOD_EXIT", line: 5, method: "find", depth: 1, data: { returnValue: 1 } }
+        {
+            sequence: 5,
+            type: "STEP",
+            line: 4,
+            method: "find",
+            depth: 1,
+            data: {
+                variables: { nums: { $arrayId: "a1", $type: "int[]", values: [4, 10] }, target: 8, i: 1, value: 10 },
+                executionEvents: [
+                    { sequence: 0, type: "ARRAY_WRITE", line: 4, method: "find", depth: 1,
+                      data: { name: "nums", objectId: "a1", values: [4, 10], changes: [{ indices: [1], before: 8, after: 10 }] } }
+                ]
+            }
+        },
+        { sequence: 6, type: "METHOD_EXIT", line: 5, method: "find", depth: 1, data: { returnValue: 1 } }
     ]
 };
 
@@ -96,12 +110,20 @@ if (!targets.some((target) => target.eventType === "ARRAY_ACCESS" && target.oper
     throw new Error("visual target was not grounded in the runtime array-access event");
 }
 
+const writeStep = prepared.events.find((event) => event.sequence === 5);
+const writeAnnotation = writeStep?.data?.visualization as Record<string, unknown> | undefined;
+const writeTargets = writeAnnotation?.targets as Array<{ eventType: string; operation: string; name?: string; indices?: number[] }>;
+if (!writeTargets.some((target) => target.eventType === "ARRAY_WRITE" && target.operation === "write" &&
+    target.name === "nums" && JSON.stringify(target.indices) === "[1]")) {
+    throw new Error("array write target did not preserve its exact changed cell path");
+}
+
 const conditionStep = prepared.events.find((event) => event.sequence === 4);
 const conditionAnnotation = conditionStep?.data?.visualization as Record<string, unknown> | undefined;
 if (conditionAnnotation?.conditionResult !== true) {
     throw new Error("runtime condition result was not preserved in semantic metadata");
 }
-if (prepared.events.find((event) => event.sequence === 5)?.data?.visualization !== undefined) {
+if (prepared.events.find((event) => event.sequence === 6)?.data?.visualization !== undefined) {
     throw new Error("semantic annotations should only be attached to STEP checkpoints");
 }
 
