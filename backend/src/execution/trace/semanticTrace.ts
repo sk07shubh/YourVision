@@ -214,7 +214,7 @@ function localProposal(source: string, trace: ExecutionTrace): SemanticTraceProp
         };
         if (typeof data.conditionResult === "boolean") annotation.conditionResult = data.conditionResult;
         if (typeof data.executionPhase === "string" && EXECUTION_PHASES.has(data.executionPhase)) {
-            annotation.executionPhase = data.executionPhase as SemanticStepAnnotation["executionPhase"];
+            annotation.executionPhase = data.executionPhase as "initialization" | "condition" | "increment" | "body" | "unknown";
         }
         annotations.push({ eventSequence: event.sequence, annotation });
     }
@@ -280,6 +280,7 @@ function validateProposal(value: unknown, trace: ExecutionTrace): SemanticTraceP
             annotation: annotation as unknown as SemanticStepAnnotation
         });
     }
+    if (seen.size !== stepEvents.size) return undefined;
     return { schemaVersion: SEMANTIC_TRACE_SCHEMA_VERSION, annotations };
 }
 
