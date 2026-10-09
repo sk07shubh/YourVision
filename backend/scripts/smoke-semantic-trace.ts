@@ -173,6 +173,36 @@ if (!scopedRoles.some((hint) => hint.name === "i" && hint.structureName === "num
     throw new Error("multiple array indices were not scoped to their own structures");
 }
 
+const misScopedAnalyzer: SemanticTraceAnalyzer = {
+    async analyze() {
+        return {
+            schemaVersion: 1,
+            annotations: multiArrayPrepared.events.filter((event) => event.type === "STEP").map((event) => {
+                const annotation = event.data?.visualization as Record<string, unknown>;
+                const roles = annotation.variableRoles as Array<Record<string, unknown>>;
+                return {
+                    eventSequence: event.sequence,
+                    annotation: {
+                        ...annotation,
+                        provider: "ai",
+                        variableRoles: roles.map((role) =>
+                            role.name === "i" && role.role === "array-index"
+                                ? { ...role, structureName: "other" }
+                                : role
+                        )
+                    }
+                };
+            })
+        };
+    }
+};
+const rejectedMisScope = await prepareSemanticTrace(multiArrayTrace, multiArraySource, misScopedAnalyzer);
+const rejectedMisScopeAnnotation = rejectedMisScope.events[0]?.data?.visualization as
+    { provider?: string } | undefined;
+if (rejectedMisScopeAnnotation?.provider !== "local-fallback") {
+    throw new Error("provider was allowed to attach an array index to the wrong source array");
+}
+
 const maliciousAnalyzer: SemanticTraceAnalyzer = {
     async analyze() {
         return {
