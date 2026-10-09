@@ -1,7 +1,22 @@
 import { runJava } from "../src/execution/java/runner.js";
 import { inferSemanticRoles } from "../src/execution/trace/semanticRoles.js";
 function assert(condition:boolean,message:string):asserts condition{if(!condition)throw new Error(message);}
-const source="class Solution { public int converge(int n,int target){int left=0;int right=n-1;while(left<right){if(left+right>target){right--;}else{left++;}}return left;} }";
+const source = [
+ "class Solution {",
+ " public int converge(int n, int target) {",
+ "  int left = 0;",
+ "  int right = n - 1;",
+ "  while (left < right) {",
+ "   if (left + right > target) {",
+ "    right--;",
+ "   } else {",
+ "    left++;",
+ "   }",
+ "  }",
+ "  return left;",
+ " }",
+ "}"
+].join("\n");
 const roles=inferSemanticRoles(source);
 assert(roles.some(r=>r.name==="left"&&r.role==="left-bound"),"must infer left boundary without array indexing");
 assert(roles.some(r=>r.name==="right"&&r.role==="right-bound"),"must infer right boundary without array indexing");
