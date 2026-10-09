@@ -109,6 +109,10 @@ if (!targets.some((target) => target.eventType === "ARRAY_ACCESS" && target.oper
     target.name === "nums" && JSON.stringify(target.indices) === "[0]")) {
     throw new Error("visual target was not grounded in the runtime array-access event");
 }
+if (!((readAnnotation.variableRoles as Array<{ name: string; role: string; structureName?: string }>)
+    .some((hint) => hint.name === "i" && hint.role === "array-index" && hint.structureName === "nums"))) {
+    throw new Error("array-index role was not scoped to the correct array");
+}
 
 const writeStep = prepared.events.find((event) => event.sequence === 5);
 const writeAnnotation = writeStep?.data?.visualization as Record<string, unknown> | undefined;
