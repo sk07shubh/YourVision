@@ -110,7 +110,8 @@ function inferVariableUsage(source:string):Map<string,VariableUsageInfo>{
  for(const [name,item] of usage){
   const occurrences=[...code.matchAll(new RegExp("\\b"+name+"\\b","g"))].length;
   const declarationsCount=declarations.get(name)??0;
-  const writes=assignedTargets.get(name)??0;
+  // Declaration initializers are both declarations and simple assignments; subtract their LHS only once.
+  const writes=Math.max(0,(assignedTargets.get(name)??0)-declarationsCount);
   item.reads=Math.max(0,occurrences-declarationsCount-writes);
   if(item.reads===0&&item.declared)item.usage.add("declared but never read");
  }
