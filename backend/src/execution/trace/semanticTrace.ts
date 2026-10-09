@@ -48,6 +48,24 @@ export interface SemanticVisualTarget {
     indices?: number[];
     key?: unknown;
     path?: unknown;
+    changeKind?: "insert" | "update" | "delete";
+}
+
+export type SemanticAnimationAction =
+    | "highlight-read"
+    | "highlight-write"
+    | "insert"
+    | "update"
+    | "delete"
+    | "create"
+    | "pointer-move";
+
+export interface SemanticAnimationIntent {
+    action: SemanticAnimationAction;
+    targetIndex: number;
+    variableName?: string;
+    confidence: number;
+    evidence: string;
 }
 
 export interface SemanticStepAnnotation {
@@ -57,6 +75,8 @@ export interface SemanticStepAnnotation {
     confidence: number;
     variableRoles: SemanticVariableRoleHint[];
     targets: SemanticVisualTarget[];
+    /** A grounded plan for a future renderer; this does not trigger animations. */
+    animationIntents: SemanticAnimationIntent[];
     conditionResult?: boolean;
     executionPhase?: "initialization" | "condition" | "increment" | "body" | "unknown";
 }
@@ -92,6 +112,9 @@ const TARGET_OPERATIONS = new Set<SemanticTargetOperation>([
 ]);
 const EXECUTION_PHASES = new Set([
     "initialization", "condition", "increment", "body", "unknown"
+]);
+const ANIMATION_ACTIONS = new Set<SemanticAnimationAction>([
+    "highlight-read", "highlight-write", "insert", "update", "delete", "create", "pointer-move"
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -154,6 +177,9 @@ function targetsFromRuntimeEvents(event: ExecutionEvent): SemanticVisualTarget[]
             }
             if (source.key !== undefined) target.key = source.key;
             if (source.path !== undefined) target.path = source.path;
+            if (source.kind === "insert" || source.kind === "update" || source.kind === "delete") {
+                target.changeKind = source.kind;
+            }
         };
 
         const changes = Array.isArray(data.changes) ? data.changes.filter(isRecord) : [];
