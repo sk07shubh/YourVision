@@ -1256,9 +1256,26 @@ function arrayIndexVariableNames(source: string, arrayName?: string): Set<string
 
 export function pointerLabels(state: TraceState | undefined, length: number, indexNames: Set<string>, arrayName?: string): Map<number,string[]> {
   const map = new Map<number,string[]>();
-  const semanticNames = new Set(stateSemanticRoles(state).filter(role =>
-    ['left-bound','right-bound','midpoint','pointer'].includes(role.role) && role.structureName === arrayName
-  ).map(role=>role.name));
+  const roles = stateSemanticRoles(state);
+  const boundaryRoles = roles.filter(role =>
+    ['left-bound','right-bound','midpoint','pointer'].includes(role.role)
+  );
+  const hasArraySpecificRoles = boundaryRoles.some(role => role.structureName === arrayName);
+  const semanticNames = new Set(boundaryRoles
+    .filter(role => role.structureName === arrayName)
+    .map(role => role.name));
+
+  // A 1-D binary-search array often has role hints for left/right/mid but no
+  // explicit structureName. If this array is indexed by the inferred midpoint,
+  // attach those interval roles to this array. Matrix rendering is handled
+  // separately above and therefore keeps row/col distinct from outer bounds.
+  const hasMidpointIndex = [...indexNames].some(name =>
+    boundaryRoles.some(role => role.name === name && role.role === 'midpoint')
+  );
+  if (!hasArraySpecificRoles && hasMidpointIndex) {
+    for (const role of boundaryRoles) semanticNames.add(role.name);
+  }
+
   for (const [name,value] of Object.entries(state?.variables ?? {})) {
     if (!indexNames.has(name) && !semanticNames.has(name)) continue;
     if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value >= length) continue;
