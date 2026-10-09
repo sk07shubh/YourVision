@@ -65,6 +65,3 @@
 .yv-ds-result-transition{color:var(--yv-accent);font-weight:700}
 .yv-ds-result-new{color:var(--yv-text);font-weight:700}
 .yv-ds-result-position{color:var(--yv-muted);font-size:11px;overflow:hidden;text-overflow:ellipsis}
-
-.yv-var-name{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
-.yv-role{font-size:9px;line-height:1.35;font-weight:700;letter-spacing:.025em;padding:1px 5px;border:1px solid var(--yv-border);border-radius:999px;color:var(--yv-muted);white-space:nowrap}

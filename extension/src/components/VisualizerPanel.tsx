@@ -1197,14 +1197,6 @@ function variableSummary(value: unknown): string {
   return displayValue(value);
 }
 
-export interface SemanticRoleView { name:string; role:string; confidence?:number; evidence?:string; structureName?:string; }
-function stateSemanticRoles(state?:TraceState):SemanticRoleView[]{
- const data=state?.lastEvent?.data;
- if(!isPlainObject(data)||!Array.isArray(data.semanticRoles))return [];
- return data.semanticRoles.filter((role):role is SemanticRoleView=>isPlainObject(role)&&typeof role.name==="string"&&typeof role.role==="string");
-}
-export function semanticRoleForVariable(state:TraceState|undefined,name:string):SemanticRoleView|undefined{return stateSemanticRoles(state).find(role=>role.name===name);}
-function semanticRoleLabel(role:string):string{return ({'left-bound':'LEFT BOUND','right-bound':'RIGHT BOUND',midpoint:'MIDPOINT','loop-counter':'LOOP',pointer:'POINTER'} as Record<string,string>)[role]??'';}
 function Variables({ state, previous }: { state?: TraceState; previous?: TraceState }) {
   const entries = Object.entries(state?.variables ?? {})
     .filter(([name, value]) => name !== 'this' && !isStructuralObject(value));
@@ -1221,7 +1213,7 @@ function Variables({ state, previous }: { state?: TraceState; previous?: TraceSt
 
         return (
           <div className={`yv-var ${changed ? 'changed' : ''}`} key={name}>
-            <div className="yv-var-name"><span>{name}</span>{semanticRoleForVariable(state,name)&&<span className="yv-role">{semanticRoleLabel(semanticRoleForVariable(state,name)!.role)}</span>}</div>
+            <div className="yv-var-name">{name}</div>
             <div className="yv-change">
               {changed && (
                 <>
@@ -1250,13 +1242,10 @@ function arrayIndexVariableNames(source: string, arrayName?: string): Set<string
   return names;
 }
 
-export function pointerLabels(state: TraceState | undefined, length: number, indexNames: Set<string>, arrayName?: string): Map<number,string[]> {
+function pointerLabels(state: TraceState | undefined, length: number, indexNames: Set<string>): Map<number,string[]> {
   const map = new Map<number,string[]>();
-  const semanticNames = new Set(stateSemanticRoles(state).filter(role =>
-    ['left-bound','right-bound','midpoint','pointer'].includes(role.role) && role.structureName === arrayName
-  ).map(role=>role.name));
   for (const [name,value] of Object.entries(state?.variables ?? {})) {
-    if (!indexNames.has(name) && !semanticNames.has(name)) continue;
+    if (!indexNames.has(name)) continue;
     if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value >= length) continue;
     const list = map.get(value) ?? []; list.push(name); map.set(value,list);
   }
@@ -1319,7 +1308,7 @@ function changedArrayIndices(state?: TraceState): Set<number> {
 
 function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<string>() }: { value: unknown[]; state?: TraceState; source?: string; arrayName?: string; depth?: number; seen?: Set<string> }) {
   if (value.every(Array.isArray)) return <div className="yv-matrix">{value.map((row,r)=><div className="yv-array" key={r}>{(row as unknown[]).map((v,i)=><div className="yv-cell" key={i}><div className="yv-cell-value"><DataValue value={v} state={state} source={source ?? ''} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">[{r},{i}]</div></div>)}</div>)}</div>;
-  const labels=pointerLabels(state,value.length,arrayIndexVariableNames(source ?? '', arrayName),arrayName); const changed=changedArrayIndices(state); const accessed=accessedArrayIndices(state,arrayName);
+  const labels=pointerLabels(state,value.length,arrayIndexVariableNames(source ?? '', arrayName)); const changed=changedArrayIndices(state); const accessed=accessedArrayIndices(state,arrayName);
   return <div className="yv-array">{value.map((v,i)=><div className="yv-cell" key={i}>{labels.has(i)&&<div className="yv-pointer">{labels.get(i)!.join(' · ')}</div>}<div className={`yv-cell-value ${changed.has(i)?'yv-cell-changed ':''}${accessed.has(i)?'yv-cell-accessed':''}`}><DataValue value={v} state={state} source={source ?? ''} name={arrayName} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">{i}</div></div>)}</div>;
 }
 

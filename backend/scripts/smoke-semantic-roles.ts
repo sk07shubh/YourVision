@@ -5,7 +5,7 @@ const source="class Solution { public int converge(int n,int target){int left=0;
 const roles=inferSemanticRoles(source);
 assert(roles.some(r=>r.name==="left"&&r.role==="left-bound"),"must infer left boundary without array indexing");
 assert(roles.some(r=>r.name==="right"&&r.role==="right-bound"),"must infer right boundary without array indexing");
-assert(!/\\w+\\s*\\[[^\\]]+\\]/.test(source),"fixture must contain no array access");
+assert(!/\w+\s*\[[^\]]+\]/.test(source),"fixture must contain no array access");
 const runtime=await runJava(source,{method:"converge",arguments:["5","2"]});
 assert(runtime.success&&runtime.result==="1","real Java fixture failed: "+runtime.kind+": "+(runtime.message??runtime.stderr));
 const steps=runtime.trace?.events.filter(e=>e.type==="STEP")??[];
