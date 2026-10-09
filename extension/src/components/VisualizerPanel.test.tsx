@@ -333,6 +333,32 @@ describe('semantic roles in rendered visualization', () => {
     expect(html).toContain('>left</div>');
     expect(html).toContain('>right</div>');
   });
+  it('renders binary-search pointers from real array-index expressions when roles omit structureName', () => {
+    const current = state({
+      variables: { n: 9, left: 0, right: 8, mid: 4 },
+      lastEvent: { type: 'STEP', line: 18, data: { semanticRoles: [
+        { name: 'left', role: 'left-bound', confidence: 0.96, evidence: 'left boundary updates are derived from midpoint' },
+        { name: 'right', role: 'right-bound', confidence: 0.96, evidence: 'right boundary updates are derived from midpoint' },
+        { name: 'mid', role: 'midpoint', confidence: 0.96, evidence: 'mid is computed from both interval boundaries' },
+      ] } },
+    });
+    const source = [
+      'int mid = left + (right - left) / 2;',
+      'if (nums[mid - 1] != nums[mid] && nums[mid + 1] != nums[mid]) {',
+      '  left = mid + 1;',
+      '  right = mid - 1;',
+    ].join('\n');
+    const html = renderToStaticMarkup(
+      <ArrayView value={[1, 1, 2, 3, 3, 4, 4, 8, 8]} state={current} source={source} arrayName="nums" />,
+    );
+    expect(html).toContain('>left</div>');
+    expect(html).toContain('>right</div>');
+    expect(html).toContain('>mid</div>');
+    expect(pointerLabels(current, 9, new Set(['left', 'right', 'mid', 'n']), 'nums')).toEqual(
+      new Map([[0, ['left']], [4, ['mid']], [8, ['right']]]),
+    );
+  });
+
   it('places matrix traversal pointers at the active row and column intersection', () => {
     const current = state({
       variables: { row: 1, col: 2 },
