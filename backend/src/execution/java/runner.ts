@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 import type { ExecutionTrace, ExecutionEvent, TraceState } from "../trace/schema.js";
 import { buildStates } from "../trace/stateBuilder.js";
 import { enrichTrace } from "../trace/enrichTrace.js";
+import { prepareSemanticTrace } from "../trace/semanticTrace.js";
 
 const MAX_TRACE_EVENTS = 5000;
 
@@ -297,7 +298,7 @@ await fs.writeFile(
                     }
                 );
             const trace =
-                parseTrace(stdout, source);
+                await parseTrace(stdout, source);
 
             const traceLimited =
                 trace.events.some(
@@ -342,7 +343,7 @@ await fs.writeFile(
                     error.stdout ?? "";
 
                 const trace =
-                    parseTrace(stdout, source);
+                    await parseTrace(stdout, source);
 
                 if (
                     !trace.events.some(
@@ -402,7 +403,7 @@ await fs.writeFile(
                 );
 
             const trace =
-                    parseTrace(stdout, source);
+                    await parseTrace(stdout, source);
 
             return {
                 success: false,
@@ -475,10 +476,10 @@ function isTimeout(
 }
 
 
-function parseTrace(
+async function parseTrace(
     stdout: string,
     source: string
-): ExecutionTrace {
+): Promise<ExecutionTrace> {
     const events: ExecutionEvent[] = [];
 
     for (const line of stdout.split(/\r?\n/)) {
@@ -516,10 +517,10 @@ function parseTrace(
 
     attachMethodDisplayLines(events, source);
 
-    const enriched = enrichTrace({
+    const enriched = await prepareSemanticTrace(enrichTrace({
         version: 1,
         events
-    }, source);
+    }, source), source);
 
     if (enriched.events.length <= MAX_TRACE_EVENTS) {
         return enriched;
