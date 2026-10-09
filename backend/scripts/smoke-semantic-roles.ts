@@ -69,6 +69,43 @@ assert(answerRoles.some(r=>r.name==="hg"&&r.role==="right-bound"),"binary-search
 assert(answerRoles.some(r=>r.name==="mid"&&r.role==="midpoint"),"answer-space midpoint must be inferred from the two bounds");
 assert(answerRoles.some(r=>r.name==="row"&&r.role==="pointer"&&r.structureName==="matrix"),"first matrix traversal index must be recognized as a matrix pointer");
 assert(answerRoles.some(r=>r.name==="col"&&r.role==="pointer"&&r.structureName==="matrix"),"second matrix traversal index must be recognized as a matrix pointer");
-assert(!answerRoles.some(r=>r.name==="row"&&r.role==="left-bound"),"matrix row traversal must not be mislabeled as a binary-search boundary");
+assert(!answerRoles.some(r=>r.name==="row"&&(r.role==="left-bound"||r.role==="right-bound")),"matrix row traversal must not be mislabeled as a binary-search boundary");
+assert(!answerRoles.some(r=>r.name==="col"&&(r.role==="left-bound"||r.role==="right-bound")),"matrix column traversal must not be mislabeled as a binary-search boundary");
+assert(!answerRoles.some(r=>(r.name==="sd"||r.name==="hg")&&r.role==="pointer"),"value-space search bounds must not be mislabeled as matrix traversal pointers");
+assert(!answerRoles.some(r=>(r.name==="sd"||r.name==="hg")&&r.structureName==="matrix"),"value-space bounds must not inherit the matrix name from nested traversal");
 
-console.log("PASS: deterministic semantic roles for ordinary binary search, answer-space search, and matrix pointers");
+const runtimeMatrixSource = `class Solution {
+ public int kthSmallest() {
+  int[][] matrix = {{1, 5, 9}, {10, 11, 13}, {12, 13, 15}};
+  int k = 8;
+  int n = matrix.length;
+  int m = matrix[0].length;
+  int sd = matrix[0][0];
+  int hg = matrix[n - 1][n - 1];
+  while (sd < hg) {
+   int mid = sd + (hg - sd) / 2;
+   int count = 0;
+   int row = 0;
+   int col = m - 1;
+   while (row < n && col >= 0) {
+    if (matrix[row][col] <= mid) { count += col + 1; row++; }
+    else { col--; }
+   }
+   if (count < k) sd = mid + 1;
+   else hg = mid;
+  }
+  return sd;
+ }
+}`;
+const matrixRuntime = await runJava(runtimeMatrixSource, { method: "kthSmallest", arguments: [] });
+assert(matrixRuntime.success && matrixRuntime.result === "13", "real matrix binary-search fixture failed: " + matrixRuntime.kind + ": " + (matrixRuntime.message ?? matrixRuntime.stderr));
+const matrixSteps = matrixRuntime.trace?.events.filter(e => e.type === "STEP") ?? [];
+assert(matrixSteps.length > 0, "matrix binary search must produce real STEP events");
+const observedRoles = matrixSteps.flatMap(step => Array.isArray(step.data?.semanticRoles) ? step.data.semanticRoles : []);
+assert(observedRoles.some(role => role && typeof role === "object" && (role as {name?:unknown}).name === "sd" && (role as {role?:unknown}).role === "left-bound"), "real runtime STEP events must retain sd as the lower search bound");
+assert(observedRoles.some(role => role && typeof role === "object" && (role as {name?:unknown}).name === "hg" && (role as {role?:unknown}).role === "right-bound"), "real runtime STEP events must retain hg as the upper search bound");
+assert(observedRoles.some(role => role && typeof role === "object" && (role as {name?:unknown}).name === "row" && (role as {role?:unknown}).role === "pointer"), "real runtime STEP events must retain row as a matrix traversal pointer");
+assert(observedRoles.some(role => role && typeof role === "object" && (role as {name?:unknown}).name === "col" && (role as {role?:unknown}).role === "pointer"), "real runtime STEP events must retain col as a matrix traversal pointer");
+assert(!observedRoles.some(role => role && typeof role === "object" && ((role as {name?:unknown}).name === "row" || (role as {name?:unknown}).name === "col") && ["left-bound", "right-bound"].includes(String((role as {role?:unknown}).role))), "runtime semantic metadata must never promote row/col to binary-search boundaries");
+
+console.log("PASS: deterministic semantic roles for ordinary binary search, answer-space search, and matrix traversal at runtime");
