@@ -199,8 +199,9 @@ const phaseTrace: ExecutionTrace = {
     version: 1,
     events: [
         {
-            sequence: 30, type: "STEP", line: 3, method: "loop", depth: 1,
+            sequence: 30, type: "STEP", line: 4, method: "loop", depth: 1,
             data: {
+                displayLine: 3,
                 variables: { n: 2, i: 0 },
                 executionEvents: [{ sequence: 0, type: "VARIABLE_UPDATE", line: 3, method: "loop", depth: 1,
                     data: { name: "i", value: 0 } }]
@@ -224,7 +225,9 @@ const phasePrepared = await prepareSemanticTrace(phaseTrace, phaseSource);
 const phases = phasePrepared.events.map((event) =>
     (event.data?.visualization as { executionPhase?: string } | undefined)?.executionPhase
 );
-if (JSON.stringify(phases) !== JSON.stringify(["initialization", "condition", "increment"])) {
+const firstPhaseAnnotation = phasePrepared.events[0]?.data?.visualization as { lineKind?: string } | undefined;
+if (firstPhaseAnnotation?.lineKind !== "loop-header" ||
+    JSON.stringify(phases) !== JSON.stringify(["initialization", "condition", "increment"])) {
     throw new Error("loop initialization, condition, and increment phases were not distinguished from runtime events");
 }
 
