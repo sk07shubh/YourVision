@@ -1252,64 +1252,102 @@ function pointerLabels(state: TraceState | undefined, length: number, indexNames
   return map;
 }
 
-function accessedArrayIndices(state: TraceState | undefined, arrayName?: string): Set<number> {
-  const set = new Set<number>();
-  const data = state?.lastEvent?.data;
-  if (!isPlainObject(data) || !Array.isArray(data.executionEvents)) return set;
-  for (const event of data.executionEvents) {
-    if (!isPlainObject(event) || event.type !== 'ARRAY_ACCESS' || !isPlainObject(event.data)) continue;
-    if (arrayName && event.data.name !== arrayName) continue;
-    if (!Array.isArray(event.data.indices)) continue;
-    const index = event.data.indices[0];
-    if (typeof index === 'number') set.add(index);
-  }
-  return set;
-}
-
 function accessedArrayPaths(state: TraceState | undefined, arrayName?: string): Set<string> {
   const paths = new Set<string>();
   const data = state?.lastEvent?.data;
   if (!isPlainObject(data) || !Array.isArray(data.executionEvents)) return paths;
+  const names = arrayName?.split(' / ').map(name => name.trim()).filter(Boolean);
   for (const event of data.executionEvents) {
     if (!isPlainObject(event) || event.type !== 'ARRAY_ACCESS' || !isPlainObject(event.data)) continue;
-    if (arrayName && event.data.name !== arrayName) continue;
+    const eventName = typeof event.data.name === 'string' ? event.data.name : undefined;
+    if (names?.length && eventName && !names.includes(eventName)) continue;
     if (!Array.isArray(event.data.indices) || !event.data.indices.every((x) => typeof x === 'number')) continue;
     paths.add((event.data.indices as number[]).join(','));
   }
   return paths;
 }
 
-function changedArrayIndices(state?: TraceState): Set<number> {
-  const set = new Set<number>();
+function changedArrayPaths(state?: TraceState, arrayName?: string): Set<string> {
+  const paths = new Set<string>();
   const data = state?.lastEvent?.data;
-  if (!isPlainObject(data)) return set;
-
-  const collect = (changes: unknown) => {
+  if (!isPlainObject(data)) return paths;
+  const names = arrayName?.split(' / ').map(name => name.trim()).filter(Boolean);
+  const collect = (changes: unknown, eventName?: string) => {
+    if (names?.length && eventName && !names.includes(eventName)) return;
     if (!Array.isArray(changes)) return;
-    for (const c of changes) {
-      if (!isPlainObject(c) || !Array.isArray(c.indices)) continue;
-      const i = c.indices[0];
-      if (typeof i === 'number') set.add(i);
+    for (const change of changes) {
+      if (!isPlainObject(change) || !Array.isArray(change.indices) ||
+          !change.indices.every((index) => typeof index === 'number')) continue;
+      paths.add((change.indices as number[]).join(','));
     }
   };
 
-  collect(data.changes);
+  collect(data.changes, typeof data.name === 'string' ? data.name : undefined);
   if (Array.isArray(data.executionEvents)) {
     for (const event of data.executionEvents) {
-      if (!isPlainObject(event)) continue;
-      if (event.type === 'ARRAY_WRITE' && isPlainObject(event.data)) {
-        collect(event.data.changes);
-      }
+      if (!isPlainObject(event) || event.type !== 'ARRAY_WRITE' || !isPlainObject(event.data)) continue;
+      collect(
+        event.data.changes,
+        typeof event.data.name === 'string' ? event.data.name : undefined
+      );
     }
   }
-
-  return set;
+  return paths;
 }
 
 function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<string>() }: { value: unknown[]; state?: TraceState; source?: string; arrayName?: string; depth?: number; seen?: Set<string> }) {
-  if (value.every(Array.isArray)) return <div className="yv-matrix">{value.map((row,r)=><div className="yv-array" key={r}>{(row as unknown[]).map((v,i)=><div className="yv-cell" key={i}><div className="yv-cell-value"><DataValue value={v} state={state} source={source ?? ''} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">[{r},{i}]</div></div>)}</div>)}</div>;
-  const labels=pointerLabels(state,value.length,arrayIndexVariableNames(source ?? '', arrayName)); const changed=changedArrayIndices(state); const accessed=accessedArrayIndices(state,arrayName);
-  return <div className="yv-array">{value.map((v,i)=><div className="yv-cell" key={i}>{labels.has(i)&&<div className="yv-pointer">{labels.get(i)!.join(' · ')}</div>}<div className={`yv-cell-value ${changed.has(i)?'yv-cell-changed ':''}${accessed.has(i)?'yv-cell-accessed':''}`}><DataValue value={v} state={state} source={source ?? ''} name={arrayName} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">{i}</div></div>)}</div>;
+  const changed = changedArrayPaths(state, arrayName);
+  const accessed = accessedArrayPaths(state, arrayName);
+
+  if (value.every(Array.isArray)) {
+    return (
+      <div className="yv-matrix">
+        {value.map((row, r) => (
+          <div className="yv-array" key={r}>
+            {(row as unknown[]).map((v, i) => {
+              const path = String(r) + ',' + String(i);
+              const isChanged = changed.has(path);
+              const isAccessed = accessed.has(path);
+              return (
+                <div
+                  className={`yv-cell ${isChanged ? 'yv-cell-write' : ''} ${isAccessed ? 'yv-cell-read' : ''}`}
+                  key={i}
+                >
+                  <div className={`yv-cell-value ${isChanged ? 'yv-cell-changed' : ''} ${isAccessed ? 'yv-cell-accessed' : ''}`}>
+                    <DataValue value={v} state={state} source={source ?? ''} depth={depth + 1} seen={seen}/>
+                  </div>
+                  <div className={`yv-cell-index ${isChanged ? 'yv-index-changed' : ''} ${isAccessed ? 'yv-index-accessed' : ''}`}>[{r},{i}]</div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  const labels = pointerLabels(state, value.length, arrayIndexVariableNames(source ?? '', arrayName));
+  return (
+    <div className="yv-array">
+      {value.map((v, i) => {
+        const path = String(i);
+        const isChanged = changed.has(path);
+        const isAccessed = accessed.has(path);
+        return (
+          <div
+            className={`yv-cell ${isChanged ? 'yv-cell-write' : ''} ${isAccessed ? 'yv-cell-read' : ''}`}
+            key={i}
+          >
+            {labels.has(i) && <div className="yv-pointer">{labels.get(i)!.join(' · ')}</div>}
+            <div className={`yv-cell-value ${isChanged ? 'yv-cell-changed' : ''} ${isAccessed ? 'yv-cell-accessed' : ''}`}>
+              <DataValue value={v} state={state} source={source ?? ''} name={arrayName} depth={depth + 1} seen={seen}/>
+            </div>
+            <div className={`yv-cell-index ${isChanged ? 'yv-index-changed' : ''} ${isAccessed ? 'yv-index-accessed' : ''}`}>{i}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function mapChanges(state?: TraceState): Array<{

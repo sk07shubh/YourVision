@@ -65,3 +65,76 @@
 .yv-ds-result-transition{color:var(--yv-accent);font-weight:700}
 .yv-ds-result-new{color:var(--yv-text);font-weight:700}
 .yv-ds-result-position{color:var(--yv-muted);font-size:11px;overflow:hidden;text-overflow:ellipsis}
+
+/* Array visualization: subtle, step-synchronous read/write motion */
+.yv-cell {
+  position: relative;
+  transform-origin: center center;
+}
+.yv-cell-value {
+  border-radius: 6px;
+  transition: background-color .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+.yv-cell-read {
+  animation: yv-array-read .48s cubic-bezier(.2,.75,.25,1) both;
+}
+.yv-cell-write {
+  animation: yv-array-write .62s cubic-bezier(.2,.8,.2,1) both;
+}
+.yv-cell-value.yv-cell-accessed {
+  animation: none;
+  border-color: color-mix(in srgb, var(--yv-success), var(--yv-border) 30%);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--yv-success), transparent 18%);
+  background: color-mix(in srgb, var(--yv-success), var(--yv-elevated) 92%);
+}
+.yv-cell-value.yv-cell-changed {
+  border-color: var(--yv-accent);
+  box-shadow: inset 0 0 0 1px var(--yv-accent);
+  background: color-mix(in srgb, var(--yv-accent), var(--yv-elevated) 91%);
+}
+.yv-cell-read .yv-cell-index,
+.yv-index-accessed {
+  color: var(--yv-success);
+  font-weight: 600;
+}
+.yv-cell-write .yv-cell-index,
+.yv-index-changed {
+  color: var(--yv-accent);
+  font-weight: 700;
+}
+.yv-pointer {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 auto 3px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--yv-accent), transparent 91%);
+  animation: yv-pointer-arrive .22s ease-out both;
+}
+@keyframes yv-array-read {
+  0% { transform: translateY(0) scale(1); }
+  42% { transform: translateY(-3px) scale(1.045); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes yv-array-write {
+  0% { transform: translateY(0) scale(1); }
+  32% { transform: translateY(-4px) scale(1.065); }
+  68% { transform: translateY(1px) scale(.99); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes yv-pointer-arrive {
+  from { opacity: .45; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-cell-read,
+  .yv-cell-write,
+  .yv-pointer {
+    animation: none;
+  }
+  .yv-cell-value {
+    transition: none;
+  }
+}
+
