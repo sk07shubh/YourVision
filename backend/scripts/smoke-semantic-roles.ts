@@ -127,13 +127,13 @@ const usageAware = `class Solution {
 const usageRoles = inferSemanticRoles(usageAware);
 const unusedDistance = usageRoles.find(role => role.name === "leftDis");
 assert(unusedDistance?.role === "unused", "whole-method analysis must identify leftDis as declared but never read");
-assert(unusedDistance.usage?.includes("declared but never read"), "unused local must explain why it received the role");
+assert(unusedDistance.usage?.includes("declared but never read") === true, "unused local must explain why it received the role");
 const derivedDistance = usageRoles.find(role => role.name === "rightDis");
 assert(derivedDistance?.role === "derived-value", "rightDis must be recognized as a derived value used in a decision condition");
-assert(derivedDistance.usage?.some(item => item.includes("derived from n, mid")), "derived value must expose its dependencies");
-assert(derivedDistance.usage?.includes("used in a condition"), "derived value must expose its downstream condition use");
+assert(derivedDistance.usage?.some(item => item.includes("derived from n, mid")) === true, "derived value must expose its dependencies");
+assert(derivedDistance.usage?.includes("used in a condition") === true, "derived value must expose its downstream condition use");
 const returnedBoundary = usageRoles.find(role => role.name === "left");
 assert(returnedBoundary?.role === "left-bound", "downstream return usage must not overwrite the inferred boundary role");
-assert(returnedBoundary.usage?.includes("contributes to the returned expression"), "analysis must inspect the return expression after the loop");
+assert(returnedBoundary.usage?.includes("contributes to the returned expression") === true, "analysis must inspect the return expression after the loop");
 
 console.log("PASS: semantic roles cover whole-method usage, dead locals, derived decision values, returns, binary search and matrix traversal");
