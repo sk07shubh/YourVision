@@ -218,6 +218,10 @@ const phaseTrace: ExecutionTrace = {
                 executionEvents: [{ sequence: 0, type: "VARIABLE_UPDATE", line: 3, method: "loop", depth: 1,
                     data: { name: "i", before: 0, value: 1 } }]
             }
+        },
+        {
+            sequence: 33, type: "STEP", line: 4, method: "loop", depth: 1,
+            data: { variables: { n: 2, i: 1 }, executionEvents: [] }
         }
     ]
 };
@@ -227,7 +231,7 @@ const phases = phasePrepared.events.map((event) =>
 );
 const firstPhaseAnnotation = phasePrepared.events[0]?.data?.visualization as { lineKind?: string } | undefined;
 if (firstPhaseAnnotation?.lineKind !== "loop-header" ||
-    JSON.stringify(phases) !== JSON.stringify(["initialization", "condition", "increment"])) {
+    JSON.stringify(phases) !== JSON.stringify(["initialization", "condition", "increment", "body"])) {
     throw new Error("loop initialization, condition, and increment phases were not distinguished from runtime events");
 }
 
