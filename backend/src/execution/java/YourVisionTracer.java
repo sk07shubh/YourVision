@@ -731,8 +731,13 @@ public class YourVisionTracer {
         Location location,
         ThreadReference thread
     ) {
+        // A StepRequest and a loop BreakpointRequest can fire at different
+        // bytecode offsets that map to the same source line in one EventSet.
+        // They represent one visible source checkpoint, not two iterations.
+        // Key by source line here (within this EventSet only); separate EventSets
+        // remain distinct so genuine repeated loop iterations are preserved.
         return thread.uniqueID() + ":" + location.method().name() +
-            location.method().signature() + ":" + location.codeIndex();
+            location.method().signature() + ":" + location.lineNumber();
     }
 
     private static int findMethodDeclarationLine(
