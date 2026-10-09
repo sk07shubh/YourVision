@@ -1197,14 +1197,14 @@ function variableSummary(value: unknown): string {
   return displayValue(value);
 }
 
-export interface SemanticRoleView { name:string; role:string; confidence?:number; evidence?:string; structureName?:string; }
+export interface SemanticRoleView { name:string; role:string; confidence?:number; evidence?:string; structureName?:string; usage?:string[]; }
 function stateSemanticRoles(state?:TraceState):SemanticRoleView[]{
  const data=state?.lastEvent?.data;
  if(!isPlainObject(data)||!Array.isArray(data.semanticRoles))return [];
  return data.semanticRoles.filter((role):role is SemanticRoleView=>isPlainObject(role)&&typeof role.name==="string"&&typeof role.role==="string");
 }
 export function semanticRoleForVariable(state:TraceState|undefined,name:string):SemanticRoleView|undefined{return stateSemanticRoles(state).find(role=>role.name===name);}
-function semanticRoleLabel(role:string):string{return ({'left-bound':'LEFT BOUND','right-bound':'RIGHT BOUND',midpoint:'MIDPOINT','loop-counter':'LOOP',pointer:'POINTER'} as Record<string,string>)[role]??'';}
+function semanticRoleLabel(role:string):string{return ({'left-bound':'LEFT BOUND','right-bound':'RIGHT BOUND',midpoint:'MIDPOINT','loop-counter':'LOOP',pointer:'POINTER','derived-value':'DERIVED','answer-value':'RESULT',unused:'UNUSED'} as Record<string,string>)[role]??'';}
 export function Variables({ state, previous }: { state?: TraceState; previous?: TraceState }) {
   const entries = Object.entries(state?.variables ?? {})
     .filter(([name, value]) => name !== 'this' && !isStructuralObject(value));
@@ -1218,10 +1218,12 @@ export function Variables({ state, previous }: { state?: TraceState; previous?: 
         const changed =
           Boolean(previous) &&
           stableStringify(old) !== stableStringify(value);
+        const role = semanticRoleForVariable(state, name);
+        const roleTitle = [role?.evidence, ...(role?.usage ?? [])].filter(Boolean).join(' · ');
 
         return (
           <div className={`yv-var ${changed ? 'changed' : ''}`} key={name}>
-            <div className="yv-var-name"><span>{name}</span>{semanticRoleForVariable(state,name)&&<span className="yv-role">{semanticRoleLabel(semanticRoleForVariable(state,name)!.role)}</span>}</div>
+            <div className="yv-var-name"><span>{name}</span>{role&&<span className="yv-role" title={roleTitle}>{semanticRoleLabel(role.role)}</span>}</div>
             <div className="yv-change">
               {changed && (
                 <>
