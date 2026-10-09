@@ -1310,7 +1310,7 @@ function arrayIndexVariableNames(source: string, arrayName?: string): Set<string
   if (!arrayName) return names;
   const arrayNames = arrayName.split(' / ').map(name => name.trim()).filter(Boolean);
   for (const name of arrayNames) {
-    const escapedName = name.replace(/\$/g, '\\
+    const escapedName = name.replace(/\$/g, '\\$');
     const pattern = new RegExp('\\b' + escapedName + '\\s*\\[([^\\]]+)\\]', 'g');
     for (const match of source.matchAll(pattern)) {
       // A variable is a pointer label only when it is the actual index value.
