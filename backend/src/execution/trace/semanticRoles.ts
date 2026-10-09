@@ -60,13 +60,13 @@ export function inferSemanticRoles(source:string):SemanticVariableRoleHint[]{
  const code=maskCommentsAndStrings(source);const roles=new Map<string,SemanticVariableRoleHint>();const loops=findLoops(code);
  const pairs:Array<{left:string;right:string}>=[];
  for(const loop of loops){
-  const cmp=new RegExp("\\b("+IDENTIFIER+")\\s*(<=|<|>=|>)\\s*\\b("+IDENTIFIER+")\\b").exec(loop.condition);
+  const cmp=new RegExp("\\b("+IDENTIFIER+")(?!\\s*\\.)\\s*(<=|<|>=|>)\\s*\\b("+IDENTIFIER+")\\b(?!\\s*\\.)").exec(loop.condition);
   if(cmp?.[1]&&cmp[3]){
    const first=cmp[1],second=cmp[3];const fu=updateDirection(first,loop.body),su=updateDirection(second,loop.body);
    const fh=nameHint(first),sh=nameHint(second);
    const named=fh==="left-bound"||fh==="right-bound"||sh==="left-bound"||sh==="right-bound";
    const opposing=fu.updated&&su.updated&&(fu.increasing!==su.increasing||fu.decreasing!==su.decreasing);
-   if(named||opposing){
+   if((named&&(fu.updated||su.updated))||opposing){
     let left=first,right=second;
     if(fh==="right-bound"||sh==="left-bound"){left=second;right=first;}
     else if(fh==="left-bound"||sh==="right-bound"){left=first;right=second;}
@@ -86,12 +86,6 @@ export function inferSemanticRoles(source:string):SemanticVariableRoleHint[]{
     const inc=new RegExp("(?:\\+\\+\\s*"+n+"\\b|\\b"+n+"\\s*\\+\\+|\\b"+n+"\\s*\\+=)").test(update);
     if(tested&&inc&&!roles.has(n))addRole(roles,n,"loop-counter",0.94,"for-loop initializer, condition and update clause identify a loop counter");
    }
-  }
-  for(const n of ["left","right","low","high","lo","hi","start","end","l","r"]){
-   if(!new RegExp("\\b"+n+"\\b","i").test(loop.condition))continue;
-   if(!updateDirection(n,loop.body).updated)continue;
-   const hint=nameHint(n);
-   if(hint==="left-bound"||hint==="right-bound")addRole(roles,n,hint,0.82,n+" is a named bound tested and updated in a loop",inferStructureName(source,n,loop.header+" "+loop.body));
   }
  }
  for(const pair of pairs){
