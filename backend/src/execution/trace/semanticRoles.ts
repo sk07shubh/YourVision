@@ -1,5 +1,5 @@
-export type SemanticVariableRole = "left-bound" | "right-bound" | "midpoint" | "loop-counter" | "pointer";
-export interface SemanticVariableRoleHint { name:string; role:SemanticVariableRole; confidence:number; evidence:string; structureName?:string; }
+export type SemanticVariableRole = "left-bound" | "right-bound" | "midpoint" | "loop-counter" | "pointer" | "derived-value" | "answer-value" | "unused";
+export interface SemanticVariableRoleHint { name:string; role:SemanticVariableRole; confidence:number; evidence:string; structureName?:string; usage?:string[]; }
 interface LoopRegion { kind:"for"|"while"; header:string; condition:string; body:string; }
 const IDENTIFIER = "[A-Za-z_$][\\w$]*";
 function maskCommentsAndStrings(source:string):string {
@@ -50,6 +50,8 @@ function rolePriority(role:SemanticVariableRole,evidence:string):number{
  if(role==="left-bound"||role==="right-bound")return 80;
  if(role==="midpoint")return 60;
  if(role==="pointer")return 50;
+ if(role==="derived-value"||role==="answer-value")return 30;
+ if(role==="unused")return 10;
  return 40;
 }
 function addRole(roles:Map<string,SemanticVariableRoleHint>,name:string,role:SemanticVariableRole,confidence:number,evidence:string,structureName?:string):void{
@@ -65,6 +67,54 @@ function inferStructureName(source:string,name:string,loopText=""):string|undefi
  // relationship. A .length expression elsewhere in a nested loop is unrelated
  // evidence and must not attach value-space bounds to that array.
  return undefined;
+}
+interface VariableUsageInfo { usage:Set<string>; reads:number; declared:boolean; dependencies:Set<string>; usedInCondition:boolean; returnedDirectly:boolean; }
+function identifierNames(expression:string):string[]{
+ const ignored=new Set(["true","false","null","this","new","return","if","else","while","for","int","long","short","byte","double","float","boolean","char","var","instanceof"]);
+ return [...expression.matchAll(new RegExp("\\b"+IDENTIFIER+"\\b","g"))].map(m=>m[0]).filter(name=>!ignored.has(name));
+}
+function inferVariableUsage(source:string):Map<string,VariableUsageInfo>{
+ const code=maskCommentsAndStrings(source);
+ const usage=new Map<string,VariableUsageInfo>();
+ const get=(name:string):VariableUsageInfo=>{let item=usage.get(name);if(!item){item={usage:new Set<string>(),reads:0,declared:false,dependencies:new Set<string>(),usedInCondition:false,returnedDirectly:false};usage.set(name,item);}return item;};
+ const declarationPattern=/\b(?:final\s+)?(?:byte|short|int|long|float|double|char|boolean|var|String|[A-Z][\w$]*(?:\s*<[^;{}()]*>)?)(?:\s*\[\s*\])*\s+([A-Za-z_$][\w$]*)\s*(?==|;|,)/g;
+ const declarations=new Map<string,number>();
+ for(const match of code.matchAll(declarationPattern)){const name=match[1];if(name){get(name).declared=true;declarations.set(name,(declarations.get(name)??0)+1);}}
+ const assignmentPattern=new RegExp("\\b("+IDENTIFIER+")\\s*=\\s*([^;]+);","g");
+ const assignedTargets=new Map<string,number>();
+ const assignmentExpressions=new Map<string,string[]>();
+ for(const match of code.matchAll(assignmentPattern)){
+  const name=match[1],expression=match[2]??"";if(!name)continue;
+  assignedTargets.set(name,(assignedTargets.get(name)??0)+1);
+  const dependencies=[...new Set(identifierNames(expression).filter(dependency=>dependency!==name))];
+  if(dependencies.length){
+   const item=get(name);dependencies.forEach(dependency=>item.dependencies.add(dependency));
+   assignmentExpressions.set(name,[...(assignmentExpressions.get(name)??[]),...dependencies]);
+  }
+ }
+ const conditions:string[]=[];
+ for(const loop of findLoops(code))conditions.push(loop.condition);
+ const ifPattern=/\bif\s*\(/g;let ifMatch:RegExpExecArray|null;
+ while((ifMatch=ifPattern.exec(code))!==null){const open=code.indexOf("(",ifMatch.index);const close=matchingDelimiter(code,open,"(",")");if(close>open)conditions.push(code.slice(open+1,close));}
+ for(const condition of conditions){for(const name of new Set(identifierNames(condition))){get(name).usedInCondition=true;get(name).usage.add("used in a condition");}}
+ for(const [name,dependencies] of assignmentExpressions){
+  const item=get(name);item.usage.add("derived from "+[...new Set(dependencies)].join(", "));
+  for(const dependency of new Set(dependencies))get(dependency).usage.add("used to compute "+name);
+ }
+ const arrayAccess=new RegExp("\\b("+IDENTIFIER+")\\s*\\[([^\\]]+)\\]","g");
+ for(const match of code.matchAll(arrayAccess)){for(const name of identifierNames(match[2]??""))get(name).usage.add("used as an array index");}
+ const returnPattern=/\breturn\s+([^;]+);/g;let returnMatch:RegExpExecArray|null;
+ while((returnMatch=returnPattern.exec(code))!==null){const expression=(returnMatch[1]??"").trim();const names=identifierNames(expression);for(const name of names)get(name).usage.add("contributes to the returned expression");if(/^[A-Za-z_$][\w$]*$/.test(expression))get(expression).returnedDirectly=true;}
+ // Count reads across the whole method, not just inside loops. A local is unused
+ // only when every occurrence is its declaration or a simple assignment target.
+ for(const [name,item] of usage){
+  const occurrences=[...code.matchAll(new RegExp("\\b"+name+"\\b","g"))].length;
+  const declarationsCount=declarations.get(name)??0;
+  const writes=assignedTargets.get(name)??0;
+  item.reads=Math.max(0,occurrences-declarationsCount-writes);
+  if(item.reads===0&&item.declared)item.usage.add("declared but never read");
+ }
+ return usage;
 }
 export function inferSemanticRoles(source:string):SemanticVariableRoleHint[]{
  if(!source.trim())return [];
@@ -129,6 +179,18 @@ export function inferSemanticRoles(source:string):SemanticVariableRoleHint[]{
    addRole(roles,name,"midpoint",nameHint(name)==="midpoint"?0.96:0.82,name+" is computed from both inferred interval boundaries",roles.get(pair.left)?.structureName??roles.get(pair.right)?.structureName);
   }
  }
+ // Analyse uses across the whole method, including code after loops and return statements.
+ // This catches dead locals and derived decision values that loop-shape inference alone misses.
+ const usageInfo=inferVariableUsage(source);
+ for(const [name,info] of usageInfo){
+  if(info.declared&&info.reads===0&&!roles.has(name)){
+   addRole(roles,name,"unused",0.99,name+" is declared but never read later in the method");
+  } else if(info.usedInCondition&&info.dependencies.size>0&&!roles.has(name)){
+   addRole(roles,name,"derived-value",0.84,name+" is derived from "+[...info.dependencies].join(", ")+" and feeds a condition");
+  } else if(info.returnedDirectly&&!roles.has(name)){
+   addRole(roles,name,"answer-value",0.84,name+" is returned directly as the method result");
+  }
+ }
  // Matrix traversal indices are pointers even when their names are arbitrary.
  // Only classify variables used as both indices of a 2D access and updated in a loop.
  const matrixAccess=new RegExp("\\b("+IDENTIFIER+")\\s*\\[\\s*("+IDENTIFIER+")\\s*\\]\\s*\\[\\s*("+IDENTIFIER+")\\s*\\]","g");
@@ -146,5 +208,5 @@ export function inferSemanticRoles(source:string):SemanticVariableRoleHint[]{
    addRole(roles,n,"pointer",0.76,n+" is updated in a loop and matches a pointer-role convention");
   }
  }
- return [...roles.values()].sort((a,b)=>b.confidence-a.confidence||a.name.localeCompare(b.name));
+ return [...roles.entries()].map(([name,role])=>{const info=usageInfo.get(name);return {...role,...(info&&info.usage.size?{usage:[...info.usage]}:{})};}).sort((a,b)=>b.confidence-a.confidence||a.name.localeCompare(b.name));
 }
