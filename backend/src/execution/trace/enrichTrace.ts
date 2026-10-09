@@ -194,24 +194,32 @@ function collapseEnhancedForLoopCheckpoints(
 
         if (
             current.type === "STEP" &&
-            next?.type === "STEP" &&
-            current.method === next.method &&
-            current.depth === next.depth &&
-            current.line === next.line &&
             isEnhancedForHeader(sourceLines, line) &&
-            hasEnhancedForVariable(next, sourceLines, line)
+            !hasEnhancedForVariable(current, sourceLines, line)
         ) {
-            // The first header checkpoint is pre-assignment. Transfer its
-            // derived effects to the meaningful assignment checkpoint, then
-            // remove the pre-assignment checkpoint and any derived events
-            // that were attached to it.
-            const currentExecutionEvents = executionEventsFor(current);
-            if (currentExecutionEvents.length > 0) {
-                appendExecutionEvents(next, currentExecutionEvents);
-            }
+            // JDI can stop on the enhanced-for header before assigning the
+            // iteration variable, and can report the same empty header again
+            // when the loop terminates. Neither is an iteration checkpoint:
+            // a real iteration is represented by a snapshot containing the
+            // loop variable's value.
+            if (
+                next?.type === "STEP" &&
+                current.method === next.method &&
+                current.depth === next.depth &&
+                current.line === next.line &&
+                hasEnhancedForVariable(next, sourceLines, line)
+            ) {
+                const currentExecutionEvents = executionEventsFor(current);
+                if (currentExecutionEvents.length > 0) {
+                    appendExecutionEvents(next, currentExecutionEvents);
+                }
 
-            normalized.push(next);
-            index = nextStepIndex;
+                normalized.push(next);
+                index = nextStepIndex;
+            }
+            // If there is no following assignment checkpoint, this is the
+            // loop-exit/pre-assignment stop; drop it instead of displaying a
+            // phantom iteration.
             continue;
         }
 
