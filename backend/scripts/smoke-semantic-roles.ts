@@ -41,4 +41,34 @@ const counter="class Solution { public int count(){int total=0;for(int i=0;i<4;i
 assert(inferSemanticRoles(counter).some(r=>r.name==="i"&&r.role==="loop-counter"),"for-loop counter must be distinguished from a boundary");
 const linked="class Solution { public int converge(int[] nums){int left=0;int right=nums.length-1;while(left<right){if(left+right>3)right--;else left++;}return left;} }";
 assert(inferSemanticRoles(linked).some(r=>r.name==="left"&&r.role==="left-bound"&&r.structureName==="nums"),"boundary should associate with nums.length");
-console.log("PASS: deterministic semantic role inference, including boundaries without array access");
+
+const answerSearch = `class Solution {
+ public int kthSmallest(int[][] matrix, int k) {
+  int n = matrix.length;
+  int m = matrix[0].length;
+  int sd = matrix[0][0];
+  int hg = matrix[n - 1][n - 1];
+  while (sd < hg) {
+   int mid = sd + (hg - sd) / 2;
+   int count = 0;
+   int row = 0;
+   int col = m - 1;
+   while (row < n && col >= 0) {
+    if (matrix[row][col] <= mid) { count += col + 1; row++; }
+    else { col--; }
+   }
+   if (count < k) sd = mid + 1;
+   else hg = mid;
+  }
+  return sd;
+ }
+}`;
+const answerRoles = inferSemanticRoles(answerSearch);
+assert(answerRoles.some(r=>r.name==="sd"&&r.role==="left-bound"),"binary-search-on-answer lower bound must be inferred from midpoint updates even with a nonstandard name");
+assert(answerRoles.some(r=>r.name==="hg"&&r.role==="right-bound"),"binary-search-on-answer upper bound must be inferred from midpoint updates even with a nonstandard name");
+assert(answerRoles.some(r=>r.name==="mid"&&r.role==="midpoint"),"answer-space midpoint must be inferred from the two bounds");
+assert(answerRoles.some(r=>r.name==="row"&&r.role==="pointer"&&r.structureName==="matrix"),"first matrix traversal index must be recognized as a matrix pointer");
+assert(answerRoles.some(r=>r.name==="col"&&r.role==="pointer"&&r.structureName==="matrix"),"second matrix traversal index must be recognized as a matrix pointer");
+assert(!answerRoles.some(r=>r.name==="row"&&r.role==="left-bound"),"matrix row traversal must not be mislabeled as a binary-search boundary");
+
+console.log("PASS: deterministic semantic roles for ordinary binary search, answer-space search, and matrix pointers");
