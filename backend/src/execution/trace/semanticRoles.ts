@@ -66,15 +66,37 @@ export function inferSemanticRoles(source:string):SemanticVariableRoleHint[]{
    const fh=nameHint(first),sh=nameHint(second);
    const named=fh==="left-bound"||fh==="right-bound"||sh==="left-bound"||sh==="right-bound";
    const opposing=fu.updated&&su.updated&&((fu.increasing&&su.decreasing)||(fu.decreasing&&su.increasing));
-   if((named&&(fu.updated||su.updated))||opposing){
-    let left=first,right=second;
-    if(fh==="right-bound"||sh==="left-bound"){left=second;right=first;}
-    else if(fh==="left-bound"||sh==="right-bound"){left=first;right=second;}
-    else if(fu.decreasing&&su.increasing){left=second;right=first;}
+   // Binary search-on-answer often assigns high = mid (not high--) and low = mid + 1.
+   // Detect this structural relationship instead of relying on variable names or ++/--.
+   const midpointAssignments=[...code.matchAll(new RegExp("\\b(?:(?:int|long|short|byte|var)\\s+)?("+IDENTIFIER+")\\s*=\\s*([^;]+);","g"))]
+    .filter(m=>{const expr=m[2]??"";return expr.includes(first)&&expr.includes(second)&&/[+*/-]/.test(expr);});
+   let structuralPair:{left:string;right:string;midpointName:string}|undefined;
+   for(const assignment of midpointAssignments){
+    const midpointName=assignment[1];if(!midpointName)continue;
+    const firstFromMid=new RegExp("\\b"+first+"\\s*=\\s*"+midpointName+"\\s*(?:([+-])\\s*\\d+)?\\s*;").exec(loop.body);
+    const secondFromMid=new RegExp("\\b"+second+"\\s*=\\s*"+midpointName+"\\s*(?:([+-])\\s*\\d+)?\\s*;").exec(loop.body);
+    if(!firstFromMid||!secondFromMid)continue;
+    const firstOffset=firstFromMid[1]??"";
+    const secondOffset=secondFromMid[1]??"";
+    if(firstOffset==="+"&&secondOffset!=="-")structuralPair={left:first,right:second,midpointName};
+    else if(secondOffset==="+"&&firstOffset!=="-")structuralPair={left:second,right:first,midpointName};
+    else if(firstOffset==="-"&&secondOffset!=="-")structuralPair={left:second,right:first,midpointName};
+    else if(secondOffset==="-"&&firstOffset!=="-")structuralPair={left:first,right:second,midpointName};
+    else if(firstOffset!==""&&secondOffset==="")structuralPair={left:first,right:second,midpointName};
+    else if(secondOffset!==""&&firstOffset==="")structuralPair={left:second,right:first,midpointName};
+    if(structuralPair)break;
+   }
+   if(structuralPair || (named&&(fu.updated||su.updated)) || opposing){
+    let left=structuralPair?.left??first,right=structuralPair?.right??second;
+    if(!structuralPair){
+     if(fh==="right-bound"||sh==="left-bound"){left=second;right=first;}
+     else if(fh==="left-bound"||sh==="right-bound"){left=first;right=second;}
+     else if(fu.decreasing&&su.increasing){left=second;right=first;}
+    }
     const structure=inferStructureName(source,left,loop.header+" "+loop.body)??inferStructureName(source,right,loop.header+" "+loop.body);
-    const evidence= "participates in a loop-boundary comparison and update pattern";
-    addRole(roles,left,"left-bound",nameHint(left)==="left-bound"?0.96:0.88,left+" "+evidence,structure);
-    addRole(roles,right,"right-bound",nameHint(right)==="right-bound"?0.96:0.88,right+" "+evidence,structure);
+    const evidence=structuralPair?"boundary updates are derived from a midpoint computed from both loop bounds":"participates in a loop-boundary comparison and update pattern";
+    addRole(roles,left,"left-bound",nameHint(left)==="left-bound"?0.96:structuralPair?0.94:0.88,left+" "+evidence,structure);
+    addRole(roles,right,"right-bound",nameHint(right)==="right-bound"?0.96:structuralPair?0.94:0.88,right+" "+evidence,structure);
     pairs.push({left,right});
    }
   }
@@ -95,6 +117,17 @@ export function inferSemanticRoles(source:string):SemanticVariableRoleHint[]{
    const name=m[1],expr=m[2]??"";if(!name||!expr.includes(pair.left)||!expr.includes(pair.right)||!/[+*/-]/.test(expr))continue;
    addRole(roles,name,"midpoint",nameHint(name)==="midpoint"?0.96:0.82,name+" is computed from both inferred interval boundaries",roles.get(pair.left)?.structureName??roles.get(pair.right)?.structureName);
   }
+ }
+ // Matrix traversal indices are pointers even when their names are arbitrary.
+ // Only classify variables used as both indices of a 2D access and updated in a loop.
+ const matrixAccess=new RegExp("\\b("+IDENTIFIER+")\\s*\\[\\s*("+IDENTIFIER+")\\s*\\]\\s*\\[\\s*("+IDENTIFIER+")\\s*\\]","g");
+ for(const access of code.matchAll(matrixAccess)){
+  const arrayName=access[1],rowName=access[2],colName=access[3];
+  if(!arrayName||!rowName||!colName)continue;
+  const rowUpdated=loops.some(loop=>updateDirection(rowName,loop.body).updated);
+  const colUpdated=loops.some(loop=>updateDirection(colName,loop.body).updated);
+  if(rowUpdated)addRole(roles,rowName,"pointer",0.9,rowName+" is updated as the first index of a two-dimensional array access",arrayName);
+  if(colUpdated)addRole(roles,colName,"pointer",0.9,colName+" is updated as the second index of a two-dimensional array access",arrayName);
  }
  for(const loop of loops){
   for(const n of ["slow","fast","curr","current","prev","previous","ptr","pointer","runner"]){
