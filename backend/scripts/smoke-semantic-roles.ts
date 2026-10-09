@@ -136,6 +136,16 @@ const returnedBoundary = usageRoles.find(role => role.name === "left");
 assert(returnedBoundary?.role === "left-bound", "downstream return usage must not overwrite the inferred boundary role");
 assert(returnedBoundary.usage?.includes("contributes to the returned expression") === true, "analysis must inspect the return expression after the loop");
 
+const usageRuntime = await runJava(usageAware, {
+ method: "singleNonDuplicate",
+ arguments: ["[1,1,2,3,3,4,4,8,8]"]
+});
+assert(usageRuntime.success && usageRuntime.result === "2", "singleNonDuplicate real Java fixture failed: " + usageRuntime.kind + ": " + (usageRuntime.message ?? usageRuntime.stderr));
+const usageRuntimeRoles = (usageRuntime.trace?.events.filter(event => event.type === "STEP") ?? [])
+ .flatMap(event => Array.isArray(event.data?.semanticRoles) ? event.data.semanticRoles : []);
+assert(usageRuntimeRoles.some(role => role && typeof role === "object" && (role as {name?:unknown}).name === "leftDis" && (role as {role?:unknown}).role === "unused"), "real runtime STEP events must identify leftDis as unused");
+assert(usageRuntimeRoles.some(role => role && typeof role === "object" && (role as {name?:unknown}).name === "rightDis" && (role as {role?:unknown}).role === "derived-value"), "real runtime STEP events must identify rightDis as a derived decision value");
+
 const directResultRoles = inferSemanticRoles("class Solution { public int answer(int input) { int result = input + 1; return result; } }");
 const directResult = directResultRoles.find(role => role.name === "result");
 assert(directResult?.role === "answer-value", "a local returned directly should be recognized as the method result");
