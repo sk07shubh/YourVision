@@ -209,7 +209,7 @@ assert(
 
 const malformedParentheses = await runJava(source, {
     method: "isValid",
-    arguments: ["\\"({({[{]))}\\""]
+    arguments: ["\"({({[{]))}\""]
 });
 assert(malformedParentheses.kind === "OK" && malformedParentheses.result === "false", "Malformed Parentheses case returned the wrong result");
 const malformedLoopSteps = malformedParentheses.trace?.events.filter(
