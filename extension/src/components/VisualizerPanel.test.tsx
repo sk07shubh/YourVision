@@ -15,6 +15,8 @@ import {
   unorderedCollectionDelta,
   semanticRoleForVariable,
   pointerLabels,
+  Variables,
+  ArrayView,
 } from './VisualizerPanel';
 
 function state(patch: Partial<TraceState> = {}): TraceState {
@@ -301,5 +303,34 @@ describe('deterministic semantic pointer roles', () => {
       { name: 'right', role: 'right-bound', confidence: 0.96, evidence: 'interval boundary', structureName: 'nums' },
     ] } } });
     expect(pointerLabels(current, 5, new Set(), 'nums')).toEqual(new Map([[1, ['left']], [3, ['right']]]));
+  });
+});
+
+describe('semantic roles in rendered visualization', () => {
+  it('renders boundary badges in the variable panel', () => {
+    const current = state({
+      variables: { left: 1, right: 3 },
+      lastEvent: { type: 'STEP', line: 5, data: { semanticRoles: [
+        { name: 'left', role: 'left-bound', confidence: 0.9, evidence: 'loop boundary', structureName: 'nums' },
+        { name: 'right', role: 'right-bound', confidence: 0.9, evidence: 'loop boundary', structureName: 'nums' },
+      ] } },
+    });
+    const html = renderToStaticMarkup(<Variables state={current} />);
+    expect(html).toContain('LEFT BOUND');
+    expect(html).toContain('RIGHT BOUND');
+  });
+
+  it('renders pointer labels over cells when source has no array indexing', () => {
+    const current = state({
+      variables: { left: 1, right: 3 },
+      arrays: { nums: [10, 20, 30, 40] },
+      lastEvent: { type: 'STEP', line: 5, data: { semanticRoles: [
+        { name: 'left', role: 'left-bound', confidence: 0.9, evidence: 'interval boundary', structureName: 'nums' },
+        { name: 'right', role: 'right-bound', confidence: 0.9, evidence: 'interval boundary', structureName: 'nums' },
+      ] } },
+    });
+    const html = renderToStaticMarkup(<ArrayView value={[10, 20, 30, 40]} state={current} source="" arrayName="nums" />);
+    expect(html).toContain('>left</div>');
+    expect(html).toContain('>right</div>');
   });
 });
