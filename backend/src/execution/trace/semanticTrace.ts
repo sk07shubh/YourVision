@@ -38,6 +38,7 @@ export interface SemanticVariableRoleHint {
     role: SemanticVariableRole;
     confidence: number;
     evidence: string;
+    structureName?: string;
 }
 
 export interface SemanticVisualTarget {
@@ -173,18 +174,35 @@ function variableRoleHints(line: string, event: ExecutionEvent): SemanticVariabl
     const variables = isRecord(event.data?.variables) ? event.data.variables : {};
     const names = new Set(Object.keys(variables));
     const hints: SemanticVariableRoleHint[] = [];
-    const add = (name: string | undefined, role: SemanticVariableRole, evidence: string) => {
-        if (!name || !names.has(name) || hints.some((hint) => hint.name === name && hint.role === role)) return;
-        hints.push({ name, role, confidence: 0.82, evidence: evidence.slice(0, 240) });
+    const add = (
+        name: string | undefined,
+        role: SemanticVariableRole,
+        evidence: string,
+        structureName?: string
+    ) => {
+        if (!name || !names.has(name) || hints.some((hint) =>
+            hint.name === name && hint.role === role && hint.structureName === structureName
+        )) return;
+        hints.push({
+            name,
+            role,
+            confidence: 0.82,
+            evidence: evidence.slice(0, 240),
+            ...(structureName ? { structureName } : {})
+        });
     };
 
     const forHeader = line.match(/\bfor\s*\(\s*(?:(?:final\s+)?[\w$.<>?\[\]]+\s+)?([A-Za-z_$][\w$]*)\s*=/);
     if (forHeader?.[1]) add(forHeader[1], "loop-counter", "Declared as the initializer variable in this for-loop header.");
 
-    const bracketPattern = /\[\s*([A-Za-z_$][\w$]*)\s*\]/g;
+    const bracketPattern = /([A-Za-z_$][\w$]*)\s*\[\s*([A-Za-z_$][\w$]*)\s*\]/g;
     let bracket: RegExpExecArray | null;
     while ((bracket = bracketPattern.exec(line)) !== null) {
-        add(bracket[1], "array-index", "Used as an index inside an array access on the highlighted source line.");
+        const arrayName = bracket[1];
+        const indexName = bracket[2];
+        if (arrayName && indexName) {
+            add(indexName, "array-index", "Used as an index into " + arrayName + " on the highlighted source line.", arrayName);
+        }
     }
 
     const lower = line.toLowerCase();
@@ -288,12 +306,14 @@ function validateProposal(value: unknown, trace: ExecutionTrace): SemanticTraceP
 
         const variables = isRecord(sourceEvent.data?.variables) ? sourceEvent.data.variables : {};
         for (const hint of annotation.variableRoles) {
-            if (!isRecord(hint) || !hasOnlyKeys(hint, ["name", "role", "confidence", "evidence"]) ||
+            if (!isRecord(hint) || !hasOnlyKeys(hint, ["name", "role", "confidence", "evidence", "structureName"]) ||
                 typeof hint.name !== "string" || !(hint.name in variables) ||
                 typeof hint.role !== "string" || !VARIABLE_ROLES.has(hint.role as SemanticVariableRole) ||
                 typeof hint.confidence !== "number" || !Number.isFinite(hint.confidence) ||
                 hint.confidence < 0 || hint.confidence > 1 ||
-                typeof hint.evidence !== "string" || hint.evidence.length > 240) return undefined;
+                typeof hint.evidence !== "string" || hint.evidence.length > 240 ||
+                (hint.structureName !== undefined && (typeof hint.structureName !== "string" || !(hint.structureName in variables))) ||
+                (hint.role === "array-index" && (typeof hint.structureName !== "string" || !(hint.structureName in variables)))) return undefined;
         }
         for (const target of annotation.targets) {
             if (!isRecord(target) || !hasOnlyKeys(target, ["eventType", "operation", "name", "indices", "key", "path"]) ||
