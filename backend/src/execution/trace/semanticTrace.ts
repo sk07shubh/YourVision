@@ -299,13 +299,16 @@ function localProposal(source: string, trace: ExecutionTrace): SemanticTraceProp
         if (event.type !== "STEP") continue;
         const data = event.data ?? {};
         const line = sourceLineFor(event, lines);
+        const variableRoles = variableRoleHints(line, event);
+        const targets = targetsFromRuntimeEvents(event);
         const annotation: SemanticStepAnnotation = {
             schemaVersion: SEMANTIC_TRACE_SCHEMA_VERSION,
             provider: "local-fallback",
             lineKind: classifyLine(line),
             confidence: line ? 0.65 : 0.25,
-            variableRoles: variableRoleHints(line, event),
-            targets: targetsFromRuntimeEvents(event)
+            variableRoles,
+            targets,
+            animationIntents: animationIntentsFrom(event, targets, variableRoles)
         };
         if (typeof data.conditionResult === "boolean") annotation.conditionResult = data.conditionResult;
         if (typeof data.executionPhase === "string" && EXECUTION_PHASES.has(data.executionPhase)) {
@@ -345,13 +348,14 @@ function validateProposal(value: unknown, trace: ExecutionTrace, source: string)
         const sourceEvent = stepEvents.get(item.eventSequence);
         const annotation = item.annotation;
         if (!sourceEvent || !isRecord(annotation) ||
-            !hasOnlyKeys(annotation, ["schemaVersion", "provider", "lineKind", "confidence", "variableRoles", "targets", "conditionResult", "executionPhase"]) ||
+            !hasOnlyKeys(annotation, ["schemaVersion", "provider", "lineKind", "confidence", "variableRoles", "targets", "animationIntents", "conditionResult", "executionPhase"]) ||
             annotation.schemaVersion !== SEMANTIC_TRACE_SCHEMA_VERSION ||
             (annotation.provider !== "ai" && annotation.provider !== "local-fallback") ||
             typeof annotation.lineKind !== "string" || !LINE_KINDS.has(annotation.lineKind as SemanticLineKind) ||
             typeof annotation.confidence !== "number" || !Number.isFinite(annotation.confidence) ||
             annotation.confidence < 0 || annotation.confidence > 1 ||
-            !Array.isArray(annotation.variableRoles) || !Array.isArray(annotation.targets)) return undefined;
+            !Array.isArray(annotation.variableRoles) || !Array.isArray(annotation.targets) ||
+            !Array.isArray(annotation.animationIntents)) return undefined;
 
         const variables = isRecord(sourceEvent.data?.variables) ? sourceEvent.data.variables : {};
         const sourceLine = sourceLineFor(sourceEvent, source.split(/\r?\n/));
@@ -374,10 +378,11 @@ function validateProposal(value: unknown, trace: ExecutionTrace, source: string)
                 ))) return undefined;
         }
         for (const target of annotation.targets) {
-            if (!isRecord(target) || !hasOnlyKeys(target, ["eventType", "operation", "name", "indices", "key", "path"]) ||
+            if (!isRecord(target) || !hasOnlyKeys(target, ["eventType", "operation", "name", "indices", "key", "path", "changeKind"]) ||
                 typeof target.eventType !== "string" ||
                 typeof target.operation !== "string" || !TARGET_OPERATIONS.has(target.operation as SemanticTargetOperation) ||
                 (target.name !== undefined && typeof target.name !== "string") ||
+                (target.changeKind !== undefined && !["insert", "update", "delete"].includes(String(target.changeKind))) ||
                 (target.indices !== undefined && (!Array.isArray(target.indices) ||
                     !target.indices.every((index) => typeof index === "number" && Number.isFinite(index))) )) return undefined;
         }
