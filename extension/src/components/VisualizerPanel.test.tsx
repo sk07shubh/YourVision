@@ -355,7 +355,7 @@ describe('semantic roles in rendered visualization', () => {
     expect(html).toContain('>right</div>');
     expect(html).toContain('>mid</div>');
     expect(pointerLabels(current, 9, new Set(['left', 'right', 'mid', 'n']), 'nums')).toEqual(
-      new Map([[0, ['left']], [4, ['mid']], [8, ['right']]]),
+      new Map([[0, ['left']], [8, ['right']], [4, ['mid']]]),
     );
   });
 
