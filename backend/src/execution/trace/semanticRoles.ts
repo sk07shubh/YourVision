@@ -52,8 +52,10 @@ function inferStructureName(source:string,name:string,loopText=""):string|undefi
  const direct=new RegExp("\\b"+name+"\\s*=\\s*[^;\\n]*?\\b([A-Za-z_$][\\w$]*)\\.length\\b").exec(source);
  if(direct?.[1])return direct[1];
  const inLoop=/\b([A-Za-z_$][\w$]*)\.length\b/.exec(loopText);if(inLoop?.[1])return inLoop[1];
- const all=[...source.matchAll(/\b([A-Za-z_$][\w$]*)\.length\b/g)].map(m=>m[1]).filter((v):v is string=>Boolean(v));
- return all.length===1?all[0]:undefined;
+ // Do not associate a variable with an array merely because the method contains
+ // one .length expression: value-space searches can coexist with unrelated
+ // matrix traversal indices in the same method.
+ return undefined;
 }
 export function inferSemanticRoles(source:string):SemanticVariableRoleHint[]{
  if(!source.trim())return [];
