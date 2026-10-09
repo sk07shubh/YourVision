@@ -1205,7 +1205,7 @@ function stateSemanticRoles(state?:TraceState):SemanticRoleView[]{
 }
 export function semanticRoleForVariable(state:TraceState|undefined,name:string):SemanticRoleView|undefined{return stateSemanticRoles(state).find(role=>role.name===name);}
 function semanticRoleLabel(role:string):string{return ({'left-bound':'LEFT BOUND','right-bound':'RIGHT BOUND',midpoint:'MIDPOINT','loop-counter':'LOOP',pointer:'POINTER'} as Record<string,string>)[role]??'';}
-function Variables({ state, previous }: { state?: TraceState; previous?: TraceState }) {
+export function Variables({ state, previous }: { state?: TraceState; previous?: TraceState }) {
   const entries = Object.entries(state?.variables ?? {})
     .filter(([name, value]) => name !== 'this' && !isStructuralObject(value));
   if (!entries.length) return <div className="yv-empty">No local variables yet.</div>;
@@ -1317,7 +1317,7 @@ function changedArrayIndices(state?: TraceState): Set<number> {
   return set;
 }
 
-function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<string>() }: { value: unknown[]; state?: TraceState; source?: string; arrayName?: string; depth?: number; seen?: Set<string> }) {
+export function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<string>() }: { value: unknown[]; state?: TraceState; source?: string; arrayName?: string; depth?: number; seen?: Set<string> }) {
   if (value.every(Array.isArray)) return <div className="yv-matrix">{value.map((row,r)=><div className="yv-array" key={r}>{(row as unknown[]).map((v,i)=><div className="yv-cell" key={i}><div className="yv-cell-value"><DataValue value={v} state={state} source={source ?? ''} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">[{r},{i}]</div></div>)}</div>)}</div>;
   const labels=pointerLabels(state,value.length,arrayIndexVariableNames(source ?? '', arrayName),arrayName); const changed=changedArrayIndices(state); const accessed=accessedArrayIndices(state,arrayName);
   return <div className="yv-array">{value.map((v,i)=><div className="yv-cell" key={i}>{labels.has(i)&&<div className="yv-pointer">{labels.get(i)!.join(' · ')}</div>}<div className={`yv-cell-value ${changed.has(i)?'yv-cell-changed ':''}${accessed.has(i)?'yv-cell-accessed':''}`}><DataValue value={v} state={state} source={source ?? ''} name={arrayName} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">{i}</div></div>)}</div>;
