@@ -33,7 +33,10 @@ const trace: ExecutionTrace = {
             depth: 1,
             data: {
                 variables: { nums: { $arrayId: "a1", $type: "int[]", values: [4, 8] }, target: 8, i: 0 },
-                executionEvents: []
+                executionEvents: [
+                    { sequence: 0, type: "VARIABLE_UPDATE", line: 3, method: "find", depth: 1,
+                      data: { name: "i", value: 0 } }
+                ]
             }
         },
         {
@@ -91,7 +94,8 @@ if (!prompt.system.includes("Never invent or omit") ||
 const prepared = await prepareSemanticTrace(trace, source);
 const loop = prepared.events.find((event) => event.sequence === 2);
 const loopAnnotation = loop?.data?.visualization as Record<string, unknown> | undefined;
-if (loopAnnotation?.lineKind !== "loop-header" || loopAnnotation.provider !== "local-fallback") {
+if (loopAnnotation?.lineKind !== "loop-header" || loopAnnotation.provider !== "local-fallback" ||
+    !Array.isArray(loopAnnotation.animationIntents) || loopAnnotation.executionPhase !== "initialization") {
     throw new Error("local semantic stage did not annotate a loop header");
 }
 const loopRoles = loopAnnotation.variableRoles as Array<{ name: string; role: string }>;
@@ -109,6 +113,11 @@ if (!targets.some((target) => target.eventType === "ARRAY_ACCESS" && target.oper
     target.name === "nums" && JSON.stringify(target.indices) === "[0]")) {
     throw new Error("visual target was not grounded in the runtime array-access event");
 }
+const readIntents = readAnnotation.animationIntents as Array<{ action: string; targetIndex: number; variableName?: string }>;
+if (!readIntents.some((intent) => intent.action === "highlight-read" && intent.targetIndex === 0) ||
+    !readIntents.some((intent) => intent.action === "pointer-move" && intent.variableName === "i" && intent.targetIndex === 0)) {
+    throw new Error("grounded array read did not produce a safe highlight and matching pointer intent");
+}
 if (!((readAnnotation.variableRoles as Array<{ name: string; role: string; structureName?: string }>)
     .some((hint) => hint.name === "i" && hint.role === "array-index" && hint.structureName === "nums"))) {
     throw new Error("array-index role was not scoped to the correct array");
@@ -120,6 +129,10 @@ const writeTargets = writeAnnotation?.targets as Array<{ eventType: string; oper
 if (!writeTargets.some((target) => target.eventType === "ARRAY_WRITE" && target.operation === "write" &&
     target.name === "nums" && JSON.stringify(target.indices) === "[1]")) {
     throw new Error("array write target did not preserve its exact changed cell path");
+}
+const writeIntents = (writeAnnotation?.animationIntents ?? []) as Array<{ action: string; targetIndex: number }>;
+if (!writeIntents.some((intent) => intent.action === "highlight-write" && intent.targetIndex === 0)) {
+    throw new Error("grounded array write did not produce a highlight intent");
 }
 
 const conditionStep = prepared.events.find((event) => event.sequence === 4);
@@ -201,6 +214,53 @@ const rejectedMisScopeAnnotation = rejectedMisScope.events[0]?.data?.visualizati
     { provider?: string } | undefined;
 if (rejectedMisScopeAnnotation?.provider !== "local-fallback") {
     throw new Error("provider was allowed to attach an array index to the wrong source array");
+}
+
+const mapSource = [
+    "class Solution {",
+    "  void save(Map<Integer, Integer> mp, int key, int value) {",
+    "    mp.put(key, value);",
+    "  }",
+    "}"
+].join("\n");
+const mapTrace: ExecutionTrace = {
+    version: 1,
+    events: [{
+        sequence: 20,
+        type: "STEP",
+        line: 3,
+        method: "save",
+        depth: 1,
+        data: {
+            variables: {
+                mp: { $mapId: "map-1", entries: [{ key: 7, value: 0 }] },
+                key: 7,
+                value: 0
+            },
+            executionEvents: [{
+                sequence: 0,
+                type: "MAP_WRITE",
+                line: 3,
+                method: "save",
+                depth: 1,
+                data: {
+                    name: "mp",
+                    mapId: "map-1",
+                    changes: [{ kind: "insert", key: 7, after: 0 }]
+                }
+            }]
+        }
+    }]
+};
+const mapPrepared = await prepareSemanticTrace(mapTrace, mapSource);
+const mapAnnotation = mapPrepared.events[0]?.data?.visualization as {
+    targets?: Array<{ eventType: string; changeKind?: string; key?: unknown }>;
+    animationIntents?: Array<{ action: string; targetIndex: number }>;
+} | undefined;
+if (!mapAnnotation?.targets?.some((target) =>
+    target.eventType === "MAP_WRITE" && target.changeKind === "insert" && target.key === 7
+) || !mapAnnotation.animationIntents?.some((intent) => intent.action === "insert" && intent.targetIndex === 0)) {
+    throw new Error("map insertion intent was not grounded in the exact runtime change");
 }
 
 const maliciousAnalyzer: SemanticTraceAnalyzer = {
