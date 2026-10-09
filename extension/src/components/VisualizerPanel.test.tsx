@@ -333,4 +333,19 @@ describe('semantic roles in rendered visualization', () => {
     expect(html).toContain('>left</div>');
     expect(html).toContain('>right</div>');
   });
+  it('places matrix traversal pointers at the active row and column intersection', () => {
+    const current = state({
+      variables: { row: 1, col: 2 },
+      lastEvent: { type: 'STEP', line: 12, data: { semanticRoles: [
+        { name: 'row', role: 'pointer', confidence: 0.9, evidence: 'row is updated as the first index of a two-dimensional array access', structureName: 'matrix' },
+        { name: 'col', role: 'pointer', confidence: 0.9, evidence: 'col is updated as the second index of a two-dimensional array access', structureName: 'matrix' },
+      ] } },
+    });
+    const html = renderToStaticMarkup(
+      <ArrayView value={[[1, 2, 3], [4, 5, 6]]} state={current} source="matrix[row][col]" arrayName="matrix" />,
+    );
+    expect(html).toContain('row · col');
+    expect(html).toContain('[1,2]');
+  });
+
 });
