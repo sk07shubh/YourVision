@@ -199,12 +199,7 @@ function collapseEnhancedForLoopCheckpoints(
             current.depth === next.depth &&
             current.line === next.line &&
             isEnhancedForHeader(sourceLines, line) &&
-            enhancedForCheckpointIsDuplicate(
-                current,
-                next,
-                sourceLines,
-                line
-            )
+            hasEnhancedForVariable(next, sourceLines, line)
         ) {
             // The first header checkpoint is pre-assignment. Transfer its
             // derived effects to the meaningful assignment checkpoint, then
