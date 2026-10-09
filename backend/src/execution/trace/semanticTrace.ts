@@ -250,6 +250,16 @@ function targetMatchesRuntime(target: SemanticVisualTarget, event: ExecutionEven
     });
 }
 
+function stableJson(value: unknown): string {
+    if (Array.isArray(value)) return "[" + value.map(stableJson).join(",") + "]";
+    if (isRecord(value)) {
+        return "{" + Object.keys(value).sort().map((key) =>
+            JSON.stringify(key) + ":" + stableJson(value[key])
+        ).join(",") + "}";
+    }
+    return JSON.stringify(value) ?? "undefined";
+}
+
 function hasOnlyKeys(value: Record<string, unknown>, allowed: readonly string[]): boolean {
     return Object.keys(value).every((key) => allowed.includes(key));
 }
@@ -308,7 +318,7 @@ function validateProposal(value: unknown, trace: ExecutionTrace): SemanticTraceP
             annotation.executionPhase !== sourceEvent.data.executionPhase) return undefined;
 
         const expectedTargets = targetsFromRuntimeEvents(sourceEvent)
-            .map((target) => JSON.stringify(target)).sort();
+            .map((target) => stableJson(target)).sort();
         const proposedTargets = (annotation.targets as unknown[])
             .map((target) => JSON.stringify(target)).sort();
         if (JSON.stringify(proposedTargets) !== JSON.stringify(expectedTargets)) return undefined;
