@@ -192,70 +192,89 @@ function collapseEnhancedForLoopCheckpoints(
 
         const next = events[nextStepIndex];
 
-        // Some JDI checkpoints expose the enhanced-for assignment only in
-        // postVariables. Preserve that real iteration header and surface the
-        // assigned loop variable in variables for consumers of the trace.
-        if (
-            current.type === "STEP" &&
-            isEnhancedForHeader(sourceLines, line)
-        ) {
-            const variableName = enhancedForVariableName(sourceLines, line);
-            const variables = current.data?.variables;
-            const postVariables = current.data?.postVariables;
-            const hasVariableInVariables =
-                isPlainObject(variables) &&
-                variableName !== undefined &&
-                variableName in variables;
-            if (
-                variableName &&
-                !hasVariableInVariables &&
-                isPlainObject(postVariables) &&
-                variableName in postVariables
-            ) {
-                current = {
-                    ...current,
-                    data: {
-                        ...(current.data ?? {}),
-                        variables: {
-                            ...(isPlainObject(variables) ? variables : {}),
-                            [variableName]: postVariables[variableName]
-                        }
-                    }
-                };
-            }
-        }
-
         if (
             current.type === "STEP" &&
             isEnhancedForHeader(sourceLines, line) &&
             !hasEnhancedForVariable(current, sourceLines, line)
         ) {
-            // JDI can stop on the enhanced-for header before assigning the
-            // iteration variable, and can report the same empty header again
-            // when the loop terminates. Neither is an iteration checkpoint:
-            // a real iteration is represented by a snapshot containing the
-            // loop variable's value.
-            if (
-                next?.type === "STEP" &&
-                current.method === next.method &&
-                current.depth === next.depth &&
-                current.line === next.line &&
-                hasEnhancedForVariable(next, sourceLines, line)
-            ) {
-                const currentExecutionEvents = executionEventsFor(current);
-                if (currentExecutionEvents.length > 0) {
-                    appendExecutionEvents(next, currentExecutionEvents);
+            const variableName = enhancedForVariableName(sourceLines, line);
+            let iterationStepIndex = index + 1;
+
+            // JDI may report one or more empty stops on the loop header, then
+            // report the assigned iteration variable on the first body line
+            // instead of on the header itself. Look through duplicate empty
+            // header stops for that first body checkpoint.
+            while (iterationStepIndex < events.length) {
+                const candidate = events[iterationStepIndex];
+                if (!candidate || candidate.type !== "STEP") {
+                    iterationStepIndex++;
+                    continue;
                 }
 
-                normalized.push(next);
-                index = nextStepIndex;
-            }
-            // If there is no following assignment checkpoint, this is the
-            // loop-exit/pre-assignment stop; drop it instead of displaying a
-            // phantom iteration.
-            continue;
-        }
+                if (
+                    candidate.method !== current.method ||
+                    candidate.depth !== current.depth
+                ) {
+                    break;
+                }
 
+                if (
+                    candidate.line === line &&
+                    isEnhancedForHeader(sourceLines, candidate.line) &&
+                    !hasEnhancedForVariable(candidate, sourceLines, line)
+                ) {
+                    iterationStepIndex++;
+                    continue;
+                }
+
+                if (
+                    variableName &&
+                    hasEnhancedForVariable(candidate, sourceLines, line)
+                ) {
+                    const candidateVariables = candidate.data?.variables;
+                    const candidatePostVariables = candidate.data?.postVariables;
+                    const assignedValue =
+                        isPlainObject(candidateVariables) &&
+                        variableName in candidateVariables
+                            ? candidateVariables[variableName]
+                            : isPlainObject(candidatePostVariables)
+                              ? candidatePostVariables[variableName]
+                              : undefined;
+
+                    current = {
+                        ...current,
+                        data: {
+                            ...(current.data ?? {}),
+                            variables: {
+                                ...(isPlainObject(current.data?.variables)
+                                    ? current.data.variables
+                                    : {}),
+                                [variableName]: assignedValue
+                            }
+                        }
+                    };
+
+                    const currentExecutionEvents = executionEventsFor(current);
+                    if (currentExecutionEvents.length > 0) {
+                        appendExecutionEvents(candidate, currentExecutionEvents);
+                    }
+
+                    // Discard any duplicate empty header checkpoints between
+                    // this one and the real assignment snapshot, but retain
+                    // the body checkpoint itself for normal line-by-line play.
+                    index = iterationStepIndex - 1;
+                    break;
+                }
+
+                // The first non-header STEP is the body/exit boundary. If it
+                // has no iteration variable, this was the terminal header.
+                break;
+            }
+
+            if (!hasEnhancedForVariable(current, sourceLines, line)) {
+                continue;
+            }
+        }
         normalized.push(current);
     }
 
