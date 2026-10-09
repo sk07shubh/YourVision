@@ -390,12 +390,11 @@ function visualizationTargets(data: Obj): Array<Record<string, unknown>> {
 }
 
 function buildVisualizationDebugTrace(states: TraceState[], source: string): string {
-  const lines = source.split(/\\r?\\n/);
+  const lines = source.split(/\r?\n/);
   return states.map((state, index) => {
     const lineNumber = state.line ?? 0;
     const data = isPlainObject(state.lastEvent?.data) ? state.lastEvent.data : {};
     const previous = index > 0 ? states[index - 1] : undefined;
-    const previousData = isPlainObject(previous?.lastEvent?.data) ? previous.lastEvent.data : {};
     const code = lineNumber > 0 ? (lines[lineNumber - 1] ?? '').trim() : '';
     const condition = typeof data.conditionResult === 'boolean'
       ? (data.conditionResult ? 'TRUE' : 'FALSE')
@@ -432,9 +431,9 @@ function buildVisualizationDebugTrace(states: TraceState[], source: string): str
       debugValue(visualizationTargets(data)),
       'LAST EVENT DATA:',
       debugValue(data),
-      '\\n' + '='.repeat(80) + '\\n'
-    ].join('\\n');
-  }).join('\\n');
+      '\n' + '='.repeat(80) + '\n'
+    ].join('\n');
+  }).join('\n');
 }
 
 function VariableResult({ name, oldValue, value, initialized }: {
