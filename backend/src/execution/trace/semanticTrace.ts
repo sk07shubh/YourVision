@@ -346,15 +346,20 @@ export async function prepareSemanticTrace(
     source: string,
     analyzer?: SemanticTraceAnalyzer
 ): Promise<ExecutionTrace> {
-    let proposal: unknown;
-    try {
-        proposal = analyzer
-            ? await analyzer.analyze(source, trace)
-            : localProposal(source, trace);
-    } catch {
-        proposal = undefined;
+    let validated: SemanticTraceProposal;
+    if (!analyzer) {
+        // The local analyzer is our own typed implementation; avoid running the
+        // expensive untrusted-provider validator against our own generated output.
+        validated = localProposal(source, trace);
+    } else {
+        let proposal: unknown;
+        try {
+            proposal = await analyzer.analyze(source, trace);
+        } catch {
+            proposal = undefined;
+        }
+        validated = validateProposal(proposal, trace) ?? localProposal(source, trace);
     }
-    const validated = validateProposal(proposal, trace) ?? localProposal(source, trace);
     const annotations = new Map(validated.annotations.map((entry) => [entry.eventSequence, entry.annotation]));
 
     return {
