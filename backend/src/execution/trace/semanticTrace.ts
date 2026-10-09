@@ -197,6 +197,85 @@ function targetsFromRuntimeEvents(event: ExecutionEvent): SemanticVisualTarget[]
 }
 
 
+
+function inferExecutionPhase(
+    source: string,
+    event: ExecutionEvent,
+    previousStep?: ExecutionEvent
+): "initialization" | "condition" | "increment" | "body" | "unknown" | undefined {
+    const data = event.data ?? {};
+    if (typeof data.executionPhase === "string" && EXECUTION_PHASES.has(data.executionPhase)) {
+        return data.executionPhase as "initialization" | "condition" | "increment" | "body" | "unknown";
+    }
+    const line = sourceLineFor(event, source.split(/\r?\n/));
+    const forMatch = line.match(/\bfor\s*\(([^;]*);([^;]*);([^)]*)\)/);
+    const nested = nestedExecutionEvents(event);
+    const updates = nested.filter((item) => item.type === "VARIABLE_UPDATE")
+        .map((item) => ({ data: isRecord(item.data) ? item.data : {} }));
+    if (forMatch) {
+        const init = forMatch[1] ?? "";
+        const update = forMatch[3] ?? "";
+        const initNames = new Set<string>();
+        for (const match of init.matchAll(/(?:^|[, \t])(?:final\s+)?(?:byte|short|int|long|float|double|char|boolean|var)\s+([A-Za-z_$][\w$]*)\s*=/g)) {
+            if (match[1]) initNames.add(match[1]);
+        }
+        for (const match of init.matchAll(/(?:^|[, \t])([A-Za-z_$][\w$]*)\s*=(?!=)/g)) {
+            if (match[1] && !/^(?:final|byte|short|int|long|float|double|char|boolean|var)$/.test(match[1])) {
+                initNames.add(match[1]);
+            }
+        }
+        const variables = isRecord(data.variables) ? data.variables : {};
+        const updateNames = new Set([...update.matchAll(/[A-Za-z_$][\w$]*/g)]
+            .map((match) => match[0])
+            .filter((name) => name in variables));
+        const initUpdate = updates.find(({ data: updateData }) =>
+            typeof updateData.name === "string" && initNames.has(updateData.name));
+        if (initUpdate && (
+            !("before" in initUpdate.data) ||
+            !previousStep ||
+            previousStep.line !== event.line
+        )) return "initialization";
+        const incrementUpdate = updates.find(({ data: updateData }) =>
+            typeof updateData.name === "string" &&
+            updateNames.has(updateData.name) &&
+            "before" in updateData);
+        if (incrementUpdate) return "increment";
+        if (typeof data.conditionResult === "boolean") return "condition";
+        return undefined;
+    }
+    if (/\b(?:while|do)\b/.test(line) && typeof data.conditionResult === "boolean") {
+        return "condition";
+    }
+    if (isInsideLoopBody(source, event.line)) return "body";
+    return undefined;
+}
+
+function isInsideLoopBody(source: string, targetLine?: number): boolean {
+    if (!targetLine || targetLine < 1) return false;
+    const lines = source.replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\r\n]/g, " "))
+        .split(/\r?\n/);
+    const stripNoise = (line: string) => line
+        .replace(/"(?:\\.|[^"\\])*"/g, '""')
+        .replace(/'(?:\\.|[^'\\])*'/g, "''")
+        .replace(/\/\/.*$/, "");
+    for (let start = 0; start < targetLine - 1; start++) {
+        if (!/\b(?:for|while)\s*\(/.test(lines[start] ?? "")) continue;
+        let started = false;
+        let depth = 0;
+        for (let index = start; index < targetLine - 1; index++) {
+            const clean = stripNoise(lines[index] ?? "");
+            for (const char of clean) {
+                if (char === "{") { started = true; depth++; }
+                else if (char === "}" && started) depth--;
+                if (started && depth === 0) break;
+            }
+            if (started && depth === 0) break;
+        }
+        if (started && depth > 0) return true;
+    }
+    return false;
+}
+
 function animationIntentsFrom(
     event: ExecutionEvent,
     targets: SemanticVisualTarget[],
