@@ -315,9 +315,9 @@ function appendExecutionEvents(
 
 function executionEventsFor(
     event: ExecutionEvent
-): unknown[] {
+): ExecutionEvent[] {
     return Array.isArray(event.data?.executionEvents)
-        ? event.data.executionEvents
+        ? event.data.executionEvents as ExecutionEvent[]
         : [];
 }
 
