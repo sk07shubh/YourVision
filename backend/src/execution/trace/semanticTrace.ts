@@ -469,6 +469,7 @@ function validateProposal(value: unknown, trace: ExecutionTrace, source: string)
 
         const variables = isRecord(sourceEvent.data?.variables) ? sourceEvent.data.variables : {};
         const sourceLine = sourceLineFor(sourceEvent, source.split(/\r?\n/));
+        if (!lineKindSupported(annotation.lineKind as SemanticLineKind, sourceLine, sourceEvent)) return undefined;
         const sourceIndexRoles = variableRoleHints(sourceLine, sourceEvent)
             .filter((hint) => hint.role === "array-index");
         for (const hint of annotation.variableRoles) {
