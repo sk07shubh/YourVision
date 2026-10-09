@@ -350,7 +350,7 @@ function buildDebugTrace(states: TraceState[], source: string): string {
   }).join('\n');
 }
 
-function visualizationTargets(data: Obj): Array<Record<string, unknown>> {
+function visualizationTargets(data: Obj, lastEventType?: string): Array<Record<string, unknown>> {
   const events = Array.isArray(data.executionEvents) ? data.executionEvents : [];
   const targets: Array<Record<string, unknown>> = [];
   const add = (eventType: string, eventData: Obj, detail?: unknown) => {
@@ -382,9 +382,8 @@ function visualizationTargets(data: Obj): Array<Record<string, unknown>> {
     }
   }
 
-  const type = typeof data.type === 'string' ? data.type : '';
-  if (type && !['STEP', 'PROGRAM_START', 'PROGRAM_END'].includes(type)) {
-    targets.push({ eventType: type, source: 'lastEvent.data', detail: data });
+  if (lastEventType && !['STEP', 'PROGRAM_START', 'PROGRAM_END'].includes(lastEventType)) {
+    targets.push({ eventType: lastEventType, source: 'lastEvent', detail: data });
   }
   return targets;
 }
@@ -428,7 +427,7 @@ function buildVisualizationDebugTrace(states: TraceState[], source: string): str
       'EVENTS ATTACHED TO THIS STEP:',
       debugValue(Array.isArray(data.executionEvents) ? data.executionEvents : []),
       'VISUAL TARGETS DERIVED FROM EVENTS:',
-      debugValue(visualizationTargets(data)),
+      debugValue(visualizationTargets(data, state.lastEvent?.type)),
       'LAST EVENT DATA:',
       debugValue(data),
       '\n' + '='.repeat(80) + '\n'
