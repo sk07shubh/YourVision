@@ -82,7 +82,7 @@ for (const test of cases) {
 
     for (const step of steps) {
         const visualization = step.data?.visualization as Record<string, unknown> | undefined;
-        assert(visualization && visualization.provider === "local-fallback",
+        assert(Boolean(visualization && visualization.provider === "local-fallback"),
             `${test.name}: STEP ${step.sequence} is missing deterministic semantic metadata`);
         assert(Array.isArray(visualization.targets),
             `${test.name}: STEP ${step.sequence} is missing semantic targets`);
@@ -126,7 +126,7 @@ for (const test of cases) {
         return hasRuntimeRead && hasTarget && hasIndexRole;
     });
 
-    assert(groundedRead,
+    assert(Boolean(groundedRead),
         `${test.name}: semantic read target/index role did not agree with the real runtime event and source`);
 
     console.log(`PASS: ${test.name} real Java execution + semantic trace (${steps.length} steps)`);
