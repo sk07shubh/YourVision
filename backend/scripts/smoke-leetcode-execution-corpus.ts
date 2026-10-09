@@ -207,6 +207,26 @@ assert(
     "char enhanced-for loop should produce exactly one header checkpoint per iteration"
 );
 
+const malformedParentheses = await runJava(source, {
+    method: "isValid",
+    arguments: ["\\"({({[{]))}\\""]
+});
+assert(malformedParentheses.kind === "OK" && malformedParentheses.result === "false", "Malformed Parentheses case returned the wrong result");
+const malformedLoopSteps = malformedParentheses.trace?.events.filter(
+    (event) => event.type === "STEP" && event.line === validParenthesesLoopLine
+) ?? [];
+const malformedLoopAssignments = malformedLoopSteps.filter((event) =>
+    Array.isArray(event.data?.executionEvents) &&
+    event.data.executionEvents.some((executionEvent: any) =>
+        executionEvent?.type === "VARIABLE_UPDATE" &&
+        executionEvent.data?.name === "ch"
+    )
+);
+assert(
+    malformedLoopSteps.length === malformedLoopAssignments.length,
+    `Malformed Parentheses enhanced-for loop retained duplicate/uninitialized header checkpoints: ${malformedLoopSteps.length} headers vs ${malformedLoopAssignments.length} element assignments`
+);
+
 const parenthesesFalse = await runJava(source, {
     method: "isValid",
     arguments: ["\"([)]\""]
