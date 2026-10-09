@@ -81,7 +81,7 @@ const trace: ExecutionTrace = {
 };
 
 const prompt = buildSemanticTracePrompt(source, trace);
-if (!prompt.system.includes("Never invent an access") ||
+if (!prompt.system.includes("Never invent or omit") ||
     !prompt.user.includes('"runtimeTrace"') ||
     !prompt.user.includes('"sequence":3') ||
     !prompt.user.includes("class Solution {")) {
