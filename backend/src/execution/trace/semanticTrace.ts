@@ -288,7 +288,7 @@ function validateProposal(value: unknown, trace: ExecutionTrace, source: string)
             !Array.isArray(annotation.variableRoles) || !Array.isArray(annotation.targets)) return undefined;
 
         const variables = isRecord(sourceEvent.data?.variables) ? sourceEvent.data.variables : {};
-        const sourceLine = sourceLineFor(sourceEvent, source.split(/\\r?\\n/));
+        const sourceLine = sourceLineFor(sourceEvent, source.split(/\r?\n/));
         const sourceIndexRoles = variableRoleHints(sourceLine, sourceEvent)
             .filter((hint) => hint.role === "array-index");
         for (const hint of annotation.variableRoles) {
