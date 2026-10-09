@@ -194,24 +194,34 @@ function collapseEnhancedForLoopCheckpoints(
 
         if (
             current.type === "STEP" &&
-            next?.type === "STEP" &&
-            current.method === next.method &&
-            current.depth === next.depth &&
-            current.line === next.line &&
             isEnhancedForHeader(sourceLines, line) &&
-            hasEnhancedForVariable(next, sourceLines, line)
+            !hasEnhancedForVariable(current, sourceLines, line)
         ) {
-            // The first header checkpoint is pre-assignment. Transfer its
-            // derived effects to the meaningful assignment checkpoint, then
-            // remove the pre-assignment checkpoint and any derived events
-            // that were attached to it.
-            const currentExecutionEvents = executionEventsFor(current);
-            if (currentExecutionEvents.length > 0) {
-                appendExecutionEvents(next, currentExecutionEvents);
+            if (
+                next?.type === "STEP" &&
+                current.method === next.method &&
+                current.depth === next.depth &&
+                current.line === next.line &&
+                hasEnhancedForVariable(next, sourceLines, line)
+            ) {
+                // JDI first pauses at the enhanced-for header before assigning
+                // the next element to the loop variable. Keep the meaningful
+                // assignment checkpoint, not the uninitialized duplicate.
+                const currentExecutionEvents = executionEventsFor(current);
+                if (currentExecutionEvents.length > 0) {
+                    appendExecutionEvents(next, currentExecutionEvents);
+                }
+
+                normalized.push(next);
+                index = nextStepIndex;
+                continue;
             }
 
-            normalized.push(next);
-            index = nextStepIndex;
+            // A header checkpoint with no loop variable and no same-line
+            // assignment is the exhausted-iterator pause. The enhanced-for
+            // runtime has no user-visible condition to evaluate here, so
+            // suppress it rather than showing a phantom extra iteration.
+            index = nextStepIndex - 1;
             continue;
         }
 
@@ -266,12 +276,18 @@ function hasEnhancedForVariable(
     const name = enhancedForVariableName(sourceLines, line);
     if (!name) return false;
 
-    const variables = event.data?.variables;
-    return !!(
-        variables &&
-        typeof variables === "object" &&
-        !Array.isArray(variables) &&
-        name in variables
+    // JDI's header checkpoint contains the pre-assignment locals in
+    // variables, while postVariables records the enhanced-for assignment.
+    // Use both so the first real iteration is not mistaken for an
+    // uninitialized checkpoint.
+    const snapshots = [event.data?.postVariables, event.data?.variables];
+    return snapshots.some((variables) =>
+        !!(
+            variables &&
+            typeof variables === "object" &&
+            !Array.isArray(variables) &&
+            name in variables
+        )
     );
 }
 
