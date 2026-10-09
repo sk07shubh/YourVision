@@ -122,8 +122,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function sourceLineFor(event: ExecutionEvent, lines: string[]): string {
-    return typeof event.line === "number" && event.line > 0
-        ? (lines[event.line - 1] ?? "").trim()
+    const displayLine = event.data?.displayLine;
+    const lineNumber = typeof displayLine === "number" && displayLine > 0
+        ? displayLine
+        : event.line;
+    return typeof lineNumber === "number" && lineNumber > 0
+        ? (lines[lineNumber - 1] ?? "").trim()
         : "";
 }
 
@@ -270,7 +274,8 @@ function inferExecutionPhase(
     if (/\b(?:while|do)\b/.test(line) && typeof data.conditionResult === "boolean") {
         return "condition";
     }
-    if (isInsideLoopBody(source, event.line)) return "body";
+    const displayLine = data.displayLine;
+    if (isInsideLoopBody(source, typeof displayLine === "number" ? displayLine : event.line)) return "body";
     return undefined;
 }
 
