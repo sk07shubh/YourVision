@@ -299,9 +299,14 @@ function appendExecutionEvents(
 
 function executionEventsFor(
     event: ExecutionEvent
-): unknown[] {
+): ExecutionEvent[] {
     return Array.isArray(event.data?.executionEvents)
-        ? event.data.executionEvents
+        ? event.data.executionEvents.filter(
+            (item): item is ExecutionEvent =>
+                isPlainObject(item) &&
+                typeof item.type === "string" &&
+                typeof item.sequence === "number"
+        ) as ExecutionEvent[]
         : [];
 }
 
