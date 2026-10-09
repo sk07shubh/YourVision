@@ -1305,7 +1305,7 @@ function Variables({ state, previous }: { state?: TraceState; previous?: TraceSt
   );
 }
 
-function arrayIndexVariableNames(source: string, arrayName?: string): Set<string> {
+export function arrayIndexVariableNames(source: string, arrayName?: string): Set<string> {
   const names = new Set<string>();
   if (!arrayName) return names;
   const arrayNames = arrayName.split(' / ').map(name => name.trim()).filter(Boolean);
