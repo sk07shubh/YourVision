@@ -561,9 +561,9 @@ function validateProposal(value: unknown, trace: ExecutionTrace, source: string)
         }
 
         const expectedTargets = targetsFromRuntimeEvents(sourceEvent)
-            .map((target) => stableJson(target)).sort();
+            .map((target) => stableJson(target));
         const proposedTargets = (annotation.targets as unknown[])
-            .map((target) => stableJson(target)).sort();
+            .map((target) => stableJson(target));
         if (JSON.stringify(proposedTargets) !== JSON.stringify(expectedTargets)) return undefined;
 
         seen.add(item.eventSequence);
