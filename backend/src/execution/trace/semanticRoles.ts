@@ -1,5 +1,5 @@
 export type SemanticVariableRole = "left-bound" | "right-bound" | "midpoint" | "loop-counter" | "pointer" | "derived-value" | "answer-value" | "unused";
-export interface SemanticVariableRoleHint { name:string; role:SemanticVariableRole; confidence:number; evidence:string; structureName?:string; usage?:string[]; }
+export interface SemanticVariableRoleHint { name:string; role:SemanticVariableRole; confidence:number; evidence:string; structureName?:string; usage?:string[]; method?:string; }
 interface LoopRegion { kind:"for"|"while"; header:string; condition:string; body:string; }
 const IDENTIFIER = "[A-Za-z_$][\\w$]*";
 function maskCommentsAndStrings(source:string):string {
@@ -117,7 +117,7 @@ function inferVariableUsage(source:string):Map<string,VariableUsageInfo>{
  }
  return usage;
 }
-export function inferSemanticRoles(source:string):SemanticVariableRoleHint[]{
+function inferSemanticRolesInScope(source:string,methodName?:string):SemanticVariableRoleHint[]{
  if(!source.trim())return [];
  const code=maskCommentsAndStrings(source);const roles=new Map<string,SemanticVariableRoleHint>();const loops=findLoops(code);
  const pairs:Array<{left:string;right:string}>=[];
@@ -209,5 +209,25 @@ export function inferSemanticRoles(source:string):SemanticVariableRoleHint[]{
    addRole(roles,n,"pointer",0.76,n+" is updated in a loop and matches a pointer-role convention");
   }
  }
- return [...roles.entries()].map(([name,role])=>{const info=usageInfo.get(name);return {...role,...(info&&info.usage.size?{usage:[...info.usage]}:{})};}).sort((a,b)=>b.confidence-a.confidence||a.name.localeCompare(b.name));
+ return [...roles.entries()].map(([name,role])=>{const info=usageInfo.get(name);return {...role,...(info&&info.usage.size?{usage:[...info.usage]}:{}),...(methodName?{method:methodName}:{})};}).sort((a,b)=>b.confidence-a.confidence||a.name.localeCompare(b.name));
+}
+interface MethodRegion { name:string; body:string; }
+function findMethodRegions(source:string):MethodRegion[]{
+ const code=maskCommentsAndStrings(source);
+ const pattern=/(?:\\b(?:public|protected|private)\\s+)?(?:(?:static|final|synchronized|native|abstract|default)\\s+)*(?:<[^>{}]+>\\s*)?[\\w$<>\\[\\].?, ]+\\s+([A-Za-z_$][\\w$]*)\\s*\\([^;{}]*\\)\\s*(?:throws\\s+[\\w$., ]+\\s*)?\\{/g;
+ const methods:MethodRegion[]=[];let match:RegExpExecArray|null;
+ while((match=pattern.exec(code))!==null){
+  const name=match[1];const open=code.indexOf("{",match.index);const close=matchingDelimiter(code,open,"{","}");
+  if(!name||open<0||close<0)continue;
+  methods.push({name,body:source.slice(open+1,close)});
+  // Skip nested blocks/methods; each Java method is analysed in isolation.
+  pattern.lastIndex=close+1;
+ }
+ return methods;
+}
+export function inferSemanticRoles(source:string):SemanticVariableRoleHint[]{
+ if(!source.trim())return [];
+ const methods=findMethodRegions(source);
+ if(methods.length===0)return inferSemanticRolesInScope(source);
+ return methods.flatMap(method=>inferSemanticRolesInScope(method.body,method.name));
 }
