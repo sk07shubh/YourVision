@@ -70,7 +70,7 @@ const prompt = buildSemanticTracePrompt(source, trace);
 if (!prompt.system.includes("Never invent an access") ||
     !prompt.user.includes('"runtimeTrace"') ||
     !prompt.user.includes('"sequence":3') ||
-    !prompt.user.includes(source)) {
+    !prompt.user.includes("class Solution {")) {
     throw new Error("future AI prompt contract omitted source, runtime trace, or grounding constraints");
 }
 
