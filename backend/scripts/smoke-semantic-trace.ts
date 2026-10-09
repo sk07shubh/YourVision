@@ -1,5 +1,6 @@
 import { prepareSemanticTrace, type SemanticTraceAnalyzer } from "../src/execution/trace/semanticTrace.js";
 import type { ExecutionTrace } from "../src/execution/trace/schema.js";
+import { buildSemanticTracePrompt } from "../src/execution/trace/semanticTracePrompt.js";
 
 const source = [
     "class Solution {",
@@ -64,6 +65,14 @@ const trace: ExecutionTrace = {
         { sequence: 5, type: "METHOD_EXIT", line: 5, method: "find", depth: 1, data: { returnValue: 1 } }
     ]
 };
+
+const prompt = buildSemanticTracePrompt(source, trace);
+if (!prompt.system.includes("Never invent an access") ||
+    !prompt.user.includes('"runtimeTrace"') ||
+    !prompt.user.includes('"sequence":3') ||
+    !prompt.user.includes(source)) {
+    throw new Error("future AI prompt contract omitted source, runtime trace, or grounding constraints");
+}
 
 const prepared = await prepareSemanticTrace(trace, source);
 const loop = prepared.events.find((event) => event.sequence === 2);
