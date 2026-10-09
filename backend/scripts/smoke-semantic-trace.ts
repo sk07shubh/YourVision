@@ -131,6 +131,48 @@ if (prepared.events.find((event) => event.sequence === 6)?.data?.visualization !
     throw new Error("semantic annotations should only be attached to STEP checkpoints");
 }
 
+const multiArraySource = [
+    "class Solution {",
+    "  void inspect(int[] nums, int[] other, int i, int j) {",
+    "    int first = nums[i]; int second = other[j];",
+    "  }",
+    "}"
+].join("\n");
+const multiArrayTrace: ExecutionTrace = {
+    version: 1,
+    events: [{
+        sequence: 10,
+        type: "STEP",
+        line: 3,
+        method: "inspect",
+        depth: 1,
+        data: {
+            variables: {
+                nums: { $arrayId: "nums-id", $type: "int[]", values: [3, 5] },
+                other: { $arrayId: "other-id", $type: "int[]", values: [7, 9] },
+                i: 1,
+                j: 0,
+                first: 5,
+                second: 7
+            },
+            executionEvents: [
+                { sequence: 0, type: "ARRAY_ACCESS", line: 3, method: "inspect", depth: 1,
+                  data: { name: "nums", arrayId: "nums-id", indices: [1], value: 5, kind: "read" } },
+                { sequence: 1, type: "ARRAY_ACCESS", line: 3, method: "inspect", depth: 1,
+                  data: { name: "other", arrayId: "other-id", indices: [0], value: 7, kind: "read" } }
+            ]
+        }
+    }]
+};
+const multiArrayPrepared = await prepareSemanticTrace(multiArrayTrace, multiArraySource);
+const multiArrayAnnotation = multiArrayPrepared.events[0]?.data?.visualization as
+    { variableRoles: Array<{ name: string; role: string; structureName?: string }> } | undefined;
+const scopedRoles = multiArrayAnnotation?.variableRoles.filter((hint) => hint.role === "array-index") ?? [];
+if (!scopedRoles.some((hint) => hint.name === "i" && hint.structureName === "nums") ||
+    !scopedRoles.some((hint) => hint.name === "j" && hint.structureName === "other")) {
+    throw new Error("multiple array indices were not scoped to their own structures");
+}
+
 const maliciousAnalyzer: SemanticTraceAnalyzer = {
     async analyze() {
         return {
