@@ -170,7 +170,7 @@ function collapseEnhancedForLoopCheckpoints(
     const normalized: ExecutionEvent[] = [];
 
     for (let index = 0; index < events.length; index++) {
-        const current = events[index];
+        let current = events[index];
         if (!current) continue;
 
         const line = current.line;
@@ -191,6 +191,39 @@ function collapseEnhancedForLoopCheckpoints(
         }
 
         const next = events[nextStepIndex];
+
+        // Some JDI checkpoints expose the enhanced-for assignment only in
+        // postVariables. Preserve that real iteration header and surface the
+        // assigned loop variable in variables for consumers of the trace.
+        if (
+            current.type === "STEP" &&
+            isEnhancedForHeader(sourceLines, line)
+        ) {
+            const variableName = enhancedForVariableName(sourceLines, line);
+            const variables = current.data?.variables;
+            const postVariables = current.data?.postVariables;
+            const hasVariableInVariables =
+                isPlainObject(variables) &&
+                variableName !== undefined &&
+                variableName in variables;
+            if (
+                variableName &&
+                !hasVariableInVariables &&
+                isPlainObject(postVariables) &&
+                variableName in postVariables
+            ) {
+                current = {
+                    ...current,
+                    data: {
+                        ...(current.data ?? {}),
+                        variables: {
+                            ...(isPlainObject(variables) ? variables : {}),
+                            [variableName]: postVariables[variableName]
+                        }
+                    }
+                };
+            }
+        }
 
         if (
             current.type === "STEP" &&
@@ -275,11 +308,10 @@ function hasEnhancedForVariable(
     if (!name) return false;
 
     const variables = event.data?.variables;
-    return !!(
-        variables &&
-        typeof variables === "object" &&
-        !Array.isArray(variables) &&
-        name in variables
+    const postVariables = event.data?.postVariables;
+    return (
+        (isPlainObject(variables) && name in variables) ||
+        (isPlainObject(postVariables) && name in postVariables)
     );
 }
 
