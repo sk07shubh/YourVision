@@ -258,10 +258,14 @@ function inferExecutionPhase(
             .filter((name) => name in variables));
         const initUpdate = updates.find(({ data: updateData }) =>
             typeof updateData.name === "string" && initNames.has(updateData.name));
+        const currentDisplayLine = typeof data.displayLine === "number" ? data.displayLine : event.line;
+        const previousDisplayLine = typeof previousStep?.data?.displayLine === "number"
+            ? previousStep.data.displayLine
+            : previousStep?.line;
         if (initUpdate && (
             !("before" in initUpdate.data) ||
             !previousStep ||
-            previousStep.line !== event.line
+            previousDisplayLine !== currentDisplayLine
         )) return "initialization";
         const incrementUpdate = updates.find(({ data: updateData }) =>
             typeof updateData.name === "string" &&
@@ -555,7 +559,8 @@ function validateProposal(value: unknown, trace: ExecutionTrace, source: string)
             } else {
                 const previousStep = trace.events.slice(0, trace.events.indexOf(sourceEvent))
                     .reverse().find((candidate) =>
-                        candidate.type === "STEP" && candidate.method === sourceEvent.method
+                        candidate.type === "STEP" && candidate.method === sourceEvent.method &&
+                        candidate.depth === sourceEvent.depth
                     );
                 if (inferExecutionPhase(source, sourceEvent, previousStep) !== annotation.executionPhase) {
                     return undefined;
