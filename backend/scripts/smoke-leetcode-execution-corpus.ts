@@ -206,6 +206,28 @@ assert(
     stepCountAtLine(validParenthesesCharLoop, validParenthesesLoopLine) === 6,
     "char enhanced-for loop should produce exactly one header checkpoint per iteration"
 );
+const charIterationValues = validParenthesesCharLoop.trace?.events
+    .filter(event => event.type === "STEP" && event.line === validParenthesesLoopLine)
+    .map(event => event.data?.variables?.ch);
+assert(
+    JSON.stringify(charIterationValues) === JSON.stringify(["(", "{", "[", "]", "}", ")"]),
+    "char enhanced-for checkpoints must contain exactly the assigned value for each iteration: " +
+        JSON.stringify(charIterationValues)
+);
+
+const shortParenthesesLoop = await runJava(source, {
+    method: "isValid",
+    arguments: ["\"()\""]
+});
+assert(shortParenthesesLoop.kind === "OK", "Valid Parentheses short char-loop execution failed");
+const shortLoopValues = shortParenthesesLoop.trace?.events
+    .filter(event => event.type === "STEP" && event.line === validParenthesesLoopLine)
+    .map(event => event.data?.variables?.ch);
+assert(
+    JSON.stringify(shortLoopValues) === JSON.stringify(["(", ")"]),
+    "two-character enhanced-for loop must not contain empty pre-assignment or loop-exit checkpoints: " +
+        JSON.stringify(shortLoopValues)
+);
 
 const parenthesesFalse = await runJava(source, {
     method: "isValid",
