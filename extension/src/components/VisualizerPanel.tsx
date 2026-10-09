@@ -1308,13 +1308,19 @@ function Variables({ state, previous }: { state?: TraceState; previous?: TraceSt
 function arrayIndexVariableNames(source: string, arrayName?: string): Set<string> {
   const names = new Set<string>();
   if (!arrayName) return names;
-  const pattern = new RegExp(arrayName + '\\s*\\[([^\\]]+)\\]', 'g');
-  for (const match of source.matchAll(pattern)) {
-    for (const identifier of match[1].matchAll(/\b[A-Za-z_$][\w$]*\b/g)) names.add(identifier[0]);
+  const arrayNames = arrayName.split(' / ').map(name => name.trim()).filter(Boolean);
+  for (const name of arrayNames) {
+    const escapedName = name.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
+    const pattern = new RegExp('\\b' + escapedName + '\\s*\\[([^\\]]+)\\]', 'g');
+    for (const match of source.matchAll(pattern)) {
+      // A variable is a pointer label only when it is the actual index value.
+      // Treating nums[i + 1] as a pointer named i incorrectly highlights cell i.
+      const expression = match[1]?.trim();
+      if (expression && /^[A-Za-z_$][\\w$]*$/.test(expression)) names.add(expression);
+    }
   }
   return names;
 }
-
 function semanticArrayIndexNames(state: TraceState | undefined, arrayName?: string): {
   provider: string;
   names: Set<string>;
