@@ -259,10 +259,14 @@ function collapseEnhancedForLoopCheckpoints(
                         appendExecutionEvents(candidate, currentExecutionEvents);
                     }
 
-                    // Discard any duplicate empty header checkpoints between
-                    // this one and the real assignment snapshot, but retain
-                    // the body checkpoint itself for normal line-by-line play.
-                    index = iterationStepIndex - 1;
+                    // If the assignment is on another header checkpoint,
+                    // replace the empty current stop and skip that duplicate.
+                    // If it is on the body line, keep the body checkpoint for
+                    // normal line-by-line playback.
+                    index =
+                        candidate.line === line
+                            ? iterationStepIndex
+                            : iterationStepIndex - 1;
                     break;
                 }
 
