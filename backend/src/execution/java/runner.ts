@@ -7,7 +7,7 @@ import { fileURLToPath } from "url";
 import type { ExecutionTrace, ExecutionEvent, TraceState } from "../trace/schema.js";
 import { buildStates } from "../trace/stateBuilder.js";
 import { enrichTrace } from "../trace/enrichTrace.js";
-import { prepareSemanticTrace } from "../trace/semanticTrace.js";
+import { prepareSemanticTrace, type SemanticTraceAnalyzer } from "../trace/semanticTrace.js";
 
 const MAX_TRACE_EVENTS = 5000;
 
@@ -102,7 +102,8 @@ function declaresType(source: string, typeName: string): boolean {
 }
 export async function runJava(
     source: string,
-    testcase?: JavaTestcase
+    testcase?: JavaTestcase,
+    semanticAnalyzer?: SemanticTraceAnalyzer
 ): Promise<JavaExecutionResult> {
 
     if (
@@ -298,7 +299,7 @@ await fs.writeFile(
                     }
                 );
             const trace =
-                await parseTrace(stdout, source);
+                await parseTrace(stdout, source, semanticAnalyzer);
 
             const traceLimited =
                 trace.events.some(
@@ -343,7 +344,7 @@ await fs.writeFile(
                     error.stdout ?? "";
 
                 const trace =
-                    await parseTrace(stdout, source);
+                    await parseTrace(stdout, source, semanticAnalyzer);
 
                 if (
                     !trace.events.some(
@@ -403,7 +404,7 @@ await fs.writeFile(
                 );
 
             const trace =
-                    await parseTrace(stdout, source);
+                    await parseTrace(stdout, source, semanticAnalyzer);
 
             return {
                 success: false,
@@ -478,7 +479,8 @@ function isTimeout(
 
 async function parseTrace(
     stdout: string,
-    source: string
+    source: string,
+    semanticAnalyzer?: SemanticTraceAnalyzer
 ): Promise<ExecutionTrace> {
     const events: ExecutionEvent[] = [];
 
@@ -520,7 +522,7 @@ async function parseTrace(
     const enriched = await prepareSemanticTrace(enrichTrace({
         version: 1,
         events
-    }, source), source);
+    }, source), source, semanticAnalyzer);
 
     if (enriched.events.length <= MAX_TRACE_EVENTS) {
         return enriched;
