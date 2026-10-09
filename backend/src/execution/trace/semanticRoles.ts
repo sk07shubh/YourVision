@@ -43,18 +43,27 @@ function nameHint(name:string):SemanticVariableRole|undefined {
  if(/^(slow|fast|curr|current|prev|previous|ptr|pointer|runner)$/.test(n))return "pointer";
  return undefined;
 }
+function rolePriority(role:SemanticVariableRole,evidence:string):number{
+ // A variable observed as a matrix access coordinate is a traversal pointer,
+ // even if a broad enclosing-loop scan also resembles a boundary pattern.
+ if(role==="pointer"&&/index of a two-dimensional array access/.test(evidence))return 100;
+ if(role==="left-bound"||role==="right-bound")return 80;
+ if(role==="midpoint")return 60;
+ if(role==="pointer")return 50;
+ return 40;
+}
 function addRole(roles:Map<string,SemanticVariableRoleHint>,name:string,role:SemanticVariableRole,confidence:number,evidence:string,structureName?:string):void{
  const prior=roles.get(name);
- if(!prior||confidence>prior.confidence){roles.set(name,{name,role,confidence,evidence,...(structureName?{structureName}:prior?.structureName?{structureName:prior.structureName}:{})});}
+ const replace=!prior||rolePriority(role,evidence)>rolePriority(prior.role,prior.evidence)||(rolePriority(role,evidence)===rolePriority(prior.role,prior.evidence)&&confidence>prior.confidence);
+ if(replace){roles.set(name,{name,role,confidence,evidence,...(structureName?{structureName}:prior?.structureName?{structureName:prior.structureName}:{})});}
  else if(structureName&&!prior.structureName)roles.set(name,{...prior,structureName});
 }
 function inferStructureName(source:string,name:string,loopText=""):string|undefined {
  const direct=new RegExp("\\b"+name+"\\s*=\\s*[^;\\n]*?\\b([A-Za-z_$][\\w$]*)\\.length\\b").exec(source);
  if(direct?.[1])return direct[1];
- const inLoop=/\b([A-Za-z_$][\w$]*)\.length\b/.exec(loopText);if(inLoop?.[1])return inLoop[1];
- // Do not associate a variable with an array merely because the method contains
- // one .length expression: value-space searches can coexist with unrelated
- // matrix traversal indices in the same method.
+ // Only a direct initialization from array.length establishes an array-bound
+ // relationship. A .length expression elsewhere in a nested loop is unrelated
+ // evidence and must not attach value-space bounds to that array.
  return undefined;
 }
 export function inferSemanticRoles(source:string):SemanticVariableRoleHint[]{
@@ -70,7 +79,7 @@ export function inferSemanticRoles(source:string):SemanticVariableRoleHint[]{
    const opposing=fu.updated&&su.updated&&((fu.increasing&&su.decreasing)||(fu.decreasing&&su.increasing));
    // Binary search-on-answer often assigns high = mid (not high--) and low = mid + 1.
    // Detect this structural relationship instead of relying on variable names or ++/--.
-   const midpointAssignments=[...code.matchAll(new RegExp("\\b(?:(?:int|long|short|byte|var)\\s+)?("+IDENTIFIER+")\\s*=\\s*([^;]+);","g"))]
+   const midpointAssignments=[...loop.body.matchAll(new RegExp("\\b(?:(?:int|long|short|byte|var)\\s+)?("+IDENTIFIER+")\\s*=\\s*([^;]+);","g"))]
     .filter(m=>{const expr=m[2]??"";return expr.includes(first)&&expr.includes(second)&&/[+*/-]/.test(expr);});
    let structuralPair:{left:string;right:string;midpointName:string}|undefined;
    for(const assignment of midpointAssignments){
