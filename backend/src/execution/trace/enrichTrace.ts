@@ -815,7 +815,7 @@ function readMethod(value: unknown, method: string, args: unknown[]): unknown {
     // Set.add(value) returns whether the set changed. Conditions such as
     // if (!seen.add(value)) are common in LeetCode and must be evaluated
     // from the pre-line snapshot without mutating the trace state.
-    if (method === "add" && snapshot.kind === "set") {
+    if (method === "add" && (snapshot.kind === "set" || Object.entries(snapshot).some(([key, value]) => key.endsWith("kind") && value === "set"))) {
         const values = Array.isArray(snapshot.values) ? snapshot.values : [];
         return !values.some((item) => sameConditionValue(item, args[0]));
     }
