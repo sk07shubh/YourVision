@@ -164,7 +164,7 @@ export function enrichTrace(
             const variables = event.data?.postVariables ?? event.data?.variables;
             const activeNames = variables && typeof variables === "object" && !Array.isArray(variables)
                 ? new Set(Object.keys(variables as Record<string, unknown>)) : undefined;
-            const methodRoles = semanticRoles.filter(role => !role.method || role.method === event.method);
+            const methodRoles = semanticRoles.filter(role => !role.method || !event.method || role.method === event.method);
             const activeRoles = activeNames ? methodRoles.filter(role => activeNames.has(role.name)) : methodRoles;
             return { ...event, sequence: index + 1, data: { ...(event.data ?? {}), semanticRoles: activeRoles } };
         })
