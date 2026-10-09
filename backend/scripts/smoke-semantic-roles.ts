@@ -136,4 +136,9 @@ const returnedBoundary = usageRoles.find(role => role.name === "left");
 assert(returnedBoundary?.role === "left-bound", "downstream return usage must not overwrite the inferred boundary role");
 assert(returnedBoundary.usage?.includes("contributes to the returned expression") === true, "analysis must inspect the return expression after the loop");
 
+const directResultRoles = inferSemanticRoles("class Solution { public int answer(int input) { int result = input + 1; return result; } }");
+const directResult = directResultRoles.find(role => role.name === "result");
+assert(directResult?.role === "answer-value", "a local returned directly should be recognized as the method result");
+assert(directResult.usage?.includes("contributes to the returned expression") === true, "direct result role must include its return use");
+
 console.log("PASS: semantic roles cover whole-method usage, dead locals, derived decision values, returns, binary search and matrix traversal");
