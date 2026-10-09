@@ -1330,6 +1330,9 @@ function arrayIndexVariableNames(source: string, arrayName?: string): Set<string
 
 function pointerLabels(state: TraceState | undefined, length: number, indexNames: Set<string>): Map<number,string[]> {
   const map = new Map<number,string[]>();
+  // Local index pointers are meaningful only while their method frame is active.
+  // METHOD_EXIT snapshots can retain final locals, but must not leave stale pointers on the array.
+  if (!state?.callStack?.length) return map;
   for (const [name,value] of Object.entries(state?.variables ?? {})) {
     if (!indexNames.has(name)) continue;
     if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value >= length) continue;
