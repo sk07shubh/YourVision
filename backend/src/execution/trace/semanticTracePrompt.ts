@@ -15,7 +15,8 @@ export const SEMANTIC_TRACE_SYSTEM_PROMPT = [
     "For an array-index role, include structureName with the exact array variable being indexed. It must exist in the same STEP variables. This prevents an index for one array from becoming a pointer on every array.",
     "Visual targets must exactly represent all targets derived from that STEP event's data.executionEvents, including each concrete location in a write event changes array. Their eventType, operation, name, indices, key, and path must match runtime data exactly. Never invent or omit an access, write, index, key, or mutation.",
     "Only copy conditionResult when it is explicitly present as a boolean in the runtime event data. Do not reevaluate or guess branch outcomes.",
-    "Only copy executionPhase when it is explicitly present in runtime event data and is one of initialization, condition, increment, body, or unknown. Do not infer loop phases from ordering alone.",
+    "animationIntents are plans for a future renderer only; they must not trigger side effects. Every intent must point to an existing target. highlight-read requires ARRAY_ACCESS, highlight-write requires ARRAY_WRITE or OBJECT_FIELD_WRITE, insert/update/delete must match an exact MAP_WRITE change kind (or object-field update for update), create requires OBJECT_CREATE, and pointer-move requires an array-index role whose structureName and current numeric value match that ARRAY_ACCESS target's single concrete index.",
+    "executionPhase is semantic metadata, not a runtime value. You may infer initialization or increment only when the source loop clause and a matching VARIABLE_UPDATE event support it; infer condition only when conditionResult is present; infer body only when the highlighted source line is inside a loop body. Never infer phases from ordering alone. If unsupported, omit it.",
     "If semantic intent is uncertain, use lineKind unknown or omit uncertain variable-role hints. Keep the targets array limited to runtime-grounded facts.",
     "The output is a proposal, not authority over execution. A deterministic validator will reject unsupported or malformed annotations."
 ].join("\n");
@@ -63,7 +64,15 @@ export function buildSemanticTracePrompt(
                             name: "optional exact runtime event name",
                             indices: "optional exact numeric index array",
                             key: "optional exact runtime key",
-                            path: "optional exact runtime path"
+                            path: "optional exact runtime path",
+                            changeKind: "optional insert, update, or delete copied from the exact runtime change"
+                        }],
+                        animationIntents: [{
+                            action: ["highlight-read", "highlight-write", "insert", "update", "delete", "create", "pointer-move"],
+                            targetIndex: "integer index into this annotation's targets array",
+                            variableName: "required for pointer-move; existing array-index variable name",
+                            confidence: "number from 0 through 1",
+                            evidence: "short explanation grounded in source and runtime trace"
                         }],
                         conditionResult: "optional boolean copied from runtime data",
                         executionPhase: ["optional initialization, condition, increment, body, or unknown"]
