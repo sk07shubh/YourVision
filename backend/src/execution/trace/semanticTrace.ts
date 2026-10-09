@@ -386,6 +386,44 @@ function validateProposal(value: unknown, trace: ExecutionTrace, source: string)
                 (target.indices !== undefined && (!Array.isArray(target.indices) ||
                     !target.indices.every((index) => typeof index === "number" && Number.isFinite(index))) )) return undefined;
         }
+        const proposalTargets = annotation.targets as SemanticVisualTarget[];
+        const proposalRoles = annotation.variableRoles as SemanticVariableRoleHint[];
+        const seenIntents = new Set<string>();
+        for (const intent of annotation.animationIntents) {
+            if (!isRecord(intent) || !hasOnlyKeys(intent, ["action", "targetIndex", "variableName", "confidence", "evidence"]) ||
+                typeof intent.action !== "string" || !ANIMATION_ACTIONS.has(intent.action as SemanticAnimationAction) ||
+                typeof intent.targetIndex !== "number" || !Number.isInteger(intent.targetIndex) ||
+                intent.targetIndex < 0 || intent.targetIndex >= proposalTargets.length ||
+                typeof intent.confidence !== "number" || !Number.isFinite(intent.confidence) ||
+                intent.confidence < 0 || intent.confidence > 1 ||
+                typeof intent.evidence !== "string" || intent.evidence.length > 240 ||
+                (intent.variableName !== undefined && (typeof intent.variableName !== "string" || !(intent.variableName in variables)))) {
+                return undefined;
+            }
+            const target = proposalTargets[intent.targetIndex];
+            if (!target) return undefined;
+            const intentKey = stableJson(intent);
+            if (seenIntents.has(intentKey)) return undefined;
+            seenIntents.add(intentKey);
+
+            if (intent.action === "highlight-read" && target.eventType !== "ARRAY_ACCESS") return undefined;
+            if (intent.action === "highlight-write" && !["ARRAY_WRITE", "OBJECT_FIELD_WRITE"].includes(target.eventType)) return undefined;
+            if (intent.action === "insert" && !(target.eventType === "MAP_WRITE" && target.changeKind === "insert")) return undefined;
+            if (intent.action === "update" && !(target.eventType === "OBJECT_FIELD_WRITE" ||
+                (target.eventType === "MAP_WRITE" && target.changeKind === "update"))) return undefined;
+            if (intent.action === "delete" && !(target.eventType === "MAP_WRITE" && target.changeKind === "delete")) return undefined;
+            if (intent.action === "create" && target.eventType !== "OBJECT_CREATE") return undefined;
+            if (intent.action === "pointer-move") {
+                const matchingRole = typeof intent.variableName === "string" && proposalRoles.find((role) =>
+                    role.name === intent.variableName && role.role === "array-index" && role.structureName === target.name
+                );
+                if (target.eventType !== "ARRAY_ACCESS" || !matchingRole ||
+                    typeof target.name !== "string" ||
+                    !Array.isArray(target.indices) || target.indices.length !== 1 ||
+                    variables[matchingRole.name] !== target.indices[0]) return undefined;
+            }
+        }
+
         if (annotation.conditionResult !== undefined &&
             (typeof annotation.conditionResult !== "boolean" ||
                 sourceEvent.data?.conditionResult !== annotation.conditionResult)) return undefined;
