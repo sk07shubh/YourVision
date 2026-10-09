@@ -197,7 +197,7 @@ for (const test of cases) {
         const indexedArray = test.indexedArray!;
         const indexedLines = sourceLines
             .map((line, index) => ({ line, lineNumber: index + 1 }))
-            .filter(({ line }) => new RegExp(`\\\\b${indexedArray}\\\\s*\\\\[`).test(line));
+            .filter(({ line }) => new RegExp(`\\b${indexedArray}\\s*\\[`).test(line));
         assert(indexedLines.length > 0, `${test.name}: test fixture has no indexed array access`);
 
         const indexedSteps = steps.filter((step) =>
@@ -249,7 +249,7 @@ for (const test of cases) {
     if (test.regression === "nested-loops") {
         const loopLines = sourceLines
             .map((line, index) => ({ line: line.trim(), lineNumber: index + 1 }))
-            .filter(({ line }) => /^for\\s*\\(/.test(line));
+            .filter(({ line }) => /^for\s*\(/.test(line));
         assert(loopLines.length === 2, "nested loops: fixture must contain two for-loop headers");
 
         const bodySteps = steps.filter((step) => {
