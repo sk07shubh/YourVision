@@ -1197,7 +1197,7 @@ function variableSummary(value: unknown): string {
   return displayValue(value);
 }
 
-export interface SemanticRoleView { name:string; role:string; confidence?:number; evidence?:string; structureName?:string; usage?:string[]; }
+export interface SemanticRoleView { name:string; role:string; confidence?:number; evidence?:string; structureName?:string; usage?:string[]; method?:string; }
 function stateSemanticRoles(state?:TraceState):SemanticRoleView[]{
  const data=state?.lastEvent?.data;
  if(!isPlainObject(data)||!Array.isArray(data.semanticRoles))return [];
