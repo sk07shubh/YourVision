@@ -88,6 +88,9 @@ for (const test of cases) {
         if (!Array.isArray(visualization.targets)) {
             throw new Error(`${test.name}: STEP ${step.sequence} is missing semantic targets`);
         }
+        if (!Array.isArray(visualization.animationIntents)) {
+            throw new Error(`${test.name}: STEP ${step.sequence} is missing grounded animation intent metadata`);
+        }
     }
 
     const sourceLines = test.source.split(/\r?\n/);
@@ -105,6 +108,7 @@ for (const test of cases) {
         const visualization = step.data?.visualization as {
             variableRoles?: Array<{ name: string; role: string; structureName?: string }>;
             targets?: Array<{ eventType: string; operation: string; name?: string; indices?: number[] }>;
+            animationIntents?: Array<{ action: string; targetIndex: number; variableName?: string }>;
         };
         const roles = visualization.variableRoles ?? [];
         const targets = visualization.targets ?? [];
@@ -125,7 +129,24 @@ for (const test of cases) {
             role.role === "array-index" &&
             role.structureName === test.indexedArray
         );
-        return hasRuntimeRead && hasTarget && hasIndexRole;
+        const hasGroundedPointerIntent = (visualization.animationIntents ?? []).some((intent) => {
+            const target = targets[intent.targetIndex];
+            const role = roles.find((candidate) =>
+                candidate.role === "array-index" &&
+                candidate.name === intent.variableName &&
+                candidate.structureName === test.indexedArray
+            );
+            return intent.action === "pointer-move" &&
+                !!role &&
+                !!target &&
+                target.eventType === "ARRAY_ACCESS" &&
+                target.name === test.indexedArray &&
+                Array.isArray(target.indices) &&
+                target.indices.length === 1 &&
+                step.data?.variables &&
+                (step.data.variables as Record<string, unknown>)[role.name] === target.indices[0];
+        });
+        return hasRuntimeRead && hasTarget && hasIndexRole && hasGroundedPointerIntent;
     });
 
     assert(Boolean(groundedRead),
