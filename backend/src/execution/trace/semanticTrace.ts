@@ -294,9 +294,24 @@ function validateProposal(value: unknown, trace: ExecutionTrace): SemanticTraceP
                     !target.indices.every((index) => typeof index === "number" && Number.isFinite(index))) ) ||
                 !targetMatchesRuntime(target as unknown as SemanticVisualTarget, sourceEvent)) return undefined;
         }
-        if (annotation.conditionResult !== undefined && typeof annotation.conditionResult !== "boolean") return undefined;
+        if (annotation.conditionResult !== undefined &&
+            (typeof annotation.conditionResult !== "boolean" ||
+                sourceEvent.data?.conditionResult !== annotation.conditionResult)) return undefined;
+        if (typeof sourceEvent.data?.conditionResult === "boolean" &&
+            annotation.conditionResult !== sourceEvent.data.conditionResult) return undefined;
+
         if (annotation.executionPhase !== undefined &&
-            (typeof annotation.executionPhase !== "string" || !EXECUTION_PHASES.has(annotation.executionPhase))) return undefined;
+            (typeof annotation.executionPhase !== "string" ||
+                !EXECUTION_PHASES.has(annotation.executionPhase) ||
+                sourceEvent.data?.executionPhase !== annotation.executionPhase)) return undefined;
+        if (sourceEvent.data?.executionPhase !== undefined &&
+            annotation.executionPhase !== sourceEvent.data.executionPhase) return undefined;
+
+        const expectedTargets = targetsFromRuntimeEvents(sourceEvent)
+            .map((target) => JSON.stringify(target)).sort();
+        const proposedTargets = (annotation.targets as unknown[])
+            .map((target) => JSON.stringify(target)).sort();
+        if (JSON.stringify(proposedTargets) !== JSON.stringify(expectedTargets)) return undefined;
 
         seen.add(item.eventSequence);
         annotations.push({
