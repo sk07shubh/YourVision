@@ -108,4 +108,32 @@ assert(observedRoles.some(role => role && typeof role === "object" && (role as {
 assert(observedRoles.some(role => role && typeof role === "object" && (role as {name?:unknown}).name === "col" && (role as {role?:unknown}).role === "pointer"), "real runtime STEP events must retain col as a matrix traversal pointer");
 assert(!observedRoles.some(role => role && typeof role === "object" && ((role as {name?:unknown}).name === "row" || (role as {name?:unknown}).name === "col") && ["left-bound", "right-bound"].includes(String((role as {role?:unknown}).role))), "runtime semantic metadata must never promote row/col to binary-search boundaries");
 
-console.log("PASS: deterministic semantic roles for ordinary binary search, answer-space search, and matrix traversal at runtime");
+const usageAware = `class Solution {
+ public int singleNonDuplicate(int[] nums) {
+  int n = nums.length;
+  int left = 0;
+  int right = n - 1;
+  int leftDis = 0;
+  int rightDis = 0;
+  while (left <= right) {
+   int mid = left + (right - left) / 2;
+   rightDis = n - mid - 1;
+   if (rightDis % 2 == 0) right = mid - 1;
+   else left = mid + 1;
+  }
+  return nums[left];
+ }
+}`;
+const usageRoles = inferSemanticRoles(usageAware);
+const unusedDistance = usageRoles.find(role => role.name === "leftDis");
+assert(unusedDistance?.role === "unused", "whole-method analysis must identify leftDis as declared but never read");
+assert(unusedDistance.usage?.includes("declared but never read"), "unused local must explain why it received the role");
+const derivedDistance = usageRoles.find(role => role.name === "rightDis");
+assert(derivedDistance?.role === "derived-value", "rightDis must be recognized as a derived value used in a decision condition");
+assert(derivedDistance.usage?.some(item => item.includes("derived from n, mid")), "derived value must expose its dependencies");
+assert(derivedDistance.usage?.includes("used in a condition"), "derived value must expose its downstream condition use");
+const returnedBoundary = usageRoles.find(role => role.name === "left");
+assert(returnedBoundary?.role === "left-bound", "downstream return usage must not overwrite the inferred boundary role");
+assert(returnedBoundary.usage?.includes("contributes to the returned expression"), "analysis must inspect the return expression after the loop");
+
+console.log("PASS: semantic roles cover whole-method usage, dead locals, derived decision values, returns, binary search and matrix traversal");
