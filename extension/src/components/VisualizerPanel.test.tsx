@@ -13,6 +13,7 @@ import {
   dataStructureResults,
   isForLoopUpdateStep,
   unorderedCollectionDelta,
+  arrayIndexVariableNames,
 } from './VisualizerPanel';
 
 function state(patch: Partial<TraceState> = {}): TraceState {
@@ -33,6 +34,11 @@ function markup(nodes: ReactNode[]): string {
 }
 
 describe('execution visualization feature matrix', () => {
+  it('only labels direct array index variables, not identifiers inside expressions', () => {
+    expect([...arrayIndexVariableNames('int a = nums[i]; int b = nums[i + 1];', 'nums')]).toEqual(['i']);
+    expect([...arrayIndexVariableNames('int a = nums[i]; int b = other[j];', 'nums / other')]).toEqual(['i', 'j']);
+  });
+
   it('reads runtime TRUE/FALSE without inventing a result', () => {
     expect(executionCondition(state({
       lastEvent: { type: 'STEP', line: 4, data: { conditionResult: true } },
