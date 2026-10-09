@@ -348,4 +348,38 @@ describe('semantic roles in rendered visualization', () => {
     expect(html).toContain('[1,2]');
   });
 
+  it('keeps matrix traversal pointers separate from outer answer-search boundaries', () => {
+    const current = state({
+      variables: { sd: 9, hg: 15, mid: 12, row: 1, col: 2 },
+      lastEvent: { type: 'STEP', line: 15, data: { semanticRoles: [
+        { name: 'sd', role: 'left-bound', confidence: 0.94, evidence: 'sd is derived from the midpoint of both search bounds' },
+        { name: 'hg', role: 'right-bound', confidence: 0.94, evidence: 'hg is derived from the midpoint of both search bounds' },
+        { name: 'mid', role: 'midpoint', confidence: 0.82, evidence: 'mid is computed from both inferred interval boundaries' },
+        { name: 'row', role: 'pointer', confidence: 0.99, evidence: 'row is updated as the first index of a two-dimensional array access', structureName: 'matrix' },
+        { name: 'col', role: 'pointer', confidence: 0.99, evidence: 'col is updated as the second index of a two-dimensional array access', structureName: 'matrix' },
+      ] } },
+    });
+
+    expect(semanticRoleForVariable(current, 'sd')?.role).toBe('left-bound');
+    expect(semanticRoleForVariable(current, 'hg')?.role).toBe('right-bound');
+    expect(semanticRoleForVariable(current, 'mid')?.role).toBe('midpoint');
+    expect(semanticRoleForVariable(current, 'row')?.role).toBe('pointer');
+    expect(semanticRoleForVariable(current, 'col')?.role).toBe('pointer');
+
+    const variablesHtml = renderToStaticMarkup(<Variables state={current} />);
+    expect(variablesHtml).toContain('LEFT BOUND');
+    expect(variablesHtml).toContain('RIGHT BOUND');
+    expect(variablesHtml).toContain('MIDPOINT');
+    expect(variablesHtml).toContain('POINTER');
+
+    const matrixHtml = renderToStaticMarkup(
+      <ArrayView value={[[1, 2, 3], [4, 5, 6]]} state={current} source="matrix[row][col]" arrayName="matrix" />,
+    );
+    expect(matrixHtml).toContain('row · col');
+    expect(matrixHtml).not.toContain('sd · hg');
+    expect(pointerLabels(current, 3, new Set(), 'matrix')).toEqual(
+      new Map([[1, ['row']], [2, ['col']]]),
+    );
+  });
+
 });
