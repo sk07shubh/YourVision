@@ -260,6 +260,26 @@ if (acceptedAnnotation?.provider !== "ai" ||
     throw new Error("a valid grounded semantic proposal was not accepted");
 }
 
+const wrongLineKindAnalyzer: SemanticTraceAnalyzer = {
+    async analyze() {
+        return {
+            schemaVersion: 1,
+            annotations: multiArrayPrepared.events.filter((event) => event.type === "STEP").map((event) => ({
+                eventSequence: event.sequence,
+                annotation: {
+                    ...(event.data?.visualization as Record<string, unknown>),
+                    provider: "ai",
+                    lineKind: "loop-header"
+                }
+            }))
+        };
+    }
+};
+const rejectedLineKind = await prepareSemanticTrace(multiArrayTrace, multiArraySource, wrongLineKindAnalyzer);
+if ((rejectedLineKind.events[0]?.data?.visualization as { provider?: string } | undefined)?.provider !== "local-fallback") {
+    throw new Error("provider was allowed to label a non-loop source line as a loop header");
+}
+
 const misScopedAnalyzer: SemanticTraceAnalyzer = {
     async analyze() {
         return {
