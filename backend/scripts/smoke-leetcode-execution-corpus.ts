@@ -208,7 +208,7 @@ assert(
 );
 const charIterationValues = validParenthesesCharLoop.trace?.events
     .filter(event => event.type === "STEP" && event.line === validParenthesesLoopLine)
-    .map(event => event.data?.variables?.ch);
+    .map(event => (event.data?.variables as Record<string, unknown> | undefined)?.["ch"]);
 assert(
     JSON.stringify(charIterationValues) === JSON.stringify(["(", "{", "[", "]", "}", ")"]),
     "char enhanced-for checkpoints must contain exactly the assigned value for each iteration: " +
@@ -222,7 +222,7 @@ const shortParenthesesLoop = await runJava(source, {
 assert(shortParenthesesLoop.kind === "OK", "Valid Parentheses short char-loop execution failed");
 const shortLoopValues = shortParenthesesLoop.trace?.events
     .filter(event => event.type === "STEP" && event.line === validParenthesesLoopLine)
-    .map(event => event.data?.variables?.ch);
+    .map(event => (event.data?.variables as Record<string, unknown> | undefined)?.["ch"]);
 assert(
     JSON.stringify(shortLoopValues) === JSON.stringify(["(", ")"]),
     "two-character enhanced-for loop must not contain empty pre-assignment or loop-exit checkpoints: " +
