@@ -148,6 +148,30 @@ function classifyLine(line: string): SemanticLineKind {
     return "statement";
 }
 
+function lineKindSupported(kind: SemanticLineKind, line: string, event: ExecutionEvent): boolean {
+    const normalized = line.trim();
+    if (kind === "unknown") return true;
+    if (kind === "statement") return normalized.length > 0;
+    if (kind === "loop-header") return /\b(?:for|while)\s*\(|\bdo\b/.test(normalized);
+    if (kind === "branch-condition") return /\b(?:if|switch|case)\b/.test(normalized);
+    if (kind === "return") return /\breturn\b/.test(normalized);
+    if (kind === "array-operation") {
+        return /\b[A-Za-z_$][\w$]*\s*\[[^\]]+\]/.test(normalized) ||
+            nestedExecutionEvents(event).some((nested) => ["ARRAY_ACCESS", "ARRAY_WRITE", "ARRAY_REFERENCE"].includes(String(nested.type)));
+    }
+    if (kind === "data-structure-operation") {
+        return /\.\s*[A-Za-z_$][\w$]*\s*\(/.test(normalized) ||
+            nestedExecutionEvents(event).some((nested) => ["MAP_WRITE", "OBJECT_FIELD_WRITE", "OBJECT_CREATE"].includes(String(nested.type)));
+    }
+    if (kind === "assignment") {
+        return /(?:^|[^=!<>])=(?!=)|\+\+|--/.test(normalized);
+    }
+    if (kind === "method-boundary") {
+        return /\b[A-Za-z_$][\w$]*\s*\([^;]*\)\s*(?:throws\s+[\w., ]+)?\s*\{?$/.test(normalized);
+    }
+    return false;
+}
+
 function nestedExecutionEvents(event: ExecutionEvent): Array<Record<string, unknown>> {
     const events = event.data?.executionEvents;
     return Array.isArray(events) ? events.filter(isRecord) : [];
