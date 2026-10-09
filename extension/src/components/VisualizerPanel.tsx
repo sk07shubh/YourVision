@@ -1315,10 +1315,41 @@ function arrayIndexVariableNames(source: string, arrayName?: string): Set<string
   return names;
 }
 
-function pointerLabels(state: TraceState | undefined, length: number, indexNames: Set<string>): Map<number,string[]> {
+function semanticArrayIndexNames(state: TraceState | undefined, arrayName?: string): {
+  provider: string;
+  names: Set<string>;
+} | undefined {
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data) || !isPlainObject(data.visualization)) return undefined;
+  const annotation = data.visualization;
+  if (!Array.isArray(annotation.variableRoles)) return undefined;
+  const allowedArrays = new Set((arrayName ?? '').split(' / ').map(name => name.trim()).filter(Boolean));
+  const names = new Set<string>();
+  for (const hint of annotation.variableRoles) {
+    if (!isPlainObject(hint) || hint.role !== 'array-index' || typeof hint.name !== 'string') continue;
+    if (typeof hint.structureName !== 'string' || !allowedArrays.has(hint.structureName)) continue;
+    names.add(hint.name);
+  }
+  return { provider: typeof annotation.provider === 'string' ? annotation.provider : 'unknown', names };
+}
+
+function pointerLabels(
+  state: TraceState | undefined,
+  length: number,
+  indexNames: Set<string>,
+  arrayName?: string
+): Map<number,string[]> {
   const map = new Map<number,string[]>();
+  const semantic = semanticArrayIndexNames(state, arrayName);
+  // AI annotations are authoritative when present. The local fallback only
+  // overrides source heuristics when it has a structure-specific index hint.
+  const names = semantic?.provider === 'ai'
+    ? semantic.names
+    : semantic?.names.size
+      ? semantic.names
+      : indexNames;
   for (const [name,value] of Object.entries(state?.variables ?? {})) {
-    if (!indexNames.has(name)) continue;
+    if (!names.has(name)) continue;
     if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value >= length) continue;
     const list = map.get(value) ?? []; list.push(name); map.set(value,list);
   }
