@@ -1310,7 +1310,560 @@ function arrayIndexVariableNames(source: string, arrayName?: string): Set<string
   if (!arrayName) return names;
   const arrayNames = arrayName.split(' / ').map(name => name.trim()).filter(Boolean);
   for (const name of arrayNames) {
-    const escapedName = name.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
+    const escapedName = name.replace(/\$/g, '\\
+    const pattern = new RegExp('\\b' + escapedName + '\\s*\\[([^\\]]+)\\]', 'g');
+    for (const match of source.matchAll(pattern)) {
+      // A variable is a pointer label only when it is the actual index value.
+      // Treating nums[i + 1] as a pointer named i incorrectly highlights cell i.
+      const expression = match[1]?.trim();
+      if (expression && /^[A-Za-z_$][\w$]*$/.test(expression)) names.add(expression);
+    }
+  }
+  return names;
+}
+function semanticArrayIndexNames(state: TraceState | undefined, arrayName?: string): {
+  provider: string;
+  names: Set<string>;
+} | undefined {
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data) || !isPlainObject(data.visualization)) return undefined;
+  const annotation = data.visualization;
+  if (!Array.isArray(annotation.variableRoles)) return undefined;
+  const allowedArrays = new Set((arrayName ?? '').split(' / ').map(name => name.trim()).filter(Boolean));
+  const names = new Set<string>();
+  for (const hint of annotation.variableRoles) {
+    if (!isPlainObject(hint) || hint.role !== 'array-index' || typeof hint.name !== 'string') continue;
+    if (typeof hint.structureName !== 'string' || !allowedArrays.has(hint.structureName)) continue;
+    names.add(hint.name);
+  }
+  return { provider: typeof annotation.provider === 'string' ? annotation.provider : 'unknown', names };
+}
+
+function pointerLabels(
+  state: TraceState | undefined,
+  length: number,
+  indexNames: Set<string>,
+  arrayName?: string
+): Map<number,string[]> {
+  const map = new Map<number,string[]>();
+  const semantic = semanticArrayIndexNames(state, arrayName);
+  // AI annotations are authoritative when present. The local fallback only
+  // overrides source heuristics when it has a structure-specific index hint.
+  const names = semantic?.provider === 'ai'
+    ? semantic.names
+    : semantic?.names.size
+      ? semantic.names
+      : indexNames;
+  for (const [name,value] of Object.entries(state?.variables ?? {})) {
+    if (!names.has(name)) continue;
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value >= length) continue;
+    const list = map.get(value) ?? []; list.push(name); map.set(value,list);
+  }
+  return map;
+}
+
+function accessedArrayIndices(state: TraceState | undefined, arrayName?: string): Set<number> {
+  const set = new Set<number>();
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data) || !Array.isArray(data.executionEvents)) return set;
+  for (const event of data.executionEvents) {
+    if (!isPlainObject(event) || event.type !== 'ARRAY_ACCESS' || !isPlainObject(event.data)) continue;
+    if (arrayName && event.data.name !== arrayName) continue;
+    if (!Array.isArray(event.data.indices)) continue;
+    const index = event.data.indices[0];
+    if (typeof index === 'number') set.add(index);
+  }
+  return set;
+}
+
+function accessedArrayPaths(state: TraceState | undefined, arrayName?: string): Set<string> {
+  const paths = new Set<string>();
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data) || !Array.isArray(data.executionEvents)) return paths;
+  for (const event of data.executionEvents) {
+    if (!isPlainObject(event) || event.type !== 'ARRAY_ACCESS' || !isPlainObject(event.data)) continue;
+    if (arrayName && event.data.name !== arrayName) continue;
+    if (!Array.isArray(event.data.indices) || !event.data.indices.every((x) => typeof x === 'number')) continue;
+    paths.add((event.data.indices as number[]).join(','));
+  }
+  return paths;
+}
+
+function changedArrayIndices(state?: TraceState): Set<number> {
+  const set = new Set<number>();
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data)) return set;
+
+  const collect = (changes: unknown) => {
+    if (!Array.isArray(changes)) return;
+    for (const c of changes) {
+      if (!isPlainObject(c) || !Array.isArray(c.indices)) continue;
+      const i = c.indices[0];
+      if (typeof i === 'number') set.add(i);
+    }
+  };
+
+  collect(data.changes);
+  if (Array.isArray(data.executionEvents)) {
+    for (const event of data.executionEvents) {
+      if (!isPlainObject(event)) continue;
+      if (event.type === 'ARRAY_WRITE' && isPlainObject(event.data)) {
+        collect(event.data.changes);
+      }
+    }
+  }
+
+  return set;
+}
+
+function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<string>() }: { value: unknown[]; state?: TraceState; source?: string; arrayName?: string; depth?: number; seen?: Set<string> }) {
+  if (value.every(Array.isArray)) return <div className="yv-matrix">{value.map((row,r)=><div className="yv-array" key={r}>{(row as unknown[]).map((v,i)=><div className="yv-cell" key={i}><div className="yv-cell-value"><DataValue value={v} state={state} source={source ?? ''} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">[{r},{i}]</div></div>)}</div>)}</div>;
+  const labels=pointerLabels(state,value.length,arrayIndexVariableNames(source ?? '', arrayName),arrayName); const changed=changedArrayIndices(state); const accessed=accessedArrayIndices(state,arrayName);
+  return <div className="yv-array">{value.map((v,i)=><div className="yv-cell" key={i}>{labels.has(i)&&<div className="yv-pointer">{labels.get(i)!.join(' · ')}</div>}<div className={`yv-cell-value ${changed.has(i)?'yv-cell-changed ':''}${accessed.has(i)?'yv-cell-accessed':''}`}><DataValue value={v} state={state} source={source ?? ''} name={arrayName} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">{i}</div></div>)}</div>;
+}
+
+function mapChanges(state?: TraceState): Array<{
+  kind: 'insert' | 'update' | 'delete';
+  key: unknown;
+  before?: unknown;
+  after?: unknown;
+}> {
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data)) return [];
+
+  const changes: unknown[] = [];
+  if (Array.isArray(data.changes)) changes.push(...data.changes);
+  if (Array.isArray(data.executionEvents)) {
+    for (const event of data.executionEvents) {
+      if (!isPlainObject(event) || event.type !== 'MAP_WRITE' || !isPlainObject(event.data)) continue;
+      if (Array.isArray(event.data.changes)) changes.push(...event.data.changes);
+    }
+  }
+
+  return changes.filter(
+    (change): change is {
+      kind: 'insert' | 'update' | 'delete';
+      key: unknown;
+      before?: unknown;
+      after?: unknown;
+    } =>
+      isPlainObject(change) &&
+      (change.kind === 'insert' ||
+        change.kind === 'update' ||
+        change.kind === 'delete')
+  );
+}
+
+function MapView({
+  value,
+  state,
+  source,
+  depth = 0,
+  seen = new Set<string>()
+}: {
+  value: Obj & {
+    $mapId: string;
+    entries: Array<{ key: unknown; value: unknown }>;
+  };
+  state?: TraceState;
+  source: string;
+  depth?: number;
+  seen?: Set<string>;
+}) {
+  const changes = mapChanges(state);
+
+  const findChange = (key: unknown) =>
+    changes.find(
+      change =>
+        stableStringify(change.key) ===
+        stableStringify(key)
+    );
+
+  const deleted = changes.filter(
+    change => change.kind === 'delete'
+  );
+
+  return (
+    <div className="yv-hashmap">
+      <div className="yv-map-meta">
+        <span>
+          {typeof value.$type === 'string'
+            ? value.$type.split('.').pop()
+            : 'Map'}
+        </span>
+        <span>{value.entries.length} entries</span>
+      </div>
+
+      <div className="yv-map-table">
+        <div className="yv-map-header">
+          <div>Key</div>
+          <div>Value</div>
+        </div>
+
+        {value.entries.map((entry, index) => {
+          const change = findChange(entry.key);
+
+          return (
+            <div
+              className={`yv-map-row ${change ? `yv-map-${change.kind}` : ''}`}
+              key={stableStringify(entry.key) || index}
+            >
+              <div className="yv-map-key">
+                <DataValue value={entry.key} state={state} source={source} depth={depth + 1} seen={seen}/>
+              </div>
+
+              <div className="yv-map-value">
+                {change?.kind === 'update' ? (
+                  <>
+                    <span className="yv-old-value">
+                      <DataValue value={change.before} state={state} source={source} depth={depth + 1} seen={seen} resolveObjects={false}/>
+                    </span>
+                    <span className="yv-map-arrow">→</span>
+                    <DataValue value={entry.value} state={state} source={source} depth={depth + 1} seen={seen}/>
+                  </>
+                ) : (
+                  <DataValue value={entry.value} state={state} source={source} depth={depth + 1} seen={seen}/>
+                )}
+
+                {change?.kind === 'insert' && (
+                  <span className="yv-map-tag">NEW</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        {deleted.map((change, index) => (
+          <div
+            className="yv-map-row yv-map-delete"
+            key={`deleted-${stableStringify(change.key)}-${index}`}
+          >
+            <div className="yv-map-key">
+              <DataValue value={change.key} state={state} source={source} depth={depth + 1} seen={seen}/>
+            </div>
+            <div className="yv-map-value">
+              <span className="yv-old-value">
+                <DataValue value={change.before} state={state} source={source} depth={depth + 1} seen={seen} resolveObjects={false}/>
+              </span>
+              <span className="yv-map-tag">REMOVED</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function objectFields(value: Obj): Obj {
+  return isPlainObject(value.fields) ? value.fields : value;
+}
+function objectType(value: Obj): string { return typeof value.$type==='string'?value.$type:''; }
+function looksListNode(value: Obj): boolean { const f=objectFields(value); return /ListNode/i.test(objectType(value)) || ('next' in f && ('val' in f || 'value' in f)); }
+function looksTreeNode(value: Obj): boolean { const f=objectFields(value); return /TreeNode/i.test(objectType(value)) || (('left' in f || 'right' in f) && ('val' in f || 'value' in f)); }
+function resolveRef(value: unknown, objects: Record<string,unknown>): unknown {
+  if (!isPlainObject(value)) return value;
+  if (typeof value.$ref==='string') return objects[value.$ref] ?? value;
+  if (typeof value.$objectId==='string') return objects[value.$objectId] ?? value;
+  return value;
+}
+function nodeValue(value: Obj): unknown { const f=objectFields(value); return f.val ?? f.value ?? f.data ?? '?'; }
+
+function LinkedListView({
+  root,
+  objects,
+  variables = {}
+}: {
+  root: Obj;
+  objects: Record<string, unknown>;
+  variables?: Record<string, unknown>;
+}) {
+  const pointerNames = new Map<string, string[]>();
+  for (const [name, value] of Object.entries(variables)) {
+    if (name === 'this') continue;
+    if (isPlainObject(value) && typeof value.$objectId === 'string') {
+      const names = pointerNames.get(value.$objectId) ?? [];
+      names.push(name);
+      pointerNames.set(value.$objectId, names);
+    }
+  }
+
+  const nodes: Array<{id:string;value:unknown}> = []; const seen=new Set<string>(); let cur: unknown=root;
+  for(let guard=0;guard<40;guard++){
+    cur=resolveRef(cur,objects); if(!isPlainObject(cur))break;
+    const id=String(cur.$objectId ?? `node-${guard}`); if(seen.has(id)){nodes.push({id:'cycle',value:'↻'});break;} seen.add(id);
+    nodes.push({id,value:nodeValue(cur)}); const f=objectFields(cur); if(f.next==null)break; cur=f.next;
+  }
+  return <div className="yv-linked">{nodes.map((n,i)=><div className="yv-linked-piece" key={`${n.id}-${i}`}>
+    {pointerNames.get(n.id)?.map(name => <div className="yv-node-pointer" key={name}>{name}</div>)}
+    <div className="yv-node">{displayValue(n.value)}</div>{i<nodes.length-1&&<div className="yv-edge">→</div>}
+  </div>)}</div>;
+}
+
+function TreeNodeView({ value, objects, depth=0 }: { value: unknown; objects: Record<string,unknown>; depth?: number }) {
+  const resolved=resolveRef(value,objects); if(!isPlainObject(resolved) || depth>6)return null;
+  const f=objectFields(resolved); return <div className="yv-tree-node"><div className="yv-node">{displayValue(nodeValue(resolved))}</div>{(f.left!=null||f.right!=null)&&<div className="yv-tree-children"><div>{f.left!=null?<TreeNodeView value={f.left} objects={objects} depth={depth+1}/>:<span className="yv-null">null</span>}</div><div>{f.right!=null?<TreeNodeView value={f.right} objects={objects} depth={depth+1}/>:<span className="yv-null">null</span>}</div></div>}</div>;
+}
+function ReturnValueView({
+  text,
+  value,
+  state
+}: {
+  text: string;
+  value: unknown;
+  state?: TraceState;
+}) {
+  if (isPlainObject(value) && looksListNode(value)) {
+    return (
+      <div className="yv-return-object">
+        <div className="yv-return-reference yv-code">{text}</div>
+        <div className="yv-return-caption">Returned node and reachable chain</div>
+        <LinkedListView root={value} objects={state?.objects ?? {}} variables={state?.variables ?? {}} />
+      </div>
+    );
+  }
+
+  if (isPlainObject(value) && looksTreeNode(value)) {
+    return (
+      <div className="yv-return-object">
+        <div className="yv-return-reference yv-code">{text}</div>
+        <div className="yv-return-caption">Returned root and reachable tree</div>
+        <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects ?? {}} /></div>
+      </div>
+    );
+  }
+
+  if (isPlainObject(value) || Array.isArray(value)) {
+    return (
+      <div className="yv-return-object">
+        <div className="yv-return-reference yv-code">{text}</div>
+        <div className="yv-return-caption">Returned value</div>
+        <DataValue value={value} state={state} source="" />
+      </div>
+    );
+  }
+
+  return <div className="yv-code">{text}</div>;
+}
+
+
+function ObjectView({
+  value,
+  state,
+  source,
+  depth = 0,
+  seen = new Set<string>()
+}: {
+  value: Obj;
+  state?: TraceState;
+  source: string;
+  depth?: number;
+  seen?: Set<string>;
+}) {
+  const objectId =
+    typeof value.$objectId === 'string'
+      ? value.$objectId
+      : undefined;
+
+  if (objectId && seen.has(objectId)) {
+    return <div className="yv-code">↻ {objectId}</div>;
+  }
+
+  if (depth >= 6) {
+    return <div className="yv-code">…</div>;
+  }
+
+  const nextSeen = new Set(seen);
+  if (objectId) {
+    nextSeen.add(objectId);
+  }
+
+  const fields = objectFields(value);
+  const entries = Object.entries(fields);
+
+  if (!entries.length) {
+    return (
+      <div className="yv-code">
+        {objectType(value) || 'Object'}
+        {objectId ? ` · ${objectId}` : ''}
+      </div>
+    );
+  }
+
+  return (
+    <div className="yv-object">
+      {entries.map(([key, fieldValue]) => (
+        <div className="yv-object-field" key={key}>
+          <div className="yv-code yv-object-key">{key}</div>
+          <div className="yv-object-value">
+            <DataValue
+              value={fieldValue}
+              state={state}
+              source={source}
+              name={key}
+              depth={depth + 1}
+              seen={nextSeen}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DataValue({
+  value,
+  state,
+  source,
+  name,
+  depth = 0,
+  seen = new Set<string>(),
+  resolveObjects = true
+}: {
+  value: unknown;
+  state?: TraceState;
+  source: string;
+  name?: string;
+  depth?: number;
+  seen?: Set<string>;
+  resolveObjects?: boolean;
+}) {
+  if (isPlainObject(value) && typeof value.$ref === 'string' &&
+      (typeof value.$arrayId === 'string' || typeof value.$mapId === 'string' || typeof value.$collectionId === 'string')) {
+    return <div className="yv-code">↻ {value.$ref}</div>;
+  }
+
+  if (depth >= 6) {
+    return <div className="yv-code">…</div>;
+  }
+
+  if (isMapSnapshot(value)) {
+    return <MapView value={value} state={state} source={source} depth={depth} seen={seen}/>;
+  }
+
+  if (isCollectionSnapshot(value)) {
+    return <CollectionView value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>;
+  }
+
+  if (isArraySnapshot(value)) {
+    return (
+      <>
+        <ArrayView value={value.values} state={state} source={source} arrayName={name} depth={depth} seen={seen}/>
+        {value.truncated === true && (
+          <div className="yv-truncated">
+            Showing first {value.values.length} of {String(value.length ?? '?')} items.
+          </div>
+        )}
+      </>
+    );
+  }
+
+  if (Array.isArray(value)) return <ArrayView value={value} state={state} source={source} arrayName={name} depth={depth} seen={seen}/>;
+  if (isPlainObject(value)) {
+    if (looksTreeNode(value)) return <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects??{}}/></div>;
+    if (looksListNode(value)) return <LinkedListView root={value} objects={state?.objects??{}} variables={state?.variables??{}}/>;
+    const resolved = resolveObjects ? resolveRef(value, state?.objects ?? {}) : value;
+    if (isPlainObject(resolved)) {
+      return <ObjectView value={resolved} state={state} source={source} depth={depth} seen={seen}/>;
+    }
+  }
+  return <div className="yv-code">{displayValue(value)}</div>;
+}
+
+function isStructuralObject(value: unknown): value is Obj {
+  if (!isPlainObject(value)) return false;
+  const fields = objectFields(value);
+  const type = objectType(value);
+  return /ListNode|TreeNode/i.test(type) ||
+    ('next' in fields && ('val' in fields || 'value' in fields)) ||
+    (('left' in fields || 'right' in fields) && ('val' in fields || 'value' in fields));
+}
+
+function DataStructures({ state, source }: { state?: TraceState; source: string }) {
+  const namedObjectIds = new Map<string, string[]>();
+
+  for (const [name, value] of Object.entries(state?.variables ?? {})) {
+    if (name === 'this') continue;
+    if (isPlainObject(value) && typeof value.$objectId === 'string') {
+      const names = namedObjectIds.get(value.$objectId) ?? [];
+      names.push(name);
+      namedObjectIds.set(value.$objectId, names);
+    }
+  }
+
+  const grouped = new Map<string, { names: string[]; value: unknown }>();
+
+  for (const [name, value] of Object.entries(state?.arrays ?? {})) {
+    const id = isPlainObject(value) && typeof value.$arrayId === 'string'
+      ? value.$arrayId
+      : name;
+    const item = grouped.get(`array:${id}`);
+    if (item) {
+      item.names.push(name);
+    } else {
+      grouped.set(`array:${id}`, { names: [name], value });
+    }
+  }
+
+  for (const [name, value] of Object.entries(state?.dataStructures ?? {})) {
+    const record = isPlainObject(value) ? value : {};
+    const id =
+      typeof record.$mapId === 'string'
+        ? `map:${record.$mapId}`
+        : typeof record.$collectionId === 'string'
+          ? `collection:${record.$collectionId}`
+          : `structure:${name}`;
+    const item = grouped.get(id);
+    if (item) {
+      item.names.push(name);
+    } else {
+      grouped.set(id, { names: [name], value });
+    }
+  }
+
+  for (const [id, value] of Object.entries(state?.objects ?? {})) {
+    const names = namedObjectIds.get(id);
+    if (!names?.length) continue;
+    grouped.set(`object:${id}`, { names, value });
+  }
+
+  const items = [...grouped.values()];
+
+  if (!items.length) {
+    return <div className="yv-empty">Structures appear here as your code creates or mutates them.</div>;
+  }
+
+  return (
+    <div className="yv-ds-list">
+      {items.map(({ names, value }) => {
+        const title = [...new Set(names)].join(' / ');
+        return (
+          <div className="yv-ds" key={title}>
+            <div className="yv-ds-title">{title}</div>
+            <DataValue value={value} state={state} source={source} name={title}/>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export function VisualizerPanel(){
+  const dsVisualizationRef = useRef<HTMLDivElement>(null);
+  const s=useSession(); const current=s.states[s.index]; const prev=s.index>0?s.states[s.index-1]:undefined;
+  const line = current?.line;
+  const lastEventData = isPlainObject(current?.lastEvent?.data) ? current.lastEvent.data : undefined;
+  const sourceLines=useMemo(()=>s.source.split(/\r?\n/),[s.source]);
+  const statement=line?sourceLines[line-1]?.trim():'';
+  useEffect(()=>{highlightEditorLine(line,s.source);return()=>clearEditorExecutionMarker();},[line,s.source]);
+  useEffect(()=>{ if(!s.playing)return; const id=setInterval(()=>sessionStore.next(),650); return()=>clearInterval(id); },[s.playing,s.index,s.states.length]);
+  useEffect(()=>{ const onKey=(e:KeyboardEvent)=>{ if(!sessionStore.get().open)return; const target=e.target as HTMLElement|null; if(target?.matches('input,textarea,[contenteditable=true]'))return; const handled=e.key==='ArrowRight'||e.key==='ArrowLeft'||e.code==='Space'||e.key.toLowerCase()==='r'; if(!handled)return; e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); const active=document.activeElement?.shadowRoot?.activeElement as HTMLElement|null; if(active?.matches('button'))active.blur(); if(e.key==='ArrowRight'||e.code==='Space')sessionStore.next(); else if(e.key==='ArrowLeft')sessionStore.prev(); else sessionStore.restart(); }; window.addEventListener('keydown',onKey,true);return()=>window.removeEventListener('keydown',onKey,true)},[]);
+  const output=s.response?.result; const tc=s.testcase; const finished=current?.lastEvent?.type==='PROGRAM_END' || (s.states.length>0&&s.index===s.states.length-1);
+  return <div className="yv-root"><div className="yv-scroll">
+    {tc&&<div className="yv-top"><div className="yv-title-row"><div className="yv-case">{tc.label}</div>{tc.source==='custom'&&<span className="yv-case-kind">Custom</span>}{tc.source==='failed'&&<span className="yv-case-kind">Failed testcase</span>}</div><div className="yv-inputs">{Object.keys(tc.inputs).length?Object.entries(tc.inputs).map(([k,v])=><div className="yv-input" key={k}><div className="yv-key">{k}</div><div className="yv-code">{v}</div></div>):<div className="yv-code">{tc.raw}</div>}</div><div className="yv-output-row"><div className={`yv-output ${finished&&s.response?.success?'good':''}`}><div className="yv-label">Output</div>{finished&&output!==undefined?<ReturnValueView text={displayValue(output)} value={lastEventData?.returnValue} state={current}/>:<div className="yv-code">—</div>}</div></div></div>}
+    {s.loading&&<div className="yv-loading">Tracing your code…</div>}{s.error&&<div className="yv-error">{s.error}</div>}
+    {!s.loading&&<><Section title="Variables"><Variables state={current} previous={prev}/></Section><Section title="Call Stack">{current?.callStack?.length?<div className="yv-stack-wrap"><div className="yv-stack-label">TOP</div><div className="yv-stack">{current.callStack.map((f:string,i:number)=><div className="yv-frame" key={`${f}-${i}`}>{f}</div>)}</div><div className="yv-stack-label bottom">BOTTOM</div></div>:<div className="yv-empty">No active method calls.</div>}</Section><Section title="Data Structures"><div className="yv-ds-debug-actions"><button className="yv-btn" type="button" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={async()=>{const currentSession=sessionStore.get();const renderedRoot=dsVisualizationRef.current;const renderedElements=renderedRoot?Array.from(renderedRoot.querySelectorAll('*')).map((element)=>{const style=getComputedStyle(element);return{tag:element.tagName,className:typeof element.className==='string'?element.className:'',text:(element.textContent??'').trim().slice(0,100),animationName:style.animationName,animationDuration:style.animationDuration,animationPlayState:style.animationPlayState};}):[];const currentStep=currentSession.index+1;const currentState=currentSession.states[currentSession.index];const trace=buildVisualizationDebugTrace(currentSession.states,currentSession.source)+'\nCURRENTLY RENDERED STEP: '+currentStep+' / '+currentSession.states.length+', line='+(currentState?.line??'—')+'\nCURRENTLY RENDERED DATA-STRUCTURE DOM:\n'+debugValue(renderedElements);try{await navigator.clipboard.writeText(trace);}catch{const textarea=document.createElement('textarea');textarea.value=trace;textarea.style.position='fixed';textarea.style.opacity='0';document.body.appendChild(textarea);textarea.select();document.execCommand('copy');textarea.remove();}}}>Copy DS Debug Trace</button></div><div className="yv-ds-visualization" ref={dsVisualizationRef}><DataStructures state={current} source={s.source}/></div></Section></>}
+  </div><div className="yv-current"><ExecutionInspector state={current} previous={prev} statement={statement} index={s.index} total={s.states.length}/><div className="yv-controls"><div className="yv-buttons"><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.restart()} disabled={!s.states.length}>↺ Restart</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.prev()} disabled={s.index<=0}>← Prev</button><button className="yv-btn primary" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.togglePlay()} disabled={s.states.length<2}>{s.playing?'■ Stop':'▶ Play'}</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.next()} disabled={!s.states.length||s.index>=s.states.length-1}>Next →</button></div></div></div></div>;
+});
     const pattern = new RegExp('\\b' + escapedName + '\\s*\\[([^\\]]+)\\]', 'g');
     for (const match of source.matchAll(pattern)) {
       // A variable is a pointer label only when it is the actual index value.
