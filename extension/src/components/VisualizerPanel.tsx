@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from '../state/session';
 import { sessionStore } from '../state/store';
 import { displayValue, stableStringify, isPlainObject } from '../utils/value';
@@ -349,6 +349,79 @@ function buildDebugTrace(states: TraceState[], source: string): string {
     ].join('\n');
   }).join('\n');
 }
+
+function visualizationTargets(data: Obj, lastEventType?: string): Array<Record<string, unknown>> {
+  const events = Array.isArray(data.executionEvents) ? data.executionEvents : [];
+  const targets: Array<Record<string, unknown>> = [];
+  const add = (eventType: string, eventData: Obj, detail?: unknown) => {
+    const target: Record<string, unknown> = { eventType };
+    for (const key of ['name', 'array', 'index', 'indices', 'key', 'fields', 'path', 'from', 'to', 'source', 'destination']) {
+      if (key in eventData) target[key] = eventData[key];
+    }
+    if (detail !== undefined) target.detail = detail;
+    targets.push(target);
+  };
+
+  for (const event of events) {
+    if (!isPlainObject(event)) continue;
+    const eventType = typeof event.type === 'string' ? event.type : 'UNKNOWN_EVENT';
+    const eventData = isPlainObject(event.data) ? event.data : {};
+    if (eventType === 'ARRAY_ACCESS') {
+      add(eventType, eventData, { value: eventData.value, indices: eventData.indices });
+    } else if (['ARRAY_WRITE', 'MAP_WRITE', 'OBJECT_FIELD_WRITE'].includes(eventType)) {
+      const changes = Array.isArray(eventData.changes) ? eventData.changes : [];
+      if (changes.length) {
+        for (const change of changes) if (isPlainObject(change)) add(eventType, eventData, change);
+      } else add(eventType, eventData);
+    } else {
+      add(eventType, eventData);
+    }
+  }
+  if (lastEventType && !['STEP', 'PROGRAM_START', 'PROGRAM_END'].includes(lastEventType)) {
+    targets.push({ eventType: lastEventType, source: 'lastEvent', detail: data });
+  }
+  return targets;
+}
+
+function buildVisualizationDebugTrace(states: TraceState[], source: string): string {
+  const lines = source.split(/\r?\n/);
+  return states.map((state, index) => {
+    const lineNumber = state.line ?? 0;
+    const data = isPlainObject(state.lastEvent?.data) ? state.lastEvent.data : {};
+    const previous = index > 0 ? states[index - 1] : undefined;
+    const code = lineNumber > 0 ? (lines[lineNumber - 1] ?? '').trim() : '';
+    const condition = typeof data.conditionResult === 'boolean'
+      ? (data.conditionResult ? 'TRUE' : 'FALSE')
+      : '—';
+    return [
+      'DS VISUALIZATION STEP ' + (index + 1) + ' / ' + states.length,
+      'SYNC: step=' + (index + 1) + ', line=' + lineNumber + ', event=' + (state.lastEvent?.type ?? '—'),
+      'CODE: ' + code,
+      'METHOD: ' + (state.method ?? '—'),
+      'CONDITION: ' + condition,
+      'SEMANTIC VISUALIZATION METADATA:',
+      debugValue(data.visualization ?? null),
+      'DATA STRUCTURE TYPES:',
+      debugValue([
+        ...Object.entries(state.arrays ?? {}).map(([name, value]) => ({ name, type: 'Array', id: isPlainObject(value) ? value.$arrayId : undefined })),
+        ...Object.entries(state.dataStructures ?? {}).map(([name, value]) => ({ name, type: structureType(value, 'Data Structure'), id: isPlainObject(value) ? (value.$mapId ?? value.$collectionId) : undefined })),
+        ...Object.entries(state.objects ?? {}).map(([id, value]) => ({ name: id, type: structureType(value, 'Object'), id }))
+      ]),
+      'VISUALIZATION INPUT — CURRENT STATE:',
+      debugValue({ arrays: state.arrays ?? {}, dataStructures: state.dataStructures ?? {}, objects: state.objects ?? {}, variables: state.variables ?? {} }),
+      'VISUALIZATION INPUT — PREVIOUS STATE:',
+      debugValue({ arrays: previous?.arrays ?? {}, dataStructures: previous?.dataStructures ?? {}, objects: previous?.objects ?? {}, variables: previous?.variables ?? {} }),
+      'EVENTS ATTACHED TO THIS STEP:',
+      debugValue(Array.isArray(data.executionEvents) ? data.executionEvents : []),
+      'VISUAL TARGETS DERIVED FROM RUNTIME EVENTS:',
+      debugValue(visualizationTargets(data, state.lastEvent?.type)),
+      'LAST EVENT DATA:',
+      debugValue(data),
+      '\n' + '='.repeat(80) + '\n'
+    ].join('\n');
+  }).join('\n');
+}
+
 function VariableResult({ name, oldValue, value, initialized }: {
   name: string;
   oldValue?: unknown;
@@ -1738,6 +1811,7 @@ function DataStructures({ state, source }: { state?: TraceState; source: string 
 }
 
 export function VisualizerPanel(){
+  const dsVisualizationRef = useRef<HTMLDivElement>(null);
   const s=useSession(); const current=s.states[s.index]; const prev=s.index>0?s.states[s.index-1]:undefined;
   const line = current?.line;
   const lastEventData = isPlainObject(current?.lastEvent?.data) ? current.lastEvent.data : undefined;
@@ -1750,6 +1824,6 @@ export function VisualizerPanel(){
   return <div className="yv-root"><div className="yv-scroll">
     {tc&&<div className="yv-top"><div className="yv-title-row"><div className="yv-case">{tc.label}</div>{tc.source==='custom'&&<span className="yv-case-kind">Custom</span>}{tc.source==='failed'&&<span className="yv-case-kind">Failed testcase</span>}</div><div className="yv-inputs">{Object.keys(tc.inputs).length?Object.entries(tc.inputs).map(([k,v])=><div className="yv-input" key={k}><div className="yv-key">{k}</div><div className="yv-code">{v}</div></div>):<div className="yv-code">{tc.raw}</div>}</div><div className="yv-output-row"><div className={`yv-output ${finished&&s.response?.success?'good':''}`}><div className="yv-label">Output</div>{finished&&output!==undefined?<ReturnValueView text={displayValue(output)} value={lastEventData?.returnValue} state={current}/>:<div className="yv-code">—</div>}</div></div></div>}
     {s.loading&&<div className="yv-loading">Tracing your code…</div>}{s.error&&<div className="yv-error">{s.error}</div>}
-    {!s.loading&&<><Section title="Variables"><Variables state={current} previous={prev}/></Section><Section title="Call Stack">{current?.callStack?.length?<div className="yv-stack-wrap"><div className="yv-stack-label">TOP</div><div className="yv-stack">{current.callStack.map((f:string,i:number)=><div className="yv-frame" key={`${f}-${i}`}>{f}</div>)}</div><div className="yv-stack-label bottom">BOTTOM</div></div>:<div className="yv-empty">No active method calls.</div>}</Section><Section title="Data Structures"><DataStructures state={current} source={s.source}/></Section></>}
+    {!s.loading&&<><Section title="Variables"><Variables state={current} previous={prev}/></Section><Section title="Call Stack">{current?.callStack?.length?<div className="yv-stack-wrap"><div className="yv-stack-label">TOP</div><div className="yv-stack">{current.callStack.map((f:string,i:number)=><div className="yv-frame" key={`${f}-${i}`}>{f}</div>)}</div><div className="yv-stack-label bottom">BOTTOM</div></div>:<div className="yv-empty">No active method calls.</div>}</Section><Section title="Data Structures"><div className="yv-ds-debug-actions"><button className="yv-btn" type="button" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={async()=>{const currentSession=sessionStore.get();const renderedRoot=dsVisualizationRef.current;const renderedElements=renderedRoot?Array.from(renderedRoot.querySelectorAll('*')).map((element)=>{const style=getComputedStyle(element);return{tag:element.tagName,className:typeof element.className==='string'?element.className:'',text:(element.textContent??'').trim().slice(0,100),animationName:style.animationName,animationDuration:style.animationDuration,animationPlayState:style.animationPlayState};}):[];const currentStep=currentSession.index+1;const currentState=currentSession.states[currentSession.index];const trace=buildVisualizationDebugTrace(currentSession.states,currentSession.source)+'\nCURRENTLY RENDERED STEP: '+currentStep+' / '+currentSession.states.length+', line='+(currentState?.line??'—')+'\nCURRENTLY RENDERED DATA-STRUCTURE DOM:\n'+debugValue(renderedElements);try{await navigator.clipboard.writeText(trace);}catch{const textarea=document.createElement('textarea');textarea.value=trace;textarea.style.position='fixed';textarea.style.opacity='0';document.body.appendChild(textarea);textarea.select();document.execCommand('copy');textarea.remove();}}}>Copy DS Debug Trace</button></div><div className="yv-ds-visualization" ref={dsVisualizationRef}><DataStructures state={current} source={s.source}/></div></Section></>}
   </div><div className="yv-current"><ExecutionInspector state={current} previous={prev} statement={statement} index={s.index} total={s.states.length}/><div className="yv-controls"><div className="yv-buttons"><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.restart()} disabled={!s.states.length}>↺ Restart</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.prev()} disabled={s.index<=0}>← Prev</button><button className="yv-btn primary" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.togglePlay()} disabled={s.states.length<2}>{s.playing?'■ Stop':'▶ Play'}</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.next()} disabled={!s.states.length||s.index>=s.states.length-1}>Next →</button></div></div></div></div>;
 }
