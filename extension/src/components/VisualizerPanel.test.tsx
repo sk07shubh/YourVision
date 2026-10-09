@@ -13,6 +13,8 @@ import {
   dataStructureResults,
   isForLoopUpdateStep,
   unorderedCollectionDelta,
+  semanticRoleForVariable,
+  pointerLabels,
 } from './VisualizerPanel';
 
 function state(patch: Partial<TraceState> = {}): TraceState {
@@ -280,5 +282,24 @@ describe('execution visualization feature matrix', () => {
     expect(html).toContain('nums');
     expect(html).toContain('[Set]');
     expect(html).toContain('Index: 1');
+  });
+});
+
+
+describe('deterministic semantic pointer roles', () => {
+  it('exposes boundary roles even when variables are not array indices', () => {
+    const current = state({ variables: { left: 1, right: 4 }, lastEvent: { type: 'STEP', line: 6, data: { semanticRoles: [
+      { name: 'left', role: 'left-bound', confidence: 0.88, evidence: 'loop boundary', structureName: 'nums' },
+      { name: 'right', role: 'right-bound', confidence: 0.96, evidence: 'loop boundary', structureName: 'nums' },
+    ] } } });
+    expect(semanticRoleForVariable(current, 'left')?.role).toBe('left-bound');
+    expect(semanticRoleForVariable(current, 'right')?.role).toBe('right-bound');
+  });
+  it('labels array cells from semantic bounds without array-index source usage', () => {
+    const current = state({ variables: { left: 1, right: 3 }, lastEvent: { type: 'STEP', line: 5, data: { semanticRoles: [
+      { name: 'left', role: 'left-bound', confidence: 0.88, evidence: 'interval boundary', structureName: 'nums' },
+      { name: 'right', role: 'right-bound', confidence: 0.96, evidence: 'interval boundary', structureName: 'nums' },
+    ] } } });
+    expect(pointerLabels(current, 5, new Set(), 'nums')).toEqual(new Map([[1, ['left']], [3, ['right']]]));
   });
 });
