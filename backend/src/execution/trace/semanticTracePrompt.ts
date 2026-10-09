@@ -55,7 +55,7 @@ export function buildSemanticTracePrompt(
                             ],
                             confidence: "number from 0 through 1",
                             evidence: "short evidence grounded in source and trace",
-                            structureName: "optional exact array variable for array-index roles"
+                            structureName: "required for array-index roles; exact array variable being indexed"
                         }],
                         targets: [{
                             eventType: "exact nested runtime event type",
