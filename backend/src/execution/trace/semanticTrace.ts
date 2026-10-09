@@ -265,7 +265,7 @@ function hasOnlyKeys(value: Record<string, unknown>, allowed: readonly string[])
     return Object.keys(value).every((key) => allowed.includes(key));
 }
 
-function validateProposal(value: unknown, trace: ExecutionTrace): SemanticTraceProposal | undefined {
+function validateProposal(value: unknown, trace: ExecutionTrace, source: string): SemanticTraceProposal | undefined {
     if (!isRecord(value) || !hasOnlyKeys(value, ["schemaVersion", "annotations"]) ||
         value.schemaVersion !== SEMANTIC_TRACE_SCHEMA_VERSION || !Array.isArray(value.annotations)) return undefined;
     const stepEvents = new Map(trace.events.filter((event) => event.type === "STEP").map((event) => [event.sequence, event]));
@@ -288,6 +288,9 @@ function validateProposal(value: unknown, trace: ExecutionTrace): SemanticTraceP
             !Array.isArray(annotation.variableRoles) || !Array.isArray(annotation.targets)) return undefined;
 
         const variables = isRecord(sourceEvent.data?.variables) ? sourceEvent.data.variables : {};
+        const sourceLine = sourceLineFor(sourceEvent, source.split(/\\r?\\n/));
+        const sourceIndexRoles = variableRoleHints(sourceLine, sourceEvent)
+            .filter((hint) => hint.role === "array-index");
         for (const hint of annotation.variableRoles) {
             if (!isRecord(hint) || !hasOnlyKeys(hint, ["name", "role", "confidence", "evidence", "structureName"]) ||
                 typeof hint.name !== "string" || !(hint.name in variables) ||
@@ -296,7 +299,13 @@ function validateProposal(value: unknown, trace: ExecutionTrace): SemanticTraceP
                 hint.confidence < 0 || hint.confidence > 1 ||
                 typeof hint.evidence !== "string" || hint.evidence.length > 240 ||
                 (hint.structureName !== undefined && (typeof hint.structureName !== "string" || !(hint.structureName in variables))) ||
-                (hint.role === "array-index" && (typeof hint.structureName !== "string" || !(hint.structureName in variables)))) return undefined;
+                (hint.role === "array-index" && (
+                    typeof hint.structureName !== "string" ||
+                    !(hint.structureName in variables) ||
+                    !sourceIndexRoles.some((expected) =>
+                        expected.name === hint.name && expected.structureName === hint.structureName
+                    )
+                ))) return undefined;
         }
         for (const target of annotation.targets) {
             if (!isRecord(target) || !hasOnlyKeys(target, ["eventType", "operation", "name", "indices", "key", "path"]) ||
@@ -358,7 +367,7 @@ export async function prepareSemanticTrace(
         } catch {
             proposal = undefined;
         }
-        validated = validateProposal(proposal, trace) ?? localProposal(source, trace);
+        validated = validateProposal(proposal, trace, source) ?? localProposal(source, trace);
     }
     const annotations = new Map(validated.annotations.map((entry) => [entry.eventSequence, entry.annotation]));
 
