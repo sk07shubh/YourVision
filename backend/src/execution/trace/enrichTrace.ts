@@ -2,6 +2,7 @@ import type {
     ExecutionEvent,
     ExecutionTrace
 } from "./schema.js";
+import { inferSemanticRoles } from "./semanticRoles.js";
 
 type SnapshotRecord = Record<string, unknown>;
 
@@ -154,12 +155,18 @@ export function enrichTrace(
         sourceLines
     );
 
+    const semanticRoles = inferSemanticRoles(source);
+
     return {
         version: 1,
-        events: normalized.map((event, index) => ({
-            ...event,
-            sequence: index + 1
-        }))
+        events: normalized.map((event, index) => {
+            if (event.type !== "STEP" || semanticRoles.length === 0) return { ...event, sequence: index + 1 };
+            const variables = event.data?.postVariables ?? event.data?.variables;
+            const activeNames = variables && typeof variables === "object" && !Array.isArray(variables)
+                ? new Set(Object.keys(variables as Record<string, unknown>)) : undefined;
+            const activeRoles = activeNames ? semanticRoles.filter(role => activeNames.has(role.name)) : semanticRoles;
+            return { ...event, sequence: index + 1, data: { ...(event.data ?? {}), semanticRoles: activeRoles } };
+        })
     };
 }
 

@@ -1,0 +1,23 @@
+import { runJava } from "../src/execution/java/runner.js";
+import { inferSemanticRoles } from "../src/execution/trace/semanticRoles.js";
+function assert(condition:boolean,message:string):asserts condition{if(!condition)throw new Error(message);}
+const source="class Solution { public int converge(int n,int target){int left=0;int right=n-1;while(left<right){if(left+right>target){right--;}else{left++;}}return left;} }";
+const roles=inferSemanticRoles(source);
+assert(roles.some(r=>r.name==="left"&&r.role==="left-bound"),"must infer left boundary without array indexing");
+assert(roles.some(r=>r.name==="right"&&r.role==="right-bound"),"must infer right boundary without array indexing");
+assert(!/\\w+\\s*\\[[^\\]]+\\]/.test(source),"fixture must contain no array access");
+const runtime=await runJava(source,{method:"converge",arguments:["5","2"]});
+assert(runtime.success&&runtime.result==="1","real Java fixture failed: "+runtime.kind+": "+(runtime.message??runtime.stderr));
+const steps=runtime.trace?.events.filter(e=>e.type==="STEP")??[];
+assert(steps.length>0,"real Java execution must produce STEP events");
+assert(steps.some(e=>Array.isArray(e.data?.semanticRoles)&&e.data.semanticRoles.some(r=>r&&typeof r==="object"&&(r as {name?:unknown}).name==="left"&&(r as {role?:unknown}).role==="left-bound")),"semantic roles must be attached to real STEP events");
+const binary="class Solution { public int search(int[] nums,int target){int low=0;int high=nums.length-1;while(low<=high){int mid=low+(high-low)/2;if(nums[mid]==target)return mid;if(nums[mid]<target)low=mid+1;else high=mid-1;}return -1;} }";
+const br=inferSemanticRoles(binary);
+assert(br.some(r=>r.name==="low"&&r.role==="left-bound"),"binary search low must be a left bound");
+assert(br.some(r=>r.name==="high"&&r.role==="right-bound"),"binary search high must be a right bound");
+assert(br.some(r=>r.name==="mid"&&r.role==="midpoint"),"midpoint derived from bounds must be inferred");
+const counter="class Solution { public int count(){int total=0;for(int i=0;i<4;i++){total+=i;}return total;} }";
+assert(inferSemanticRoles(counter).some(r=>r.name==="i"&&r.role==="loop-counter"),"for-loop counter must be distinguished from a boundary");
+const linked="class Solution { public int converge(int[] nums){int left=0;int right=nums.length-1;while(left<right){if(left+right>3)right--;else left++;}return left;} }";
+assert(inferSemanticRoles(linked).some(r=>r.name==="left"&&r.role==="left-bound"&&r.structureName==="nums"),"boundary should associate with nums.length");
+console.log("PASS: deterministic semantic role inference, including boundaries without array access");
