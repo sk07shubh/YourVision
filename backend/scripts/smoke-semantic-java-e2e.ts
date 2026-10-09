@@ -76,16 +76,18 @@ for (const test of cases) {
         `${test.name}: expected result ${test.expectedResult}, got ${result.result}`);
 
     const trace = result.trace;
-    assert(trace && trace.events.length > 0, `${test.name}: real runner returned no trace`);
+    if (!trace || trace.events.length === 0) throw new Error(`${test.name}: real runner returned no trace`);
     const steps = trace.events.filter((event) => event.type === "STEP");
     assert(steps.length > 0, `${test.name}: no STEP checkpoints were captured`);
 
     for (const step of steps) {
         const visualization = step.data?.visualization as Record<string, unknown> | undefined;
-        assert(Boolean(visualization && visualization.provider === "local-fallback"),
-            `${test.name}: STEP ${step.sequence} is missing deterministic semantic metadata`);
-        assert(Array.isArray(visualization.targets),
-            `${test.name}: STEP ${step.sequence} is missing semantic targets`);
+        if (!visualization || visualization.provider !== "local-fallback") {
+            throw new Error(`${test.name}: STEP ${step.sequence} is missing deterministic semantic metadata`);
+        }
+        if (!Array.isArray(visualization.targets)) {
+            throw new Error(`${test.name}: STEP ${step.sequence} is missing semantic targets`);
+        }
     }
 
     const sourceLines = test.source.split(/\r?\n/);
