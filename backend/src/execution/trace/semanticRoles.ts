@@ -71,7 +71,7 @@ function inferStructureName(source:string,name:string,loopText=""):string|undefi
 interface VariableUsageInfo { usage:Set<string>; reads:number; declared:boolean; dependencies:Set<string>; usedInCondition:boolean; returnedDirectly:boolean; }
 function identifierNames(expression:string):string[]{
  const ignored=new Set(["true","false","null","this","new","return","if","else","while","for","int","long","short","byte","double","float","boolean","char","var","instanceof"]);
- return [...expression.matchAll(new RegExp("\\b"+IDENTIFIER+"\\b","g"))].map(m=>m[0]).filter(name=>!ignored.has(name));
+ return [...expression.matchAll(new RegExp("\\b"+IDENTIFIER+"\\b","g"))].filter(match=>!expression.slice(0,match.index??0).trimEnd().endsWith(".")).map(m=>m[0]).filter(name=>!ignored.has(name));
 }
 function inferVariableUsage(source:string):Map<string,VariableUsageInfo>{
  const code=maskCommentsAndStrings(source);
