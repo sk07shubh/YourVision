@@ -139,22 +139,33 @@ function targetOperation(type: string): SemanticTargetOperation {
 }
 
 function targetsFromRuntimeEvents(event: ExecutionEvent): SemanticVisualTarget[] {
-    return nestedExecutionEvents(event).map((nested) => {
+    return nestedExecutionEvents(event).flatMap((nested) => {
         const data = isRecord(nested.data) ? nested.data : {};
-        const target: SemanticVisualTarget = {
-            eventType: typeof nested.type === "string" ? nested.type : "UNKNOWN_EVENT",
-            operation: targetOperation(typeof nested.type === "string" ? nested.type : "")
+        const eventType = typeof nested.type === "string" ? nested.type : "UNKNOWN_EVENT";
+        const operation = targetOperation(eventType);
+        const base: SemanticVisualTarget = { eventType, operation };
+        if (typeof data.name === "string") base.name = data.name;
+
+        const copyLocation = (source: Record<string, unknown>, target: SemanticVisualTarget) => {
+            if (Array.isArray(source.indices) &&
+                source.indices.every((index) => typeof index === "number" && Number.isFinite(index))) {
+                target.indices = [...source.indices] as number[];
+            }
+            if (source.key !== undefined) target.key = source.key;
+            if (source.path !== undefined) target.path = source.path;
         };
-        for (const key of ["name", "indices", "key", "path"] as const) {
-            const value = data[key];
-            if (key === "name" && typeof value === "string") target.name = value;
-            else if (key === "indices" && Array.isArray(value) &&
-                value.every((index) => typeof index === "number" && Number.isFinite(index))) {
-                target.indices = [...value] as number[];
-            } else if (key === "key" && value !== undefined) target.key = value;
-            else if (key === "path" && value !== undefined) target.path = value;
+
+        const changes = Array.isArray(data.changes) ? data.changes.filter(isRecord) : [];
+        if (changes.length > 0 && ["ARRAY_WRITE", "MAP_WRITE", "OBJECT_FIELD_WRITE"].includes(eventType)) {
+            return changes.map((change) => {
+                const target: SemanticVisualTarget = { ...base };
+                copyLocation(change, target);
+                return target;
+            });
         }
-        return target;
+
+        copyLocation(data, base);
+        return [base];
     });
 }
 
@@ -223,30 +234,41 @@ function localProposal(source: string, trace: ExecutionTrace): SemanticTraceProp
 
 function targetMatchesRuntime(target: SemanticVisualTarget, event: ExecutionEvent): boolean {
     return nestedExecutionEvents(event).some((nested) => {
-        if (nested.type !== target.eventType) return false;
+        if (nested.type !== target.eventType ||
+            target.operation !== targetOperation(String(nested.type))) return false;
         const data = isRecord(nested.data) ? nested.data : {};
         if (target.name !== undefined && data.name !== target.name) return false;
-        if (target.indices !== undefined &&
-            (!Array.isArray(data.indices) || JSON.stringify(data.indices) !== JSON.stringify(target.indices))) return false;
-        if (target.key !== undefined && JSON.stringify(data.key) !== JSON.stringify(target.key)) return false;
-        if (target.path !== undefined && JSON.stringify(data.path) !== JSON.stringify(target.path)) return false;
-        return target.operation === targetOperation(String(nested.type));
+
+        const changes = Array.isArray(data.changes) ? data.changes.filter(isRecord) : [];
+        const candidates = [data, ...changes];
+        const locationKeys = (["indices", "key", "path"] as const)
+            .filter((key) => target[key] !== undefined);
+        if (locationKeys.length === 0) return true;
+        return candidates.some((candidate) => locationKeys.every((key) =>
+            JSON.stringify(candidate[key]) === JSON.stringify(target[key])
+        ));
     });
 }
 
+function hasOnlyKeys(value: Record<string, unknown>, allowed: readonly string[]): boolean {
+    return Object.keys(value).every((key) => allowed.includes(key));
+}
+
 function validateProposal(value: unknown, trace: ExecutionTrace): SemanticTraceProposal | undefined {
-    if (!isRecord(value) || value.schemaVersion !== SEMANTIC_TRACE_SCHEMA_VERSION ||
-        !Array.isArray(value.annotations)) return undefined;
+    if (!isRecord(value) || !hasOnlyKeys(value, ["schemaVersion", "annotations"]) ||
+        value.schemaVersion !== SEMANTIC_TRACE_SCHEMA_VERSION || !Array.isArray(value.annotations)) return undefined;
     const stepEvents = new Map(trace.events.filter((event) => event.type === "STEP").map((event) => [event.sequence, event]));
     const seen = new Set<number>();
     const annotations: SemanticTraceProposal["annotations"] = [];
 
     for (const item of value.annotations) {
-        if (!isRecord(item) || typeof item.eventSequence !== "number" || !Number.isInteger(item.eventSequence) ||
+        if (!isRecord(item) || !hasOnlyKeys(item, ["eventSequence", "annotation"]) ||
+            typeof item.eventSequence !== "number" || !Number.isInteger(item.eventSequence) ||
             seen.has(item.eventSequence)) return undefined;
         const sourceEvent = stepEvents.get(item.eventSequence);
         const annotation = item.annotation;
         if (!sourceEvent || !isRecord(annotation) ||
+            !hasOnlyKeys(annotation, ["schemaVersion", "provider", "lineKind", "confidence", "variableRoles", "targets", "conditionResult", "executionPhase"]) ||
             annotation.schemaVersion !== SEMANTIC_TRACE_SCHEMA_VERSION ||
             (annotation.provider !== "ai" && annotation.provider !== "local-fallback") ||
             typeof annotation.lineKind !== "string" || !LINE_KINDS.has(annotation.lineKind as SemanticLineKind) ||
@@ -256,14 +278,16 @@ function validateProposal(value: unknown, trace: ExecutionTrace): SemanticTraceP
 
         const variables = isRecord(sourceEvent.data?.variables) ? sourceEvent.data.variables : {};
         for (const hint of annotation.variableRoles) {
-            if (!isRecord(hint) || typeof hint.name !== "string" || !(hint.name in variables) ||
+            if (!isRecord(hint) || !hasOnlyKeys(hint, ["name", "role", "confidence", "evidence"]) ||
+                typeof hint.name !== "string" || !(hint.name in variables) ||
                 typeof hint.role !== "string" || !VARIABLE_ROLES.has(hint.role as SemanticVariableRole) ||
                 typeof hint.confidence !== "number" || !Number.isFinite(hint.confidence) ||
                 hint.confidence < 0 || hint.confidence > 1 ||
                 typeof hint.evidence !== "string" || hint.evidence.length > 240) return undefined;
         }
         for (const target of annotation.targets) {
-            if (!isRecord(target) || typeof target.eventType !== "string" ||
+            if (!isRecord(target) || !hasOnlyKeys(target, ["eventType", "operation", "name", "indices", "key", "path"]) ||
+                typeof target.eventType !== "string" ||
                 typeof target.operation !== "string" || !TARGET_OPERATIONS.has(target.operation as SemanticTargetOperation) ||
                 (target.name !== undefined && typeof target.name !== "string") ||
                 (target.indices !== undefined && (!Array.isArray(target.indices) ||
