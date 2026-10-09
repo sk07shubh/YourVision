@@ -911,7 +911,7 @@ function ExecutionInspector({ state, previous, statement, index, total }: { stat
             }
           }}
         >
-          Copy Debug Trace
+          Copy DS Debug Trace
         </button>
       </div>
 
