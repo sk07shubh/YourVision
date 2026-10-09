@@ -320,7 +320,7 @@ function validateProposal(value: unknown, trace: ExecutionTrace): SemanticTraceP
         const expectedTargets = targetsFromRuntimeEvents(sourceEvent)
             .map((target) => stableJson(target)).sort();
         const proposedTargets = (annotation.targets as unknown[])
-            .map((target) => JSON.stringify(target)).sort();
+            .map((target) => stableJson(target)).sort();
         if (JSON.stringify(proposedTargets) !== JSON.stringify(expectedTargets)) return undefined;
 
         seen.add(item.eventSequence);
