@@ -12,7 +12,8 @@ export const SEMANTIC_TRACE_SYSTEM_PROMPT = [
     "Annotate every STEP event exactly once, keyed by its exact event sequence. Do not annotate non-STEP events.",
     "Classify the highlighted source line and infer useful variable roles from the whole source and trace, not variable names alone. Use evidence and calibrated confidence.",
     "A variable-role hint name must exist in that STEP event's data.variables object. Do not create variable names.",
-    "Visual targets must be copied from that STEP event's data.executionEvents. Their eventType, operation, name, indices, key, and path must match the corresponding runtime event exactly. Never invent an access, write, index, key, or mutation.",
+    "For an array-index role, include structureName with the exact array variable being indexed. It must exist in the same STEP variables. This prevents an index for one array from becoming a pointer on every array.",
+    "Visual targets must exactly represent all targets derived from that STEP event's data.executionEvents, including each concrete location in a write event changes array. Their eventType, operation, name, indices, key, and path must match runtime data exactly. Never invent or omit an access, write, index, key, or mutation.",
     "Only copy conditionResult when it is explicitly present as a boolean in the runtime event data. Do not reevaluate or guess branch outcomes.",
     "Only copy executionPhase when it is explicitly present in runtime event data and is one of initialization, condition, increment, body, or unknown. Do not infer loop phases from ordering alone.",
     "If semantic intent is uncertain, use lineKind unknown or omit uncertain variable-role hints. Keep the targets array limited to runtime-grounded facts.",
@@ -53,7 +54,8 @@ export function buildSemanticTracePrompt(
                                 "midpoint", "result", "target", "collection", "pointer", "unknown"
                             ],
                             confidence: "number from 0 through 1",
-                            evidence: "short evidence grounded in source and trace"
+                            evidence: "short evidence grounded in source and trace",
+                            structureName: "optional exact array variable for array-index roles"
                         }],
                         targets: [{
                             eventType: "exact nested runtime event type",
