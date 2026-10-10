@@ -1326,17 +1326,32 @@ function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<
     const host = arrayRef.current;
     if (!host) return;
 
-    const offsets: Record<string, number> = {};
+    const cellCenters: Record<string, number> = {};
     const moving = new Set<string>();
     const nextIndices = new Map<string, number>();
+    const targetsByIndex = new Map<number, typeof targets>();
 
     for (const target of targets) {
       const cell = cellRefs.current[target.index];
       if (!cell) continue;
-      offsets[target.name] = cell.offsetLeft + cell.offsetWidth / 2;
+      cellCenters[target.name] = cell.offsetLeft + cell.offsetWidth / 2;
       const previousIndex = previousIndices.current.get(target.name);
       if (previousIndex !== undefined && previousIndex !== target.index) moving.add(target.name);
       nextIndices.set(target.name, target.index);
+      const peers = targetsByIndex.get(target.index) ?? [];
+      peers.push(target);
+      targetsByIndex.set(target.index, peers);
+    }
+
+    const offsets: Record<string, number> = {};
+    for (const target of targets) {
+      const peers = targetsByIndex.get(target.index) ?? [target];
+      const widths = peers.map(peer => Math.max(1, peer.name.length) * 6.2 + 10);
+      const peerIndex = peers.findIndex(peer => peer.name === target.name);
+      const totalWidth = widths.reduce((sum, width) => sum + width, 0) + Math.max(0, peers.length - 1) * 3;
+      const precedingWidth = widths.slice(0, peerIndex).reduce((sum, width) => sum + width + 3, 0);
+      const centeredOffset = precedingWidth + widths[peerIndex]! / 2 - totalWidth / 2;
+      offsets[target.name] = (cellCenters[target.name] ?? 0) + centeredOffset;
     }
 
     previousIndices.current = nextIndices;
@@ -1347,21 +1362,8 @@ function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<
 
   const changed = changedArrayIndices(state);
   const accessed = accessedArrayIndices(state, arrayName);
-  const targetsByIndex = new Map<number, typeof targets>();
-  for (const target of targets) {
-    const atIndex = targetsByIndex.get(target.index) ?? [];
-    atIndex.push(target);
-    targetsByIndex.set(target.index, atIndex);
-  }
-
   const pointerMarkers = targets.map(target => {
-    const peers = targetsByIndex.get(target.index) ?? [target];
-    const widths = peers.map(peer => Math.max(1, peer.name.length) * 6.2 + 10);
-    const peerIndex = peers.findIndex(peer => peer.name === target.name);
-    const totalWidth = widths.reduce((sum, width) => sum + width, 0) + Math.max(0, peers.length - 1) * 3;
-    const precedingWidth = widths.slice(0, peerIndex).reduce((sum, width) => sum + width + 3, 0);
-    const centeredOffset = precedingWidth + widths[peerIndex]! / 2 - totalWidth / 2;
-    const x = (pointerLayout.offsets[target.name] ?? 0) + centeredOffset;
+    const x = pointerLayout.offsets[target.name] ?? 0;
     return (
       <div
         key={target.name}
@@ -1374,7 +1376,7 @@ function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<
   });
 
   return (
-    <div className="yv-array yv-array-pointer-host" ref={arrayRef}>
+    <div className={`yv-array yv-array-pointer-host ${targets.length ? 'has-pointers' : ''}`} ref={arrayRef}>
       <div className="yv-pointer-layer" aria-hidden="true">{pointerMarkers}</div>
       {value.map((v, i) => (
         <div className="yv-cell" key={i} ref={element => { cellRefs.current[i] = element; }}>
