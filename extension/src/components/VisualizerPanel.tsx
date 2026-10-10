@@ -1512,6 +1512,10 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
   const writtenPaths = changedArrayPaths(state, arrayName);
   const indexNames = matrixIndexVariableNames(source, arrayName);
   const targets = matrixPointerTargets(state, rowCount, columnCount, indexNames);
+  const activeRows = new Set(targets.rows.map(target => target.index));
+  const activeColumns = new Set(targets.columns.map(target => target.index));
+  const activeCells = new Set<string>();
+  for (const row of activeRows) for (const column of activeColumns) activeCells.add(row + ',' + column);
   const targetSignature = [
     ...targets.rows.map(target => 'r:' + target.name + ':' + target.index),
     ...targets.columns.map(target => 'c:' + target.name + ':' + target.index)
@@ -1553,156 +1557,137 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
       if (previous !== undefined && previous !== target.index) movingRows.add(target.name);
       next.set(key, target.index);
     }
-    previousMatrixTargets  if (value.length > 0 && value.every(Array.isArray)) {
-    return <MatrixView value={value as unknown[][]} state={state} source={source ?? ''} arrayName={arrayName} depth={depth} seen={seen}/>;
-  }ow.length));
-    const readPaths = accessedArrayPaths(state, arrayName);
-    const writtenPaths = changedArrayPaths(state, arrayName);
-    const indexNames = matrixIndexVariableNames(source ?? '', arrayName);
-    const targets = matrixPointerTargets(state, rowCount, columnCount, indexNames);
-    const targetSignature = [
-      ...targets.rows.map(target => 'r:' + target.name + ':' + target.index),
-      ...targets.columns.map(target => 'c:' + target.name + ':' + target.index)
-    ].sort().join('|');
-    const matrixRef = useRef<HTMLDivElement | null>(null);
-    const matrixCellRefs = useRef<Record<string, HTMLDivElement | null>>({});
-    const previousMatrixTargets = useRef<Map<string, number>>(new Map());
-    const [matrixPointerLayout, setMatrixPointerLayout] = useState<{
-      x: Record<string, number>;
-      y: Record<string, number>;
-      movingRows: Set<string>;
-      movingColumns: Set<string>;
-    }>({ x: {}, y: {}, movingRows: new Set(), movingColumns: new Set() });
+    previousMatrixTargets.current = next;
+    setMatrixPointerLayout({ x, y, movingRows, movingColumns });
+  }, [targetSignature, state?.sequence, rowCount, columnCount]);
 
-    useLayoutEffect(() => {
-      const host = matrixRef.current;
-      if (!host) return;
-      const x: Record<string, number> = {};
-      const y: Record<string, number> = {};
-      const movingRows = new Set<string>();
-      const movingColumns = new Set<string>();
-      const next = new Map<string, number>();
-
-      for (const target of targets.columns) {
-        const cell = matrixCellRefs.current[target.index + ',0'];
-        const colCell = matrixCellRefs.current['__col,' + target.index];
-        const measured = colCell ?? cell;
-        if (!measured) continue;
-        x[target.name] = measured.offsetLeft + measured.offsetWidth / 2;
-        const key = 'c:' + target.name;
-        const previous = previousMatrixTargets.current.get(key);
-        if (previous !== undefined && previous !== target.index) movingColumns.add(target.name);
-        next.set(key, target.index);
-      }
-      for (const target of targets.rows) {
-        const cell = matrixCellRefs.current[target.index + ',0'];
-        if (!cell) continue;
-        y[target.name] = cell.offsetTop + cell.offsetHeight / 2;
-        const key = 'r:' + target.name;
-        const previous = previousMatrixTargets.current.get(key);
-        if (previous !== undefined && previous !== target.index) movingRows.add(target.name);
-        next.set(key, target.index);
-      }
-      previousMatrixTargets.current = next;
-      setMatrixPointerLayout({ x, y, movingRows, movingColumns });
-    }, [targetSignature, state?.sequence, rowCount, columnCount]);
-
-    return (
-      <div
-        className="yv-matrix yv-matrix-grid"
-        ref={matrixRef}
-        style={{ gridTemplateColumns: `62px repeat(${columnCount}, minmax(36px, max-content))` }}
-      >
-        <div className="yv-matrix-corner" />
-        {Array.from({ length: columnCount }, (_, column) => (
-          <div
-            className="yv-matrix-column-index"
-            key={'column-' + column}
-            ref={element => { matrixCellRefs.current['__col,' + column] = element; }}
-          >{column}</div>
-        ))}
-        {rows.map((row, r) => (
-          <div className="yv-matrix-row-fragment" key={'row-' + r}>
-            <div className="yv-matrix-row-index">{r}</div>
-            {Array.from({ length: columnCount }, (_, column) => {
-              const path = r + ',' + column;
-              const exists = column < row.length;
-              return (
+  return (
+    <div
+      className="yv-matrix yv-matrix-grid"
+      ref={matrixRef}
+      style={{ gridTemplateColumns: `62px repeat(${columnCount}, minmax(36px, max-content))` }}
+    >
+      <div className="yv-matrix-corner" />
+      {Array.from({ length: columnCount }, (_, column) => (
+        <div
+          className={`yv-matrix-column-index ${activeColumns.has(column) ? 'yv-matrix-axis-active' : ''}`}
+          key={'column-' + column}
+          ref={element => { matrixCellRefs.current['__col,' + column] = element; }}
+        >{column}</div>
+      ))}
+      {rows.map((row, r) => (
+        <div className="yv-matrix-row-fragment" key={'row-' + r}>
+          <div className={`yv-matrix-row-index ${activeRows.has(r) ? 'yv-matrix-axis-active' : ''}`}>{r}</div>
+          {Array.from({ length: columnCount }, (_, column) => {
+            const path = r + ',' + column;
+            const exists = column < row.length;
+            const active = activeCells.has(path) && exists;
+            return (
+              <div
+                className={`yv-matrix-cell ${exists ? '' : 'yv-matrix-cell-empty'} ${active ? 'yv-matrix-cell-active' : ''}`}
+                key={path}
+                ref={element => { matrixCellRefs.current[path] = element; }}
+              >
                 <div
-                  className={`yv-matrix-cell ${exists ? '' : 'yv-matrix-cell-empty'}`}
-                  key={path}
-                  ref={element => { matrixCellRefs.current[path] = element; }}
+                  key={`${path}-${state?.sequence ?? state?.line ?? 'initial'}`}
+                  className={`yv-cell-value ${readPaths.has(path) ? 'yv-cell-read ' : ''}${writtenPaths.has(path) ? 'yv-cell-written' : ''}`}
                 >
-                  <div
-                    key={`${path}-${state?.sequence ?? state?.line ?? 'initial'}`}
-                    className={`yv-cell-value ${readPaths.has(path) ? 'yv-cell-read ' : ''}${writtenPaths.has(path) ? 'yv-cell-written' : ''}`}
-                  >
-                    {exists
-                      ? <DataValue value={row[column]} state={state} source={source ?? ''} depth={depth + 1} seen={seen}/>
-                      : <span className="yv-matrix-missing">—</span>}
-                  </div>
+                  {exists
+                    ? <DataValue value={row[column]} state={state} source={source} depth={depth + 1} seen={seen}/>
+                    : <span className="yv-matrix-missing">—</span>}
                 </div>
-              );
-            })}
-          </div>
-        ))}
-        <div className="yv-matrix-pointer-layer" aria-hidden="true">
-          {targets.columns.map(target => (
-            <div
-              key={'c:' + target.name}
-              className={`yv-matrix-pointer yv-matrix-pointer-column ${matrixPointerLayout.movingColumns.has(target.name) ? 'is-moving' : ''}`}
-              style={{ transform: `translate3d(${matrixPointerLayout.x[target.name] ?? 0}px, 0, 0) translateX(-50%)` }}
-            >{target.name}</div>
-          ))}
-          {targets.rows.map(target => (
-            <div
-              key={'r:' + target.name}
-              className={`yv-matrix-pointer yv-matrix-pointer-row ${matrixPointerLayout.movingRows.has(target.name) ? 'is-moving' : ''}`}
-              style={{ transform: `translate3d(0, ${matrixPointerLayout.y[target.name] ?? 0}px, 0) translateY(-50%)` }}
-            >{target.name}</div>
-          ))}
+              </div>
+            );
+          })}
         </div>
+      ))}
+      <div className="yv-matrix-pointer-layer" aria-hidden="true">
+        {targets.columns.map(target => (
+          <div
+            key={'c:' + target.name}
+            className={`yv-matrix-pointer yv-matrix-pointer-column ${matrixPointerLayout.movingColumns.has(target.name) ? 'is-moving' : ''}`}
+            style={{ transform: `translate3d(${matrixPointerLayout.x[target.name] ?? 0}px, 0, 0) translateX(-50%)` }}
+          >{target.name}</div>
+        ))}
+        {targets.rows.map(target => (
+          <div
+            key={'r:' + target.name}
+            className={`yv-matrix-pointer yv-matrix-pointer-row ${matrixPointerLayout.movingRows.has(target.name) ? 'is-moving' : ''}`}
+            style={{ transform: `translate3d(0, ${matrixPointerLayout.y[target.name] ?? 0}px, 0) translateY(-50%)` }}
+          >{target.name}</div>
+        ))}
       </div>
-    );
+    </div>
+  );
+}
+
+function ArrayView({ value, state, source, arrayName, depth, seen }: {
+  value: unknown[];
+  state?: TraceState;
+  source: string;
+  arrayName?: string;
+  depth: number;
+  seen: Set<string>;
+}) {
+  if (value.length > 0 && value.every(Array.isArray)) {
+    return <MatrixView value={value as unknown[][]} state={state} source={source} arrayName={arrayName} depth={depth} seen={seen}/>;
   }
 
-  // Reads and writes are independent trace facts: a read gets a cool blue
-  // focus, while only an ARRAY_WRITE checkpoint gets the green write pulse.
+  const indexNames = arrayIndexVariableNames(source, arrayName);
+  const targets = pointerTargets(state, value.length, indexNames);
+  const targetSignature = targets.map(target => target.name + ':' + target.index).sort().join('|');
+  const arrayRef = useRef<HTMLDivElement | null>(null);
+  const cellRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const previousTargets = useRef<Map<string, number>>(new Map());
+  const [pointerLayout, setPointerLayout] = useState<{ offsets: Record<string, number>; moving: Set<string> }>({ offsets: {}, moving: new Set() });
+
+  useLayoutEffect(() => {
+    const host = arrayRef.current;
+    if (!host) return;
+    const offsets: Record<string, number> = {};
+    const moving = new Set<string>();
+    const next = new Map<string, number>();
+    for (const target of targets) {
+      const cell = cellRefs.current[target.index];
+      if (!cell) continue;
+      offsets[target.name] = cell.offsetLeft + cell.offsetWidth / 2;
+      const previous = previousTargets.current.get(target.name);
+      if (previous !== undefined && previous !== target.index) moving.add(target.name);
+      next.set(target.name, target.index);
+    }
+    previousTargets.current = next;
+    setPointerLayout({ offsets, moving });
+  }, [targetSignature, state?.sequence, value.length]);
+
   const changed = changedArrayIndices(state, arrayName);
   const accessed = accessedArrayIndices(state, arrayName);
   const swapped = swappedArrayIndices(state, arrayName);
   const shifted = shiftedArrayIndices(state, arrayName);
-  // With two or more source-grounded array indices, softly mark the active
-  // interval. This works for windows and candidate ranges without naming an algorithm.
   const rangeStart = targets.length >= 2 ? Math.min(...targets.map(target => target.index)) : -1;
   const rangeEnd = targets.length >= 2 ? Math.max(...targets.map(target => target.index)) : -1;
-  const pointerMarkers = targets.map(target => {
-    const x = pointerLayout.offsets[target.name] ?? 0;
-    return (
-      <div
-        key={target.name}
-        className={`yv-pointer ${pointerLayout.moving.has(target.name) ? 'yv-pointer-moving' : ''}`}
-        style={{ transform: `translate3d(${x}px, 0, 0) translateX(-50%)` }}
-      >
-        {target.name}
-      </div>
-    );
-  });
 
   return (
     <div className={`yv-array yv-array-pointer-host ${targets.length ? 'has-pointers' : ''}`} ref={arrayRef}>
-      <div className="yv-pointer-layer" aria-hidden="true">{pointerMarkers}</div>
-      {value.map((v, i) => (
-        <div className="yv-cell" key={i} ref={element => { cellRefs.current[i] = element; }}>
+      <div className="yv-pointer-layer" aria-hidden="true">
+        {targets.map(target => (
           <div
-            key={`${i}-${state?.sequence ?? state?.line ?? 'initial'}`}
-            className={`yv-cell-value ${rangeStart >= 0 && i >= rangeStart && i <= rangeEnd ? 'yv-cell-range ' : ''}${changed.has(i) ? 'yv-cell-written ' : ''}${accessed.has(i) ? 'yv-cell-read ' : ''}${swapped.has(i) ? 'yv-cell-swapped' : ''}`}
+            key={target.name}
+            className={`yv-pointer ${pointerLayout.moving.has(target.name) ? 'yv-pointer-moving' : ''}`}
+            style={{ transform: `translate3d(${pointerLayout.offsets[target.name] ?? 0}px, 0, 0) translateX(-50%)` }}
+          >{target.name}</div>
+        ))}
+      </div>
+      {value.map((item, index) => (
+        <div className="yv-cell" key={index} ref={element => { cellRefs.current[index] = element; }}>
+          <div
+            key={`${index}-${state?.sequence ?? state?.line ?? 'initial'}`}
+            className={`yv-cell-value ${rangeStart >= 0 && index >= rangeStart && index <= rangeEnd ? 'yv-cell-range ' : ''}${changed.has(index) ? 'yv-cell-written ' : ''}${accessed.has(index) ? 'yv-cell-read ' : ''}${swapped.has(index) ? 'yv-cell-swapped' : ''}`}
           >
-            <div className={`yv-array-cell-content ${swapped.has(i) ? 'yv-array-cell-content-swapped' : ''}${shifted.has(i) ? ' yv-array-cell-content-shift-' + shifted.get(i) : ''}`}>
-              <DataValue value={v} state={state} source={source ?? ''} name={arrayName} depth={depth + 1} seen={seen}/>
+            <div className={`yv-array-cell-content ${swapped.has(index) ? 'yv-array-cell-content-swapped' : ''}${shifted.has(index) ? ' yv-array-cell-content-shift-' + shifted.get(index) : ''}`}>
+              <DataValue value={item} state={state} source={source} name={arrayName} depth={depth + 1} seen={seen}/>
             </div>
           </div>
-          <div className="yv-cell-index">{i}</div>
+          <div className="yv-cell-index">{index}</div>
         </div>
       ))}
     </div>
