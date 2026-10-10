@@ -1258,7 +1258,8 @@ export function pointerTargets(
   state: TraceState | undefined,
   length: number,
   indexNames: Set<string>,
-  arrayName?: string
+  arrayName?: string,
+  source = ''
 ): Array<{ name: string; index: number }> {
   const targets: Array<{ name: string; index: number }> = [];
   const roles = stateSemanticRoles(state);
@@ -1326,11 +1327,12 @@ export function pointerLabels(
   state: TraceState | undefined,
   length: number,
   indexNames: Set<string>,
-  arrayName?: string
+  arrayName?: string,
+  source = ''
 ): Map<number, string[]> {
   const labels = new Map<number, string[]>();
 
-  for (const target of pointerTargets(state, length, indexNames, arrayName)) {
+  for (const target of pointerTargets(state, length, indexNames, arrayName, source)) {
     const names = labels.get(target.index) ?? [];
     names.push(target.name);
     labels.set(target.index, names);
@@ -1889,7 +1891,7 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
   }
 
   const indexNames = arrayIndexVariableNames(source, arrayName);
-  const targets = pointerTargets(state, value.length, indexNames, arrayName);
+  const targets = pointerTargets(state, value.length, indexNames, arrayName, source);
   const targetSignature = targets.map(target => target.name + ':' + target.index).sort().join('|');
   const arrayRef = useRef<HTMLDivElement | null>(null);
   const cellRefs = useRef<Record<number, HTMLDivElement | null>>({});
