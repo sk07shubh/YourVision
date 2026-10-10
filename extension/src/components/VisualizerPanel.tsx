@@ -1256,13 +1256,18 @@ export function pointerTargets(
   return targets;
 }
 
+function arrayNameMatches(candidate: string, requested?: string): boolean {
+  if (!requested) return true;
+  return requested.split('/').map(name => name.trim()).includes(candidate);
+}
+
 function matrixIndexVariableNames(source: string, arrayName?: string): { rows: Set<string>; columns: Set<string> } {
   const rows = new Set<string>();
   const columns = new Set<string>();
   if (!arrayName) return { rows, columns };
   const pattern = /([A-Za-z_$][\w$]*)\s*\[\s*([^\]]+)\s*\]\s*\[\s*([^\]]+)\s*\]/g;
   for (const match of source.matchAll(pattern)) {
-    if (match[1] !== arrayName) continue;
+    if (!arrayNameMatches(match[1] ?? '', arrayName)) continue;
     const rowExpr = match[2] ?? '';
     const colExpr = match[3] ?? '';
     for (const id of rowExpr.matchAll(/\b[A-Za-z_$][\w$]*\b/g)) rows.add(id[0]);
@@ -1320,7 +1325,7 @@ function accessedArrayIndices(state: TraceState | undefined, arrayName?: string)
   if (!isPlainObject(data) || !Array.isArray(data.executionEvents)) return set;
   for (const event of data.executionEvents) {
     if (!isPlainObject(event) || event.type !== 'ARRAY_ACCESS' || !isPlainObject(event.data)) continue;
-    if (arrayName && event.data.name !== arrayName) continue;
+    if (typeof event.data.name === 'string' && !arrayNameMatches(event.data.name, arrayName)) continue;
     if (!Array.isArray(event.data.indices)) continue;
     const index = event.data.indices[0];
     if (typeof index === 'number') set.add(index);
@@ -1347,7 +1352,7 @@ function changedArrayIndices(state?: TraceState, arrayName?: string): Set<number
   if (!isPlainObject(data)) return set;
 
   const collect = (changes: unknown, eventArrayName?: unknown) => {
-    if (arrayName && typeof eventArrayName === 'string' && eventArrayName !== arrayName) return;
+    if (typeof eventArrayName === 'string' && !arrayNameMatches(eventArrayName, arrayName)) return;
     if (!Array.isArray(changes)) return;
     for (const change of changes) {
       if (!isPlainObject(change) || !Array.isArray(change.indices)) continue;
@@ -1399,7 +1404,7 @@ function swappedArrayIndices(state?: TraceState, arrayName?: string): Set<number
   if (!isPlainObject(data)) return indices;
 
   const inspectWrite = (writeData: Obj) => {
-    if (arrayName && typeof writeData.name === 'string' && writeData.name !== arrayName) return;
+    if (typeof writeData.name === 'string' && !arrayNameMatches(writeData.name, arrayName)) return;
     if (!Array.isArray(writeData.changes)) return;
     const changes = writeData.changes.filter((change): change is Obj =>
       isPlainObject(change) &&
