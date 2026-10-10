@@ -373,6 +373,38 @@
 }
 
 
+/* Two active index pointers define a moving interval. Its endpoints are
+   emphasized separately so partition/window boundaries remain easy to read. */
+.yv-array-pointer-host .yv-cell-value.yv-cell-range {
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  background: color-mix(in srgb, var(--yv-accent), var(--yv-elevated) 94%);
+}
+.yv-array-pointer-host .yv-cell-value.yv-cell-range-start,
+.yv-array-pointer-host .yv-cell-value.yv-cell-range-end {
+  border-color: color-mix(in srgb, var(--yv-accent), var(--yv-border) 20%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--yv-accent), transparent 48%);
+}
+.yv-array-pointer-host .yv-cell-value.yv-cell-range-start {
+  border-top-left-radius: 7px;
+  border-bottom-left-radius: 7px;
+  animation: yv-range-boundary-enter 260ms ease-out;
+}
+.yv-array-pointer-host .yv-cell-value.yv-cell-range-end {
+  border-top-right-radius: 7px;
+  border-bottom-right-radius: 7px;
+  animation: yv-range-boundary-enter 260ms ease-out;
+}
+@keyframes yv-range-boundary-enter {
+  0% { box-shadow: inset 0 0 0 1px var(--yv-accent), 0 0 0 3px color-mix(in srgb, var(--yv-accent), transparent 78%); }
+  100% { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--yv-accent), transparent 48%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-array-pointer-host .yv-cell-value.yv-cell-range-start,
+  .yv-array-pointer-host .yv-cell-value.yv-cell-range-end {
+    animation: none;
+  }
+}
+
 /* Adjacent/value comparisons are emphasized only when the executed source line
    contains a comparison operator and the trace observed multiple array reads. */
 .yv-array-pointer-host .yv-cell-value.yv-cell-compared,
