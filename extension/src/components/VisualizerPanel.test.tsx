@@ -355,7 +355,7 @@ describe('deterministic semantic pointer roles', () => {
     );
     expect(html).toContain('>gh</div>');
     expect(html).toContain('>df</div>');
-    expect(pointerLabels(current, 6, new Set(['mid']), 'nums')).toEqual(
+    expect(pointerLabels(current, 6, new Set(['mid']), 'nums', source)).toEqual(
       new Map([[0, ['gh']], [5, ['df']]]),
     );
   });
