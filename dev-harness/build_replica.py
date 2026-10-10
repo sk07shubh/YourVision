@@ -27,6 +27,26 @@ LEETCODE_UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
 )
 
+# LeetCode's compiled CSS bundles (fetched once, inlined into replicas so the
+# page renders faithfully without depending on leetcode.com at view time).
+CSS_URLS = [
+    "https://leetcode.com/_next/static/css/001e89d2b970c068.css",
+    "https://leetcode.com/_next/static/css/56303832030f10b5.css",
+]
+
+
+def fetch_css() -> str:
+    """Download and concatenate LeetCode's real stylesheets."""
+    parts = []
+    for url in CSS_URLS:
+        out = subprocess.run(
+            ["curl", "-s", "-m", "20", url,
+             "-H", f"User-Agent: {LEETCODE_UA}"],
+            capture_output=True, text=True, check=True,
+        )
+        parts.append(out.stdout)
+    return "\n".join(parts)
+
 # ---------------------------------------------------------------------------
 # 1. Fetch the real page
 # ---------------------------------------------------------------------------
@@ -93,6 +113,10 @@ REPLICA_TEMPLATE = """<!DOCTYPE html>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>{title} - LeetCode Replica (YourVision dev)</title>
+<style>
+/* ==== REAL LEETCODE CSS (inlined from leetcode.com/_next/static/css) ==== */
+{real_css}
+</style>
 <style>
   /* Minimal replica chrome: real LeetCode DOM is preserved below.
      Only the stripped Next.js runtime is replaced with these basics. */
@@ -235,6 +259,10 @@ def build_replica(slug: str) -> str:
     if not question:
         raise RuntimeError("question object not found in __NEXT_DATA__")
 
+    print("Fetching real LeetCode CSS …")
+    real_css = fetch_css()
+    print(f"  got {len(real_css)//1024} KB of CSS")
+
     # Keep the real <body> DOM; drop Next.js runtime scripts that cannot
     # hydrate offline (they would throw and break the replica).
     body = re.search(r"<body[^>]*>(.*)</body>", html, re.DOTALL)
@@ -265,12 +293,16 @@ def build_replica(slug: str) -> str:
     )
 
     title = question.get("title", slug)
-    return REPLICA_TEMPLATE.format(
+    # NOTE: real_css is substituted AFTER .format() because CSS braces
+    # would collide with format placeholders.
+    page = REPLICA_TEMPLATE.format(
         title=escape(title),
+        real_css="__REAL_CSS__",
         body_html=body_html,
         monaco_loader=MONACO_LOADER,
         problem_json=problem_json,
     )
+    return page.replace("__REAL_CSS__", real_css)
 
 
 def main() -> None:
