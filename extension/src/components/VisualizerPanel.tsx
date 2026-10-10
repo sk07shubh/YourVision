@@ -1492,58 +1492,65 @@ function shiftedArrayIndices(state?: TraceState, arrayName?: string): Map<number
   return directions;
 }
 
-function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<string>() }: { value: unknown[]; state?: TraceState; source?: string; arrayName?: string; depth?: number; seen?: Set<string> }) {
-  const arrayRef = useRef<HTMLDivElement | null>(null);
-  const cellRefs = useRef<Array<HTMLDivElement | null>>([]);
-  const indexNames = arrayIndexVariableNames(source ?? '', arrayName);
-  const targets = pointerTargets(state, value.length, indexNames);
-  const targetSignature = targets.map(({ name, index }) => name + ':' + index).sort().join('|');
-  const previousIndices = useRef<Map<string, number>>(new Map());
-  const [pointerLayout, setPointerLayout] = useState<{ offsets: Record<string, number>; moving: Set<string> }>({
-    offsets: {},
-    moving: new Set<string>()
-  });
+function MatrixView({ value, state, source, arrayName, depth, seen }: {
+  value: unknown[][];
+  state?: TraceState;
+  source: string;
+  arrayName?: string;
+  depth: number;
+  seen: Set<string>;
+}) {
+  const rows = value;
+  const rowCount = rows.length;
+  const columnCount = Math.max(0, ...rows.map(row => row.length));
+  const readPaths = accessedArrayPaths(state, arrayName);
+  const writtenPaths = changedArrayPaths(state, arrayName);
+  const indexNames = matrixIndexVariableNames(source, arrayName);
+  const targets = matrixPointerTargets(state, rowCount, columnCount, indexNames);
+  const targetSignature = [
+    ...targets.rows.map(target => 'r:' + target.name + ':' + target.index),
+    ...targets.columns.map(target => 'c:' + target.name + ':' + target.index)
+  ].sort().join('|');
+  const matrixRef = useRef<HTMLDivElement | null>(null);
+  const matrixCellRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const previousMatrixTargets = useRef<Map<string, number>>(new Map());
+  const [matrixPointerLayout, setMatrixPointerLayout] = useState<{
+    x: Record<string, number>;
+    y: Record<string, number>;
+    movingRows: Set<string>;
+    movingColumns: Set<string>;
+  }>({ x: {}, y: {}, movingRows: new Set(), movingColumns: new Set() });
 
   useLayoutEffect(() => {
-    const host = arrayRef.current;
+    const host = matrixRef.current;
     if (!host) return;
+    const x: Record<string, number> = {};
+    const y: Record<string, number> = {};
+    const movingRows = new Set<string>();
+    const movingColumns = new Set<string>();
+    const next = new Map<string, number>();
 
-    const cellCenters: Record<string, number> = {};
-    const moving = new Set<string>();
-    const nextIndices = new Map<string, number>();
-    const targetsByIndex = new Map<number, typeof targets>();
-
-    for (const target of targets) {
-      const cell = cellRefs.current[target.index];
+    for (const target of targets.columns) {
+      const header = matrixCellRefs.current['__col,' + target.index];
+      if (!header) continue;
+      x[target.name] = header.offsetLeft + header.offsetWidth / 2;
+      const key = 'c:' + target.name;
+      const previous = previousMatrixTargets.current.get(key);
+      if (previous !== undefined && previous !== target.index) movingColumns.add(target.name);
+      next.set(key, target.index);
+    }
+    for (const target of targets.rows) {
+      const cell = matrixCellRefs.current[target.index + ',0'];
       if (!cell) continue;
-      cellCenters[target.name] = cell.offsetLeft + cell.offsetWidth / 2;
-      const previousIndex = previousIndices.current.get(target.name);
-      if (previousIndex !== undefined && previousIndex !== target.index) moving.add(target.name);
-      nextIndices.set(target.name, target.index);
-      const peers = targetsByIndex.get(target.index) ?? [];
-      peers.push(target);
-      targetsByIndex.set(target.index, peers);
+      y[target.name] = cell.offsetTop + cell.offsetHeight / 2;
+      const key = 'r:' + target.name;
+      const previous = previousMatrixTargets.current.get(key);
+      if (previous !== undefined && previous !== target.index) movingRows.add(target.name);
+      next.set(key, target.index);
     }
-
-    const offsets: Record<string, number> = {};
-    for (const target of targets) {
-      const peers = targetsByIndex.get(target.index) ?? [target];
-      const widths = peers.map(peer => Math.max(1, peer.name.length) * 6.2 + 10);
-      const peerIndex = peers.findIndex(peer => peer.name === target.name);
-      const totalWidth = widths.reduce((sum, width) => sum + width, 0) + Math.max(0, peers.length - 1) * 3;
-      const precedingWidth = widths.slice(0, peerIndex).reduce((sum, width) => sum + width + 3, 0);
-      const centeredOffset = precedingWidth + widths[peerIndex]! / 2 - totalWidth / 2;
-      offsets[target.name] = (cellCenters[target.name] ?? 0) + centeredOffset;
-    }
-
-    previousIndices.current = nextIndices;
-    setPointerLayout({ offsets, moving });
-  }, [targetSignature, state?.sequence, value.length]);
-
-  if (value.length > 0 && value.every(Array.isArray)) {
-    const rows = value as unknown[][];
-    const rowCount = rows.length;
-    const columnCount = Math.max(0, ...rows.map(row => row.length));
+    previousMatrixTargets  if (value.length > 0 && value.every(Array.isArray)) {
+    return <MatrixView value={value as unknown[][]} state={state} source={source ?? ''} arrayName={arrayName} depth={depth} seen={seen}/>;
+  }ow.length));
     const readPaths = accessedArrayPaths(state, arrayName);
     const writtenPaths = changedArrayPaths(state, arrayName);
     const indexNames = matrixIndexVariableNames(source ?? '', arrayName);
