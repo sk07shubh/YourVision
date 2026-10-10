@@ -1351,6 +1351,74 @@ function swappedArrayIndices(state?: TraceState, arrayName?: string): Set<number
   return indices;
 }
 
+function shiftedArrayIndices(state?: TraceState, arrayName?: string): Map<number, 'left' | 'right'> {
+  const directions = new Map<number, 'left' | 'right'>();
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data)) return directions;
+
+  const inspectWrite = (writeData: Obj) => {
+    if (arrayName && typeof writeData.name === 'string' && writeData.name !== arrayName) return;
+    if (!Array.isArray(writeData.changes)) return;
+    const changes = writeData.changes.filter((change): change is Obj =>
+      isPlainObject(change) &&
+      Array.isArray(change.indices) &&
+      change.indices.length === 1 &&
+      typeof change.indices[0] === 'number' &&
+      Number.isInteger(change.indices[0]) &&
+      'before' in change &&
+      'after' in change
+    ).map(change => ({
+      index: (change.indices as number[])[0]!,
+      before: change.before,
+      after: change.after
+    })).sort((a, b) => a.index - b.index);
+
+    // Two writes are ambiguous with a swap. Three or more contiguous changed
+    // cells are needed before calling the movement a shift.
+    if (changes.length < 3) return;
+    for (let i = 1; i < changes.length; i++) {
+      if (changes[i]!.index !== changes[i - 1]!.index + 1) return;
+    }
+
+    const shiftsRight = changes.slice(1).every((change, i) =>
+      valueChanged(change.before, change.after) &&
+      !valueChanged(change.after, changes[i]!.before)
+    ) && changes.slice(1).every((change, i) =>
+      !valueChanged(change.after, changes[i]!.before)
+    );
+    const shiftsLeft = changes.slice(0, -1).every((change, i) =>
+      valueChanged(change.before, change.after) &&
+      !valueChanged(change.after, changes[i + 1]!.before)
+    ) && changes.slice(0, -1).every((change, i) =>
+      !valueChanged(change.after, changes[i + 1]!.before)
+    );
+
+    // Compare destination values to the neighboring cell's previous value.
+    const rightMatches = changes.slice(1).every((change, i) =>
+      !valueChanged(change.after, changes[i]!.before)
+    );
+    const leftMatches = changes.slice(0, -1).every((change, i) =>
+      !valueChanged(change.after, changes[i + 1]!.before)
+    );
+
+    if (rightMatches && !leftMatches) {
+      for (const change of changes) directions.set(change.index, 'right');
+    } else if (leftMatches && !rightMatches) {
+      for (const change of changes) directions.set(change.index, 'left');
+    }
+  };
+
+  if (state?.lastEvent?.type === 'ARRAY_WRITE') inspectWrite(data);
+  if (Array.isArray(data.executionEvents)) {
+    for (const event of data.executionEvents) {
+      if (isPlainObject(event) && event.type === 'ARRAY_WRITE' && isPlainObject(event.data)) {
+        inspectWrite(event.data);
+      }
+    }
+  }
+  return directions;
+}
+
 function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<string>() }: { value: unknown[]; state?: TraceState; source?: string; arrayName?: string; depth?: number; seen?: Set<string> }) {
   const arrayRef = useRef<HTMLDivElement | null>(null);
   const cellRefs = useRef<Array<HTMLDivElement | null>>([]);
@@ -1406,6 +1474,7 @@ function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<
   const changed = changedArrayIndices(state, arrayName);
   const accessed = accessedArrayIndices(state, arrayName);
   const swapped = swappedArrayIndices(state, arrayName);
+  const shifted = shiftedArrayIndices(state, arrayName);
   // With two or more source-grounded array indices, softly mark the active
   // interval. This works for windows and candidate ranges without naming an algorithm.
   const rangeStart = targets.length >= 2 ? Math.min(...targets.map(target => target.index)) : -1;
@@ -1432,7 +1501,7 @@ function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<
             key={`${i}-${state?.sequence ?? state?.line ?? 'initial'}`}
             className={`yv-cell-value ${rangeStart >= 0 && i >= rangeStart && i <= rangeEnd ? 'yv-cell-range ' : ''}${changed.has(i) ? 'yv-cell-written ' : ''}${accessed.has(i) ? 'yv-cell-read ' : ''}${swapped.has(i) ? 'yv-cell-swapped' : ''}`}
           >
-            <div className={`yv-array-cell-content ${swapped.has(i) ? 'yv-array-cell-content-swapped' : ''}`}>
+            <div className={`yv-array-cell-content ${swapped.has(i) ? 'yv-array-cell-content-swapped' : ''}${shifted.has(i) ? ' yv-array-cell-content-shift-' + shifted.get(i) : ''}`}>
               <DataValue value={v} state={state} source={source ?? ''} name={arrayName} depth={depth + 1} seen={seen}/>
             </div>
           </div>
