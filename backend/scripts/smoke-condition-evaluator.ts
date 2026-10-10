@@ -207,4 +207,45 @@ if (
     );
 }
 
+const elseIfSource = [
+    "class Solution {",
+    "    int search(int[] nums, int target, int mid) {",
+    "        if (nums[mid] == target) {",
+    "        }else if(nums[mid] < target){",
+    "            return -1;",
+    "        }",
+    "        return -1;",
+    "    }",
+    "}"
+].join("\\n");
+const elseIfTrace: ExecutionTrace = {
+    version: 1,
+    events: [{
+        sequence: 1,
+        type: "STEP",
+        line: 4,
+        method: "search",
+        depth: 1,
+        data: {
+            variables: {
+                nums: { $arrayId: "nums-1", $type: "int[]", values: [-1, 0, 3, 5, 9, 12] },
+                target: 9,
+                mid: 2
+            },
+            executionEvents: [{
+                sequence: 0,
+                type: "ARRAY_ACCESS",
+                line: 4,
+                method: "search",
+                depth: 1,
+                data: { name: "nums", arrayId: "nums-1", indices: [2], value: 3, kind: "read" }
+            }]
+        }
+    }]
+};
+const elseIfResult = enrichTrace(elseIfTrace, elseIfSource).events[0]?.data?.conditionResult;
+if (elseIfResult !== true) {
+    throw new Error("else-if condition was not evaluated: " + JSON.stringify({ elseIfResult }));
+}
+
 console.log("condition evaluator regression passed");
