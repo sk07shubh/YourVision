@@ -70,6 +70,8 @@
 /* Array pointer transitions: keep cells and index labels stationary. */
 .yv-array-pointer-host {
   position: relative;
+}
+.yv-array-pointer-host.has-pointers {
   padding-top: 22px;
 }
 .yv-pointer-layer {
