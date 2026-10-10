@@ -1364,6 +1364,9 @@ function changedArrayIndices(state?: TraceState, arrayName?: string): Set<number
     if (!Array.isArray(changes)) return;
     for (const change of changes) {
       if (!isPlainObject(change) || !Array.isArray(change.indices)) continue;
+      // A trace may report a write operation even when the stored value is
+      // unchanged. Don't replay a "changed cell" animation for a no-op write.
+      if ('before' in change && 'after' in change && !valueChanged(change.before, change.after)) continue;
       const i = change.indices[0];
       if (typeof i === 'number' && Number.isInteger(i) && i >= 0) set.add(i);
     }
