@@ -1283,27 +1283,26 @@ function accessedArrayPaths(state: TraceState | undefined, arrayName?: string): 
   return paths;
 }
 
-function changedArrayIndices(state?: TraceState): Set<number> {
+function changedArrayIndices(state?: TraceState, arrayName?: string): Set<number> {
   const set = new Set<number>();
   const data = state?.lastEvent?.data;
   if (!isPlainObject(data)) return set;
 
-  const collect = (changes: unknown) => {
+  const collect = (changes: unknown, eventArrayName?: unknown) => {
+    if (arrayName && typeof eventArrayName === 'string' && eventArrayName !== arrayName) return;
     if (!Array.isArray(changes)) return;
-    for (const c of changes) {
-      if (!isPlainObject(c) || !Array.isArray(c.indices)) continue;
-      const i = c.indices[0];
-      if (typeof i === 'number') set.add(i);
+    for (const change of changes) {
+      if (!isPlainObject(change) || !Array.isArray(change.indices)) continue;
+      const i = change.indices[0];
+      if (typeof i === 'number' && Number.isInteger(i) && i >= 0) set.add(i);
     }
   };
 
-  collect(data.changes);
+  collect(data.changes, data.name);
   if (Array.isArray(data.executionEvents)) {
     for (const event of data.executionEvents) {
-      if (!isPlainObject(event)) continue;
-      if (event.type === 'ARRAY_WRITE' && isPlainObject(event.data)) {
-        collect(event.data.changes);
-      }
+      if (!isPlainObject(event) || event.type !== 'ARRAY_WRITE' || !isPlainObject(event.data)) continue;
+      collect(event.data.changes, event.data.name);
     }
   }
 
@@ -1360,7 +1359,9 @@ function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<
 
   if (value.every(Array.isArray)) return <div className="yv-matrix">{value.map((row,r)=><div className="yv-array" key={r}>{(row as unknown[]).map((v,i)=><div className="yv-cell" key={i}><div className="yv-cell-value"><DataValue value={v} state={state} source={source ?? ''} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">[{r},{i}]</div></div>)}</div>)}</div>;
 
-  const changed = changedArrayIndices(state);
+  // Reads and writes are independent trace facts: a read gets a cool blue
+  // focus, while only an ARRAY_WRITE checkpoint gets the green write pulse.
+  const changed = changedArrayIndices(state, arrayName);
   const accessed = accessedArrayIndices(state, arrayName);
   const pointerMarkers = targets.map(target => {
     const x = pointerLayout.offsets[target.name] ?? 0;
@@ -1380,7 +1381,10 @@ function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<
       <div className="yv-pointer-layer" aria-hidden="true">{pointerMarkers}</div>
       {value.map((v, i) => (
         <div className="yv-cell" key={i} ref={element => { cellRefs.current[i] = element; }}>
-          <div className={`yv-cell-value ${changed.has(i) ? 'yv-cell-changed ' : ''}${accessed.has(i) ? 'yv-cell-accessed' : ''}`}>
+          <div
+            key={`${i}-${state?.sequence ?? state?.line ?? 'initial'}`}
+            className={`yv-cell-value ${changed.has(i) ? 'yv-cell-written ' : ''}${accessed.has(i) ? 'yv-cell-read' : ''}`}
+          >
             <DataValue value={v} state={state} source={source ?? ''} name={arrayName} depth={depth + 1} seen={seen}/>
           </div>
           <div className="yv-cell-index">{i}</div>
