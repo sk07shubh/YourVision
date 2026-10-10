@@ -65,3 +65,45 @@
 .yv-ds-result-transition{color:var(--yv-accent);font-weight:700}
 .yv-ds-result-new{color:var(--yv-text);font-weight:700}
 .yv-ds-result-position{color:var(--yv-muted);font-size:11px;overflow:hidden;text-overflow:ellipsis}
+
+
+/* Array pointer transitions: keep cells and index labels stationary. */
+.yv-array-pointer-host {
+  position: relative;
+  padding-top: 22px;
+}
+.yv-pointer-layer {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 19px;
+  pointer-events: none;
+  z-index: 2;
+}
+.yv-pointer-layer .yv-pointer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  width: max-content;
+  max-width: none;
+  margin: 0;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--yv-accent), transparent 91%);
+  color: var(--yv-accent);
+  font-size: 10px;
+  line-height: 15px;
+  text-align: center;
+  white-space: nowrap;
+  will-change: transform;
+  animation: none;
+  transition: none;
+}
+.yv-pointer-layer .yv-pointer-moving {
+  transition: transform 180ms cubic-bezier(.4, 0, .2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-pointer-layer .yv-pointer-moving {
+    transition: none;
+  }
+}
