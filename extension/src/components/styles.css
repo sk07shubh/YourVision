@@ -165,3 +165,13 @@
     animation: none;
   }
 }
+
+
+/* Soft interval shading between live pointers (window / candidate range). */
+.yv-array-pointer-host .yv-cell-value.yv-cell-range {
+  border-bottom-color: color-mix(in srgb, #3b82f6, var(--yv-border) 20%);
+  background: color-mix(in srgb, #3b82f6, var(--yv-elevated) 96%);
+}
+.yv-array-pointer-host .yv-cell-value.yv-cell-range.yv-cell-read {
+  background: color-mix(in srgb, #3b82f6, var(--yv-elevated) 90%);
+}
