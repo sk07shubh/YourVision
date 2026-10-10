@@ -1347,7 +1347,7 @@ function accessedArrayPaths(state: TraceState | undefined, arrayName?: string): 
   if (!isPlainObject(data) || !Array.isArray(data.executionEvents)) return paths;
   for (const event of data.executionEvents) {
     if (!isPlainObject(event) || event.type !== 'ARRAY_ACCESS' || !isPlainObject(event.data)) continue;
-    if (arrayName && event.data.name !== arrayName) continue;
+    if (arrayName && (typeof event.data.name !== 'string' || !arrayNameMatches(event.data.name, arrayName))) continue;
     if (!Array.isArray(event.data.indices) || !event.data.indices.every((x) => typeof x === 'number')) continue;
     paths.add((event.data.indices as number[]).join(','));
   }
@@ -1386,7 +1386,7 @@ function changedArrayPaths(state?: TraceState, arrayName?: string): Set<string> 
   if (!isPlainObject(data)) return paths;
 
   const collect = (changes: unknown, eventArrayName?: unknown) => {
-    if (arrayName && typeof eventArrayName === 'string' && eventArrayName !== arrayName) return;
+    if (arrayName && (typeof eventArrayName !== 'string' || !arrayNameMatches(eventArrayName, arrayName))) return;
     if (!Array.isArray(changes)) return;
     for (const change of changes) {
       if (!isPlainObject(change) || !Array.isArray(change.indices) ||
