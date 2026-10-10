@@ -429,6 +429,49 @@ describe('semantic roles in rendered visualization', () => {
     expect(html).toContain('[1,2]');
   });
 
+  it('does not invent an active matrix cell while row and column assignments are between checkpoints', () => {
+    const current = state({
+      variables: { row: 0, col: 1, mid: 2, n: 4 },
+      lastEvent: { type: 'STEP', line: 13, data: {
+        executionEvents: [
+          { type: 'VARIABLE_UPDATE', data: { name: 'row', value: 0 } },
+        ],
+        semanticRoles: [
+          { name: 'row', role: 'pointer', confidence: 0.99, evidence: 'first index in matrix access', structureName: 'matrix' },
+          { name: 'col', role: 'pointer', confidence: 0.99, evidence: 'second index in matrix access', structureName: 'matrix' },
+        ],
+      } },
+    });
+    const html = renderToStaticMarkup(
+      <ArrayView value={[[1, 3, 5, 7], [10, 11, 16, 20], [23, 30, 34, 60]]}
+        state={current} source="matrix[row][col]" arrayName="matrix" />,
+    );
+    expect(html).not.toContain('yv-matrix-cell-active');
+    expect(html).not.toContain('data-matrix-intersection=');
+  });
+
+  it('uses the recorded two-dimensional ARRAY_ACCESS as the active cell', () => {
+    const current = state({
+      variables: { row: 0, col: 2, mid: 2, n: 4 },
+      lastEvent: { type: 'STEP', line: 15, data: {
+        executionEvents: [
+          { type: 'ARRAY_ACCESS', data: { name: 'matrix', indices: [0, 2], value: 5, kind: 'read' } },
+        ],
+        semanticRoles: [
+          { name: 'row', role: 'pointer', confidence: 0.99, evidence: 'first index in matrix access', structureName: 'matrix' },
+          { name: 'col', role: 'pointer', confidence: 0.99, evidence: 'second index in matrix access', structureName: 'matrix' },
+        ],
+      } },
+    });
+    const html = renderToStaticMarkup(
+      <ArrayView value={[[1, 3, 5, 7], [10, 11, 16, 20], [23, 30, 34, 60]]}
+        state={current} source="matrix[row][col]" arrayName="matrix" />,
+    );
+    expect(html.match(/yv-matrix-cell-active/g)).toHaveLength(1);
+    expect(html).toContain('data-matrix-cell="[0,2]"');
+    expect(html).toContain('yv-matrix-cell-active');
+  });
+
   it('keeps matrix traversal pointers separate from outer answer-search boundaries', () => {
     const current = state({
       variables: { sd: 9, hg: 15, mid: 12, row: 1, col: 2 },
