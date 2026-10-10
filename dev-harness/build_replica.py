@@ -241,11 +241,91 @@ REPLICA_TEMPLATE = """<!DOCTYPE html>
     }}
   }});
 
+  /* ---- Full console interactivity: Run wired to the real backend ----
+     Mirrors the extension's own flow: editor code + test cases go to
+     POST http://127.0.0.1:3000/visualize, and the trace/result renders
+     in the Test Result tab. Requires `npm run dev` in backend/. */
+  const BACKEND = 'http://127.0.0.1:3000';
+
+  async function backendAlive() {{
+    try {{
+      const r = await fetch(BACKEND + '/health');
+      return r.ok;
+    }} catch {{ return false; }}
+  }}
+
+  function collectTestcase() {{
+    // Gather the currently visible test-case inputs as the backend expects.
+    const tas = [...document.querySelectorAll(
+      'textarea[data-e2e-locator="console-testcase-input"]'
+    )];
+    return tas.map((ta) => ta.value);
+  }}
+
+  function ensureRunUI() {{
+    // Add Run / Test-Result UI to the injected console if not present.
+    let bar = document.getElementById('yv-runbar');
+    if (bar) return bar;
+    const consoleEl = document.getElementById('yv-console');
+    if (!consoleEl) return null;
+    bar = document.createElement('div');
+    bar.id = 'yv-runbar';
+    bar.style.cssText = 'display:flex;gap:8px;align-items:center;margin:10px 0;';
+    bar.innerHTML =
+      '<button id="yv-run" style="background:#2cbb5d;border:none;color:#fff;' +
+      'padding:8px 22px;border-radius:6px;font-weight:600;cursor:pointer;">Run</button>' +
+      '<button id="yv-result-tab" style="background:#333;border:1px solid #4a4a4a;' +
+      'color:#eff1f6;padding:8px 16px;border-radius:6px;cursor:pointer;">Test Result</button>' +
+      '<span id="yv-backend" style="font-size:12px;color:#a3a3a3;"></span>';
+    consoleEl.prepend(bar);
+    const out = document.createElement('div');
+    out.id = 'yv-result';
+    out.style.cssText = 'display:none;background:#1a1a1a;border:1px solid #3a3a3a;' +
+      'border-radius:6px;padding:10px;font-family:monospace;font-size:12px;' +
+      'white-space:pre-wrap;max-height:220px;overflow:auto;margin-top:8px;';
+    consoleEl.appendChild(out);
+
+    bar.querySelector('#yv-run').addEventListener('click', runCode);
+    bar.querySelector('#yv-result-tab').addEventListener('click', () => {{
+      const o = document.getElementById('yv-result');
+      o.style.display = o.style.display === 'none' ? 'block' : 'none';
+    }});
+    backendAlive().then((ok) => {{
+      bar.querySelector('#yv-backend').textContent = ok
+        ? '● backend connected (127.0.0.1:3000)'
+        : '○ backend not reachable — start it with `npm run dev` in backend/';
+      bar.querySelector('#yv-backend').style.color = ok ? '#2cbb5d' : '#ff375f';
+    }});
+    return bar;
+  }}
+
+  async function runCode() {{
+    const out = document.getElementById('yv-result');
+    const code = window.yvEditor ? window.yvEditor.getValue() : '';
+    const testcase = collectTestcase();
+    out.style.display = 'block';
+    out.textContent = 'Running…';
+    try {{
+      const res = await fetch(BACKEND + '/visualize', {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify({{ language: 'java', source: code, testcase }}),
+      }});
+      const json = await res.json();
+      const ex = json.execution || json;
+      out.textContent = JSON.stringify(ex, null, 2).slice(0, 4000);
+      status('Ran — ' + (ex.kind || ex.status || 'done'));
+    }} catch (e) {{
+      out.textContent = 'Backend error: ' + e.message +
+        '\\nIs the backend running? (cd backend && npm run dev)';
+      status('Backend unreachable');
+    }}
+  }}
+
   /* ---- Working tab switching (Description/Solutions/Editorial/...) ----
      The extension injects its own tab button into this bar and manages
      selection state, so the native tabs must behave like the real site:
-     click switches the selected button and swaps the content host. */
-  function initTabs() {{
+     click switches the selected button and swaps the content host. */  function initTabs() {{
     const tabList = document.querySelector(
       '.flexlayout__tabset_tabbar_inner_tab_container_top'
     );
@@ -305,9 +385,10 @@ REPLICA_TEMPLATE = """<!DOCTYPE html>
   initTabs();
 
   // The SSR HTML has no live editor; mount ours once DOM is ready.
+  function boot() {{ mountMonaco(); mountConsole(); ensureRunUI(); }}
   if (document.readyState === 'loading')
-    document.addEventListener('DOMContentLoaded', () => {{ mountMonaco(); mountConsole(); }});
-  else {{ mountMonaco(); mountConsole(); }}
+    document.addEventListener('DOMContentLoaded', boot);
+  else boot();
 }})();
 </script>
 </body>
