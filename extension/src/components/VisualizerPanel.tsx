@@ -1638,8 +1638,12 @@ function ArrayView({ value, state, source, arrayName, depth, seen }: {
   depth: number;
   seen: Set<string>;
 }) {
-  if (value.length > 0 && value.every(Array.isArray)) {
-    return <MatrixView value={value as unknown[][]} state={state} source={source} arrayName={arrayName} depth={depth} seen={seen}/>;
+  // A Java 2D array may arrive as raw nested arrays or as row-level array
+  // snapshots. Normalize both shapes into a single grid without flattening it.
+  const matrixLike = value.length > 0 && value.every(row => Array.isArray(row) || isArraySnapshot(row));
+  if (matrixLike) {
+    const rows = value.map(row => Array.isArray(row) ? row : isArraySnapshot(row) ? row.values : []);
+    return <MatrixView value={rows} state={state} source={source} arrayName={arrayName} depth={depth} seen={seen}/>;
   }
 
   const indexNames = arrayIndexVariableNames(source, arrayName);
