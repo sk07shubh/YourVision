@@ -2333,6 +2333,10 @@ function DataValue({
     return <div className="yv-code">…</div>;
   }
 
+  if (isPlainObject(value) && typeof value.$stringValue === 'string') {
+    return <StringView value={value.$stringValue} state={state} name={name ?? ''} />;
+  }
+
   if (isMapSnapshot(value)) {
     return <MapView value={value} state={state} source={source} depth={depth} seen={seen}/>;
   }
@@ -2375,6 +2379,36 @@ function isStructuralObject(value: unknown): value is Obj {
     (('left' in fields || 'right' in fields) && ('val' in fields || 'value' in fields));
 }
 
+export function StringView({ value, state, name }: { value: string; state?: TraceState; name: string }) {
+  const data = isPlainObject(state?.lastEvent?.data) ? state.lastEvent.data : {};
+  const executionEvents = Array.isArray(data.executionEvents) ? data.executionEvents : [];
+  const accessed = new Set<number>();
+  for (const event of executionEvents) {
+    if (!isPlainObject(event) || event.type !== 'ARRAY_ACCESS' || !isPlainObject(event.data)) continue;
+    const eventName = typeof event.data.name === 'string' ? event.data.name : undefined;
+    const indices = Array.isArray(event.data.indices) ? event.data.indices : [];
+    if (eventName === name && typeof indices[0] === 'number' && Number.isInteger(indices[0])) {
+      accessed.add(indices[0]);
+    }
+  }
+  // Java String indexing and charAt use UTF-16 code units, so split('') keeps
+  // visual cell indices aligned with the runtime trace.
+  const characters = value.split('');
+  return (
+    <div className="yv-array" data-string-structure={name}>
+      {characters.map((character, index) => (
+        <div className="yv-array-cell-wrap" key={index}>
+          <div className={`yv-array-cell ${accessed.has(index) ? 'yv-cell-read' : ''}`} data-string-index={index}>
+            <div className="yv-array-cell-content">{character === ' ' ? '␠' : character}</div>
+          </div>
+          <div className="yv-cell-index">{index}</div>
+        </div>
+      ))}
+      {!characters.length && <div className="yv-empty">Empty string</div>}
+    </div>
+  );
+}
+
 function DataStructures({ state, source }: { state?: TraceState; source: string }) {
   const namedObjectIds = new Map<string, string[]>();
 
@@ -2399,6 +2433,13 @@ function DataStructures({ state, source }: { state?: TraceState; source: string 
     } else {
       grouped.set(`array:${id}`, { names: [name], value });
     }
+  }
+
+  // Strings remain ordinary variables as well as being shown as indexed,
+  // read-only character sequences in the Data Structures section.
+  for (const [name, value] of Object.entries(state?.variables ?? {})) {
+    if (name === 'this' || typeof value !== 'string') continue;
+    grouped.set(`string:${name}`, { names: [name], value: { $stringValue: value } });
   }
 
   for (const [name, value] of Object.entries(state?.dataStructures ?? {})) {
