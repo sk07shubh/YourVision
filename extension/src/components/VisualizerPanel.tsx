@@ -1450,6 +1450,36 @@ function swappedArrayIndices(state?: TraceState, arrayName?: string): Set<number
   return indices;
 }
 
+function copiedArrayIndices(state: TraceState | undefined, arrayName?: string): Set<number> {
+  const indices = new Set<number>();
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data) || !Array.isArray(data.executionEvents)) return indices;
+
+  const events = data.executionEvents.filter(isPlainObject);
+  const sourceReads = events.filter(event =>
+    event.type === 'ARRAY_ACCESS' &&
+    isPlainObject(event.data) &&
+    typeof event.data.name === 'string' &&
+    !arrayNameMatches(event.data.name, arrayName)
+  );
+  if (sourceReads.length === 0) return indices;
+
+  for (const event of events) {
+    if (event.type !== 'ARRAY_WRITE' || !isPlainObject(event.data)) continue;
+    const write = event.data;
+    if (typeof write.name === 'string' && !arrayNameMatches(write.name, arrayName)) continue;
+    if (!Array.isArray(write.changes)) continue;
+    for (const change of write.changes) {
+      if (!isPlainObject(change) || !Array.isArray(change.indices) ||
+          change.indices.length !== 1 || typeof change.indices[0] !== 'number' ||
+          !Number.isInteger(change.indices[0]) || !('before' in change) || !('after' in change)) continue;
+      // Only animate a genuine value update, not a repeated write of the same value.
+      if (valueChanged(change.before, change.after)) indices.add(change.indices[0]);
+    }
+  }
+  return indices;
+}
+
 function rotatedArrayIndices(state?: TraceState, arrayName?: string): Map<number, 'left' | 'right'> {
   const directions = new Map<number, 'left' | 'right'>();
   const data = state?.lastEvent?.data;
@@ -1728,6 +1758,7 @@ function ArrayView({ value, state, source, arrayName, depth, seen }: {
   const compared = isComparisonStatement(source, state) && accessed.size >= 2 ? accessed : new Set<number>();
   const swapped = swappedArrayIndices(state, arrayName);
   const rotated = rotatedArrayIndices(state, arrayName);
+  const copied = copiedArrayIndices(state, arrayName);
   const shifted = shiftedArrayIndices(state, arrayName);
   const rangeStart = targets.length >= 2 ? Math.min(...targets.map(target => target.index)) : -1;
   const rangeEnd = targets.length >= 2 ? Math.max(...targets.map(target => target.index)) : -1;
@@ -1747,7 +1778,7 @@ function ArrayView({ value, state, source, arrayName, depth, seen }: {
         <div className="yv-cell" key={index} ref={element => { cellRefs.current[index] = element; }}>
           <div
             key={`${index}-${state?.sequence ?? state?.line ?? 'initial'}`}
-            className={`yv-cell-value ${rangeStart >= 0 && index >= rangeStart && index <= rangeEnd ? 'yv-cell-range ' : ''}${changed.has(index) ? 'yv-cell-written ' : ''}${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-cell-compared ' : ''}${rotated.has(index) ? 'yv-cell-rotated-' + rotated.get(index) + ' ' : ''}${swapped.has(index) ? 'yv-cell-swapped' : ''}`}
+            className={`yv-cell-value ${rangeStart >= 0 && index >= rangeStart && index <= rangeEnd ? 'yv-cell-range ' : ''}${changed.has(index) ? 'yv-cell-written ' : ''}${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-cell-compared ' : ''}${copied.has(index) ? 'yv-cell-copied ' : ''}${rotated.has(index) ? 'yv-cell-rotated-' + rotated.get(index) + ' ' : ''}${swapped.has(index) ? 'yv-cell-swapped' : ''}`}
           >
             <div className={`yv-array-cell-content ${swapped.has(index) ? 'yv-array-cell-content-swapped' : ''}${rotated.has(index) ? ' yv-array-cell-content-rotate-' + rotated.get(index) : shifted.has(index) ? ' yv-array-cell-content-shift-' + shifted.get(index) : ''}`}>
               <DataValue value={item} state={state} source={source} name={arrayName} depth={depth + 1} seen={seen}/>
