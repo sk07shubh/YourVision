@@ -109,3 +109,36 @@
     transition: none;
   }
 }
+
+
+/* Array cell operation feedback: read and write are deliberately different. */
+.yv-array-pointer-host .yv-cell-value.yv-cell-read {
+  border-color: color-mix(in srgb, #3b82f6, var(--yv-border) 35%);
+  background: color-mix(in srgb, #3b82f6, var(--yv-elevated) 93%);
+  animation: yv-array-read-pulse 420ms ease-out;
+}
+.yv-array-pointer-host .yv-cell-value.yv-cell-written {
+  border-color: color-mix(in srgb, var(--yv-success), var(--yv-border) 22%);
+  background: color-mix(in srgb, var(--yv-success), var(--yv-elevated) 89%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--yv-success), transparent 30%);
+  animation: yv-array-write-pulse 520ms cubic-bezier(.2, .75, .25, 1);
+}
+.yv-array-pointer-host .yv-cell-value.yv-cell-read.yv-cell-written {
+  border-color: var(--yv-success);
+  background: color-mix(in srgb, var(--yv-success), var(--yv-elevated) 89%);
+}
+@keyframes yv-array-read-pulse {
+  0% { background: color-mix(in srgb, #3b82f6, var(--yv-elevated) 78%); }
+  100% { background: color-mix(in srgb, #3b82f6, var(--yv-elevated) 93%); }
+}
+@keyframes yv-array-write-pulse {
+  0% { transform: scale(1); background: var(--yv-elevated); }
+  38% { transform: scale(1.035); background: color-mix(in srgb, var(--yv-success), var(--yv-elevated) 74%); }
+  100% { transform: scale(1); background: color-mix(in srgb, var(--yv-success), var(--yv-elevated) 89%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-array-pointer-host .yv-cell-value.yv-cell-read,
+  .yv-array-pointer-host .yv-cell-value.yv-cell-written {
+    animation: none;
+  }
+}
