@@ -217,7 +217,7 @@ const elseIfSource = [
     "        return -1;",
     "    }",
     "}"
-].join("\\n");
+].join("\n");
 const elseIfTrace: ExecutionTrace = {
     version: 1,
     events: [{
