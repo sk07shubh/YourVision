@@ -1380,19 +1380,6 @@ function shiftedArrayIndices(state?: TraceState, arrayName?: string): Map<number
       if (changes[i]!.index !== changes[i - 1]!.index + 1) return;
     }
 
-    const shiftsRight = changes.slice(1).every((change, i) =>
-      valueChanged(change.before, change.after) &&
-      !valueChanged(change.after, changes[i]!.before)
-    ) && changes.slice(1).every((change, i) =>
-      !valueChanged(change.after, changes[i]!.before)
-    );
-    const shiftsLeft = changes.slice(0, -1).every((change, i) =>
-      valueChanged(change.before, change.after) &&
-      !valueChanged(change.after, changes[i + 1]!.before)
-    ) && changes.slice(0, -1).every((change, i) =>
-      !valueChanged(change.after, changes[i + 1]!.before)
-    );
-
     // Compare destination values to the neighboring cell's previous value.
     const rightMatches = changes.slice(1).every((change, i) =>
       !valueChanged(change.after, changes[i]!.before)
