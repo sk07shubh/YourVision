@@ -2409,7 +2409,7 @@ export function StringView({ value, state, name }: { value: string; state?: Trac
   );
 }
 
-function DataStructures({ state, source }: { state?: TraceState; source: string }) {
+export function DataStructures({ state, source }: { state?: TraceState; source: string }) {
   const namedObjectIds = new Map<string, string[]>();
 
   for (const [name, value] of Object.entries(state?.variables ?? {})) {
