@@ -175,3 +175,28 @@
 .yv-array-pointer-host .yv-cell-value.yv-cell-range.yv-cell-read {
   background: color-mix(in srgb, #3b82f6, var(--yv-elevated) 90%);
 }
+
+
+/* Multi-cell shifts animate the values, not the fixed array boxes or indices. */
+.yv-array-cell-content-shift-right {
+  animation: yv-array-shift-right 420ms cubic-bezier(.2, .75, .25, 1);
+}
+.yv-array-cell-content-shift-left {
+  animation: yv-array-shift-left 420ms cubic-bezier(.2, .75, .25, 1);
+}
+@keyframes yv-array-shift-right {
+  0% { opacity: .35; transform: translateX(-7px); }
+  65% { opacity: 1; transform: translateX(1px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+@keyframes yv-array-shift-left {
+  0% { opacity: .35; transform: translateX(7px); }
+  65% { opacity: 1; transform: translateX(-1px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-array-cell-content-shift-right,
+  .yv-array-cell-content-shift-left {
+    animation: none;
+  }
+}
