@@ -1661,32 +1661,44 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
   useLayoutEffect(() => {
     const host = matrixRef.current;
     if (!host) return;
-    const x: Record<string, number> = {};
-    const y: Record<string, number> = {};
-    const movingRows = new Set<string>();
-    const movingColumns = new Set<string>();
-    const next = new Map<string, number>();
 
-    for (const target of targets.columns) {
-      const header = matrixCellRefs.current['__col,' + target.index];
-      if (!header) continue;
-      x[target.name] = header.offsetLeft + header.offsetWidth / 2;
-      const key = 'c:' + target.name;
-      const previous = previousMatrixTargets.current.get(key);
-      if (previous !== undefined && previous !== target.index) movingColumns.add(target.name);
-      next.set(key, target.index);
-    }
-    for (const target of targets.rows) {
-      const cell = matrixCellRefs.current[target.index + ',0'];
-      if (!cell) continue;
-      y[target.name] = cell.offsetTop + cell.offsetHeight / 2;
-      const key = 'r:' + target.name;
-      const previous = previousMatrixTargets.current.get(key);
-      if (previous !== undefined && previous !== target.index) movingRows.add(target.name);
-      next.set(key, target.index);
-    }
-    previousMatrixTargets.current = next;
-    setMatrixPointerLayout({ x, y, movingRows, movingColumns });
+    const layoutPointers = () => {
+      const x: Record<string, number> = {};
+      const y: Record<string, number> = {};
+      const movingRows = new Set<string>();
+      const movingColumns = new Set<string>();
+      const next = new Map<string, number>();
+
+      for (const target of targets.columns) {
+        const header = matrixCellRefs.current['__col,' + target.index];
+        if (!header) continue;
+        x[target.name] = header.offsetLeft + header.offsetWidth / 2;
+        const key = 'c:' + target.name;
+        const previous = previousMatrixTargets.current.get(key);
+        if (previous !== undefined && previous !== target.index) movingColumns.add(target.name);
+        next.set(key, target.index);
+      }
+      for (const target of targets.rows) {
+        const cell = matrixCellRefs.current[target.index + ',0'];
+        if (!cell) continue;
+        y[target.name] = cell.offsetTop + cell.offsetHeight / 2;
+        const key = 'r:' + target.name;
+        const previous = previousMatrixTargets.current.get(key);
+        if (previous !== undefined && previous !== target.index) movingRows.add(target.name);
+        next.set(key, target.index);
+      }
+      previousMatrixTargets.current = next;
+      setMatrixPointerLayout({ x, y, movingRows, movingColumns });
+    };
+
+    layoutPointers();
+    // Matrix columns can resize independently as values change, so pointer
+    // coordinates must be remeasured after responsive/layout changes too.
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(layoutPointers);
+    observer.observe(host);
+    Object.values(matrixCellRefs.current).forEach(cell => { if (cell) observer.observe(cell); });
+    return () => observer.disconnect();
   }, [targetSignature, state?.sequence, rowCount, columnCount]);
 
   return (
