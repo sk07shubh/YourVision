@@ -20,6 +20,7 @@ import {
   ArrayView,
   DataStructures,
   StringView,
+  Variables,
 } from './VisualizerPanel';
 
 function state(patch: Partial<TraceState> = {}): TraceState {
@@ -48,6 +49,9 @@ describe('string data structure visualization', () => {
     expect(html).toContain('data-string-index="0"');
     expect(html).toContain('data-string-index="5"');
     expect(html).toContain('({[]})');
+    const variablesHtml = renderToStaticMarkup(<Variables state={current} />);
+    expect(variablesHtml).toContain('s');
+    expect(variablesHtml).toContain('({[]})');
   });
 
   it('highlights the exact character index reported by a string access event', () => {
@@ -59,8 +63,8 @@ describe('string data structure visualization', () => {
     });
     const html = renderToStaticMarkup(<StringView value="stack" state={current} name="s" />);
     expect(html).toContain('data-string-index="2"');
-    expect(html).toMatch(/data-string-index="2"[^]*?yv-cell-read/);
-    expect(html).not.toMatch(/data-string-index="1"[^]*?yv-cell-read/);
+    expect(html).toContain('class="yv-array-cell yv-cell-read" data-string-index="2"');
+    expect(html).not.toContain('class="yv-array-cell yv-cell-read" data-string-index="1"');
   });
 });
 
