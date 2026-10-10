@@ -177,13 +177,24 @@ REPLICA_TEMPLATE = """<!DOCTYPE html>
   }}
 
   function mountConsole() {{
-    // Find the real editor's parent region; fall back to #qd-content.
-    const editors = [...document.querySelectorAll('.monaco-editor')];
-    const anchor = editors[0]?.parentElement || document.getElementById('qd-content');
-    const console = document.createElement('div');
-    console.id = 'yv-console';
+    // Place the console right after the Monaco host (not after #qd-content,
+    // which would put it outside the visible layout).
+    let host = document.getElementById('yv-monaco-host');
+    if (!host) {{
+      // Fallback: create a visible container at the end of body
+      host = document.body;
+    }}
+    let console = document.getElementById('yv-console');
+    if (!console) {{
+      console = document.createElement('div');
+      console.id = 'yv-console';
+      console.style.cssText = 'border-top:2px solid #ffa116;background:#262626;' +
+        'padding:12px;margin-top:8px;';
+      host.after(console);
+    }}
     const examples = parseExamples(problemData.exampleTestcases);
     console.innerHTML =
+      '<div style="font-size:13px;font-weight:600;margin-bottom:8px;">Testcases</div>' +
       '<div class="testcase-tags" id="yv-tags"></div><div id="yv-inputs"></div>';
     anchor.after(console);
     const tags = console.querySelector('#yv-tags');
@@ -213,17 +224,40 @@ REPLICA_TEMPLATE = """<!DOCTYPE html>
   }}
 
   function mountMonaco() {{
-    // Replace the SSR editor placeholder with a live Monaco instance so the
-    // extension reads real editor lines via .view-lines .view-line.
-    const placeholder =
-      document.querySelector('.monaco-editor') ||
-      document.querySelector('[data-e2e-locator="editor"]');
-    const host = document.createElement('div');
-    host.id = 'yv-monaco-host';
-    if (placeholder) placeholder.replaceWith(host);
-    else (document.getElementById('qd-content') || document.body).appendChild(host);
+    // Find the Code tab's tabset, or fall back to creating our own layout.
+    // The SSR HTML has tab bars but no content areas (client-rendered).
+    const codeTab = [...document.querySelectorAll('.flexlayout__tab_button_top')]
+      .find((b) => (b.textContent || '').trim().toLowerCase().startsWith('code'));
+    let host = document.getElementById('yv-monaco-host');
+    if (!host) {{
+      host = document.createElement('div');
+      host.id = 'yv-monaco-host';
+      // NOTE: do NOT pre-add 'monaco-editor' class — the extension's
+      // findEditor() looks for real Monaco instances; Monaco adds the
+      // class itself on creation.
+      host.style.cssText = 'width:100%;height:400px;min-height:300px;' +
+        'border:1px solid #3a3a3a;margin:8px 0;';
+      if (codeTab) {{
+        // Insert after the Code tab's tabset container
+        const tabset = codeTab.closest('.flexlayout__tabset') ||
+                       codeTab.closest('[class*="flexlayout"]');
+        if (tabset) {{
+          tabset.appendChild(host);
+        }} else {{
+          codeTab.parentElement.after(host);
+        }}
+      }} else {{
+        (document.getElementById('qd-content') || document.body).appendChild(host);
+      }}
+    }}
+    // Load Monaco
+    if (typeof require === 'undefined') {{
+      status('Monaco loader failed — check network');
+      return;
+    }}
     require.config({{ paths: {{ vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs' }} }});
     require(['vs/editor/editor.main'], () => {{
+      if (window.yvEditor) window.yvEditor.dispose();
       window.yvEditor = monaco.editor.create(host, {{
         value: javaCode(), language: 'java', theme: 'vs-dark',
         fontSize: 14, minimap: {{ enabled: false }},
@@ -348,10 +382,10 @@ REPLICA_TEMPLATE = """<!DOCTYPE html>
           ':scope > .flexlayout__tab_button_top, :scope > [role="tab"]'
         )];
         buttons.forEach((b) => {{
-          b.classList.remove('flexlayout__tab_button_top--selected');
+          b.classList.remove('flexlayout__tab_button--selected');
           b.setAttribute('aria-selected', 'false');
         }});
-        btn.classList.add('flexlayout__tab_button_top--selected');
+        btn.classList.add('flexlayout__tab_button--selected');
         btn.setAttribute('aria-selected', 'true');
         const name = tabName(btn).toLowerCase();
         if (contentHost) {{
@@ -385,10 +419,36 @@ REPLICA_TEMPLATE = """<!DOCTYPE html>
   initTabs();
 
   // The SSR HTML has no live editor; mount ours once DOM is ready.
-  function boot() {{ mountMonaco(); mountConsole(); ensureRunUI(); }}
+  function boot() {{
+    mountDescription();
+    mountMonaco();
+    mountConsole();
+    ensureRunUI();
+    initTabs();
+  }}
   if (document.readyState === 'loading')
     document.addEventListener('DOMContentLoaded', boot);
   else boot();
+
+  function mountDescription() {{
+    // Inject the real problem description into the Description tab's area.
+    // The SSR has the tab bar but no content area (client-rendered).
+    const descTab = [...document.querySelectorAll('.flexlayout__tab_button_top')]
+      .find((b) => (b.textContent || '').trim().toLowerCase().startsWith('description'));
+    if (!descTab || document.getElementById('yv-description')) return;
+    const desc = document.createElement('div');
+    desc.id = 'yv-description';
+    desc.style.cssText = 'padding:20px;max-width:800px;';
+    desc.innerHTML =
+      `<h2 style="font-size:20px;margin-bottom:4px;">${{problemData.questionId}}. ${{problemData.title}}</h2>` +
+      `<div style="color:${{problemData.difficulty === 'Easy' ? '#00b8a3' : problemData.difficulty === 'Medium' ? '#ffc01e' : '#ff375f'}};font-size:13px;margin-bottom:16px;">${{problemData.difficulty}}</div>` +
+      `<div style="font-size:14px;line-height:1.7;">${{problemData.content || ''}}</div>`;
+    // Place it after the description tab's tabset, or at a sensible location
+    const tabset = descTab.closest('.flexlayout__tabset') ||
+                   descTab.closest('[class*="flexlayout"]');
+    if (tabset) tabset.appendChild(desc);
+    else (document.getElementById('qd-content') || document.body).prepend(desc);
+  }}
 }})();
 </script>
 </body>
