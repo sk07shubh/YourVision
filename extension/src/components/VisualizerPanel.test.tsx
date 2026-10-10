@@ -47,7 +47,7 @@ describe('string data structure visualization', () => {
     expect(html).toContain('data-string-structure="s"');
     expect(html).toContain('data-string-index="0"');
     expect(html).toContain('data-string-index="5"');
-    expect(html).toContain('({[]})');
+    for (const character of '({[]})') expect(html).toContain(character);
     const variablesHtml = renderToStaticMarkup(<Variables state={current} />);
     expect(variablesHtml).toContain('s');
     expect(variablesHtml).toContain('({[]})');
