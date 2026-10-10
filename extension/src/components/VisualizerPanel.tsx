@@ -1292,33 +1292,6 @@ function matrixPointerTargets(
   return { rows, columns };
 }
 
-function accessedArrayIndices(state: TraceState | undefined, arrayName?: string): Set<number> {');
-  const pattern = new RegExp('\\b' + escaped + '\\s*\\[([^\\]]+)\\]\\s*\\[([^\\]]+)\\]', 'g');
-  for (const match of source.matchAll(pattern)) {
-    const rowExpr = match[1] ?? '';
-    const colExpr = match[2] ?? '';
-    for (const id of rowExpr.matchAll(/\\b[A-Za-z_$][\\w$]*\\b/g)) rows.add(id[0]);
-    for (const id of colExpr.matchAll(/\\b[A-Za-z_$][\\w$]*\\b/g)) columns.add(id[0]);
-  }
-  return { rows, columns };
-}
-
-function matrixPointerTargets(
-  state: TraceState | undefined,
-  rowCount: number,
-  columnCount: number,
-  names: { rows: Set<string>; columns: Set<string> }
-): { rows: Array<{ name: string; index: number }>; columns: Array<{ name: string; index: number }> } {
-  const rows: Array<{ name: string; index: number }> = [];
-  const columns: Array<{ name: string; index: number }> = [];
-  for (const [name, value] of Object.entries(state?.variables ?? {})) {
-    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) continue;
-    if (names.rows.has(name) && value < rowCount) rows.push({ name, index: value });
-    if (names.columns.has(name) && value < columnCount) columns.push({ name, index: value });
-  }
-  return { rows, columns };
-}
-
 function accessedArrayIndices(state: TraceState | undefined, arrayName?: string): Set<number> {
   const set = new Set<number>();
   const data = state?.lastEvent?.data;
