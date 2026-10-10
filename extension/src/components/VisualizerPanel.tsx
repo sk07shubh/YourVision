@@ -1298,7 +1298,7 @@ function changedArrayIndices(state?: TraceState, arrayName?: string): Set<number
     }
   };
 
-  collect(data.changes, data.name);
+  if (state?.lastEvent?.type === 'ARRAY_WRITE') collect(data.changes, data.name);
   if (Array.isArray(data.executionEvents)) {
     for (const event of data.executionEvents) {
       if (!isPlainObject(event) || event.type !== 'ARRAY_WRITE' || !isPlainObject(event.data)) continue;
