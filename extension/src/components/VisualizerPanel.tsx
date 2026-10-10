@@ -1406,6 +1406,10 @@ function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<
   const changed = changedArrayIndices(state, arrayName);
   const accessed = accessedArrayIndices(state, arrayName);
   const swapped = swappedArrayIndices(state, arrayName);
+  // With two or more source-grounded array indices, softly mark the active
+  // interval. This works for windows and candidate ranges without naming an algorithm.
+  const rangeStart = targets.length >= 2 ? Math.min(...targets.map(target => target.index)) : -1;
+  const rangeEnd = targets.length >= 2 ? Math.max(...targets.map(target => target.index)) : -1;
   const pointerMarkers = targets.map(target => {
     const x = pointerLayout.offsets[target.name] ?? 0;
     return (
@@ -1426,7 +1430,7 @@ function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<
         <div className="yv-cell" key={i} ref={element => { cellRefs.current[i] = element; }}>
           <div
             key={`${i}-${state?.sequence ?? state?.line ?? 'initial'}`}
-            className={`yv-cell-value ${changed.has(i) ? 'yv-cell-written ' : ''}${accessed.has(i) ? 'yv-cell-read ' : ''}${swapped.has(i) ? 'yv-cell-swapped' : ''}`}
+            className={`yv-cell-value ${rangeStart >= 0 && i >= rangeStart && i <= rangeEnd ? 'yv-cell-range ' : ''}${changed.has(i) ? 'yv-cell-written ' : ''}${accessed.has(i) ? 'yv-cell-read ' : ''}${swapped.has(i) ? 'yv-cell-swapped' : ''}`}
           >
             <div className={`yv-array-cell-content ${swapped.has(i) ? 'yv-array-cell-content-swapped' : ''}`}>
               <DataValue value={v} state={state} source={source ?? ''} name={arrayName} depth={depth + 1} seen={seen}/>
