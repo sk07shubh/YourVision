@@ -1309,6 +1309,32 @@ function changedArrayIndices(state?: TraceState, arrayName?: string): Set<number
   return set;
 }
 
+function changedArrayPaths(state?: TraceState, arrayName?: string): Set<string> {
+  const paths = new Set<string>();
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data)) return paths;
+
+  const collect = (changes: unknown, eventArrayName?: unknown) => {
+    if (arrayName && typeof eventArrayName === 'string' && eventArrayName !== arrayName) return;
+    if (!Array.isArray(changes)) return;
+    for (const change of changes) {
+      if (!isPlainObject(change) || !Array.isArray(change.indices) ||
+          !change.indices.every(index => typeof index === 'number' && Number.isInteger(index))) continue;
+      paths.add((change.indices as number[]).join(','));
+    }
+  };
+
+  if (state?.lastEvent?.type === 'ARRAY_WRITE') collect(data.changes, data.name);
+  if (Array.isArray(data.executionEvents)) {
+    for (const event of data.executionEvents) {
+      if (isPlainObject(event) && event.type === 'ARRAY_WRITE' && isPlainObject(event.data)) {
+        collect(event.data.changes, event.data.name);
+      }
+    }
+  }
+  return paths;
+}
+
 function swappedArrayIndices(state?: TraceState, arrayName?: string): Set<number> {
   const indices = new Set<number>();
   const data = state?.lastEvent?.data;
@@ -1456,7 +1482,32 @@ function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<
     setPointerLayout({ offsets, moving });
   }, [targetSignature, state?.sequence, value.length]);
 
-  if (value.every(Array.isArray)) return <div className="yv-matrix">{value.map((row,r)=><div className="yv-array" key={r}>{(row as unknown[]).map((v,i)=><div className="yv-cell" key={i}><div className="yv-cell-value"><DataValue value={v} state={state} source={source ?? ''} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">[{r},{i}]</div></div>)}</div>)}</div>;
+  if (value.length > 0 && value.every(Array.isArray)) {
+    const readPaths = accessedArrayPaths(state, arrayName);
+    const writtenPaths = changedArrayPaths(state, arrayName);
+    return (
+      <div className="yv-matrix">
+        {value.map((row, r) => (
+          <div className="yv-array" key={r}>
+            {(row as unknown[]).map((cellValue, i) => {
+              const path = r + ',' + i;
+              return (
+                <div className="yv-cell" key={i}>
+                  <div
+                    key={`${path}-${state?.sequence ?? state?.line ?? 'initial'}`}
+                    className={`yv-cell-value ${readPaths.has(path) ? 'yv-cell-read ' : ''}${writtenPaths.has(path) ? 'yv-cell-written' : ''}`}
+                  >
+                    <DataValue value={cellValue} state={state} source={source ?? ''} depth={depth + 1} seen={seen}/>
+                  </div>
+                  <div className="yv-cell-index">[{r},{i}]</div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   // Reads and writes are independent trace facts: a read gets a cool blue
   // focus, while only an ARRAY_WRITE checkpoint gets the green write pulse.
