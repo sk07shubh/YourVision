@@ -1333,6 +1333,14 @@ function accessedArrayIndices(state: TraceState | undefined, arrayName?: string)
   return set;
 }
 
+function isComparisonStatement(source: string, state?: TraceState): boolean {
+  const line = state?.line;
+  if (!line || line < 1) return false;
+  const statement = source.split(/\r?\n/)[line - 1] ?? '';
+  // Require an actual comparison operator, not a plain assignment.
+  return /(?:===|!==|==|!=|<=|>=|(?<![<>=!])<(?![=])|(?<![<>=!])>(?![=]))/.test(statement);
+}
+
 function accessedArrayPaths(state: TraceState | undefined, arrayName?: string): Set<string> {
   const paths = new Set<string>();
   const data = state?.lastEvent?.data;
@@ -1510,6 +1518,7 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
   const columnCount = Math.max(0, ...rows.map(row => row.length));
   const readPaths = accessedArrayPaths(state, arrayName);
   const writtenPaths = changedArrayPaths(state, arrayName);
+  const comparedPaths = isComparisonStatement(source, state) && readPaths.size >= 2 ? readPaths : new Set<string>();
   const indexNames = matrixIndexVariableNames(source, arrayName);
   const targets = matrixPointerTargets(state, rowCount, columnCount, indexNames);
   const activeRows = new Set(targets.rows.map(target => target.index));
@@ -1590,7 +1599,7 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
               >
                 <div
                   key={`${path}-${state?.sequence ?? state?.line ?? 'initial'}`}
-                  className={`yv-cell-value ${readPaths.has(path) ? 'yv-cell-read ' : ''}${writtenPaths.has(path) ? 'yv-cell-written' : ''}`}
+                  className={`yv-cell-value ${comparedPaths.has(path) ? 'yv-cell-compared ' : ''}${readPaths.has(path) ? 'yv-cell-read ' : ''}${writtenPaths.has(path) ? 'yv-cell-written' : ''}`}
                 >
                   {exists
                     ? <DataValue value={row[column]} state={state} source={source} depth={depth + 1} seen={seen}/>
@@ -1661,6 +1670,7 @@ function ArrayView({ value, state, source, arrayName, depth, seen }: {
 
   const changed = changedArrayIndices(state, arrayName);
   const accessed = accessedArrayIndices(state, arrayName);
+  const compared = isComparisonStatement(source, state) && accessed.size >= 2 ? accessed : new Set<number>();
   const swapped = swappedArrayIndices(state, arrayName);
   const shifted = shiftedArrayIndices(state, arrayName);
   const rangeStart = targets.length >= 2 ? Math.min(...targets.map(target => target.index)) : -1;
@@ -1681,7 +1691,7 @@ function ArrayView({ value, state, source, arrayName, depth, seen }: {
         <div className="yv-cell" key={index} ref={element => { cellRefs.current[index] = element; }}>
           <div
             key={`${index}-${state?.sequence ?? state?.line ?? 'initial'}`}
-            className={`yv-cell-value ${rangeStart >= 0 && index >= rangeStart && index <= rangeEnd ? 'yv-cell-range ' : ''}${changed.has(index) ? 'yv-cell-written ' : ''}${accessed.has(index) ? 'yv-cell-read ' : ''}${swapped.has(index) ? 'yv-cell-swapped' : ''}`}
+            className={`yv-cell-value ${rangeStart >= 0 && index >= rangeStart && index <= rangeEnd ? 'yv-cell-range ' : ''}${changed.has(index) ? 'yv-cell-written ' : ''}${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-cell-compared ' : ''}${swapped.has(index) ? 'yv-cell-swapped' : ''}`}
           >
             <div className={`yv-array-cell-content ${swapped.has(index) ? 'yv-array-cell-content-swapped' : ''}${shifted.has(index) ? ' yv-array-cell-content-shift-' + shifted.get(index) : ''}`}>
               <DataValue value={item} state={state} source={source} name={arrayName} depth={depth + 1} seen={seen}/>
