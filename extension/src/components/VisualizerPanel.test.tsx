@@ -18,6 +18,8 @@ import {
   pointerLabels,
   Variables,
   ArrayView,
+  DataStructures,
+  StringView,
 } from './VisualizerPanel';
 
 function state(patch: Partial<TraceState> = {}): TraceState {
@@ -36,6 +38,31 @@ function state(patch: Partial<TraceState> = {}): TraceState {
 function markup(nodes: ReactNode[]): string {
   return renderToStaticMarkup(<>{nodes}</>);
 }
+
+
+describe('string data structure visualization', () => {
+  it('keeps strings in Variables and also renders them as indexed character cells', () => {
+    const current = state({ variables: { s: '({[]})', count: 6 } });
+    const html = renderToStaticMarkup(<DataStructures state={current} source="s.charAt(i)" />);
+    expect(html).toContain('data-string-structure="s"');
+    expect(html).toContain('data-string-index="0"');
+    expect(html).toContain('data-string-index="5"');
+    expect(html).toContain('({[]})');
+  });
+
+  it('highlights the exact character index reported by a string access event', () => {
+    const current = state({
+      variables: { s: 'stack' },
+      lastEvent: { type: 'STEP', line: 4, data: { executionEvents: [
+        { type: 'ARRAY_ACCESS', data: { name: 's', indices: [2], value: 'a', kind: 'read' } },
+      ] } },
+    });
+    const html = renderToStaticMarkup(<StringView value="stack" state={current} name="s" />);
+    expect(html).toContain('data-string-index="2"');
+    expect(html).toMatch(/data-string-index="2"[^]*?yv-cell-read/);
+    expect(html).not.toMatch(/data-string-index="1"[^]*?yv-cell-read/);
+  });
+});
 
 describe('execution visualization feature matrix', () => {
   it('resolves pointer destinations from actual in-range integer index variables only', () => {
