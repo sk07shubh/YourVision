@@ -330,6 +330,35 @@ describe('deterministic semantic pointer roles', () => {
     ] } } });
     expect(pointerLabels(current, 5, new Set(), 'nums')).toEqual(new Map([[1, ['left']], [3, ['right']]]));
   });
+  it('keeps binary-search boundary pointers visible when the current step omits the midpoint role', () => {
+    // While evaluating the while condition, mid has not been assigned for this
+    // iteration yet. The trace still contains gh/df, so their pointer labels
+    // must not depend on a midpoint semantic role being present in this step.
+    const current = state({
+      variables: { n: 6, gh: 0, df: 5, target: 9 },
+      arrays: { nums: [-1, 0, 3, 5, 9, 12] },
+      lastEvent: { type: 'STEP', line: 5, data: { semanticRoles: [
+        { name: 'gh', role: 'left-bound', confidence: 0.94, evidence: 'boundary updates are derived from a midpoint' },
+        { name: 'df', role: 'right-bound', confidence: 0.94, evidence: 'boundary updates are derived from a midpoint' },
+      ] } },
+    });
+    const source = [
+      'int mid = gh + (df - gh) / 2;',
+      'while (gh <= df) {',
+      '  if (nums[mid] == target) {',
+      '    return mid;',
+      '  }',
+    ].join('\\n');
+
+    const html = renderToStaticMarkup(
+      <ArrayView value={[-1, 0, 3, 5, 9, 12]} state={current} source={source} arrayName="nums" />,
+    );
+    expect(html).toContain('>gh</div>');
+    expect(html).toContain('>df</div>');
+    expect(pointerLabels(current, 6, new Set(['mid']), 'nums')).toEqual(
+      new Map([[0, ['gh']], [5, ['df']]]),
+    );
+  });
 });
 
 describe('semantic roles in rendered visualization', () => {
