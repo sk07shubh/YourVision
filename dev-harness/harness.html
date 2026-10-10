@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>YourVision Dev Harness — LeetCode Problem Page</title>
+<style>
+  :root {
+    --bg: #1a1a1a;
+    --bg-secondary: #262626;
+    --bg-tertiary: #333333;
+    --text: #eff1f6;
+    --text-secondary: #a3a3a3;
+    --accent: #ffa116;
+    --border: #3a3a3a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  /* Harness toolbar (dev-only, outside #qd-content) */
+  #harness-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background: #0f0f0f;
+    border-bottom: 2px solid var(--accent);
+    z-index: 1000;
+  }
+  #harness-toolbar .badge {
+    background: var(--accent);
+    color: #000;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  #harness-toolbar input {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 10px;
+    border-radius: 6px;
+    width: 220px;
+    font-size: 13px;
+  }
+  #harness-toolbar button {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  #harness-toolbar button:hover { background: #404040; }
+  #harness-toolbar button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+    font-weight: 600;
+  }
+  #harness-status { font-size: 12px; color: var(--text-secondary); }
+  /* LeetCode-like layout */
+  #qd-content {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+  }
+  .panel-left, .panel-right {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .panel-left { width: 42%; border-right: 1px solid var(--border); }
+  .panel-right { flex: 1; }
+  /* FlexLayout tab bar (matches selectors.ts expectations) */
+  .flexlayout__tabset { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .flexlayout__tabset_tabbar_outer_top { background: var(--bg-secondary); }
+  .flexlayout__tabset_tabbar_inner_tab_container_top {
+    display: flex;
+    gap: 4px;
+    padding: 0 12px;
+  }
+  .flexlayout__tab_button_top {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    padding: 10px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .flexlayout__tab_button_top--selected {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+  }
+  .flexlayout__tabset_content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    min-height: 0;
+  }
+  .problem-title { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+  .problem-difficulty { font-size: 13px; margin-bottom: 16px; }
+  .problem-difficulty.Easy { color: #00b8a3; }
+  .problem-difficulty.Medium { color: #ffc01e; }
+  .problem-difficulty.Hard { color: #ff375f; }
+  .problem-content { font-size: 14px; line-height: 1.7; }
+  .problem-content p { margin-bottom: 12px; }
+  .problem-content code {
+    background: var(--bg-tertiary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+  .problem-content pre {
+    background: var(--bg-tertiary);
+    padding: 12px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 12px 0;
+    font-size: 13px;
+  }
+  /* Editor */
+  .editor-container {
+    flex: 1;
+    min-height: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  #monaco-host { width: 100%; height: 100%; }
+  /* Console / test cases */
+  .console-panel {
+    height: 220px;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-secondary);
+  }
+  .console-tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .console-tab {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    padding: 8px 12px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .console-tab.active { color: var(--text); border-bottom: 2px solid var(--accent); }
+  .testcase-tags { display: flex; gap: 6px; padding: 10px 12px 0; }
+  .testcase-tags button {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .testcase-tags button.bg-fill-3 {
+    background: #404040;
+    color: var(--text);
+  }
+  .testcase-inputs { padding: 10px 12px; overflow-y: auto; flex: 1; }
+  .testcase-inputs label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin: 8px 0 4px;
+    font-family: monospace;
+  }
+  .testcase-inputs textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 8px;
+    font-family: monospace;
+    font-size: 13px;
+    resize: vertical;
+    min-height: 36px;
+  }
+  .console-actions { padding: 10px 12px; display: flex; gap: 8px; }
+  .console-actions button {
+    padding: 8px 20px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 13px;
+  }
+  #run-btn { background: #2cbb5d; border-color: #2cbb5d; color: #fff; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<!-- Dev harness toolbar: NOT part of the LeetCode replica -->
+<div id="harness-toolbar">
+  <span class="badge">DEV HARNESS</span>
+  <input id="problem-slug" placeholder="problem slug, e.g. two-sum" value="two-sum" />
+  <button id="load-problem" class="primary">Load Problem</button>
+  <button id="swap-code">Replace Code in Editor</button>
+  <span id="harness-status">Ready</span>
+</div>
+
+<!-- LeetCode problem page replica: extension hooks into this -->
+<div id="qd-content">
+  <!-- Left: problem description -->
+  <div class="panel-left">
+    <div class="flexlayout__tabset">
+      <div class="flexlayout__tabset_tabbar_outer_top">
+        <div class="flexlayout__tabset_tabbar_inner_tab_container_top">
+          <button class="flexlayout__tab_button_top flexlayout__tab_button_top--selected">
+            <span>Description</span>
+          </button>
+          <button class="flexlayout__tab_button_top"><span>Solutions</span></button>
+          <button class="flexlayout__tab_button_top"><span>Editorial</span></button>
+          <button class="flexlayout__tab_button_top"><span>Submissions</span></button>
+        </div>
+      </div>
+      <div class="flexlayout__tabset_content" data-layout-path="/ts0/tb0">
+        <div class="problem-title" id="problem-title">Loading…</div>
+        <div class="problem-difficulty" id="problem-difficulty"></div>
+        <div class="problem-content" id="problem-content"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: editor + console -->
+  <div class="panel-right">
+    <div class="editor-container">
+      <div id="monaco-host"></div>
+    </div>
+    <div class="console-panel">
+      <div class="console-tabs">
+        <button class="console-tab active">Testcase</button>
+        <button class="console-tab">Test Result</button>
+      </div>
+      <div class="testcase-tags" id="testcase-tags"></div>
+      <div class="testcase-inputs" id="testcase-inputs"></div>
+      <div class="console-actions">
+        <button id="run-btn">Run</button>
+        <button id="submit-btn">Submit</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
+<script src="harness.js"></script>
+</body>
+</html>
