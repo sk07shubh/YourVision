@@ -1668,24 +1668,60 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
       const movingRows = new Set<string>();
       const movingColumns = new Set<string>();
       const next = new Map<string, number>();
+      const labels = new Map<string, HTMLElement>();
+      host.querySelectorAll<HTMLElement>('[data-matrix-pointer]').forEach(label => {
+        const name = label.dataset.matrixPointer;
+        if (name) labels.set(name, label);
+      });
+      const columnGroups = new Map<number, typeof targets.columns>();
+      const rowGroups = new Map<number, typeof targets.rows>();
 
       for (const target of targets.columns) {
         const header = matrixCellRefs.current['__col,' + target.index];
         if (!header) continue;
-        x[target.name] = header.offsetLeft + header.offsetWidth / 2;
+        const group = columnGroups.get(target.index) ?? [];
+        group.push(target);
+        columnGroups.set(target.index, group);
         const key = 'c:' + target.name;
         const previous = previousMatrixTargets.current.get(key);
         if (previous !== undefined && previous !== target.index) movingColumns.add(target.name);
         next.set(key, target.index);
       }
+      for (const [index, group] of columnGroups) {
+        const header = matrixCellRefs.current['__col,' + index];
+        if (!header) continue;
+        const center = header.offsetLeft + header.offsetWidth / 2;
+        const gap = 4;
+        const widths = group.map(target => labels.get(target.name)?.offsetWidth ?? Math.max(24, target.name.length * 7 + 10));
+        let left = center - (widths.reduce((sum, width) => sum + width, 0) + gap * Math.max(0, group.length - 1)) / 2;
+        group.forEach((target, i) => {
+          x[target.name] = left + widths[i]! / 2;
+          left += widths[i]! + gap;
+        });
+      }
+
       for (const target of targets.rows) {
         const cell = matrixCellRefs.current[target.index + ',0'];
         if (!cell) continue;
-        y[target.name] = cell.offsetTop + cell.offsetHeight / 2;
+        const group = rowGroups.get(target.index) ?? [];
+        group.push(target);
+        rowGroups.set(target.index, group);
         const key = 'r:' + target.name;
         const previous = previousMatrixTargets.current.get(key);
         if (previous !== undefined && previous !== target.index) movingRows.add(target.name);
         next.set(key, target.index);
+      }
+      for (const [index, group] of rowGroups) {
+        const cell = matrixCellRefs.current[index + ',0'];
+        if (!cell) continue;
+        const center = cell.offsetTop + cell.offsetHeight / 2;
+        const gap = 3;
+        const heights = group.map(target => labels.get(target.name)?.offsetHeight ?? 16);
+        let top = center - (heights.reduce((sum, height) => sum + height, 0) + gap * Math.max(0, group.length - 1)) / 2;
+        group.forEach((target, i) => {
+          y[target.name] = top + heights[i]! / 2;
+          top += heights[i]! + gap;
+        });
       }
       previousMatrixTargets.current = next;
       setMatrixPointerLayout({ x, y, movingRows, movingColumns });
@@ -1745,6 +1781,7 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
         {targets.columns.map(target => (
           <div
             key={'c:' + target.name}
+            data-matrix-pointer={target.name}
             className={`yv-matrix-pointer yv-matrix-pointer-column ${matrixPointerLayout.movingColumns.has(target.name) ? 'is-moving' : ''}`}
             style={{ transform: `translate3d(${matrixPointerLayout.x[target.name] ?? 0}px, 0, 0) translateX(-50%)` }}
           >{target.name}</div>
@@ -1752,6 +1789,7 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
         {targets.rows.map(target => (
           <div
             key={'r:' + target.name}
+            data-matrix-pointer={target.name}
             className={`yv-matrix-pointer yv-matrix-pointer-row ${matrixPointerLayout.movingRows.has(target.name) ? 'is-moving' : ''}`}
             style={{ transform: `translate3d(0, ${matrixPointerLayout.y[target.name] ?? 0}px, 0) translateY(-50%)` }}
           >{target.name}</div>
