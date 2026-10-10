@@ -1281,11 +1281,11 @@ export function pointerTargets(
   const leftBounds = boundaryRoles.filter(role => role.role === 'left-bound');
   const rightBounds = boundaryRoles.filter(role => role.role === 'right-bound');
   const hasSourceDerivedMidpointIndex = [...indexNames].some(indexName => {
-    const assignmentPattern = /(?:\\b(?:byte|short|int|long|char|float|double)\\s+)?([A-Za-z_$][\\w$]*)\\s*=\\s*([^;\\n]+);/g;
+    const assignmentPattern = /(?:\b(?:byte|short|int|long|char|float|double)\s+)?([A-Za-z_$][\w$]*)\s*=\s*([^;\n]+);/g;
     for (const match of source.matchAll(assignmentPattern)) {
       if (match[1] !== indexName) continue;
       const identifiers = new Set(
-        [...(match[2] ?? '').matchAll(/\\b[A-Za-z_$][\\w$]*\\b/g)].map(item => item[0])
+        [...(match[2] ?? '').matchAll(/\b[A-Za-z_$][\w$]*\b/g)].map(item => item[0])
       );
       if (
         leftBounds.some(role => identifiers.has(role.name)) &&
