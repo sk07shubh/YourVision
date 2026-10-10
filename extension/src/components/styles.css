@@ -333,3 +333,9 @@
     transition: none;
   }
 }
+
+
+/* Row wrappers are layout-transparent so every matrix cell shares one grid. */
+.yv-matrix-grid .yv-matrix-row-fragment {
+  display: contents;
+}
