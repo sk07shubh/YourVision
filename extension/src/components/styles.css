@@ -326,6 +326,16 @@
   left: 0;
   top: 0;
 }
+.yv-matrix-grid .yv-matrix-pointer-intersection {
+  left: 0;
+  top: 0;
+  z-index: 2;
+  color: var(--yv-accent);
+  font-weight: 700;
+  border-color: var(--yv-accent);
+  background: var(--yv-elevated);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 14%);
+}
 .yv-matrix-grid .yv-matrix-pointer.is-moving {
   color: var(--yv-accent);
 }
@@ -496,3 +506,5 @@
     animation: none;
   }
 }
+.yv-var-name{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.yv-role{font-size:9px;line-height:1.35;font-weight:700;letter-spacing:.025em;padding:1px 5px;border:1px solid var(--yv-border);border-radius:999px;color:var(--yv-muted);white-space:nowrap}

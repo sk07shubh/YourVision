@@ -14,6 +14,10 @@ import {
   isForLoopUpdateStep,
   pointerTargets,
   unorderedCollectionDelta,
+  semanticRoleForVariable,
+  pointerLabels,
+  Variables,
+  ArrayView,
 } from './VisualizerPanel';
 
 function state(patch: Partial<TraceState> = {}): TraceState {
@@ -307,4 +311,127 @@ describe('execution visualization feature matrix', () => {
     expect(html).toContain('[Set]');
     expect(html).toContain('Index: 1');
   });
+});
+
+
+describe('deterministic semantic pointer roles', () => {
+  it('exposes boundary roles even when variables are not array indices', () => {
+    const current = state({ variables: { left: 1, right: 4 }, lastEvent: { type: 'STEP', line: 6, data: { semanticRoles: [
+      { name: 'left', role: 'left-bound', confidence: 0.88, evidence: 'loop boundary', structureName: 'nums' },
+      { name: 'right', role: 'right-bound', confidence: 0.96, evidence: 'loop boundary', structureName: 'nums' },
+    ] } } });
+    expect(semanticRoleForVariable(current, 'left')?.role).toBe('left-bound');
+    expect(semanticRoleForVariable(current, 'right')?.role).toBe('right-bound');
+  });
+  it('labels array cells from semantic bounds without array-index source usage', () => {
+    const current = state({ variables: { left: 1, right: 3 }, lastEvent: { type: 'STEP', line: 5, data: { semanticRoles: [
+      { name: 'left', role: 'left-bound', confidence: 0.88, evidence: 'interval boundary', structureName: 'nums' },
+      { name: 'right', role: 'right-bound', confidence: 0.96, evidence: 'interval boundary', structureName: 'nums' },
+    ] } } });
+    expect(pointerLabels(current, 5, new Set(), 'nums')).toEqual(new Map([[1, ['left']], [3, ['right']]]));
+  });
+});
+
+describe('semantic roles in rendered visualization', () => {
+  it('renders boundary badges in the variable panel', () => {
+    const current = state({
+      variables: { left: 1, right: 3 },
+      lastEvent: { type: 'STEP', line: 5, data: { semanticRoles: [
+        { name: 'left', role: 'left-bound', confidence: 0.9, evidence: 'loop boundary', structureName: 'nums' },
+        { name: 'right', role: 'right-bound', confidence: 0.9, evidence: 'loop boundary', structureName: 'nums' },
+      ] } },
+    });
+    const html = renderToStaticMarkup(<Variables state={current} />);
+    expect(html).toContain('LEFT BOUND');
+    expect(html).toContain('RIGHT BOUND');
+  });
+
+  it('renders pointer labels over cells when source has no array indexing', () => {
+    const current = state({
+      variables: { left: 1, right: 3 },
+      arrays: { nums: [10, 20, 30, 40] },
+      lastEvent: { type: 'STEP', line: 5, data: { semanticRoles: [
+        { name: 'left', role: 'left-bound', confidence: 0.9, evidence: 'interval boundary', structureName: 'nums' },
+        { name: 'right', role: 'right-bound', confidence: 0.9, evidence: 'interval boundary', structureName: 'nums' },
+      ] } },
+    });
+    const html = renderToStaticMarkup(<ArrayView value={[10, 20, 30, 40]} state={current} source="" arrayName="nums" />);
+    expect(html).toContain('>left</div>');
+    expect(html).toContain('>right</div>');
+  });
+  it('renders binary-search pointers from real array-index expressions when roles omit structureName', () => {
+    const current = state({
+      variables: { n: 9, left: 0, right: 8, mid: 4 },
+      lastEvent: { type: 'STEP', line: 18, data: { semanticRoles: [
+        { name: 'left', role: 'left-bound', confidence: 0.96, evidence: 'left boundary updates are derived from midpoint' },
+        { name: 'right', role: 'right-bound', confidence: 0.96, evidence: 'right boundary updates are derived from midpoint' },
+        { name: 'mid', role: 'midpoint', confidence: 0.96, evidence: 'mid is computed from both interval boundaries' },
+      ] } },
+    });
+    const source = [
+      'int mid = left + (right - left) / 2;',
+      'if (nums[mid - 1] != nums[mid] && nums[mid + 1] != nums[mid]) {',
+      '  left = mid + 1;',
+      '  right = mid - 1;',
+    ].join('\n');
+    const html = renderToStaticMarkup(
+      <ArrayView value={[1, 1, 2, 3, 3, 4, 4, 8, 8]} state={current} source={source} arrayName="nums" />,
+    );
+    expect(html).toContain('>left</div>');
+    expect(html).toContain('>right</div>');
+    expect(html).toContain('>mid</div>');
+    expect(pointerLabels(current, 9, new Set(['left', 'right', 'mid', 'n']), 'nums')).toEqual(
+      new Map([[0, ['left']], [8, ['right']], [4, ['mid']]]),
+    );
+  });
+
+  it('places matrix traversal pointers at the active row and column intersection', () => {
+    const current = state({
+      variables: { row: 1, col: 2 },
+      lastEvent: { type: 'STEP', line: 12, data: { semanticRoles: [
+        { name: 'row', role: 'pointer', confidence: 0.9, evidence: 'row is updated as the first index of a two-dimensional array access', structureName: 'matrix' },
+        { name: 'col', role: 'pointer', confidence: 0.9, evidence: 'col is updated as the second index of a two-dimensional array access', structureName: 'matrix' },
+      ] } },
+    });
+    const html = renderToStaticMarkup(
+      <ArrayView value={[[1, 2, 3], [4, 5, 6]]} state={current} source="matrix[row][col]" arrayName="matrix" />,
+    );
+    expect(html).toContain('row · col');
+    expect(html).toContain('[1,2]');
+  });
+
+  it('keeps matrix traversal pointers separate from outer answer-search boundaries', () => {
+    const current = state({
+      variables: { sd: 9, hg: 15, mid: 12, row: 1, col: 2 },
+      lastEvent: { type: 'STEP', line: 15, data: { semanticRoles: [
+        { name: 'sd', role: 'left-bound', confidence: 0.94, evidence: 'sd is derived from the midpoint of both search bounds' },
+        { name: 'hg', role: 'right-bound', confidence: 0.94, evidence: 'hg is derived from the midpoint of both search bounds' },
+        { name: 'mid', role: 'midpoint', confidence: 0.82, evidence: 'mid is computed from both inferred interval boundaries' },
+        { name: 'row', role: 'pointer', confidence: 0.99, evidence: 'row is updated as the first index of a two-dimensional array access', structureName: 'matrix' },
+        { name: 'col', role: 'pointer', confidence: 0.99, evidence: 'col is updated as the second index of a two-dimensional array access', structureName: 'matrix' },
+      ] } },
+    });
+
+    expect(semanticRoleForVariable(current, 'sd')?.role).toBe('left-bound');
+    expect(semanticRoleForVariable(current, 'hg')?.role).toBe('right-bound');
+    expect(semanticRoleForVariable(current, 'mid')?.role).toBe('midpoint');
+    expect(semanticRoleForVariable(current, 'row')?.role).toBe('pointer');
+    expect(semanticRoleForVariable(current, 'col')?.role).toBe('pointer');
+
+    const variablesHtml = renderToStaticMarkup(<Variables state={current} />);
+    expect(variablesHtml).toContain('LEFT BOUND');
+    expect(variablesHtml).toContain('RIGHT BOUND');
+    expect(variablesHtml).toContain('MIDPOINT');
+    expect(variablesHtml).toContain('POINTER');
+
+    const matrixHtml = renderToStaticMarkup(
+      <ArrayView value={[[1, 2, 3], [4, 5, 6]]} state={current} source="matrix[row][col]" arrayName="matrix" />,
+    );
+    expect(matrixHtml).toContain('row · col');
+    expect(matrixHtml).not.toContain('sd · hg');
+    expect(pointerLabels(current, 3, new Set(), 'matrix')).toEqual(
+      new Map([[1, ['row']], [2, ['col']]]),
+    );
+  });
+
 });

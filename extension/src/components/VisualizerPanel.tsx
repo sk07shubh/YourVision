@@ -911,7 +911,7 @@ function ExecutionInspector({ state, previous, statement, index, total }: { stat
             }
           }}
         >
-          Copy Debug Trace
+          Copy DS Debug Trace
         </button>
       </div>
 
@@ -1197,7 +1197,15 @@ function variableSummary(value: unknown): string {
   return displayValue(value);
 }
 
-function Variables({ state, previous }: { state?: TraceState; previous?: TraceState }) {
+export interface SemanticRoleView { name:string; role:string; confidence?:number; evidence?:string; structureName?:string; usage?:string[]; method?:string; }
+function stateSemanticRoles(state?:TraceState):SemanticRoleView[]{
+ const data=state?.lastEvent?.data;
+ if(!isPlainObject(data)||!Array.isArray(data.semanticRoles))return [];
+ return data.semanticRoles.filter((role):role is SemanticRoleView=>isPlainObject(role)&&typeof role.name==="string"&&typeof role.role==="string");
+}
+export function semanticRoleForVariable(state:TraceState|undefined,name:string):SemanticRoleView|undefined{return stateSemanticRoles(state).find(role=>role.name===name);}
+function semanticRoleLabel(role:string):string{return ({'left-bound':'LEFT BOUND','right-bound':'RIGHT BOUND',midpoint:'MIDPOINT','loop-counter':'LOOP',pointer:'POINTER','derived-value':'DERIVED','answer-value':'RESULT',unused:'UNUSED'} as Record<string,string>)[role]??'';}
+export function Variables({ state, previous }: { state?: TraceState; previous?: TraceState }) {
   const entries = Object.entries(state?.variables ?? {})
     .filter(([name, value]) => name !== 'this' && !isStructuralObject(value));
   if (!entries.length) return <div className="yv-empty">No local variables yet.</div>;
@@ -1210,10 +1218,12 @@ function Variables({ state, previous }: { state?: TraceState; previous?: TraceSt
         const changed =
           Boolean(previous) &&
           stableStringify(old) !== stableStringify(value);
+        const role = semanticRoleForVariable(state, name);
+        const roleTitle = [role?.evidence, ...(role?.usage ?? [])].filter(Boolean).join(' · ');
 
         return (
           <div className={`yv-var ${changed ? 'changed' : ''}`} key={name}>
-            <div className="yv-var-name">{name}</div>
+            <div className="yv-var-name"><span>{name}</span>{role&&<span className="yv-role" title={roleTitle}>{semanticRoleLabel(role.role)}</span>}</div>
             <div className="yv-change">
               {changed && (
                 <>
@@ -1235,7 +1245,9 @@ function Variables({ state, previous }: { state?: TraceState; previous?: TraceSt
 function arrayIndexVariableNames(source: string, arrayName?: string): Set<string> {
   const names = new Set<string>();
   if (!arrayName) return names;
-  const pattern = new RegExp(arrayName + '\\s*\\[([^\\]]+)\\]', 'g');
+  // Java identifiers may contain '$'. Escape it and keep the regex escapes single.
+  const escapedArrayName = arrayName.replace(/[$]/g, '\\$&');
+  const pattern = new RegExp('\\b' + escapedArrayName + '\\s*\\[([^\\]]+)\\]', 'g');
   for (const match of source.matchAll(pattern)) {
     for (const identifier of match[1].matchAll(/\b[A-Za-z_$][\w$]*\b/g)) names.add(identifier[0]);
   }
@@ -1245,15 +1257,60 @@ function arrayIndexVariableNames(source: string, arrayName?: string): Set<string
 export function pointerTargets(
   state: TraceState | undefined,
   length: number,
-  indexNames: Set<string>
+  indexNames: Set<string>,
+  arrayName?: string
 ): Array<{ name: string; index: number }> {
   const targets: Array<{ name: string; index: number }> = [];
+  const roles = stateSemanticRoles(state);
+  const boundaryRoles = roles.filter(role =>
+    ['left-bound', 'right-bound', 'midpoint', 'pointer'].includes(role.role)
+  );
+  const hasArraySpecificRoles = boundaryRoles.some(
+    role => role.structureName === arrayName
+  );
+  const semanticNames = new Set(
+    boundaryRoles
+      .filter(role => role.structureName === arrayName)
+      .map(role => role.name)
+  );
+
+  // If semantic metadata doesn't name this array, infer boundary roles only
+  // when the array's source indexes it using the semantic midpoint variable.
+  const hasMidpointIndex = [...indexNames].some(name =>
+    boundaryRoles.some(role => role.name === name && role.role === 'midpoint')
+  );
+  if (!hasArraySpecificRoles && hasMidpointIndex) {
+    for (const role of boundaryRoles) semanticNames.add(role.name);
+  }
+
   for (const [name, value] of Object.entries(state?.variables ?? {})) {
-    if (!indexNames.has(name)) continue;
-    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value >= length) continue;
+    if (!indexNames.has(name) && !semanticNames.has(name)) continue;
+    if (
+      typeof value !== 'number' ||
+      !Number.isInteger(value) ||
+      value < 0 ||
+      value >= length
+    ) continue;
     targets.push({ name, index: value });
   }
   return targets;
+}
+
+export function pointerLabels(
+  state: TraceState | undefined,
+  length: number,
+  indexNames: Set<string>,
+  arrayName?: string
+): Map<number, string[]> {
+  const labels = new Map<number, string[]>();
+
+  for (const target of pointerTargets(state, length, indexNames, arrayName)) {
+    const names = labels.get(target.index) ?? [];
+    names.push(target.name);
+    labels.set(target.index, names);
+  }
+
+  return labels;
 }
 
 function arrayNameMatches(candidate: string, requested?: string): boolean {
@@ -1771,18 +1828,31 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
             style={{ transform: `translate3d(0, ${matrixPointerLayout.y[target.name] ?? 0}px, 0) translateY(-50%)` }}
           >{target.name}</div>
         ))}
+        {targets.rows.flatMap(rowTarget =>
+          targets.columns.map(columnTarget => (
+            <div
+              key={`intersection:${rowTarget.name}:${columnTarget.name}`}
+              className="yv-matrix-pointer yv-matrix-pointer-intersection"
+              data-matrix-intersection={`${rowTarget.name},${columnTarget.name}`}
+              data-matrix-cell={`[${rowTarget.index},${columnTarget.index}]`}
+              style={{
+                transform: `translate3d(${matrixPointerLayout.x[columnTarget.name] ?? 0}px, ${matrixPointerLayout.y[rowTarget.name] ?? 0}px, 0) translate(-50%, -100%)`
+              }}
+            >{rowTarget.name} · {columnTarget.name}</div>
+          ))
+        )}
       </div>
     </div>
   );
 }
 
-function ArrayView({ value, state, source, arrayName, depth, seen }: {
+export function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<string>() }: {
   value: unknown[];
   state?: TraceState;
   source: string;
   arrayName?: string;
-  depth: number;
-  seen: Set<string>;
+  depth?: number;
+  seen?: Set<string>;
 }) {
   // A Java 2D array may arrive as raw nested arrays or as row-level array
   // snapshots. Normalize both shapes into a single grid without flattening it.
@@ -1793,7 +1863,7 @@ function ArrayView({ value, state, source, arrayName, depth, seen }: {
   }
 
   const indexNames = arrayIndexVariableNames(source, arrayName);
-  const targets = pointerTargets(state, value.length, indexNames);
+  const targets = pointerTargets(state, value.length, indexNames, arrayName);
   const targetSignature = targets.map(target => target.name + ':' + target.index).sort().join('|');
   const arrayRef = useRef<HTMLDivElement | null>(null);
   const cellRefs = useRef<Record<number, HTMLDivElement | null>>({});
