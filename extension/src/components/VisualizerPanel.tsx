@@ -1704,8 +1704,28 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
   const targets = matrixPointerTargets(state, rowCount, columnCount, indexNames);
   const activeRows = new Set(targets.rows.map(target => target.index));
   const activeColumns = new Set(targets.columns.map(target => target.index));
+  // Runtime access coordinates are authoritative for the active matrix cell.
+  // During row = mid / n and col = mid % n, one coordinate can be new while
+  // the other is still from the previous iteration. Do not render that
+  // temporary Cartesian-product intersection as if it had been accessed.
+  const eventData = state?.lastEvent?.data;
+  const hasAuthoritativeAccessEvents = isPlainObject(eventData) && Array.isArray(eventData.executionEvents);
   const activeCells = new Set<string>();
-  for (const row of activeRows) for (const column of activeColumns) activeCells.add(row + ',' + column);
+  if (hasAuthoritativeAccessEvents) {
+    for (const path of readPaths) {
+      const [rowText, columnText] = path.split(',');
+      const row = Number(rowText);
+      const column = Number(columnText);
+      if (
+        Number.isInteger(row) && Number.isInteger(column) &&
+        row >= 0 && row < rowCount &&
+        column >= 0 && column < (rows[row]?.length ?? 0)
+      ) activeCells.add(path);
+    }
+  } else {
+    // Compatibility fallback for older/synthetic states without execution events.
+    for (const row of activeRows) for (const column of activeColumns) activeCells.add(row + ',' + column);
+  }
   const targetSignature = [
     ...targets.rows.map(target => 'r:' + target.name + ':' + target.index),
     ...targets.columns.map(target => 'c:' + target.name + ':' + target.index)
@@ -1857,17 +1877,21 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
           >{target.name}</div>
         ))}
         {targets.rows.flatMap(rowTarget =>
-          targets.columns.map(columnTarget => (
-            <div
-              key={`intersection:${rowTarget.name}:${columnTarget.name}`}
-              className="yv-matrix-pointer yv-matrix-pointer-intersection"
-              data-matrix-intersection={`${rowTarget.name},${columnTarget.name}`}
-              data-matrix-cell={`[${rowTarget.index},${columnTarget.index}]`}
-              style={{
-                transform: `translate3d(${matrixPointerLayout.x[columnTarget.name] ?? 0}px, ${matrixPointerLayout.y[rowTarget.name] ?? 0}px, 0) translate(-50%, -100%)`
-              }}
-            >{rowTarget.name} · {columnTarget.name}</div>
-          ))
+          targets.columns
+            .filter(columnTarget =>
+              !hasAuthoritativeAccessEvents || readPaths.has(rowTarget.index + ',' + columnTarget.index)
+            )
+            .map(columnTarget => (
+              <div
+                key={`intersection:${rowTarget.name}:${columnTarget.name}`}
+                className="yv-matrix-pointer yv-matrix-pointer-intersection"
+                data-matrix-intersection={`${rowTarget.name},${columnTarget.name}`}
+                data-matrix-cell={`[${rowTarget.index},${columnTarget.index}]`}
+                style={{
+                  transform: `translate3d(${matrixPointerLayout.x[columnTarget.name] ?? 0}px, ${matrixPointerLayout.y[rowTarget.name] ?? 0}px, 0) translate(-50%, -100%)`
+                }}
+              >{rowTarget.name} · {columnTarget.name}</div>
+            ))
         )}
       </div>
     </div>
