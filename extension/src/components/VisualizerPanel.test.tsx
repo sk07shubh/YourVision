@@ -348,7 +348,7 @@ describe('deterministic semantic pointer roles', () => {
       '  if (nums[mid] == target) {',
       '    return mid;',
       '  }',
-    ].join('\\n');
+    ].join('\n');
 
     const html = renderToStaticMarkup(
       <ArrayView value={[-1, 0, 3, 5, 9, 12]} state={current} source={source} arrayName="nums" />,
