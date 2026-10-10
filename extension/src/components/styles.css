@@ -142,3 +142,26 @@
     animation: none;
   }
 }
+
+
+/* A swap is inferred only when two traced writes exchange their prior values. */
+.yv-array-pointer-host .yv-cell-value.yv-cell-swapped {
+  border-color: color-mix(in srgb, var(--yv-success), var(--yv-border) 22%);
+  background: color-mix(in srgb, var(--yv-success), var(--yv-elevated) 89%);
+}
+.yv-array-cell-content {
+  min-width: 0;
+}
+.yv-array-cell-content-swapped {
+  animation: yv-array-swap-content 420ms cubic-bezier(.2, .75, .25, 1);
+}
+@keyframes yv-array-swap-content {
+  0% { opacity: .35; transform: translateY(3px) scale(.96); filter: blur(.5px); }
+  65% { opacity: 1; transform: translateY(-1px) scale(1.015); filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-array-cell-content-swapped {
+    animation: none;
+  }
+}
