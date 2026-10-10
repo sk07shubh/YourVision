@@ -1274,13 +1274,39 @@ export function pointerTargets(
       .map(role => role.name)
   );
 
-  // If semantic metadata doesn't name this array, infer boundary roles only
-  // when the array's source indexes it using the semantic midpoint variable.
+  // A semantic midpoint role may be omitted on condition/loop-header steps,
+  // even while its boundary roles remain present. Keep those boundary pointers
+  // attached by deriving the midpoint relationship from source, not from the
+  // current step's role list alone.
+  const leftBounds = boundaryRoles.filter(role => role.role === 'left-bound');
+  const rightBounds = boundaryRoles.filter(role => role.role === 'right-bound');
+  const hasSourceDerivedMidpointIndex = [...indexNames].some(indexName => {
+    const assignmentPattern = /(?:\\b(?:byte|short|int|long|char|float|double)\\s+)?([A-Za-z_$][\\w$]*)\\s*=\\s*([^;\\n]+);/g;
+    for (const match of source.matchAll(assignmentPattern)) {
+      if (match[1] !== indexName) continue;
+      const identifiers = new Set(
+        [...(match[2] ?? '').matchAll(/\\b[A-Za-z_$][\\w$]*\\b/g)].map(item => item[0])
+      );
+      if (
+        leftBounds.some(role => identifiers.has(role.name)) &&
+        rightBounds.some(role => identifiers.has(role.name))
+      ) return true;
+    }
+    return false;
+  });
   const hasMidpointIndex = [...indexNames].some(name =>
     boundaryRoles.some(role => role.name === name && role.role === 'midpoint')
-  );
+  ) || hasSourceDerivedMidpointIndex;
   if (!hasArraySpecificRoles && hasMidpointIndex) {
-    for (const role of boundaryRoles) semanticNames.add(role.name);
+    for (const role of boundaryRoles) {
+      // Never leak explicit roles belonging to another structure into this array.
+      if (role.structureName && role.structureName !== arrayName) continue;
+      if (role.role === 'left-bound' || role.role === 'right-bound') {
+        semanticNames.add(role.name);
+      } else if (role.role === 'midpoint' && indexNames.has(role.name)) {
+        semanticNames.add(role.name);
+      }
+    }
   }
 
   for (const [name, value] of Object.entries(state?.variables ?? {})) {
