@@ -1260,7 +1260,34 @@ function matrixIndexVariableNames(source: string, arrayName?: string): { rows: S
   const rows = new Set<string>();
   const columns = new Set<string>();
   if (!arrayName) return { rows, columns };
-  const escaped = arrayName.replace(/[.*+?^${}()|[\]\\]/g, '\\function accessedArrayIndices(state: TraceState | undefined, arrayName?: string): Set<number> {');
+  const pattern = /([A-Za-z_$][\w$]*)\s*\[\s*([^\]]+)\s*\]\s*\[\s*([^\]]+)\s*\]/g;
+  for (const match of source.matchAll(pattern)) {
+    if (match[1] !== arrayName) continue;
+    const rowExpr = match[2] ?? '';
+    const colExpr = match[3] ?? '';
+    for (const id of rowExpr.matchAll(/\b[A-Za-z_$][\w$]*\b/g)) rows.add(id[0]);
+    for (const id of colExpr.matchAll(/\b[A-Za-z_$][\w$]*\b/g)) columns.add(id[0]);
+  }
+  return { rows, columns };
+}
+
+function matrixPointerTargets(
+  state: TraceState | undefined,
+  rowCount: number,
+  columnCount: number,
+  names: { rows: Set<string>; columns: Set<string> }
+): { rows: Array<{ name: string; index: number }>; columns: Array<{ name: string; index: number }> } {
+  const rows: Array<{ name: string; index: number }> = [];
+  const columns: Array<{ name: string; index: number }> = [];
+  for (const [name, value] of Object.entries(state?.variables ?? {})) {
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) continue;
+    if (names.rows.has(name) && value < rowCount) rows.push({ name, index: value });
+    if (names.columns.has(name) && value < columnCount) columns.push({ name, index: value });
+  }
+  return { rows, columns };
+}
+
+function accessedArrayIndices(state: TraceState | undefined, arrayName?: string): Set<number> {');
   const pattern = new RegExp('\\b' + escaped + '\\s*\\[([^\\]]+)\\]\\s*\\[([^\\]]+)\\]', 'g');
   for (const match of source.matchAll(pattern)) {
     const rowExpr = match[1] ?? '';
@@ -1583,7 +1610,7 @@ function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<
           >{column}</div>
         ))}
         {rows.map((row, r) => (
-          <React.Fragment key={'row-' + r}>
+          <div className="yv-matrix-row-fragment" key={'row-' + r}>
             <div className="yv-matrix-row-index">{r}</div>
             {Array.from({ length: columnCount }, (_, column) => {
               const path = r + ',' + column;
@@ -1602,7 +1629,7 @@ function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<
                 </div>
               );
             })}
-          </React.Fragment>
+          </div>
         ))}
         <div className="yv-matrix-pointer-layer" aria-hidden="true">
           {targets.columns.map(target => (
