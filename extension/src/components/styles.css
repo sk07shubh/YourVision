@@ -371,3 +371,29 @@
     animation: none;
   }
 }
+
+
+/* Adjacent/value comparisons are emphasized only when the executed source line
+   contains a comparison operator and the trace observed multiple array reads. */
+.yv-array-pointer-host .yv-cell-value.yv-cell-compared,
+.yv-matrix-grid .yv-cell-value.yv-cell-compared {
+  border-color: color-mix(in srgb, #d97706, var(--yv-border) 22%);
+  background: color-mix(in srgb, #d97706, var(--yv-elevated) 87%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #d97706, transparent 48%);
+  animation: yv-array-compare-pulse 360ms ease-out;
+}
+.yv-array-pointer-host .yv-cell-value.yv-cell-compared.yv-cell-read,
+.yv-matrix-grid .yv-cell-value.yv-cell-compared.yv-cell-read {
+  border-color: #d97706;
+  background: color-mix(in srgb, #d97706, var(--yv-elevated) 84%);
+}
+@keyframes yv-array-compare-pulse {
+  0% { transform: scale(.97); box-shadow: inset 0 0 0 1px #d97706, 0 0 0 3px rgb(217 119 6 / 14%); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-array-pointer-host .yv-cell-value.yv-cell-compared,
+  .yv-matrix-grid .yv-cell-value.yv-cell-compared {
+    animation: none;
+  }
+}
