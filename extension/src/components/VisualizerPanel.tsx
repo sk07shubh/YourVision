@@ -1450,6 +1450,57 @@ function swappedArrayIndices(state?: TraceState, arrayName?: string): Set<number
   return indices;
 }
 
+function rotatedArrayIndices(state?: TraceState, arrayName?: string): Map<number, 'left' | 'right'> {
+  const directions = new Map<number, 'left' | 'right'>();
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data)) return directions;
+
+  const inspectWrite = (writeData: Obj) => {
+    if (typeof writeData.name === 'string' && !arrayNameMatches(writeData.name, arrayName)) return;
+    if (!Array.isArray(writeData.changes)) return;
+    const changes = writeData.changes.filter((change): change is Obj =>
+      isPlainObject(change) &&
+      Array.isArray(change.indices) &&
+      change.indices.length === 1 &&
+      typeof change.indices[0] === 'number' &&
+      Number.isInteger(change.indices[0]) &&
+      'before' in change &&
+      'after' in change
+    ).map(change => ({
+      index: (change.indices as number[])[0]!,
+      before: change.before,
+      after: change.after
+    })).sort((a, b) => a.index - b.index);
+
+    // Infer a rotation only when this trace event contains the full contiguous
+    // segment and each destination receives its cyclic neighbor's old value.
+    if (changes.length < 3) return;
+    for (let i = 1; i < changes.length; i++) {
+      if (changes[i]!.index !== changes[i - 1]!.index + 1) return;
+    }
+    if (!changes.every(change => valueChanged(change.before, change.after))) return;
+
+    const leftMatches = changes.every((change, i) =>
+      !valueChanged(change.after, changes[(i + 1) % changes.length]!.before)
+    );
+    const rightMatches = changes.every((change, i) =>
+      !valueChanged(change.after, changes[(i - 1 + changes.length) % changes.length]!.before)
+    );
+    if (leftMatches === rightMatches) return;
+    for (const change of changes) directions.set(change.index, leftMatches ? 'left' : 'right');
+  };
+
+  if (state?.lastEvent?.type === 'ARRAY_WRITE') inspectWrite(data);
+  if (Array.isArray(data.executionEvents)) {
+    for (const event of data.executionEvents) {
+      if (isPlainObject(event) && event.type === 'ARRAY_WRITE' && isPlainObject(event.data)) {
+        inspectWrite(event.data);
+      }
+    }
+  }
+  return directions;
+}
+
 function shiftedArrayIndices(state?: TraceState, arrayName?: string): Map<number, 'left' | 'right'> {
   const directions = new Map<number, 'left' | 'right'>();
   const data = state?.lastEvent?.data;
@@ -1676,6 +1727,7 @@ function ArrayView({ value, state, source, arrayName, depth, seen }: {
   const accessed = accessedArrayIndices(state, arrayName);
   const compared = isComparisonStatement(source, state) && accessed.size >= 2 ? accessed : new Set<number>();
   const swapped = swappedArrayIndices(state, arrayName);
+  const rotated = rotatedArrayIndices(state, arrayName);
   const shifted = shiftedArrayIndices(state, arrayName);
   const rangeStart = targets.length >= 2 ? Math.min(...targets.map(target => target.index)) : -1;
   const rangeEnd = targets.length >= 2 ? Math.max(...targets.map(target => target.index)) : -1;
@@ -1695,9 +1747,9 @@ function ArrayView({ value, state, source, arrayName, depth, seen }: {
         <div className="yv-cell" key={index} ref={element => { cellRefs.current[index] = element; }}>
           <div
             key={`${index}-${state?.sequence ?? state?.line ?? 'initial'}`}
-            className={`yv-cell-value ${rangeStart >= 0 && index >= rangeStart && index <= rangeEnd ? 'yv-cell-range ' : ''}${changed.has(index) ? 'yv-cell-written ' : ''}${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-cell-compared ' : ''}${swapped.has(index) ? 'yv-cell-swapped' : ''}`}
+            className={`yv-cell-value ${rangeStart >= 0 && index >= rangeStart && index <= rangeEnd ? 'yv-cell-range ' : ''}${changed.has(index) ? 'yv-cell-written ' : ''}${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-cell-compared ' : ''}${rotated.has(index) ? 'yv-cell-rotated-' + rotated.get(index) + ' ' : ''}${swapped.has(index) ? 'yv-cell-swapped' : ''}`}
           >
-            <div className={`yv-array-cell-content ${swapped.has(index) ? 'yv-array-cell-content-swapped' : ''}${shifted.has(index) ? ' yv-array-cell-content-shift-' + shifted.get(index) : ''}`}>
+            <div className={`yv-array-cell-content ${swapped.has(index) ? 'yv-array-cell-content-swapped' : ''}${rotated.has(index) ? ' yv-array-cell-content-rotate-' + rotated.get(index) : shifted.has(index) ? ' yv-array-cell-content-shift-' + shifted.get(index) : ''}`}>
               <DataValue value={item} state={state} source={source} name={arrayName} depth={depth + 1} seen={seen}/>
             </div>
           </div>
