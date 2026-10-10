@@ -397,3 +397,27 @@
     animation: none;
   }
 }
+
+
+/* Whole-segment cyclic movement is animated only when the trace proves a
+   rotation. The cell frames stay fixed; only their value content animates. */
+.yv-array-pointer-host .yv-array-cell-content-rotate-left {
+  animation: yv-array-rotate-left 420ms cubic-bezier(.2, .75, .25, 1);
+}
+.yv-array-pointer-host .yv-array-cell-content-rotate-right {
+  animation: yv-array-rotate-right 420ms cubic-bezier(.2, .75, .25, 1);
+}
+@keyframes yv-array-rotate-left {
+  0% { transform: translateX(9px); opacity: .55; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+@keyframes yv-array-rotate-right {
+  0% { transform: translateX(-9px); opacity: .55; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-array-pointer-host .yv-array-cell-content-rotate-left,
+  .yv-array-pointer-host .yv-array-cell-content-rotate-right {
+    animation: none;
+  }
+}
