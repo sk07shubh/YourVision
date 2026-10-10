@@ -1309,6 +1309,48 @@ function changedArrayIndices(state?: TraceState, arrayName?: string): Set<number
   return set;
 }
 
+function swappedArrayIndices(state?: TraceState, arrayName?: string): Set<number> {
+  const indices = new Set<number>();
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data)) return indices;
+
+  const inspectWrite = (writeData: Obj) => {
+    if (arrayName && typeof writeData.name === 'string' && writeData.name !== arrayName) return;
+    if (!Array.isArray(writeData.changes)) return;
+    const changes = writeData.changes.filter((change): change is Obj =>
+      isPlainObject(change) &&
+      Array.isArray(change.indices) &&
+      change.indices.length === 1 &&
+      typeof change.indices[0] === 'number' &&
+      Number.isInteger(change.indices[0])
+    );
+    if (changes.length !== 2) return;
+
+    const [first, second] = changes;
+    if (!first || !second) return;
+    const firstIndex = (first.indices as number[])[0]!;
+    const secondIndex = (second.indices as number[])[0]!;
+    if (firstIndex === secondIndex) return;
+    if (
+      valueChanged(first.before, second.after) ||
+      valueChanged(first.after, second.before)
+    ) return;
+
+    indices.add(firstIndex);
+    indices.add(secondIndex);
+  };
+
+  if (state?.lastEvent?.type === 'ARRAY_WRITE') inspectWrite(data);
+  if (Array.isArray(data.executionEvents)) {
+    for (const event of data.executionEvents) {
+      if (isPlainObject(event) && event.type === 'ARRAY_WRITE' && isPlainObject(event.data)) {
+        inspectWrite(event.data);
+      }
+    }
+  }
+  return indices;
+}
+
 function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<string>() }: { value: unknown[]; state?: TraceState; source?: string; arrayName?: string; depth?: number; seen?: Set<string> }) {
   const arrayRef = useRef<HTMLDivElement | null>(null);
   const cellRefs = useRef<Array<HTMLDivElement | null>>([]);
@@ -1363,6 +1405,7 @@ function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<
   // focus, while only an ARRAY_WRITE checkpoint gets the green write pulse.
   const changed = changedArrayIndices(state, arrayName);
   const accessed = accessedArrayIndices(state, arrayName);
+  const swapped = swappedArrayIndices(state, arrayName);
   const pointerMarkers = targets.map(target => {
     const x = pointerLayout.offsets[target.name] ?? 0;
     return (
@@ -1383,9 +1426,11 @@ function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<
         <div className="yv-cell" key={i} ref={element => { cellRefs.current[i] = element; }}>
           <div
             key={`${i}-${state?.sequence ?? state?.line ?? 'initial'}`}
-            className={`yv-cell-value ${changed.has(i) ? 'yv-cell-written ' : ''}${accessed.has(i) ? 'yv-cell-read' : ''}`}
+            className={`yv-cell-value ${changed.has(i) ? 'yv-cell-written ' : ''}${accessed.has(i) ? 'yv-cell-read ' : ''}${swapped.has(i) ? 'yv-cell-swapped' : ''}`}
           >
-            <DataValue value={v} state={state} source={source ?? ''} name={arrayName} depth={depth + 1} seen={seen}/>
+            <div className={`yv-array-cell-content ${swapped.has(i) ? 'yv-array-cell-content-swapped' : ''}`}>
+              <DataValue value={v} state={state} source={source ?? ''} name={arrayName} depth={depth + 1} seen={seen}/>
+            </div>
           </div>
           <div className="yv-cell-index">{i}</div>
         </div>
