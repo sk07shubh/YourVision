@@ -241,6 +241,69 @@ REPLICA_TEMPLATE = """<!DOCTYPE html>
     }}
   }});
 
+  /* ---- Working tab switching (Description/Solutions/Editorial/...) ----
+     The extension injects its own tab button into this bar and manages
+     selection state, so the native tabs must behave like the real site:
+     click switches the selected button and swaps the content host. */
+  function initTabs() {{
+    const tabList = document.querySelector(
+      '.flexlayout__tabset_tabbar_inner_tab_container_top'
+    );
+    if (!tabList) return;
+    const tabset = tabList.closest('.flexlayout__tabset');
+    const contentHost = tabset
+      ? tabset.querySelector(':scope > .flexlayout__tabset_content')
+      : null;
+    // Snapshot the real Description content so we can restore it.
+    const originalContent = contentHost ? contentHost.innerHTML : '';
+    const tabName = (btn) =>
+      (btn.textContent || '').replace(/\\s+/g, ' ').trim();
+
+    // Observe for the extension's injected tab button and wire it too.
+    function wireButton(btn) {{
+      if (btn.dataset.yvWired) return;
+      btn.dataset.yvWired = 'true';
+      btn.addEventListener('click', () => {{
+        const buttons = [...tabList.querySelectorAll(
+          ':scope > .flexlayout__tab_button_top, :scope > [role="tab"]'
+        )];
+        buttons.forEach((b) => {{
+          b.classList.remove('flexlayout__tab_button_top--selected');
+          b.setAttribute('aria-selected', 'false');
+        }});
+        btn.classList.add('flexlayout__tab_button_top--selected');
+        btn.setAttribute('aria-selected', 'true');
+        const name = tabName(btn).toLowerCase();
+        if (contentHost) {{
+          if (name.includes('description')) {{
+            contentHost.innerHTML = originalContent;
+          }} else if (btn.dataset.yourvisionTab === 'true') {{
+            // Leave the host alone: the extension manages its own panel.
+          }} else {{
+            contentHost.innerHTML =
+              '<div style="padding:20px;color:#a3a3a3;font-size:14px;">' +
+              `<p><strong>${{tabName(btn)}}</strong> — replica placeholder.</p>` +
+              '<p>Real content for this tab is not captured in the static ' +
+              'replica. The Description tab carries the full real problem.</p></div>';
+          }}
+        }}
+        status('Tab: ' + tabName(btn));
+      }});
+    }}
+
+    tabList.querySelectorAll(':scope > .flexlayout__tab_button_top')
+      .forEach(wireButton);
+    // Pick up the extension's injected tab (and any late native tabs).
+    new MutationObserver((mutations) => {{
+      for (const m of mutations)
+        for (const n of m.addedNodes)
+          if (n instanceof HTMLElement &&
+              (n.classList.contains('flexlayout__tab_button_top') ||
+               n.getAttribute('role') === 'tab')) wireButton(n);
+    }}).observe(tabList, {{ childList: true }});
+  }}
+  initTabs();
+
   // The SSR HTML has no live editor; mount ours once DOM is ready.
   if (document.readyState === 'loading')
     document.addEventListener('DOMContentLoaded', () => {{ mountMonaco(); mountConsole(); }});
