@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from '../state/session';
 import { sessionStore } from '../state/store';
 import { displayValue, stableStringify, isPlainObject } from '../utils/value';
@@ -1242,14 +1242,18 @@ function arrayIndexVariableNames(source: string, arrayName?: string): Set<string
   return names;
 }
 
-function pointerLabels(state: TraceState | undefined, length: number, indexNames: Set<string>): Map<number,string[]> {
-  const map = new Map<number,string[]>();
-  for (const [name,value] of Object.entries(state?.variables ?? {})) {
+export function pointerTargets(
+  state: TraceState | undefined,
+  length: number,
+  indexNames: Set<string>
+): Array<{ name: string; index: number }> {
+  const targets: Array<{ name: string; index: number }> = [];
+  for (const [name, value] of Object.entries(state?.variables ?? {})) {
     if (!indexNames.has(name)) continue;
     if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value >= length) continue;
-    const list = map.get(value) ?? []; list.push(name); map.set(value,list);
+    targets.push({ name, index: value });
   }
-  return map;
+  return targets;
 }
 
 function accessedArrayIndices(state: TraceState | undefined, arrayName?: string): Set<number> {
@@ -1307,9 +1311,81 @@ function changedArrayIndices(state?: TraceState): Set<number> {
 }
 
 function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<string>() }: { value: unknown[]; state?: TraceState; source?: string; arrayName?: string; depth?: number; seen?: Set<string> }) {
+  const arrayRef = useRef<HTMLDivElement | null>(null);
+  const cellRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const indexNames = arrayIndexVariableNames(source ?? '', arrayName);
+  const targets = pointerTargets(state, value.length, indexNames);
+  const targetSignature = targets.map(({ name, index }) => name + ':' + index).sort().join('|');
+  const previousIndices = useRef<Map<string, number>>(new Map());
+  const [pointerLayout, setPointerLayout] = useState<{ offsets: Record<string, number>; moving: Set<string> }>({
+    offsets: {},
+    moving: new Set<string>()
+  });
+
+  useLayoutEffect(() => {
+    const host = arrayRef.current;
+    if (!host) return;
+
+    const offsets: Record<string, number> = {};
+    const moving = new Set<string>();
+    const nextIndices = new Map<string, number>();
+
+    for (const target of targets) {
+      const cell = cellRefs.current[target.index];
+      if (!cell) continue;
+      offsets[target.name] = cell.offsetLeft + cell.offsetWidth / 2;
+      const previousIndex = previousIndices.current.get(target.name);
+      if (previousIndex !== undefined && previousIndex !== target.index) moving.add(target.name);
+      nextIndices.set(target.name, target.index);
+    }
+
+    previousIndices.current = nextIndices;
+    setPointerLayout({ offsets, moving });
+  }, [targetSignature, state?.sequence, value.length]);
+
   if (value.every(Array.isArray)) return <div className="yv-matrix">{value.map((row,r)=><div className="yv-array" key={r}>{(row as unknown[]).map((v,i)=><div className="yv-cell" key={i}><div className="yv-cell-value"><DataValue value={v} state={state} source={source ?? ''} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">[{r},{i}]</div></div>)}</div>)}</div>;
-  const labels=pointerLabels(state,value.length,arrayIndexVariableNames(source ?? '', arrayName)); const changed=changedArrayIndices(state); const accessed=accessedArrayIndices(state,arrayName);
-  return <div className="yv-array">{value.map((v,i)=><div className="yv-cell" key={i}>{labels.has(i)&&<div className="yv-pointer">{labels.get(i)!.join(' · ')}</div>}<div className={`yv-cell-value ${changed.has(i)?'yv-cell-changed ':''}${accessed.has(i)?'yv-cell-accessed':''}`}><DataValue value={v} state={state} source={source ?? ''} name={arrayName} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">{i}</div></div>)}</div>;
+
+  const changed = changedArrayIndices(state);
+  const accessed = accessedArrayIndices(state, arrayName);
+  const targetsByIndex = new Map<number, typeof targets>();
+  for (const target of targets) {
+    const atIndex = targetsByIndex.get(target.index) ?? [];
+    atIndex.push(target);
+    targetsByIndex.set(target.index, atIndex);
+  }
+
+  const pointerMarkers = targets.map(target => {
+    const peers = targetsByIndex.get(target.index) ?? [target];
+    const widths = peers.map(peer => Math.max(1, peer.name.length) * 6.2 + 10);
+    const peerIndex = peers.findIndex(peer => peer.name === target.name);
+    const totalWidth = widths.reduce((sum, width) => sum + width, 0) + Math.max(0, peers.length - 1) * 3;
+    const precedingWidth = widths.slice(0, peerIndex).reduce((sum, width) => sum + width + 3, 0);
+    const centeredOffset = precedingWidth + widths[peerIndex]! / 2 - totalWidth / 2;
+    const x = (pointerLayout.offsets[target.name] ?? 0) + centeredOffset;
+    return (
+      <div
+        key={target.name}
+        className={`yv-pointer ${pointerLayout.moving.has(target.name) ? 'yv-pointer-moving' : ''}`}
+        style={{ transform: `translate3d(${x}px, 0, 0) translateX(-50%)` }}
+      >
+        {target.name}
+      </div>
+    );
+  });
+
+  return (
+    <div className="yv-array yv-array-pointer-host" ref={arrayRef}>
+      <div className="yv-pointer-layer" aria-hidden="true">{pointerMarkers}</div>
+      {value.map((v, i) => (
+        <div className="yv-cell" key={i} ref={element => { cellRefs.current[i] = element; }}>
+          <div className={`yv-cell-value ${changed.has(i) ? 'yv-cell-changed ' : ''}${accessed.has(i) ? 'yv-cell-accessed' : ''}`}>
+            <DataValue value={v} state={state} source={source ?? ''} name={arrayName} depth={depth + 1} seen={seen}/>
+          </div>
+          <div className="yv-cell-index">{i}</div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function mapChanges(state?: TraceState): Array<{
