@@ -200,3 +200,18 @@
     animation: none;
   }
 }
+
+
+/* Newly materialized cells fade in without shifting neighboring cells. */
+.yv-array-pointer-host > .yv-cell {
+  animation: yv-array-cell-enter 220ms ease-out both;
+}
+@keyframes yv-array-cell-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-array-pointer-host > .yv-cell {
+    animation: none;
+  }
+}
