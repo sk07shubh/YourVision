@@ -1776,19 +1776,58 @@ function ArrayView({ value, state, source, arrayName, depth, seen }: {
   useLayoutEffect(() => {
     const host = arrayRef.current;
     if (!host) return;
-    const offsets: Record<string, number> = {};
-    const moving = new Set<string>();
-    const next = new Map<string, number>();
-    for (const target of targets) {
-      const cell = cellRefs.current[target.index];
-      if (!cell) continue;
-      offsets[target.name] = cell.offsetLeft + cell.offsetWidth / 2;
-      const previous = previousTargets.current.get(target.name);
-      if (previous !== undefined && previous !== target.index) moving.add(target.name);
-      next.set(target.name, target.index);
-    }
-    previousTargets.current = next;
-    setPointerLayout({ offsets, moving });
+
+    const layoutPointers = () => {
+      const offsets: Record<string, number> = {};
+      const moving = new Set<string>();
+      const next = new Map<string, number>();
+      const labels = new Map<string, HTMLElement>();
+      host.querySelectorAll<HTMLElement>('[data-array-pointer]').forEach(label => {
+        const name = label.dataset.arrayPointer;
+        if (name) labels.set(name, label);
+      });
+
+      // Group pointers on the same cell and lay their measured labels side by
+      // side. This avoids hiding one index behind another (e.g. left/right).
+      const groups = new Map<number, typeof targets>();
+      for (const target of targets) {
+        const cell = cellRefs.current[target.index];
+        if (!cell) continue;
+        const group = groups.get(target.index) ?? [];
+        group.push(target);
+        groups.set(target.index, group);
+        const previous = previousTargets.current.get(target.name);
+        if (previous !== undefined && previous !== target.index) moving.add(target.name);
+        next.set(target.name, target.index);
+      }
+
+      for (const [index, group] of groups) {
+        const cell = cellRefs.current[index];
+        if (!cell) continue;
+        const center = cell.offsetLeft + cell.offsetWidth / 2;
+        const gap = 5;
+        const widths = group.map(target => labels.get(target.name)?.offsetWidth ?? Math.max(24, target.name.length * 7 + 10));
+        const totalWidth = widths.reduce((sum, width) => sum + width, 0) + gap * Math.max(0, group.length - 1);
+        let left = center - totalWidth / 2;
+        group.forEach((target, i) => {
+          offsets[target.name] = left + widths[i]! / 2;
+          left += widths[i]! + gap;
+        });
+      }
+
+      previousTargets.current = next;
+      setPointerLayout({ offsets, moving });
+    };
+
+    layoutPointers();
+    // Keep labels aligned when responsive layout, fonts, or cell contents alter
+    // widths, not only when the traced index changes.
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(layoutPointers);
+    observer.observe(host);
+    Object.values(cellRefs.current).forEach(cell => { if (cell) observer.observe(cell); });
+    host.querySelectorAll<HTMLElement>('[data-array-pointer]').forEach(label => observer.observe(label));
+    return () => observer.disconnect();
   }, [targetSignature, state?.sequence, value.length]);
 
   const changed = changedArrayIndices(state, arrayName);
@@ -1808,6 +1847,7 @@ function ArrayView({ value, state, source, arrayName, depth, seen }: {
         {targets.map(target => (
           <div
             key={target.name}
+            data-array-pointer={target.name}
             className={`yv-pointer ${pointerLayout.moving.has(target.name) ? 'yv-pointer-moving' : ''}`}
             style={{ transform: `translate3d(${pointerLayout.offsets[target.name] ?? 0}px, 0, 0) translateX(-50%)` }}
           >{target.name}</div>
