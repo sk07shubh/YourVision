@@ -20,7 +20,6 @@ import {
   ArrayView,
   DataStructures,
   StringView,
-  Variables,
 } from './VisualizerPanel';
 
 function state(patch: Partial<TraceState> = {}): TraceState {
