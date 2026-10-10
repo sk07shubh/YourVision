@@ -1394,6 +1394,7 @@ function changedArrayPaths(state?: TraceState, arrayName?: string): Set<string> 
     for (const change of changes) {
       if (!isPlainObject(change) || !Array.isArray(change.indices) ||
           !change.indices.every(index => typeof index === 'number' && Number.isInteger(index))) continue;
+      if ('before' in change && 'after' in change && !valueChanged(change.before, change.after)) continue;
       paths.add((change.indices as number[]).join(','));
     }
   };
