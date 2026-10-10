@@ -1256,6 +1256,37 @@ export function pointerTargets(
   return targets;
 }
 
+function matrixIndexVariableNames(source: string, arrayName?: string): { rows: Set<string>; columns: Set<string> } {
+  const rows = new Set<string>();
+  const columns = new Set<string>();
+  if (!arrayName) return { rows, columns };
+  const escaped = arrayName.replace(/[.*+?^${}()|[\]\\]/g, '\\function accessedArrayIndices(state: TraceState | undefined, arrayName?: string): Set<number> {');
+  const pattern = new RegExp('\\b' + escaped + '\\s*\\[([^\\]]+)\\]\\s*\\[([^\\]]+)\\]', 'g');
+  for (const match of source.matchAll(pattern)) {
+    const rowExpr = match[1] ?? '';
+    const colExpr = match[2] ?? '';
+    for (const id of rowExpr.matchAll(/\\b[A-Za-z_$][\\w$]*\\b/g)) rows.add(id[0]);
+    for (const id of colExpr.matchAll(/\\b[A-Za-z_$][\\w$]*\\b/g)) columns.add(id[0]);
+  }
+  return { rows, columns };
+}
+
+function matrixPointerTargets(
+  state: TraceState | undefined,
+  rowCount: number,
+  columnCount: number,
+  names: { rows: Set<string>; columns: Set<string> }
+): { rows: Array<{ name: string; index: number }>; columns: Array<{ name: string; index: number }> } {
+  const rows: Array<{ name: string; index: number }> = [];
+  const columns: Array<{ name: string; index: number }> = [];
+  for (const [name, value] of Object.entries(state?.variables ?? {})) {
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) continue;
+    if (names.rows.has(name) && value < rowCount) rows.push({ name, index: value });
+    if (names.columns.has(name) && value < columnCount) columns.push({ name, index: value });
+  }
+  return { rows, columns };
+}
+
 function accessedArrayIndices(state: TraceState | undefined, arrayName?: string): Set<number> {
   const set = new Set<number>();
   const data = state?.lastEvent?.data;
@@ -1483,28 +1514,112 @@ function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<
   }, [targetSignature, state?.sequence, value.length]);
 
   if (value.length > 0 && value.every(Array.isArray)) {
+    const rows = value as unknown[][];
+    const rowCount = rows.length;
+    const columnCount = Math.max(0, ...rows.map(row => row.length));
     const readPaths = accessedArrayPaths(state, arrayName);
     const writtenPaths = changedArrayPaths(state, arrayName);
+    const indexNames = matrixIndexVariableNames(source ?? '', arrayName);
+    const targets = matrixPointerTargets(state, rowCount, columnCount, indexNames);
+    const targetSignature = [
+      ...targets.rows.map(target => 'r:' + target.name + ':' + target.index),
+      ...targets.columns.map(target => 'c:' + target.name + ':' + target.index)
+    ].sort().join('|');
+    const matrixRef = useRef<HTMLDivElement | null>(null);
+    const matrixCellRefs = useRef<Record<string, HTMLDivElement | null>>({});
+    const previousMatrixTargets = useRef<Map<string, number>>(new Map());
+    const [matrixPointerLayout, setMatrixPointerLayout] = useState<{
+      x: Record<string, number>;
+      y: Record<string, number>;
+      movingRows: Set<string>;
+      movingColumns: Set<string>;
+    }>({ x: {}, y: {}, movingRows: new Set(), movingColumns: new Set() });
+
+    useLayoutEffect(() => {
+      const host = matrixRef.current;
+      if (!host) return;
+      const x: Record<string, number> = {};
+      const y: Record<string, number> = {};
+      const movingRows = new Set<string>();
+      const movingColumns = new Set<string>();
+      const next = new Map<string, number>();
+
+      for (const target of targets.columns) {
+        const cell = matrixCellRefs.current[target.index + ',0'];
+        const colCell = matrixCellRefs.current['__col,' + target.index];
+        const measured = colCell ?? cell;
+        if (!measured) continue;
+        x[target.name] = measured.offsetLeft + measured.offsetWidth / 2;
+        const key = 'c:' + target.name;
+        const previous = previousMatrixTargets.current.get(key);
+        if (previous !== undefined && previous !== target.index) movingColumns.add(target.name);
+        next.set(key, target.index);
+      }
+      for (const target of targets.rows) {
+        const cell = matrixCellRefs.current[target.index + ',0'];
+        if (!cell) continue;
+        y[target.name] = cell.offsetTop + cell.offsetHeight / 2;
+        const key = 'r:' + target.name;
+        const previous = previousMatrixTargets.current.get(key);
+        if (previous !== undefined && previous !== target.index) movingRows.add(target.name);
+        next.set(key, target.index);
+      }
+      previousMatrixTargets.current = next;
+      setMatrixPointerLayout({ x, y, movingRows, movingColumns });
+    }, [targetSignature, state?.sequence, rowCount, columnCount]);
+
     return (
-      <div className="yv-matrix">
-        {value.map((row, r) => (
-          <div className="yv-array" key={r}>
-            {(row as unknown[]).map((cellValue, i) => {
-              const path = r + ',' + i;
+      <div
+        className="yv-matrix yv-matrix-grid"
+        ref={matrixRef}
+        style={{ gridTemplateColumns: `38px repeat(${columnCount}, minmax(36px, max-content))` }}
+      >
+        <div className="yv-matrix-corner" />
+        {Array.from({ length: columnCount }, (_, column) => (
+          <div
+            className="yv-matrix-column-index"
+            key={'column-' + column}
+            ref={element => { matrixCellRefs.current['__col,' + column] = element; }}
+          >{column}</div>
+        ))}
+        {rows.map((row, r) => (
+          <React.Fragment key={'row-' + r}>
+            <div className="yv-matrix-row-index">{r}</div>
+            {Array.from({ length: columnCount }, (_, column) => {
+              const path = r + ',' + column;
+              const exists = column < row.length;
               return (
-                <div className="yv-cell" key={i}>
+                <div className={`yv-matrix-cell ${exists ? '' : 'yv-matrix-cell-empty'}`} key={path}>
                   <div
+                    ref={element => { matrixCellRefs.current[path] = element; }}
                     key={`${path}-${state?.sequence ?? state?.line ?? 'initial'}`}
                     className={`yv-cell-value ${readPaths.has(path) ? 'yv-cell-read ' : ''}${writtenPaths.has(path) ? 'yv-cell-written' : ''}`}
                   >
-                    <DataValue value={cellValue} state={state} source={source ?? ''} depth={depth + 1} seen={seen}/>
+                    {exists
+                      ? <DataValue value={row[column]} state={state} source={source ?? ''} depth={depth + 1} seen={seen}/>
+                      : <span className="yv-matrix-missing">—</span>}
                   </div>
-                  <div className="yv-cell-index">[{r},{i}]</div>
                 </div>
               );
             })}
-          </div>
+          </React.Fragment>
         ))}
+        <div className="yv-matrix-pointer-layer" aria-hidden="true">
+          {targets.columns.map(target => (
+            <div
+              key={'c:' + target.name}
+              className={`yv-matrix-pointer yv-matrix-pointer-column ${matrixPointerLayout.movingColumns.has(target.name) ? 'is-moving' : ''}`}
+              style={{ transform: `translate3d(${matrixPointerLayout.x[target.name] ?? 0}px, 0, 0) translateX(-50%)` }}
+            >{target.name}</div>
+          ))}
+          {targets.rows.map(target => (
+            <div
+              key={'r:' + target.name}
+              className={`yv-matrix-pointer yv-matrix-pointer-row ${matrixPointerLayout.movingRows.has(target.name) ? 'is-moving' : ''}`}
+              style={{ transform: `translate3d(0, ${matrixPointerLayout.y[target.name] ?? 0}px, 0) translateY(-50%)` }}
+            >{target.name}</div>
+          ))}
+        </div>
       </div>
     );
   }
