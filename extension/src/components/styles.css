@@ -339,3 +339,35 @@
 .yv-matrix-grid .yv-matrix-row-fragment {
   display: contents;
 }
+
+
+/* Matrix traversal: the row/column pointer intersection is the active cell. */
+.yv-matrix-grid .yv-matrix-axis-active {
+  color: var(--yv-accent);
+  font-weight: 800;
+}
+.yv-matrix-grid .yv-matrix-cell-active .yv-cell-value {
+  position: relative;
+  z-index: 1;
+  border-color: var(--yv-accent);
+  background: color-mix(in srgb, var(--yv-accent), var(--yv-elevated) 84%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--yv-accent), transparent 35%), 0 0 0 1px color-mix(in srgb, var(--yv-accent), transparent 68%);
+  animation: yv-matrix-intersection 360ms cubic-bezier(.2, .75, .25, 1);
+}
+.yv-matrix-grid .yv-matrix-cell-active .yv-cell-value.yv-cell-read {
+  border-color: #3b82f6;
+  background: color-mix(in srgb, #3b82f6, var(--yv-elevated) 82%);
+}
+.yv-matrix-grid .yv-matrix-cell-active .yv-cell-value.yv-cell-written {
+  border-color: var(--yv-success);
+  background: color-mix(in srgb, var(--yv-success), var(--yv-elevated) 80%);
+}
+@keyframes yv-matrix-intersection {
+  0% { transform: scale(.96); box-shadow: inset 0 0 0 1px var(--yv-accent), 0 0 0 3px color-mix(in srgb, var(--yv-accent), transparent 72%); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-matrix-grid .yv-matrix-cell-active .yv-cell-value {
+    animation: none;
+  }
+}
