@@ -1599,7 +1599,7 @@ function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<
       <div
         className="yv-matrix yv-matrix-grid"
         ref={matrixRef}
-        style={{ gridTemplateColumns: `38px repeat(${columnCount}, minmax(36px, max-content))` }}
+        style={{ gridTemplateColumns: `62px repeat(${columnCount}, minmax(36px, max-content))` }}
       >
         <div className="yv-matrix-corner" />
         {Array.from({ length: columnCount }, (_, column) => (
@@ -1616,9 +1616,12 @@ function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<
               const path = r + ',' + column;
               const exists = column < row.length;
               return (
-                <div className={`yv-matrix-cell ${exists ? '' : 'yv-matrix-cell-empty'}`} key={path}>
+                <div
+                  className={`yv-matrix-cell ${exists ? '' : 'yv-matrix-cell-empty'}`}
+                  key={path}
+                  ref={element => { matrixCellRefs.current[path] = element; }}
+                >
                   <div
-                    ref={element => { matrixCellRefs.current[path] = element; }}
                     key={`${path}-${state?.sequence ?? state?.line ?? 'initial'}`}
                     className={`yv-cell-value ${readPaths.has(path) ? 'yv-cell-read ' : ''}${writtenPaths.has(path) ? 'yv-cell-written' : ''}`}
                   >
