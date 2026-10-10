@@ -2,6 +2,7 @@ import type {
     ExecutionEvent,
     ExecutionTrace
 } from "./schema.js";
+import { inferSemanticRoles } from "./semanticRoles.js";
 
 type SnapshotRecord = Record<string, unknown>;
 
@@ -154,12 +155,19 @@ export function enrichTrace(
         sourceLines
     );
 
+    const semanticRoles = inferSemanticRoles(source);
+
     return {
         version: 1,
-        events: normalized.map((event, index) => ({
-            ...event,
-            sequence: index + 1
-        }))
+        events: normalized.map((event, index) => {
+            if (event.type !== "STEP" || semanticRoles.length === 0) return { ...event, sequence: index + 1 };
+            const variables = event.data?.postVariables ?? event.data?.variables;
+            const activeNames = variables && typeof variables === "object" && !Array.isArray(variables)
+                ? new Set(Object.keys(variables as Record<string, unknown>)) : undefined;
+            const methodRoles = semanticRoles.filter(role => !role.method || !event.method || role.method === event.method);
+            const activeRoles = activeNames ? methodRoles.filter(role => activeNames.has(role.name)) : methodRoles;
+            return { ...event, sequence: index + 1, data: { ...(event.data ?? {}), semanticRoles: activeRoles } };
+        })
     };
 }
 
@@ -401,9 +409,12 @@ function annotateCondition(
 
 function extractConditionExpression(statement: string): string | undefined {
     const trimmed = statement.trim();
+    // A branch checkpoint can retain the full source spelling "else if (...)";
+    // normalize only the leading keyword so its condition is evaluated too.
+    const conditionStatement = trimmed.replace(/^(?:}\s*)?else\s+if\b/, "if");
     for (const keyword of ["if", "while"]) {
-        if (new RegExp("^" + keyword + "\\s*\\(").test(trimmed)) {
-            return balancedParenthesized(trimmed, trimmed.indexOf("("));
+        if (new RegExp("^" + keyword + "\\s*\\(").test(conditionStatement)) {
+            return balancedParenthesized(conditionStatement, conditionStatement.indexOf("("));
         }
     }
     if (/^for\s*\(/.test(trimmed)) {

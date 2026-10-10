@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from '../state/session';
 import { sessionStore } from '../state/store';
 import { displayValue, stableStringify, isPlainObject } from '../utils/value';
@@ -911,7 +911,7 @@ function ExecutionInspector({ state, previous, statement, index, total }: { stat
             }
           }}
         >
-          Copy Debug Trace
+          Copy DS Debug Trace
         </button>
       </div>
 
@@ -1197,7 +1197,15 @@ function variableSummary(value: unknown): string {
   return displayValue(value);
 }
 
-function Variables({ state, previous }: { state?: TraceState; previous?: TraceState }) {
+export interface SemanticRoleView { name:string; role:string; confidence?:number; evidence?:string; structureName?:string; usage?:string[]; method?:string; }
+function stateSemanticRoles(state?:TraceState):SemanticRoleView[]{
+ const data=state?.lastEvent?.data;
+ if(!isPlainObject(data)||!Array.isArray(data.semanticRoles))return [];
+ return data.semanticRoles.filter((role):role is SemanticRoleView=>isPlainObject(role)&&typeof role.name==="string"&&typeof role.role==="string");
+}
+export function semanticRoleForVariable(state:TraceState|undefined,name:string):SemanticRoleView|undefined{return stateSemanticRoles(state).find(role=>role.name===name);}
+function semanticRoleLabel(role:string):string{return ({'left-bound':'LEFT BOUND','right-bound':'RIGHT BOUND',midpoint:'MIDPOINT','loop-counter':'LOOP',pointer:'POINTER','derived-value':'DERIVED','answer-value':'RESULT',unused:'UNUSED'} as Record<string,string>)[role]??'';}
+export function Variables({ state, previous }: { state?: TraceState; previous?: TraceState }) {
   const entries = Object.entries(state?.variables ?? {})
     .filter(([name, value]) => name !== 'this' && !isStructuralObject(value));
   if (!entries.length) return <div className="yv-empty">No local variables yet.</div>;
@@ -1210,10 +1218,12 @@ function Variables({ state, previous }: { state?: TraceState; previous?: TraceSt
         const changed =
           Boolean(previous) &&
           stableStringify(old) !== stableStringify(value);
+        const role = semanticRoleForVariable(state, name);
+        const roleTitle = [role?.evidence, ...(role?.usage ?? [])].filter(Boolean).join(' · ');
 
         return (
           <div className={`yv-var ${changed ? 'changed' : ''}`} key={name}>
-            <div className="yv-var-name">{name}</div>
+            <div className="yv-var-name"><span>{name}</span>{role&&<span className="yv-role" title={roleTitle}>{semanticRoleLabel(role.role)}</span>}</div>
             <div className="yv-change">
               {changed && (
                 <>
@@ -1235,21 +1245,136 @@ function Variables({ state, previous }: { state?: TraceState; previous?: TraceSt
 function arrayIndexVariableNames(source: string, arrayName?: string): Set<string> {
   const names = new Set<string>();
   if (!arrayName) return names;
-  const pattern = new RegExp(arrayName + '\\s*\\[([^\\]]+)\\]', 'g');
+  // Java identifiers may contain '$'. Escape it and keep the regex escapes single.
+  const escapedArrayName = arrayName.replace(/[$]/g, '\\$&');
+  const pattern = new RegExp('\\b' + escapedArrayName + '\\s*\\[([^\\]]+)\\]', 'g');
   for (const match of source.matchAll(pattern)) {
     for (const identifier of match[1].matchAll(/\b[A-Za-z_$][\w$]*\b/g)) names.add(identifier[0]);
   }
   return names;
 }
 
-function pointerLabels(state: TraceState | undefined, length: number, indexNames: Set<string>): Map<number,string[]> {
-  const map = new Map<number,string[]>();
-  for (const [name,value] of Object.entries(state?.variables ?? {})) {
-    if (!indexNames.has(name)) continue;
-    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value >= length) continue;
-    const list = map.get(value) ?? []; list.push(name); map.set(value,list);
+export function pointerTargets(
+  state: TraceState | undefined,
+  length: number,
+  indexNames: Set<string>,
+  arrayName?: string,
+  source = ''
+): Array<{ name: string; index: number }> {
+  const targets: Array<{ name: string; index: number }> = [];
+  const roles = stateSemanticRoles(state);
+  const boundaryRoles = roles.filter(role =>
+    ['left-bound', 'right-bound', 'midpoint', 'pointer'].includes(role.role)
+  );
+  const hasArraySpecificRoles = boundaryRoles.some(
+    role => role.structureName === arrayName
+  );
+  const semanticNames = new Set(
+    boundaryRoles
+      .filter(role => role.structureName === arrayName)
+      .map(role => role.name)
+  );
+
+  // A semantic midpoint role may be omitted on condition/loop-header steps,
+  // even while its boundary roles remain present. Keep those boundary pointers
+  // attached by deriving the midpoint relationship from source, not from the
+  // current step's role list alone.
+  const leftBounds = boundaryRoles.filter(role => role.role === 'left-bound');
+  const rightBounds = boundaryRoles.filter(role => role.role === 'right-bound');
+  const hasSourceDerivedMidpointIndex = [...indexNames].some(indexName => {
+    const assignmentPattern = /(?:\b(?:byte|short|int|long|char|float|double)\s+)?([A-Za-z_$][\w$]*)\s*=\s*([^;\n]+);/g;
+    for (const match of source.matchAll(assignmentPattern)) {
+      if (match[1] !== indexName) continue;
+      const identifiers = new Set(
+        [...(match[2] ?? '').matchAll(/\b[A-Za-z_$][\w$]*\b/g)].map(item => item[0])
+      );
+      if (
+        leftBounds.some(role => identifiers.has(role.name)) &&
+        rightBounds.some(role => identifiers.has(role.name))
+      ) return true;
+    }
+    return false;
+  });
+  const hasMidpointIndex = [...indexNames].some(name =>
+    boundaryRoles.some(role => role.name === name && role.role === 'midpoint')
+  ) || hasSourceDerivedMidpointIndex;
+  if (!hasArraySpecificRoles && hasMidpointIndex) {
+    for (const role of boundaryRoles) {
+      // Never leak explicit roles belonging to another structure into this array.
+      if (role.structureName && role.structureName !== arrayName) continue;
+      if (role.role === 'left-bound' || role.role === 'right-bound') {
+        semanticNames.add(role.name);
+      } else if (role.role === 'midpoint' && indexNames.has(role.name)) {
+        semanticNames.add(role.name);
+      }
+    }
   }
-  return map;
+
+  for (const [name, value] of Object.entries(state?.variables ?? {})) {
+    if (!indexNames.has(name) && !semanticNames.has(name)) continue;
+    if (
+      typeof value !== 'number' ||
+      !Number.isInteger(value) ||
+      value < 0 ||
+      value >= length
+    ) continue;
+    targets.push({ name, index: value });
+  }
+  return targets;
+}
+
+export function pointerLabels(
+  state: TraceState | undefined,
+  length: number,
+  indexNames: Set<string>,
+  arrayName?: string,
+  source = ''
+): Map<number, string[]> {
+  const labels = new Map<number, string[]>();
+
+  for (const target of pointerTargets(state, length, indexNames, arrayName, source)) {
+    const names = labels.get(target.index) ?? [];
+    names.push(target.name);
+    labels.set(target.index, names);
+  }
+
+  return labels;
+}
+
+function arrayNameMatches(candidate: string, requested?: string): boolean {
+  if (!requested) return true;
+  return requested.split('/').map(name => name.trim()).includes(candidate);
+}
+
+function matrixIndexVariableNames(source: string, arrayName?: string): { rows: Set<string>; columns: Set<string> } {
+  const rows = new Set<string>();
+  const columns = new Set<string>();
+  if (!arrayName) return { rows, columns };
+  const pattern = /([A-Za-z_$][\w$]*)\s*\[\s*([^\]]+)\s*\]\s*\[\s*([^\]]+)\s*\]/g;
+  for (const match of source.matchAll(pattern)) {
+    if (!arrayNameMatches(match[1] ?? '', arrayName)) continue;
+    const rowExpr = match[2] ?? '';
+    const colExpr = match[3] ?? '';
+    for (const id of rowExpr.matchAll(/\b[A-Za-z_$][\w$]*\b/g)) rows.add(id[0]);
+    for (const id of colExpr.matchAll(/\b[A-Za-z_$][\w$]*\b/g)) columns.add(id[0]);
+  }
+  return { rows, columns };
+}
+
+function matrixPointerTargets(
+  state: TraceState | undefined,
+  rowCount: number,
+  columnCount: number,
+  names: { rows: Set<string>; columns: Set<string> }
+): { rows: Array<{ name: string; index: number }>; columns: Array<{ name: string; index: number }> } {
+  const rows: Array<{ name: string; index: number }> = [];
+  const columns: Array<{ name: string; index: number }> = [];
+  for (const [name, value] of Object.entries(state?.variables ?? {})) {
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) continue;
+    if (names.rows.has(name) && value < rowCount) rows.push({ name, index: value });
+    if (names.columns.has(name) && value < columnCount) columns.push({ name, index: value });
+  }
+  return { rows, columns };
 }
 
 function accessedArrayIndices(state: TraceState | undefined, arrayName?: string): Set<number> {
@@ -1258,12 +1383,20 @@ function accessedArrayIndices(state: TraceState | undefined, arrayName?: string)
   if (!isPlainObject(data) || !Array.isArray(data.executionEvents)) return set;
   for (const event of data.executionEvents) {
     if (!isPlainObject(event) || event.type !== 'ARRAY_ACCESS' || !isPlainObject(event.data)) continue;
-    if (arrayName && event.data.name !== arrayName) continue;
+    if (typeof event.data.name === 'string' && !arrayNameMatches(event.data.name, arrayName)) continue;
     if (!Array.isArray(event.data.indices)) continue;
     const index = event.data.indices[0];
     if (typeof index === 'number') set.add(index);
   }
   return set;
+}
+
+function isComparisonStatement(source: string, state?: TraceState): boolean {
+  const line = state?.line;
+  if (!line || line < 1) return false;
+  const statement = source.split(/\r?\n/)[line - 1] ?? '';
+  // Require an actual comparison operator, not a plain assignment.
+  return /(?:===|!==|==|!=|<=|>=|(?<![<>=!])<(?![=])|(?<![<>=!])>(?![=]))/.test(statement);
 }
 
 function accessedArrayPaths(state: TraceState | undefined, arrayName?: string): Set<string> {
@@ -1272,44 +1405,618 @@ function accessedArrayPaths(state: TraceState | undefined, arrayName?: string): 
   if (!isPlainObject(data) || !Array.isArray(data.executionEvents)) return paths;
   for (const event of data.executionEvents) {
     if (!isPlainObject(event) || event.type !== 'ARRAY_ACCESS' || !isPlainObject(event.data)) continue;
-    if (arrayName && event.data.name !== arrayName) continue;
+    if (arrayName && (typeof event.data.name !== 'string' || !arrayNameMatches(event.data.name, arrayName))) continue;
     if (!Array.isArray(event.data.indices) || !event.data.indices.every((x) => typeof x === 'number')) continue;
     paths.add((event.data.indices as number[]).join(','));
   }
   return paths;
 }
 
-function changedArrayIndices(state?: TraceState): Set<number> {
+function changedArrayIndices(state?: TraceState, arrayName?: string): Set<number> {
   const set = new Set<number>();
   const data = state?.lastEvent?.data;
   if (!isPlainObject(data)) return set;
 
-  const collect = (changes: unknown) => {
+  const collect = (changes: unknown, eventArrayName?: unknown) => {
+    if (typeof eventArrayName === 'string' && !arrayNameMatches(eventArrayName, arrayName)) return;
     if (!Array.isArray(changes)) return;
-    for (const c of changes) {
-      if (!isPlainObject(c) || !Array.isArray(c.indices)) continue;
-      const i = c.indices[0];
-      if (typeof i === 'number') set.add(i);
+    for (const change of changes) {
+      if (!isPlainObject(change) || !Array.isArray(change.indices)) continue;
+      // A trace may report a write operation even when the stored value is
+      // unchanged. Don't replay a "changed cell" animation for a no-op write.
+      if ('before' in change && 'after' in change && !valueChanged(change.before, change.after)) continue;
+      const i = change.indices[0];
+      if (typeof i === 'number' && Number.isInteger(i) && i >= 0) set.add(i);
     }
   };
 
-  collect(data.changes);
+  if (state?.lastEvent?.type === 'ARRAY_WRITE') collect(data.changes, data.name);
   if (Array.isArray(data.executionEvents)) {
     for (const event of data.executionEvents) {
-      if (!isPlainObject(event)) continue;
-      if (event.type === 'ARRAY_WRITE' && isPlainObject(event.data)) {
-        collect(event.data.changes);
-      }
+      if (!isPlainObject(event) || event.type !== 'ARRAY_WRITE' || !isPlainObject(event.data)) continue;
+      collect(event.data.changes, event.data.name);
     }
   }
 
   return set;
 }
 
-function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<string>() }: { value: unknown[]; state?: TraceState; source?: string; arrayName?: string; depth?: number; seen?: Set<string> }) {
-  if (value.every(Array.isArray)) return <div className="yv-matrix">{value.map((row,r)=><div className="yv-array" key={r}>{(row as unknown[]).map((v,i)=><div className="yv-cell" key={i}><div className="yv-cell-value"><DataValue value={v} state={state} source={source ?? ''} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">[{r},{i}]</div></div>)}</div>)}</div>;
-  const labels=pointerLabels(state,value.length,arrayIndexVariableNames(source ?? '', arrayName)); const changed=changedArrayIndices(state); const accessed=accessedArrayIndices(state,arrayName);
-  return <div className="yv-array">{value.map((v,i)=><div className="yv-cell" key={i}>{labels.has(i)&&<div className="yv-pointer">{labels.get(i)!.join(' · ')}</div>}<div className={`yv-cell-value ${changed.has(i)?'yv-cell-changed ':''}${accessed.has(i)?'yv-cell-accessed':''}`}><DataValue value={v} state={state} source={source ?? ''} name={arrayName} depth={depth + 1} seen={seen}/></div><div className="yv-cell-index">{i}</div></div>)}</div>;
+function changedArrayPaths(state?: TraceState, arrayName?: string): Set<string> {
+  const paths = new Set<string>();
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data)) return paths;
+
+  const collect = (changes: unknown, eventArrayName?: unknown) => {
+    if (arrayName && (typeof eventArrayName !== 'string' || !arrayNameMatches(eventArrayName, arrayName))) return;
+    if (!Array.isArray(changes)) return;
+    for (const change of changes) {
+      if (!isPlainObject(change) || !Array.isArray(change.indices) ||
+          !change.indices.every(index => typeof index === 'number' && Number.isInteger(index))) continue;
+      if ('before' in change && 'after' in change && !valueChanged(change.before, change.after)) continue;
+      paths.add((change.indices as number[]).join(','));
+    }
+  };
+
+  if (state?.lastEvent?.type === 'ARRAY_WRITE') collect(data.changes, data.name);
+  if (Array.isArray(data.executionEvents)) {
+    for (const event of data.executionEvents) {
+      if (isPlainObject(event) && event.type === 'ARRAY_WRITE' && isPlainObject(event.data)) {
+        collect(event.data.changes, event.data.name);
+      }
+    }
+  }
+  return paths;
+}
+
+function swappedArrayIndices(state?: TraceState, arrayName?: string): Set<number> {
+  const indices = new Set<number>();
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data)) return indices;
+
+  const inspectWrite = (writeData: Obj) => {
+    if (typeof writeData.name === 'string' && !arrayNameMatches(writeData.name, arrayName)) return;
+    if (!Array.isArray(writeData.changes)) return;
+    const changes = writeData.changes.filter((change): change is Obj =>
+      isPlainObject(change) &&
+      Array.isArray(change.indices) &&
+      change.indices.length === 1 &&
+      typeof change.indices[0] === 'number' &&
+      Number.isInteger(change.indices[0])
+    );
+    if (changes.length !== 2) return;
+
+    const [first, second] = changes;
+    if (!first || !second) return;
+    const firstIndex = (first.indices as number[])[0]!;
+    const secondIndex = (second.indices as number[])[0]!;
+    if (firstIndex === secondIndex) return;
+    if (
+      !valueChanged(first.before, first.after) ||
+      !valueChanged(second.before, second.after) ||
+      valueChanged(first.before, second.after) ||
+      valueChanged(first.after, second.before)
+    ) return;
+
+    indices.add(firstIndex);
+    indices.add(secondIndex);
+  };
+
+  if (state?.lastEvent?.type === 'ARRAY_WRITE') inspectWrite(data);
+  if (Array.isArray(data.executionEvents)) {
+    for (const event of data.executionEvents) {
+      if (isPlainObject(event) && event.type === 'ARRAY_WRITE' && isPlainObject(event.data)) {
+        inspectWrite(event.data);
+      }
+    }
+  }
+  return indices;
+}
+
+function accumulatedArrayIndices(state: TraceState | undefined, arrayName?: string): Set<number> {
+  const indices = new Set<number>();
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data) || !Array.isArray(data.executionEvents)) return indices;
+  const events = data.executionEvents.filter(isPlainObject);
+  const reads = events.filter(event =>
+    event.type === 'ARRAY_ACCESS' &&
+    isPlainObject(event.data) &&
+    typeof event.data.name === 'string' &&
+    arrayNameMatches(event.data.name, arrayName) &&
+    Array.isArray(event.data.indices)
+  );
+  if (reads.length === 0) return indices;
+
+  for (const event of events) {
+    if (event.type !== 'ARRAY_WRITE' || !isPlainObject(event.data)) continue;
+    const write = event.data;
+    if (typeof write.name === 'string' && !arrayNameMatches(write.name, arrayName)) continue;
+    if (!Array.isArray(write.changes)) continue;
+    for (const change of write.changes) {
+      if (!isPlainObject(change) || !Array.isArray(change.indices) ||
+          change.indices.length !== 1 || typeof change.indices[0] !== 'number' ||
+          !Number.isInteger(change.indices[0]) || !('before' in change) || !('after' in change) ||
+          !valueChanged(change.before, change.after)) continue;
+      const destination = change.indices[0];
+      const readsAnotherCell = reads.some(read =>
+        isPlainObject(read.data) &&
+        Array.isArray(read.data.indices) &&
+        read.data.indices.length === 1 &&
+        typeof read.data.indices[0] === 'number' &&
+        read.data.indices[0] !== destination
+      );
+      if (readsAnotherCell) indices.add(destination);
+    }
+  }
+  return indices;
+}
+
+function copiedArrayIndices(state: TraceState | undefined, arrayName?: string): Set<number> {
+  const indices = new Set<number>();
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data) || !Array.isArray(data.executionEvents)) return indices;
+
+  const events = data.executionEvents.filter(isPlainObject);
+  const sourceReads = events.filter(event =>
+    event.type === 'ARRAY_ACCESS' &&
+    isPlainObject(event.data) &&
+    typeof event.data.name === 'string' &&
+    !arrayNameMatches(event.data.name, arrayName)
+  );
+  if (sourceReads.length === 0) return indices;
+
+  for (const event of events) {
+    if (event.type !== 'ARRAY_WRITE' || !isPlainObject(event.data)) continue;
+    const write = event.data;
+    if (typeof write.name === 'string' && !arrayNameMatches(write.name, arrayName)) continue;
+    if (!Array.isArray(write.changes)) continue;
+    for (const change of write.changes) {
+      if (!isPlainObject(change) || !Array.isArray(change.indices) ||
+          change.indices.length !== 1 || typeof change.indices[0] !== 'number' ||
+          !Number.isInteger(change.indices[0]) || !('before' in change) || !('after' in change)) continue;
+      // Only animate a genuine value update, not a repeated write of the same value.
+      if (valueChanged(change.before, change.after)) indices.add(change.indices[0]);
+    }
+  }
+  return indices;
+}
+
+function rotatedArrayIndices(state?: TraceState, arrayName?: string): Map<number, 'left' | 'right'> {
+  const directions = new Map<number, 'left' | 'right'>();
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data)) return directions;
+
+  const inspectWrite = (writeData: Obj) => {
+    if (typeof writeData.name === 'string' && !arrayNameMatches(writeData.name, arrayName)) return;
+    if (!Array.isArray(writeData.changes)) return;
+    const changes = writeData.changes.filter((change): change is Obj =>
+      isPlainObject(change) &&
+      Array.isArray(change.indices) &&
+      change.indices.length === 1 &&
+      typeof change.indices[0] === 'number' &&
+      Number.isInteger(change.indices[0]) &&
+      'before' in change &&
+      'after' in change
+    ).map(change => ({
+      index: (change.indices as number[])[0]!,
+      before: change.before,
+      after: change.after
+    })).sort((a, b) => a.index - b.index);
+
+    // Infer a rotation only when this trace event contains the full contiguous
+    // segment and each destination receives its cyclic neighbor's old value.
+    if (changes.length < 3) return;
+    for (let i = 1; i < changes.length; i++) {
+      if (changes[i]!.index !== changes[i - 1]!.index + 1) return;
+    }
+    if (!changes.every(change => valueChanged(change.before, change.after))) return;
+
+    const leftMatches = changes.every((change, i) =>
+      !valueChanged(change.after, changes[(i + 1) % changes.length]!.before)
+    );
+    const rightMatches = changes.every((change, i) =>
+      !valueChanged(change.after, changes[(i - 1 + changes.length) % changes.length]!.before)
+    );
+    if (leftMatches === rightMatches) return;
+    for (const change of changes) directions.set(change.index, leftMatches ? 'left' : 'right');
+  };
+
+  if (state?.lastEvent?.type === 'ARRAY_WRITE') inspectWrite(data);
+  if (Array.isArray(data.executionEvents)) {
+    for (const event of data.executionEvents) {
+      if (isPlainObject(event) && event.type === 'ARRAY_WRITE' && isPlainObject(event.data)) {
+        inspectWrite(event.data);
+      }
+    }
+  }
+  return directions;
+}
+
+function shiftedArrayIndices(state?: TraceState, arrayName?: string): Map<number, 'left' | 'right'> {
+  const directions = new Map<number, 'left' | 'right'>();
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data)) return directions;
+
+  const inspectWrite = (writeData: Obj) => {
+    if (arrayName && typeof writeData.name === 'string' && writeData.name !== arrayName) return;
+    if (!Array.isArray(writeData.changes)) return;
+    const changes = writeData.changes.filter((change): change is Obj =>
+      isPlainObject(change) &&
+      Array.isArray(change.indices) &&
+      change.indices.length === 1 &&
+      typeof change.indices[0] === 'number' &&
+      Number.isInteger(change.indices[0]) &&
+      'before' in change &&
+      'after' in change
+    ).map(change => ({
+      index: (change.indices as number[])[0]!,
+      before: change.before,
+      after: change.after
+    })).sort((a, b) => a.index - b.index);
+
+    // A two-cell exchange matches both directions and is handled by the
+    // swap animation; a one-direction neighbor match indicates a shift.
+    if (changes.length < 2) return;
+    for (let i = 1; i < changes.length; i++) {
+      if (changes[i]!.index !== changes[i - 1]!.index + 1) return;
+    }
+
+    // Compare destination values to the neighboring cell's previous value.
+    const rightMatches = changes.slice(1).every((change, i) =>
+      !valueChanged(change.after, changes[i]!.before)
+    );
+    const leftMatches = changes.slice(0, -1).every((change, i) =>
+      !valueChanged(change.after, changes[i + 1]!.before)
+    );
+
+    if (rightMatches && !leftMatches) {
+      for (const change of changes) directions.set(change.index, 'right');
+    } else if (leftMatches && !rightMatches) {
+      for (const change of changes) directions.set(change.index, 'left');
+    }
+  };
+
+  if (state?.lastEvent?.type === 'ARRAY_WRITE') inspectWrite(data);
+  if (Array.isArray(data.executionEvents)) {
+    for (const event of data.executionEvents) {
+      if (isPlainObject(event) && event.type === 'ARRAY_WRITE' && isPlainObject(event.data)) {
+        inspectWrite(event.data);
+      }
+    }
+  }
+  return directions;
+}
+
+function MatrixView({ value, state, source, arrayName, depth, seen }: {
+  value: unknown[][];
+  state?: TraceState;
+  source: string;
+  arrayName?: string;
+  depth: number;
+  seen: Set<string>;
+}) {
+  const rows = value;
+  const rowCount = rows.length;
+  const columnCount = Math.max(0, ...rows.map(row => row.length));
+  const readPaths = accessedArrayPaths(state, arrayName);
+  const writtenPaths = changedArrayPaths(state, arrayName);
+  const comparedPaths = isComparisonStatement(source, state) && readPaths.size >= 2 ? readPaths : new Set<string>();
+  const indexNames = matrixIndexVariableNames(source, arrayName);
+  const targets = matrixPointerTargets(state, rowCount, columnCount, indexNames);
+  const activeRows = new Set(targets.rows.map(target => target.index));
+  const activeColumns = new Set(targets.columns.map(target => target.index));
+  // Runtime access coordinates are authoritative for the active matrix cell.
+  // During row = mid / n and col = mid % n, one coordinate can be new while
+  // the other is still from the previous iteration. Do not render that
+  // temporary Cartesian-product intersection as if it had been accessed.
+  const eventData = state?.lastEvent?.data;
+  const hasAuthoritativeAccessEvents = isPlainObject(eventData) && Array.isArray(eventData.executionEvents);
+  const activeCells = new Set<string>();
+  if (hasAuthoritativeAccessEvents) {
+    for (const path of readPaths) {
+      const [rowText, columnText] = path.split(',');
+      const row = Number(rowText);
+      const column = Number(columnText);
+      if (
+        Number.isInteger(row) && Number.isInteger(column) &&
+        row >= 0 && row < rowCount &&
+        column >= 0 && column < (rows[row]?.length ?? 0)
+      ) activeCells.add(path);
+    }
+  } else {
+    // Compatibility fallback for older/synthetic states without execution events.
+    for (const row of activeRows) for (const column of activeColumns) activeCells.add(row + ',' + column);
+  }
+  const targetSignature = [
+    ...targets.rows.map(target => 'r:' + target.name + ':' + target.index),
+    ...targets.columns.map(target => 'c:' + target.name + ':' + target.index)
+  ].sort().join('|');
+  const matrixRef = useRef<HTMLDivElement | null>(null);
+  const matrixCellRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const previousMatrixTargets = useRef<Map<string, number>>(new Map());
+  const [matrixPointerLayout, setMatrixPointerLayout] = useState<{
+    x: Record<string, number>;
+    y: Record<string, number>;
+    movingRows: Set<string>;
+    movingColumns: Set<string>;
+  }>({ x: {}, y: {}, movingRows: new Set(), movingColumns: new Set() });
+
+  useLayoutEffect(() => {
+    const host = matrixRef.current;
+    if (!host) return;
+
+    const layoutPointers = () => {
+      const x: Record<string, number> = {};
+      const y: Record<string, number> = {};
+      const movingRows = new Set<string>();
+      const movingColumns = new Set<string>();
+      const next = new Map<string, number>();
+      const labels = new Map<string, HTMLElement>();
+      host.querySelectorAll<HTMLElement>('[data-matrix-pointer]').forEach(label => {
+        const name = label.dataset.matrixPointer;
+        if (name) labels.set(name, label);
+      });
+      const columnGroups = new Map<number, typeof targets.columns>();
+      const rowGroups = new Map<number, typeof targets.rows>();
+
+      for (const target of targets.columns) {
+        const header = matrixCellRefs.current['__col,' + target.index];
+        if (!header) continue;
+        const group = columnGroups.get(target.index) ?? [];
+        group.push(target);
+        columnGroups.set(target.index, group);
+        const key = 'c:' + target.name;
+        const previous = previousMatrixTargets.current.get(key);
+        if (previous !== undefined && previous !== target.index) movingColumns.add(target.name);
+        next.set(key, target.index);
+      }
+      for (const [index, group] of columnGroups) {
+        const header = matrixCellRefs.current['__col,' + index];
+        if (!header) continue;
+        const center = header.offsetLeft + header.offsetWidth / 2;
+        const gap = 4;
+        const widths = group.map(target => labels.get(target.name)?.offsetWidth ?? Math.max(24, target.name.length * 7 + 10));
+        let left = center - (widths.reduce((sum, width) => sum + width, 0) + gap * Math.max(0, group.length - 1)) / 2;
+        group.forEach((target, i) => {
+          x[target.name] = left + widths[i]! / 2;
+          left += widths[i]! + gap;
+        });
+      }
+
+      for (const target of targets.rows) {
+        const cell = matrixCellRefs.current[target.index + ',0'];
+        if (!cell) continue;
+        const group = rowGroups.get(target.index) ?? [];
+        group.push(target);
+        rowGroups.set(target.index, group);
+        const key = 'r:' + target.name;
+        const previous = previousMatrixTargets.current.get(key);
+        if (previous !== undefined && previous !== target.index) movingRows.add(target.name);
+        next.set(key, target.index);
+      }
+      for (const [index, group] of rowGroups) {
+        const cell = matrixCellRefs.current[index + ',0'];
+        if (!cell) continue;
+        const center = cell.offsetTop + cell.offsetHeight / 2;
+        const gap = 3;
+        const heights = group.map(target => labels.get(target.name)?.offsetHeight ?? 16);
+        let top = center - (heights.reduce((sum, height) => sum + height, 0) + gap * Math.max(0, group.length - 1)) / 2;
+        group.forEach((target, i) => {
+          y[target.name] = top + heights[i]! / 2;
+          top += heights[i]! + gap;
+        });
+      }
+      previousMatrixTargets.current = next;
+      setMatrixPointerLayout({ x, y, movingRows, movingColumns });
+    };
+
+    layoutPointers();
+    // Matrix columns can resize independently as values change, so pointer
+    // coordinates must be remeasured after responsive/layout changes too.
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(layoutPointers);
+    observer.observe(host);
+    Object.values(matrixCellRefs.current).forEach(cell => { if (cell) observer.observe(cell); });
+    return () => observer.disconnect();
+  }, [targetSignature, state?.sequence, rowCount, columnCount]);
+
+  return (
+    <div
+      className="yv-matrix yv-matrix-grid"
+      ref={matrixRef}
+      style={{ gridTemplateColumns: `62px repeat(${columnCount}, minmax(36px, max-content))` }}
+    >
+      <div className="yv-matrix-corner" />
+      {Array.from({ length: columnCount }, (_, column) => (
+        <div
+          className={`yv-matrix-column-index ${activeColumns.has(column) ? 'yv-matrix-axis-active' : ''}`}
+          key={'column-' + column}
+          ref={element => { matrixCellRefs.current['__col,' + column] = element; }}
+        >{column}</div>
+      ))}
+      {rows.map((row, r) => (
+        <div className="yv-matrix-row-fragment" key={'row-' + r}>
+          <div className={`yv-matrix-row-index ${activeRows.has(r) ? 'yv-matrix-axis-active' : ''}`}>{r}</div>
+          {Array.from({ length: columnCount }, (_, column) => {
+            const path = r + ',' + column;
+            const exists = column < row.length;
+            const active = activeCells.has(path) && exists;
+            return (
+              <div
+                className={`yv-matrix-cell ${exists ? '' : 'yv-matrix-cell-empty'} ${active ? 'yv-matrix-cell-active' : ''}`}
+                key={path}
+                ref={element => { matrixCellRefs.current[path] = element; }}
+              >
+                <div
+                  key={`${path}-${state?.sequence ?? state?.line ?? 'initial'}`}
+                  className={`yv-cell-value ${comparedPaths.has(path) ? 'yv-cell-compared ' : ''}${readPaths.has(path) ? 'yv-cell-read ' : ''}${writtenPaths.has(path) ? 'yv-cell-written' : ''}`}
+                >
+                  {exists
+                    ? <DataValue value={row[column]} state={state} source={source} depth={depth + 1} seen={seen}/>
+                    : <span className="yv-matrix-missing">—</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+      <div className="yv-matrix-pointer-layer" aria-hidden="true">
+        {targets.columns.map(target => (
+          <div
+            key={'c:' + target.name}
+            data-matrix-pointer={target.name}
+            className={`yv-matrix-pointer yv-matrix-pointer-column ${matrixPointerLayout.movingColumns.has(target.name) ? 'is-moving' : ''}`}
+            style={{ transform: `translate3d(${matrixPointerLayout.x[target.name] ?? 0}px, 0, 0) translateX(-50%)` }}
+          >{target.name}</div>
+        ))}
+        {targets.rows.map(target => (
+          <div
+            key={'r:' + target.name}
+            data-matrix-pointer={target.name}
+            className={`yv-matrix-pointer yv-matrix-pointer-row ${matrixPointerLayout.movingRows.has(target.name) ? 'is-moving' : ''}`}
+            style={{ transform: `translate3d(0, ${matrixPointerLayout.y[target.name] ?? 0}px, 0) translateY(-50%)` }}
+          >{target.name}</div>
+        ))}
+        {targets.rows.flatMap(rowTarget =>
+          targets.columns
+            .filter(columnTarget =>
+              !hasAuthoritativeAccessEvents || readPaths.has(rowTarget.index + ',' + columnTarget.index)
+            )
+            .map(columnTarget => (
+              <div
+                key={`intersection:${rowTarget.name}:${columnTarget.name}`}
+                className="yv-matrix-pointer yv-matrix-pointer-intersection"
+                data-matrix-intersection={`${rowTarget.name},${columnTarget.name}`}
+                data-matrix-cell={`[${rowTarget.index},${columnTarget.index}]`}
+                style={{
+                  transform: `translate3d(${matrixPointerLayout.x[columnTarget.name] ?? 0}px, ${matrixPointerLayout.y[rowTarget.name] ?? 0}px, 0) translate(-50%, -100%)`
+                }}
+              >{rowTarget.name} · {columnTarget.name}</div>
+            ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<string>() }: {
+  value: unknown[];
+  state?: TraceState;
+  source: string;
+  arrayName?: string;
+  depth?: number;
+  seen?: Set<string>;
+}) {
+  // A Java 2D array may arrive as raw nested arrays or as row-level array
+  // snapshots. Normalize both shapes into a single grid without flattening it.
+  const matrixLike = value.length > 0 && value.every(row => Array.isArray(row) || isArraySnapshot(row));
+  if (matrixLike) {
+    const rows = value.map(row => Array.isArray(row) ? row : isArraySnapshot(row) ? row.values : []);
+    return <MatrixView value={rows} state={state} source={source} arrayName={arrayName} depth={depth} seen={seen}/>;
+  }
+
+  const indexNames = arrayIndexVariableNames(source, arrayName);
+  const targets = pointerTargets(state, value.length, indexNames, arrayName, source);
+  const targetSignature = targets.map(target => target.name + ':' + target.index).sort().join('|');
+  const arrayRef = useRef<HTMLDivElement | null>(null);
+  const cellRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const previousTargets = useRef<Map<string, number>>(new Map());
+  const [pointerLayout, setPointerLayout] = useState<{ offsets: Record<string, number>; moving: Set<string> }>({ offsets: {}, moving: new Set() });
+
+  useLayoutEffect(() => {
+    const host = arrayRef.current;
+    if (!host) return;
+
+    const layoutPointers = () => {
+      const offsets: Record<string, number> = {};
+      const moving = new Set<string>();
+      const next = new Map<string, number>();
+      const labels = new Map<string, HTMLElement>();
+      host.querySelectorAll<HTMLElement>('[data-array-pointer]').forEach(label => {
+        const name = label.dataset.arrayPointer;
+        if (name) labels.set(name, label);
+      });
+
+      // Group pointers on the same cell and lay their measured labels side by
+      // side. This avoids hiding one index behind another (e.g. left/right).
+      const groups = new Map<number, typeof targets>();
+      for (const target of targets) {
+        const cell = cellRefs.current[target.index];
+        if (!cell) continue;
+        const group = groups.get(target.index) ?? [];
+        group.push(target);
+        groups.set(target.index, group);
+        const previous = previousTargets.current.get(target.name);
+        if (previous !== undefined && previous !== target.index) moving.add(target.name);
+        next.set(target.name, target.index);
+      }
+
+      for (const [index, group] of groups) {
+        const cell = cellRefs.current[index];
+        if (!cell) continue;
+        const center = cell.offsetLeft + cell.offsetWidth / 2;
+        const gap = 5;
+        const widths = group.map(target => labels.get(target.name)?.offsetWidth ?? Math.max(24, target.name.length * 7 + 10));
+        const totalWidth = widths.reduce((sum, width) => sum + width, 0) + gap * Math.max(0, group.length - 1);
+        let left = center - totalWidth / 2;
+        group.forEach((target, i) => {
+          offsets[target.name] = left + widths[i]! / 2;
+          left += widths[i]! + gap;
+        });
+      }
+
+      previousTargets.current = next;
+      setPointerLayout({ offsets, moving });
+    };
+
+    layoutPointers();
+    // Keep labels aligned when responsive layout, fonts, or cell contents alter
+    // widths, not only when the traced index changes.
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(layoutPointers);
+    observer.observe(host);
+    Object.values(cellRefs.current).forEach(cell => { if (cell) observer.observe(cell); });
+    host.querySelectorAll<HTMLElement>('[data-array-pointer]').forEach(label => observer.observe(label));
+    return () => observer.disconnect();
+  }, [targetSignature, state?.sequence, value.length]);
+
+  const changed = changedArrayIndices(state, arrayName);
+  const accessed = accessedArrayIndices(state, arrayName);
+  const compared = isComparisonStatement(source, state) && accessed.size >= 2 ? accessed : new Set<number>();
+  const swapped = swappedArrayIndices(state, arrayName);
+  const rotated = rotatedArrayIndices(state, arrayName);
+  const copied = copiedArrayIndices(state, arrayName);
+  const accumulated = accumulatedArrayIndices(state, arrayName);
+  const shifted = shiftedArrayIndices(state, arrayName);
+  const rangeStart = targets.length >= 2 ? Math.min(...targets.map(target => target.index)) : -1;
+  const rangeEnd = targets.length >= 2 ? Math.max(...targets.map(target => target.index)) : -1;
+
+  return (
+    <div className={`yv-array yv-array-pointer-host ${targets.length ? 'has-pointers' : ''}`} ref={arrayRef}>
+      <div className="yv-pointer-layer" aria-hidden="true">
+        {targets.map(target => (
+          <div
+            key={target.name}
+            data-array-pointer={target.name}
+            className={`yv-pointer ${pointerLayout.moving.has(target.name) ? 'yv-pointer-moving' : ''}`}
+            style={{ transform: `translate3d(${pointerLayout.offsets[target.name] ?? 0}px, 0, 0) translateX(-50%)` }}
+          >{target.name}</div>
+        ))}
+      </div>
+      {value.map((item, index) => (
+        <div className="yv-cell" key={index} ref={element => { cellRefs.current[index] = element; }}>
+          <div
+            key={`${index}-${state?.sequence ?? state?.line ?? 'initial'}`}
+            className={`yv-cell-value ${rangeStart >= 0 && index >= rangeStart && index <= rangeEnd ? 'yv-cell-range ' : ''}${rangeStart >= 0 && index === rangeStart ? 'yv-cell-range-start ' : ''}${rangeEnd >= 0 && index === rangeEnd && rangeEnd !== rangeStart ? 'yv-cell-range-end ' : ''}${changed.has(index) ? 'yv-cell-written ' : ''}${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-cell-compared ' : ''}${accumulated.has(index) && !copied.has(index) ? 'yv-cell-accumulated ' : ''}${copied.has(index) ? 'yv-cell-copied ' : ''}${rotated.has(index) ? 'yv-cell-rotated-' + rotated.get(index) + ' ' : ''}${swapped.has(index) ? 'yv-cell-swapped' : ''}`}
+          >
+            <div className={`yv-array-cell-content ${swapped.has(index) ? 'yv-array-cell-content-swapped' : ''}${rotated.has(index) ? ' yv-array-cell-content-rotate-' + rotated.get(index) : shifted.has(index) ? ' yv-array-cell-content-shift-' + shifted.get(index) : ''}`}>
+              <DataValue value={item} state={state} source={source} name={arrayName} depth={depth + 1} seen={seen}/>
+            </div>
+          </div>
+          <div className="yv-cell-index">{index}</div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function mapChanges(state?: TraceState): Array<{
@@ -1626,6 +2333,10 @@ function DataValue({
     return <div className="yv-code">…</div>;
   }
 
+  if (isPlainObject(value) && typeof value.$stringValue === 'string') {
+    return <StringView value={value.$stringValue} state={state} name={name ?? ''} />;
+  }
+
   if (isMapSnapshot(value)) {
     return <MapView value={value} state={state} source={source} depth={depth} seen={seen}/>;
   }
@@ -1668,7 +2379,37 @@ function isStructuralObject(value: unknown): value is Obj {
     (('left' in fields || 'right' in fields) && ('val' in fields || 'value' in fields));
 }
 
-function DataStructures({ state, source }: { state?: TraceState; source: string }) {
+export function StringView({ value, state, name }: { value: string; state?: TraceState; name: string }) {
+  const data = isPlainObject(state?.lastEvent?.data) ? state.lastEvent.data : {};
+  const executionEvents = Array.isArray(data.executionEvents) ? data.executionEvents : [];
+  const accessed = new Set<number>();
+  for (const event of executionEvents) {
+    if (!isPlainObject(event) || event.type !== 'ARRAY_ACCESS' || !isPlainObject(event.data)) continue;
+    const eventName = typeof event.data.name === 'string' ? event.data.name : undefined;
+    const indices = Array.isArray(event.data.indices) ? event.data.indices : [];
+    if (eventName === name && typeof indices[0] === 'number' && Number.isInteger(indices[0])) {
+      accessed.add(indices[0]);
+    }
+  }
+  // Java String indexing and charAt use UTF-16 code units, so split('') keeps
+  // visual cell indices aligned with the runtime trace.
+  const characters = value.split('');
+  return (
+    <div className="yv-array" data-string-structure={name}>
+      {characters.map((character, index) => (
+        <div className="yv-array-cell-wrap" key={index}>
+          <div className={`yv-array-cell ${accessed.has(index) ? 'yv-cell-read' : ''}`} data-string-index={index}>
+            <div className="yv-array-cell-content">{character === ' ' ? '␠' : character}</div>
+          </div>
+          <div className="yv-cell-index">{index}</div>
+        </div>
+      ))}
+      {!characters.length && <div className="yv-empty">Empty string</div>}
+    </div>
+  );
+}
+
+export function DataStructures({ state, source }: { state?: TraceState; source: string }) {
   const namedObjectIds = new Map<string, string[]>();
 
   for (const [name, value] of Object.entries(state?.variables ?? {})) {
@@ -1692,6 +2433,13 @@ function DataStructures({ state, source }: { state?: TraceState; source: string 
     } else {
       grouped.set(`array:${id}`, { names: [name], value });
     }
+  }
+
+  // Strings remain ordinary variables as well as being shown as indexed,
+  // read-only character sequences in the Data Structures section.
+  for (const [name, value] of Object.entries(state?.variables ?? {})) {
+    if (name === 'this' || typeof value !== 'string') continue;
+    grouped.set(`string:${name}`, { names: [name], value: { $stringValue: value } });
   }
 
   for (const [name, value] of Object.entries(state?.dataStructures ?? {})) {

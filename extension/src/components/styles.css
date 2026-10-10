@@ -38,7 +38,9 @@
 .yv-btn:focus{outline:none}.yv-btn:focus-visible{outline:none}
 .yv-collection{min-width:260px}.yv-collection-meta{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;color:var(--yv-muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.yv-collection-meta span:last-child{font-size:10px}.yv-stack-view{display:flex;flex-direction:column;gap:2px;align-items:stretch;max-width:260px;margin:0 auto}.yv-stack-cell{position:relative;display:flex;align-items:center;justify-content:center;min-height:34px;border:1px solid var(--yv-border);border-radius:6px;background:var(--yv-elevated)}.yv-stack-cell:first-child{box-shadow:inset 0 0 0 1px var(--yv-accent)}.yv-stack-position{position:absolute;left:6px;font-size:9px;color:var(--yv-accent)}.yv-queue-view{display:flex;align-items:center;gap:3px;overflow-x:auto;padding:4px 0}.yv-queue-cell{min-width:48px;padding:8px 6px;border:1px solid var(--yv-border);border-radius:6px;background:var(--yv-elevated);text-align:center}.yv-queue-end{font-size:9px;color:var(--yv-accent);font-weight:600;white-space:nowrap}.yv-heap-tree{display:flex;flex-direction:column;gap:14px;overflow-x:auto;padding:4px 4px 8px}.yv-heap-level{display:flex;justify-content:center;gap:22px;min-width:max-content}.yv-heap-node-wrap{text-align:center;min-width:44px}.yv-heap-node{border:1px solid var(--yv-border);border-radius:50%;min-width:36px;min-height:36px;padding:8px 5px;background:var(--yv-elevated);display:flex;align-items:center;justify-content:center;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.yv-heap-note{margin:2px 0 8px;color:var(--yv-muted);font-size:10px}.yv-return-object{margin-top:5px}.yv-return-reference{padding:7px 8px;border:1px solid var(--yv-border);border-radius:6px;background:var(--yv-elevated)}.yv-return-caption{font-size:10px;color:var(--yv-muted);margin:7px 0}.yv-linked{overflow-x:auto;padding:3px 0 5px}.yv-linked-piece{flex:0 0 auto}.yv-linked-piece:first-child .yv-node{box-shadow:inset 0 0 0 1px var(--yv-accent)}
 .yv-set-view{display:flex;flex-wrap:wrap;gap:7px;min-width:max-content}.yv-set-element{display:flex;align-items:center;min-height:32px;padding:4px 10px;border:1px solid var(--yv-border);border-radius:999px;background:var(--yv-elevated)}
-.yv-node-pointer{font-size:9px;color:var(--yv-accent);text-align:center;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin-bottom:2px}.yv-linked-piece{position:relative}
+.yv-node-pointer{font-size:9px;color:var(--yv-accent);text-align:center;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin:0 auto 3px;padding:2px 5px;width:max-content;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:1px solid color-mix(in srgb,var(--yv-accent),var(--yv-border) 35%);border-radius:4px;background:var(--yv-elevated);box-shadow:0 1px 3px rgb(0 0 0 / 10%);animation:yv-node-pointer-arrive 220ms ease-out both}.yv-linked-piece{position:relative}
+@keyframes yv-node-pointer-arrive{from{opacity:.35;transform:translateY(4px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media (prefers-reduced-motion:reduce){.yv-node-pointer{animation:none}}
 .yv-stack-wrap{max-width:300px}.yv-stack-label{font-size:9px;color:var(--yv-accent);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin:0 0 4px 2px}.yv-stack-label.bottom{margin:4px 0 0 2px;color:var(--yv-muted)}.yv-stack{border-left:1px solid var(--yv-border);border-right:1px solid var(--yv-border);padding:2px 5px}
 .yv-collection-backing{margin-top:10px;padding-top:8px;border-top:1px solid var(--yv-border)}.yv-collection-backing-title{margin-bottom:6px;color:var(--yv-muted);font-size:10px}
 
@@ -65,3 +67,444 @@
 .yv-ds-result-transition{color:var(--yv-accent);font-weight:700}
 .yv-ds-result-new{color:var(--yv-text);font-weight:700}
 .yv-ds-result-position{color:var(--yv-muted);font-size:11px;overflow:hidden;text-overflow:ellipsis}
+
+
+/* Array pointer transitions: keep cells and index labels stationary. */
+.yv-array-pointer-host {
+  position: relative;
+}
+.yv-array-pointer-host.has-pointers {
+  padding-top: 22px;
+}
+.yv-pointer-layer {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 19px;
+  pointer-events: none;
+  z-index: 2;
+}
+.yv-pointer-layer .yv-pointer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  width: max-content;
+  max-width: none;
+  margin: 0;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--yv-accent), transparent 91%);
+  color: var(--yv-accent);
+  font-size: 10px;
+  line-height: 15px;
+  text-align: center;
+  white-space: nowrap;
+  will-change: transform;
+  animation: none;
+  transition: none;
+}
+.yv-pointer-layer .yv-pointer-moving {
+  transition: transform 180ms cubic-bezier(.4, 0, .2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-pointer-layer .yv-pointer-moving {
+    transition: none;
+  }
+}
+
+
+/* Array cell operation feedback: read and write are deliberately different. */
+.yv-array-pointer-host .yv-cell-value.yv-cell-read {
+  border-color: color-mix(in srgb, #3b82f6, var(--yv-border) 35%);
+  background: color-mix(in srgb, #3b82f6, var(--yv-elevated) 93%);
+  animation: yv-array-read-pulse 420ms ease-out;
+}
+.yv-array-pointer-host .yv-cell-value.yv-cell-written {
+  border-color: color-mix(in srgb, var(--yv-success), var(--yv-border) 22%);
+  background: color-mix(in srgb, var(--yv-success), var(--yv-elevated) 89%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--yv-success), transparent 30%);
+  animation: yv-array-write-pulse 520ms cubic-bezier(.2, .75, .25, 1);
+}
+.yv-array-pointer-host .yv-cell-value.yv-cell-read.yv-cell-written {
+  border-color: var(--yv-success);
+  background: color-mix(in srgb, var(--yv-success), var(--yv-elevated) 89%);
+}
+@keyframes yv-array-read-pulse {
+  0% { background: color-mix(in srgb, #3b82f6, var(--yv-elevated) 78%); }
+  100% { background: color-mix(in srgb, #3b82f6, var(--yv-elevated) 93%); }
+}
+@keyframes yv-array-write-pulse {
+  0% { transform: scale(1); background: var(--yv-elevated); }
+  38% { transform: scale(1.035); background: color-mix(in srgb, var(--yv-success), var(--yv-elevated) 74%); }
+  100% { transform: scale(1); background: color-mix(in srgb, var(--yv-success), var(--yv-elevated) 89%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-array-pointer-host .yv-cell-value.yv-cell-read,
+  .yv-array-pointer-host .yv-cell-value.yv-cell-written {
+    animation: none;
+  }
+}
+
+
+/* A swap is inferred only when two traced writes exchange their prior values. */
+.yv-array-pointer-host .yv-cell-value.yv-cell-swapped {
+  border-color: color-mix(in srgb, var(--yv-success), var(--yv-border) 22%);
+  background: color-mix(in srgb, var(--yv-success), var(--yv-elevated) 89%);
+}
+.yv-array-cell-content {
+  min-width: 0;
+}
+.yv-array-cell-content-swapped {
+  animation: yv-array-swap-content 420ms cubic-bezier(.2, .75, .25, 1);
+}
+@keyframes yv-array-swap-content {
+  0% { opacity: .35; transform: translateY(3px) scale(.96); filter: blur(.5px); }
+  65% { opacity: 1; transform: translateY(-1px) scale(1.015); filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-array-cell-content-swapped {
+    animation: none;
+  }
+}
+
+
+/* Soft interval shading between live pointers (window / candidate range). */
+.yv-array-pointer-host .yv-cell-value.yv-cell-range {
+  border-bottom-color: color-mix(in srgb, #3b82f6, var(--yv-border) 20%);
+  background: color-mix(in srgb, #3b82f6, var(--yv-elevated) 96%);
+}
+.yv-array-pointer-host .yv-cell-value.yv-cell-range.yv-cell-read {
+  background: color-mix(in srgb, #3b82f6, var(--yv-elevated) 90%);
+}
+
+
+/* Multi-cell shifts animate the values, not the fixed array boxes or indices. */
+.yv-array-cell-content-shift-right {
+  animation: yv-array-shift-right 420ms cubic-bezier(.2, .75, .25, 1);
+}
+.yv-array-cell-content-shift-left {
+  animation: yv-array-shift-left 420ms cubic-bezier(.2, .75, .25, 1);
+}
+@keyframes yv-array-shift-right {
+  0% { opacity: .35; transform: translateX(-7px); }
+  65% { opacity: 1; transform: translateX(1px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+@keyframes yv-array-shift-left {
+  0% { opacity: .35; transform: translateX(7px); }
+  65% { opacity: 1; transform: translateX(-1px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-array-cell-content-shift-right,
+  .yv-array-cell-content-shift-left {
+    animation: none;
+  }
+}
+
+
+/* Newly materialized cells fade in without shifting neighboring cells. */
+.yv-array-pointer-host > .yv-cell {
+  animation: yv-array-cell-enter 220ms ease-out both;
+}
+@keyframes yv-array-cell-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-array-pointer-host > .yv-cell {
+    animation: none;
+  }
+}
+
+
+/* The same trace-grounded read/write feedback applies to matrix coordinates. */
+.yv-matrix .yv-cell-value.yv-cell-read {
+  border-color: color-mix(in srgb, #3b82f6, var(--yv-border) 35%);
+  background: color-mix(in srgb, #3b82f6, var(--yv-elevated) 93%);
+  animation: yv-array-read-pulse 420ms ease-out;
+}
+.yv-matrix .yv-cell-value.yv-cell-written {
+  border-color: color-mix(in srgb, var(--yv-success), var(--yv-border) 22%);
+  background: color-mix(in srgb, var(--yv-success), var(--yv-elevated) 89%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--yv-success), transparent 30%);
+  animation: yv-array-write-pulse 520ms cubic-bezier(.2, .75, .25, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-matrix .yv-cell-value.yv-cell-read,
+  .yv-matrix .yv-cell-value.yv-cell-written {
+    animation: none;
+  }
+}
+
+
+/* True 2D array grid: one shared column system and fixed row/column headers. */
+.yv-matrix-grid {
+  position: relative;
+  display: grid;
+  align-items: stretch;
+  justify-items: stretch;
+  gap: 2px;
+  width: max-content;
+  max-width: 100%;
+  padding-top: 23px;
+  padding-right: 2px;
+  overflow: visible;
+}
+.yv-matrix-grid .yv-matrix-corner,
+.yv-matrix-grid .yv-matrix-column-index,
+.yv-matrix-grid .yv-matrix-row-index,
+.yv-matrix-grid .yv-matrix-cell {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+.yv-matrix-grid .yv-matrix-corner {
+  border-bottom: 1px solid var(--yv-border);
+}
+.yv-matrix-grid .yv-matrix-column-index,
+.yv-matrix-grid .yv-matrix-row-index {
+  font-size: 10px;
+  color: var(--yv-muted);
+  min-height: 28px;
+}
+.yv-matrix-grid .yv-matrix-row-index {
+  justify-content: flex-end;
+  padding-right: 8px;
+  padding-left: 30px;
+}
+.yv-matrix-grid .yv-matrix-cell {
+  min-width: 36px;
+}
+.yv-matrix-grid .yv-matrix-cell .yv-cell-value {
+  width: 100%;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.yv-matrix-grid .yv-matrix-cell-empty .yv-cell-value {
+  opacity: .3;
+  border-style: dashed;
+}
+.yv-matrix-grid .yv-matrix-missing {
+  color: var(--yv-muted);
+  opacity: .55;
+}
+.yv-matrix-grid .yv-matrix-pointer-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+.yv-matrix-grid .yv-matrix-pointer {
+  position: absolute;
+  width: max-content;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 4px;
+  padding: 2px 5px;
+  color: var(--yv-accent);
+  background: var(--yv-elevated);
+  border: 1px solid color-mix(in srgb, var(--yv-accent), var(--yv-border) 35%);
+  font: 10px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
+  transition: transform 180ms cubic-bezier(.4, 0, .2, 1);
+}
+.yv-matrix-grid .yv-matrix-pointer-column {
+  top: 0;
+  left: 0;
+}
+.yv-matrix-grid .yv-matrix-pointer-row {
+  left: 0;
+  top: 0;
+}
+.yv-matrix-grid .yv-matrix-pointer-intersection {
+  left: 0;
+  top: 0;
+  z-index: 2;
+  color: var(--yv-accent);
+  font-weight: 700;
+  border-color: var(--yv-accent);
+  background: var(--yv-elevated);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 14%);
+}
+.yv-matrix-grid .yv-matrix-pointer.is-moving {
+  color: var(--yv-accent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-matrix-grid .yv-matrix-pointer,
+  .yv-matrix-grid .yv-matrix-cell .yv-cell-value {
+    transition: none;
+  }
+}
+
+
+/* Row wrappers are layout-transparent so every matrix cell shares one grid. */
+.yv-matrix-grid .yv-matrix-row-fragment {
+  display: contents;
+}
+
+
+/* Matrix traversal: the row/column pointer intersection is the active cell. */
+.yv-matrix-grid .yv-matrix-axis-active {
+  color: var(--yv-accent);
+  font-weight: 800;
+}
+.yv-matrix-grid .yv-matrix-cell-active .yv-cell-value {
+  position: relative;
+  z-index: 1;
+  border-color: var(--yv-accent);
+  background: color-mix(in srgb, var(--yv-accent), var(--yv-elevated) 84%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--yv-accent), transparent 35%), 0 0 0 1px color-mix(in srgb, var(--yv-accent), transparent 68%);
+  animation: yv-matrix-intersection 360ms cubic-bezier(.2, .75, .25, 1);
+}
+.yv-matrix-grid .yv-matrix-cell-active .yv-cell-value.yv-cell-read {
+  border-color: #3b82f6;
+  background: color-mix(in srgb, #3b82f6, var(--yv-elevated) 82%);
+}
+.yv-matrix-grid .yv-matrix-cell-active .yv-cell-value.yv-cell-written {
+  border-color: var(--yv-success);
+  background: color-mix(in srgb, var(--yv-success), var(--yv-elevated) 80%);
+}
+@keyframes yv-matrix-intersection {
+  0% { transform: scale(.96); box-shadow: inset 0 0 0 1px var(--yv-accent), 0 0 0 3px color-mix(in srgb, var(--yv-accent), transparent 72%); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-matrix-grid .yv-matrix-cell-active .yv-cell-value {
+    animation: none;
+  }
+}
+
+
+/* Two active index pointers define a moving interval. Its endpoints are
+   emphasized separately so partition/window boundaries remain easy to read. */
+.yv-array-pointer-host .yv-cell-value.yv-cell-range {
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  background: color-mix(in srgb, var(--yv-accent), var(--yv-elevated) 94%);
+}
+.yv-array-pointer-host .yv-cell-value.yv-cell-range-start,
+.yv-array-pointer-host .yv-cell-value.yv-cell-range-end {
+  border-color: color-mix(in srgb, var(--yv-accent), var(--yv-border) 20%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--yv-accent), transparent 48%);
+}
+.yv-array-pointer-host .yv-cell-value.yv-cell-range-start {
+  border-top-left-radius: 7px;
+  border-bottom-left-radius: 7px;
+  animation: yv-range-boundary-enter 260ms ease-out;
+}
+.yv-array-pointer-host .yv-cell-value.yv-cell-range-end {
+  border-top-right-radius: 7px;
+  border-bottom-right-radius: 7px;
+  animation: yv-range-boundary-enter 260ms ease-out;
+}
+@keyframes yv-range-boundary-enter {
+  0% { box-shadow: inset 0 0 0 1px var(--yv-accent), 0 0 0 3px color-mix(in srgb, var(--yv-accent), transparent 78%); }
+  100% { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--yv-accent), transparent 48%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-array-pointer-host .yv-cell-value.yv-cell-range-start,
+  .yv-array-pointer-host .yv-cell-value.yv-cell-range-end {
+    animation: none;
+  }
+}
+
+/* Adjacent/value comparisons are emphasized only when the executed source line
+   contains a comparison operator and the trace observed multiple array reads. */
+.yv-array-pointer-host .yv-cell-value.yv-cell-compared,
+.yv-matrix-grid .yv-cell-value.yv-cell-compared {
+  border-color: color-mix(in srgb, #d97706, var(--yv-border) 22%);
+  background: color-mix(in srgb, #d97706, var(--yv-elevated) 87%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #d97706, transparent 48%);
+  animation: yv-array-compare-pulse 360ms ease-out;
+}
+.yv-array-pointer-host .yv-cell-value.yv-cell-compared.yv-cell-read,
+.yv-matrix-grid .yv-cell-value.yv-cell-compared.yv-cell-read {
+  border-color: #d97706;
+  background: color-mix(in srgb, #d97706, var(--yv-elevated) 84%);
+}
+@keyframes yv-array-compare-pulse {
+  0% { transform: scale(.97); box-shadow: inset 0 0 0 1px #d97706, 0 0 0 3px rgb(217 119 6 / 14%); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-array-pointer-host .yv-cell-value.yv-cell-compared,
+  .yv-matrix-grid .yv-cell-value.yv-cell-compared {
+    animation: none;
+  }
+}
+
+
+/* Whole-segment cyclic movement is animated only when the trace proves a
+   rotation. The cell frames stay fixed; only their value content animates. */
+.yv-array-pointer-host .yv-array-cell-content-rotate-left {
+  animation: yv-array-rotate-left 420ms cubic-bezier(.2, .75, .25, 1);
+}
+.yv-array-pointer-host .yv-array-cell-content-rotate-right {
+  animation: yv-array-rotate-right 420ms cubic-bezier(.2, .75, .25, 1);
+}
+@keyframes yv-array-rotate-left {
+  0% { transform: translateX(9px); opacity: .55; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+@keyframes yv-array-rotate-right {
+  0% { transform: translateX(-9px); opacity: .55; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-array-pointer-host .yv-array-cell-content-rotate-left,
+  .yv-array-pointer-host .yv-array-cell-content-rotate-right {
+    animation: none;
+  }
+}
+
+
+/* Destination cells pulse when the same trace batch reads a different array
+   and writes a changed value here (copy/merge/transfer primitive). */
+.yv-array-pointer-host .yv-cell-value.yv-cell-copied {
+  animation: yv-array-copy-arrive 420ms cubic-bezier(.18, .75, .28, 1);
+}
+.yv-array-pointer-host .yv-cell-value.yv-cell-copied.yv-cell-written {
+  border-color: var(--yv-success);
+}
+@keyframes yv-array-copy-arrive {
+  0% { transform: translateY(-5px) scale(.96); opacity: .5; box-shadow: 0 0 0 3px color-mix(in srgb, var(--yv-accent), transparent 72%); }
+  70% { transform: translateY(1px) scale(1.015); opacity: 1; }
+  100% { transform: translateY(0) scale(1); box-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-array-pointer-host .yv-cell-value.yv-cell-copied {
+    animation: none;
+  }
+}
+
+
+/* In-place accumulation: distinguish a destination cell that is updated after
+   reading another cell of the same array (prefix/suffix and running totals). */
+.yv-array-pointer-host .yv-cell-value.yv-cell-accumulated {
+  animation: yv-array-accumulate 380ms ease-out;
+}
+.yv-array-pointer-host .yv-cell-value.yv-cell-accumulated.yv-cell-written {
+  border-color: var(--yv-success);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--yv-success), transparent 38%);
+}
+@keyframes yv-array-accumulate {
+  0% { transform: scale(.94); filter: brightness(1.12); }
+  65% { transform: scale(1.025); }
+  100% { transform: scale(1); filter: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-array-pointer-host .yv-cell-value.yv-cell-accumulated {
+    animation: none;
+  }
+}
+.yv-var-name{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.yv-role{font-size:9px;line-height:1.35;font-weight:700;letter-spacing:.025em;padding:1px 5px;border:1px solid var(--yv-border);border-radius:999px;color:var(--yv-muted);white-space:nowrap}

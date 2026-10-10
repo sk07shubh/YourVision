@@ -1,4 +1,5 @@
 import { execFile } from "child_process";
+import { spawn } from "child_process";
 import { promisify } from "util";
 import fs from "fs/promises";
 import path from "path";
@@ -9,8 +10,163 @@ import { buildStates } from "../trace/stateBuilder.js";
 import { enrichTrace } from "../trace/enrichTrace.js";
 
 const MAX_TRACE_EVENTS = 5000;
+const JAVA_EXECUTION_TIMEOUT_MS = 5000;
+const JAVA_EXECUTION_MAX_BUFFER = 8 * 1024 * 1024;
 
 const execFileAsync = promisify(execFile);
+
+/**
+ * Runs the tracer in its own POSIX process group so a timeout can terminate
+ * both the tracer JVM and the JDI-launched debuggee. Output remains buffered
+ * and bounded like execFile's stdout/stderr capture.
+ */
+function runJavaTracer(
+    args: string[]
+): Promise<{ stdout: string; stderr: string }> {
+    return new Promise((resolve, reject) => {
+        const child = spawn("java", args, {
+            detached: process.platform !== "win32",
+            stdio: ["ignore", "pipe", "pipe"]
+        });
+
+        const stdoutChunks: Buffer[] = [];
+        const stderrChunks: Buffer[] = [];
+        let stdoutBytes = 0;
+        let stderrBytes = 0;
+        let timedOut = false;
+        let bufferExceeded = false;
+        let settled = false;
+
+        const stdoutText = () => Buffer.concat(stdoutChunks).toString("utf8");
+        const stderrText = () => Buffer.concat(stderrChunks).toString("utf8");
+
+        const killProcessTree = () => {
+            if (child.pid === undefined) return;
+
+            try {
+                if (process.platform !== "win32") {
+                    // The negative PID targets the entire process group.
+                    process.kill(-child.pid, "SIGKILL");
+                } else {
+                    child.kill("SIGKILL");
+                }
+            } catch (error) {
+                // ESRCH means the process/group has already exited.
+                if ((error as NodeJS.ErrnoException).code !== "ESRCH") {
+                    // Fall back to killing the direct child if group signalling
+                    // is unavailable; do not mask the original timeout.
+                    child.kill("SIGKILL");
+                }
+            }
+        };
+
+        const timer = setTimeout(() => {
+            timedOut = true;
+            killProcessTree();
+        }, JAVA_EXECUTION_TIMEOUT_MS);
+
+        const fail = (error: NodeJS.ErrnoException & {
+            stdout?: string;
+            stderr?: string;
+            killed?: boolean;
+            signal?: NodeJS.Signals | null;
+        }) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            error.stdout = stdoutText();
+            error.stderr = stderrText();
+            reject(error);
+        };
+
+        child.stdout.on("data", (chunk: Buffer) => {
+            if (settled || bufferExceeded) return;
+            stdoutBytes += chunk.length;
+            if (stdoutBytes > JAVA_EXECUTION_MAX_BUFFER) {
+                bufferExceeded = true;
+                killProcessTree();
+                return;
+            }
+            stdoutChunks.push(chunk);
+        });
+
+        child.stderr.on("data", (chunk: Buffer) => {
+            if (settled || bufferExceeded) return;
+            stderrBytes += chunk.length;
+            if (stderrBytes > JAVA_EXECUTION_MAX_BUFFER) {
+                bufferExceeded = true;
+                killProcessTree();
+                return;
+            }
+            stderrChunks.push(chunk);
+        });
+
+        child.on("error", (error) => {
+            fail(error as NodeJS.ErrnoException & {
+                stdout?: string;
+                stderr?: string;
+            });
+        });
+
+        child.on("close", (code, signal) => {
+            if (settled) return;
+            clearTimeout(timer);
+
+            if (timedOut) {
+                const error = Object.assign(
+                    new Error(`Java execution exceeded ${JAVA_EXECUTION_TIMEOUT_MS} ms`),
+                    {
+                        code: "ETIMEDOUT",
+                        killed: true,
+                        signal,
+                        stdout: stdoutText(),
+                        stderr: stderrText()
+                    }
+                );
+                settled = true;
+                reject(error);
+                return;
+            }
+
+            if (bufferExceeded) {
+                const error = Object.assign(
+                    new Error("stdout/stderr maxBuffer exceeded"),
+                    {
+                        code: "ERR_CHILD_PROCESS_STDIO_MAXBUFFER",
+                        killed: true,
+                        signal,
+                        stdout: stdoutText(),
+                        stderr: stderrText()
+                    }
+                );
+                settled = true;
+                reject(error);
+                return;
+            }
+
+            if (code !== 0) {
+                const error = Object.assign(
+                    new Error(`Java tracer exited with code ${code}`),
+                    {
+                        code,
+                        signal,
+                        stdout: stdoutText(),
+                        stderr: stderrText()
+                    }
+                );
+                settled = true;
+                reject(error);
+                return;
+            }
+
+            settled = true;
+            resolve({
+                stdout: stdoutText(),
+                stderr: stderrText()
+            });
+        });
+    });
+}
 
 export interface JavaTestcase {
     method: string;
@@ -287,15 +443,7 @@ await fs.writeFile(
                 stdout,
                 stderr
             } =
-                await execFileAsync(
-                    "java",
-                    childArguments,
-                    {
-                        timeout: 5000,
-                        maxBuffer:
-                            8 * 1024 * 1024
-                    }
-                );
+                await runJavaTracer(childArguments);
             const trace =
                 parseTrace(stdout, source);
 
@@ -356,7 +504,7 @@ await fs.writeFile(
                         type: "TIMEOUT",
                         data: {
                             message:
-                                "Java execution exceeded 3000 ms"
+                                `Java execution exceeded ${JAVA_EXECUTION_TIMEOUT_MS} ms`
                         }
                     };
 
@@ -374,7 +522,7 @@ await fs.writeFile(
                     stderr:
                         error.stderr ?? "",
                     message:
-                        "Java execution exceeded 3000 ms",
+                        `Java execution exceeded ${JAVA_EXECUTION_TIMEOUT_MS} ms`,
                     trace,
                     states:
                         buildStates(trace)
