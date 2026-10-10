@@ -409,9 +409,12 @@ function annotateCondition(
 
 function extractConditionExpression(statement: string): string | undefined {
     const trimmed = statement.trim();
+    // A branch checkpoint can retain the full source spelling "else if (...)";
+    // normalize only the leading keyword so its condition is evaluated too.
+    const conditionStatement = trimmed.replace(/^(?:}\\s*)?else\\s+if\\b/, "if");
     for (const keyword of ["if", "while"]) {
-        if (new RegExp("^" + keyword + "\\s*\\(").test(trimmed)) {
-            return balancedParenthesized(trimmed, trimmed.indexOf("("));
+        if (new RegExp("^" + keyword + "\\s*\\(").test(conditionStatement)) {
+            return balancedParenthesized(conditionStatement, conditionStatement.indexOf("("));
         }
     }
     if (/^for\s*\(/.test(trimmed)) {
