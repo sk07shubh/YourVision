@@ -421,3 +421,23 @@
     animation: none;
   }
 }
+
+
+/* Destination cells pulse when the same trace batch reads a different array
+   and writes a changed value here (copy/merge/transfer primitive). */
+.yv-array-pointer-host .yv-cell-value.yv-cell-copied {
+  animation: yv-array-copy-arrive 420ms cubic-bezier(.18, .75, .28, 1);
+}
+.yv-array-pointer-host .yv-cell-value.yv-cell-copied.yv-cell-written {
+  border-color: var(--yv-success);
+}
+@keyframes yv-array-copy-arrive {
+  0% { transform: translateY(-5px) scale(.96); opacity: .5; box-shadow: 0 0 0 3px color-mix(in srgb, var(--yv-accent), transparent 72%); }
+  70% { transform: translateY(1px) scale(1.015); opacity: 1; }
+  100% { transform: translateY(0) scale(1); box-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-array-pointer-host .yv-cell-value.yv-cell-copied {
+    animation: none;
+  }
+}
