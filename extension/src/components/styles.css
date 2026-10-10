@@ -441,3 +441,24 @@
     animation: none;
   }
 }
+
+
+/* In-place accumulation: distinguish a destination cell that is updated after
+   reading another cell of the same array (prefix/suffix and running totals). */
+.yv-array-pointer-host .yv-cell-value.yv-cell-accumulated {
+  animation: yv-array-accumulate 380ms ease-out;
+}
+.yv-array-pointer-host .yv-cell-value.yv-cell-accumulated.yv-cell-written {
+  border-color: var(--yv-success);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--yv-success), transparent 38%);
+}
+@keyframes yv-array-accumulate {
+  0% { transform: scale(.94); filter: brightness(1.12); }
+  65% { transform: scale(1.025); }
+  100% { transform: scale(1); filter: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-array-pointer-host .yv-cell-value.yv-cell-accumulated {
+    animation: none;
+  }
+}
