@@ -12,6 +12,7 @@ import {
   eventEffects,
   dataStructureResults,
   isForLoopUpdateStep,
+  pointerTargets,
   unorderedCollectionDelta,
 } from './VisualizerPanel';
 
@@ -33,6 +34,31 @@ function markup(nodes: ReactNode[]): string {
 }
 
 describe('execution visualization feature matrix', () => {
+  it('resolves pointer destinations from actual in-range integer index variables only', () => {
+    const current = state({
+      variables: {
+        i: 2,
+        left: 0,
+        right: 4,
+        row: 1,
+        invalid: 8,
+        negative: -1,
+        fractional: 1.5,
+        textIndex: '2',
+      },
+    });
+
+    expect(pointerTargets(
+      current,
+      5,
+      new Set(['i', 'left', 'right', 'invalid', 'negative', 'fractional', 'textIndex'])
+    )).toEqual([
+      { name: 'i', index: 2 },
+      { name: 'left', index: 0 },
+      { name: 'right', index: 4 },
+    ]);
+  });
+
   it('reads runtime TRUE/FALSE without inventing a result', () => {
     expect(executionCondition(state({
       lastEvent: { type: 'STEP', line: 4, data: { conditionResult: true } },
