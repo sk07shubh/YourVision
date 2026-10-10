@@ -1332,6 +1332,8 @@ function swappedArrayIndices(state?: TraceState, arrayName?: string): Set<number
     const secondIndex = (second.indices as number[])[0]!;
     if (firstIndex === secondIndex) return;
     if (
+      !valueChanged(first.before, first.after) ||
+      !valueChanged(second.before, second.after) ||
       valueChanged(first.before, second.after) ||
       valueChanged(first.after, second.before)
     ) return;
