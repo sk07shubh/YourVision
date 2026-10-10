@@ -1401,9 +1401,9 @@ function shiftedArrayIndices(state?: TraceState, arrayName?: string): Map<number
       after: change.after
     })).sort((a, b) => a.index - b.index);
 
-    // Two writes are ambiguous with a swap. Three or more contiguous changed
-    // cells are needed before calling the movement a shift.
-    if (changes.length < 3) return;
+    // A two-cell exchange matches both directions and is handled by the
+    // swap animation; a one-direction neighbor match indicates a shift.
+    if (changes.length < 2) return;
     for (let i = 1; i < changes.length; i++) {
       if (changes[i]!.index !== changes[i - 1]!.index + 1) return;
     }
