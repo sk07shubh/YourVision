@@ -1817,7 +1817,7 @@ function ArrayView({ value, state, source, arrayName, depth, seen }: {
         <div className="yv-cell" key={index} ref={element => { cellRefs.current[index] = element; }}>
           <div
             key={`${index}-${state?.sequence ?? state?.line ?? 'initial'}`}
-            className={`yv-cell-value ${rangeStart >= 0 && index >= rangeStart && index <= rangeEnd ? 'yv-cell-range ' : ''}${changed.has(index) ? 'yv-cell-written ' : ''}${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-cell-compared ' : ''}${accumulated.has(index) ? 'yv-cell-accumulated ' : ''}${copied.has(index) ? 'yv-cell-copied ' : ''}${rotated.has(index) ? 'yv-cell-rotated-' + rotated.get(index) + ' ' : ''}${swapped.has(index) ? 'yv-cell-swapped' : ''}`}
+            className={`yv-cell-value ${rangeStart >= 0 && index >= rangeStart && index <= rangeEnd ? 'yv-cell-range ' : ''}${changed.has(index) ? 'yv-cell-written ' : ''}${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-cell-compared ' : ''}${accumulated.has(index) && !copied.has(index) ? 'yv-cell-accumulated ' : ''}${copied.has(index) ? 'yv-cell-copied ' : ''}${rotated.has(index) ? 'yv-cell-rotated-' + rotated.get(index) + ' ' : ''}${swapped.has(index) ? 'yv-cell-swapped' : ''}`}
           >
             <div className={`yv-array-cell-content ${swapped.has(index) ? 'yv-array-cell-content-swapped' : ''}${rotated.has(index) ? ' yv-array-cell-content-rotate-' + rotated.get(index) : shifted.has(index) ? ' yv-array-cell-content-shift-' + shifted.get(index) : ''}`}>
               <DataValue value={item} state={state} source={source} name={arrayName} depth={depth + 1} seen={seen}/>
