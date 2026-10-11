@@ -445,6 +445,18 @@ describe('execution visualization feature matrix', () => {
     }
   });
 
+  it('shows structure type and variable name together for strings and char arrays', () => {
+    const current = state({
+      variables: { s: 'ab' },
+      arrays: { S: ['a', 'b'] },
+    });
+    const html = renderToStaticMarkup(<DataStructures state={current} source="char[] S = s.toCharArray();" />);
+    expect(html).toContain('String → s');
+    expect(html).toContain('charArray → S');
+    expect(html).not.toContain('yv-string-meta');
+    expect(html).not.toContain('UTF-16 units');
+  });
+
   it('renders every enhanced-for header generically', () => {
     const cases = [
       ['for (char ch : s.toCharArray())', 'char ch : s.toCharArray()'],
