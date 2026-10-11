@@ -1319,13 +1319,26 @@ function enhancedForBinding(source: string, state: TraceState | undefined, colle
   return undefined;
 }
 
+function isEnhancedForVariable(source: string, name: string): boolean {
+  const pattern = /for\\s*\\(\\s*(?:final\\s+)?(?:[\\w.$<>?,\\[\\]\\s]+?)\\s+([A-Za-z_$][\\w$]*)\\s*:/g;
+  return [...source.matchAll(pattern)].some(match => match[1] === name);
+}
+
 function EnhancedForValueCard({ binding }: { binding: EnhancedForBinding }) {
   return (
-    <div className="yv-enhanced-for-card" data-enhanced-for-variable={binding.variable}>
-      <span className="yv-enhanced-for-name">{binding.variable}</span>
+    <div className="yv-enhanced-for-card" data-enhanced-for-variable={binding.variable}
+      style={{ position: 'absolute', zIndex: 5, left: '50%', bottom: 'calc(100% + 9px)', transform: 'translateX(-50%)',
+        display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', padding: '4px 8px',
+        border: '1px solid var(--yv-accent, #65a9ff)', borderRadius: 7, background: 'var(--yv-panel, #101b2d)',
+        color: 'var(--yv-text, #f3f6ff)', boxShadow: '0 3px 12px rgba(0,0,0,.28)', fontSize: 12,
+        lineHeight: '16px', pointerEvents: 'none', transition: 'opacity 120ms ease' }}>
+      <span className="yv-enhanced-for-name" style={{ color: 'var(--yv-accent, #65a9ff)', fontWeight: 700 }}>{binding.variable}</span>
       <span className="yv-enhanced-for-equals">=</span>
       <span className="yv-enhanced-for-value">{compactValue(binding.value)}</span>
-      <span className="yv-enhanced-for-connector" aria-hidden="true" />
+      <span className="yv-enhanced-for-connector" aria-hidden="true"
+        style={{ position: 'absolute', left: '50%', top: '100%', height: 9, borderLeft: '1px solid var(--yv-accent, #65a9ff)' }} />
+      <span aria-hidden="true" style={{ position: 'absolute', left: 'calc(50% - 3px)', top: 'calc(100% + 6px)',
+        width: 6, height: 6, borderRadius: '50%', background: 'var(--yv-accent, #65a9ff)' }} />
     </div>
   );
 }
@@ -2092,7 +2105,7 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
         ))}
       </div>
       {value.map((item, index) => (
-        <div className="yv-cell" key={index} ref={element => { cellRefs.current[index] = element; }}>
+        <div className="yv-cell" key={index} ref={element => { cellRefs.current[index] = element; }} style={enhancedBinding?.index === index ? { position: "relative" } : undefined}>
           {enhancedBinding?.index === index && <EnhancedForValueCard binding={enhancedBinding} />}
           <div
             key={`${index}-${state?.sequence ?? state?.line ?? 'initial'}`}
@@ -2665,7 +2678,7 @@ export function StringView({ value, state, name, source = '' }: { value: string;
             index >= transition.index);
           const removedHere = transition?.kind === 'mutation' && transition.removed && transition.index === index ? transition.removed : undefined;
           return (
-            <div className="yv-string-cell-wrap" key={index} data-string-cell-index={index}>
+            <div className="yv-string-cell-wrap" key={index} data-string-cell-index={index} style={enhancedBinding?.index === index ? { position: "relative" } : undefined}>
               {enhancedBinding?.index === index && <EnhancedForValueCard binding={enhancedBinding} />}
               {removedHere && <div className="yv-string-removed-overlay" aria-hidden="true">{removedHere}</div>}
               <div className={`yv-string-cell ${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-string-cell-compared ' : ''}${inRange ? 'yv-cell-range ' : ''}${changed ? 'yv-string-cell-changed ' : ''}${added ? 'yv-string-cell-added ' : ''}${swapFromRight ? 'yv-string-cell-swap-right ' : ''}${swapFromLeft ? 'yv-string-cell-swap-left ' : ''}${shiftsRight ? 'yv-string-cell-shift-right ' : ''}${shiftsLeft ? 'yv-string-cell-shift-left' : ''}`} data-string-index={index}>
@@ -2719,7 +2732,7 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
   for (const [name, value] of Object.entries(state?.variables ?? {})) {
     if (name === 'this' || typeof value !== 'string') continue;
     // Enhanced-for element variables are scalar loop bindings, not independent strings.
-    if (enhancedForBinding(source, state, name, value.split(''))) continue;
+    if (isEnhancedForVariable(source, name)) continue;
     grouped.set(`string:${name}`, { names: [name], value: { $stringValue: value } });
   }
 
