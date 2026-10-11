@@ -496,14 +496,15 @@ This section records code that has been implemented after the design audit. It d
 
 - **Ordered collections:** runtime snapshots distinguish TreeSet (sortedSet) and LinkedHashSet (insertionOrderedSet) from unordered HashSet. The visualizer labels sorted and insertion-ordered sets accurately.
 - **Ordered maps:** TreeMap snapshots use the existing in-order tree traversal and the UI labels sorted-key order. LinkedHashMap snapshots now follow the linked entry chain (head / after) rather than hash-table bucket order, preserving its observable insertion order.
-- **Priority queues:** the UI says HEAP, not MIN-HEAP, because the snapshot does not establish whether a custom comparator reverses priority.
+- **Priority queues:** the UI says HEAP, not MIN-HEAP, because the snapshot does not establish whether a custom comparator reverses priority. Heap and unordered-set deltas are computed independently of snapshot iteration order.
 - **Adjacency graphs:** an initial graph view renders captured nodes with neighbors fields, their recorded references, cycles, self-links, and variable aliases. It caps rendering at 80 nodes.
 - **Trie nodes:** an initial trie view renders captured child relationships, map-key or array-index edge labels, and common terminal flags (isEnd, isWord, endOfWord, isEndOfWord, terminal, isTerminal). Rendering is depth-bounded and node-bounded.
+- **Binary trees:** left/right branch labels and stable node identities are visible; cyclic references render as references instead of repeated nodes.
 - **Disjoint sets:** an initial parent-forest view is enabled only when the source contains conventional find/union and parent/parents/par array patterns. It displays parent relationships and highlights recorded parent-array writes. It supports self-parent roots and -1 root sentinels.
 
 ### Regression coverage added
 
-- extension/src/components/VisualizerPanel.test.tsx: sorted/insertion-ordered collection labels, comparator-agnostic heap label, graph cycles/self-loops, trie child edges and terminal nodes, and disjoint-set forest rendering.
+- extension/src/components/VisualizerPanel.test.tsx: sorted/insertion-ordered collection labels, comparator-agnostic heap label, unordered-set membership deltas, graph cycles/self-loops, trie child edges and terminal nodes, disjoint-set forest rendering, and binary-tree branch/cycle handling.
 - backend/scripts/smoke-java-data-structures.ts: TreeSet comparator order, LinkedHashSet insertion order, LinkedHashMap insertion order, TreeMap key order, and captured GraphNode/TrieNode snapshots.
 
 ### Remaining verification and scope
