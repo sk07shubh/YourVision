@@ -2413,6 +2413,7 @@ export function StringView({ value, state, name, source = '' }: { value: string;
   const structureNames = name.split(' / ');
   const matchesName = (candidate: unknown) => typeof candidate === 'string' && structureNames.includes(candidate);
   const accessed = new Set<number>();
+  const stringAccessIndices: number[] = [];
   const compared = new Set<number>();
   const ranges: Array<{ start: number; end: number }> = [];
   const pointers = new Map<string, number>();
@@ -2425,7 +2426,10 @@ export function StringView({ value, state, name, source = '' }: { value: string;
     if ((event.type === 'STRING_ACCESS' || event.type === 'ARRAY_ACCESS') && matchesName(effect.name)) {
       const index = event.type === 'STRING_ACCESS' ? effect.index :
         Array.isArray(effect.indices) ? effect.indices[0] : undefined;
-      if (typeof index === 'number' && Number.isInteger(index) && index >= 0 && index < value.length) accessed.add(index);
+      if (typeof index === 'number' && Number.isInteger(index) && index >= 0 && index < value.length) {
+        accessed.add(index);
+        if (event.type === 'STRING_ACCESS') stringAccessIndices.push(index);
+      }
       if (event.type === 'STRING_ACCESS' && typeof effect.indexVariable === 'string' && typeof effect.index === 'number') {
         pointers.set(effect.indexVariable, effect.index);
       }
@@ -2494,6 +2498,9 @@ export function StringView({ value, state, name, source = '' }: { value: string;
   // Runtime events control highlights. Source scanning only locates integer
   // pointer variables for the currently executed string expression.
   const line = source.split(/\r?\n/)[Math.max(0, (state?.line ?? 1) - 1)] ?? '';
+  if (/(?:==|!=|<=|>=|<|>)/.test(line)) {
+    for (const index of stringAccessIndices) compared.add(index);
+  }
   const sourceName = structureNames[0] ?? name;
   const escapedName = sourceName.replace(/\$/g, '\\$');
   const indexExpressions: string[] = [];
