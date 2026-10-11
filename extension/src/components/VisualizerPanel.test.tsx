@@ -131,6 +131,24 @@ describe('string data structure visualization', () => {
     expect(resultHtml).toContain('yv-string-cell-added');
   });
 
+  it('highlights all runtime-read characters participating in a character comparison', () => {
+    const source = 'if (s.charAt(left) != s.charAt(right)) return false;';
+    const current = state({
+      line: 1,
+      variables: { s: 'radar', left: 0, right: 4 },
+      lastEvent: { type: 'STEP', line: 1, data: { executionEvents: [
+        { type: 'STRING_ACCESS', data: { name: 's', index: 0, value: 'r', kind: 'read', indexVariable: 'left' } },
+        { type: 'STRING_ACCESS', data: { name: 's', index: 4, value: 'r', kind: 'read', indexVariable: 'right' } },
+      ] } },
+    });
+    const html = renderToStaticMarkup(<StringView value="radar" state={current} name="s" source={source} />);
+    expect(html).toContain('yv-string-cell yv-cell-read yv-string-cell-compared');
+    expect(html).toContain('data-string-index="0"');
+    expect(html).toContain('data-string-index="4"');
+    expect(html).toContain('data-string-pointer="left"');
+    expect(html).toContain('data-string-pointer="right"');
+  });
+
   it('links split results to the source and highlights only literal delimiter ranges', () => {
     const current = state({ lastEvent: { type: 'STEP', line: 5, data: { executionEvents: [
       { type: 'STRING_SPLIT_RESULT', data: {
