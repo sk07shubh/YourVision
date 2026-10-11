@@ -611,3 +611,8 @@
 .yv-linked-empty-label{font-size:11px}
 .yv-linked-piece[data-next-target="null"] .yv-node{border-color:color-mix(in srgb,var(--yv-border),var(--yv-accent) 25%)}
 @media(prefers-reduced-motion:reduce){.yv-linked-piece,.yv-linked-piece .yv-node,.yv-linked-piece .yv-edge{animation:none;transition:none}}
+
+.yv-linked-components{display:flex;flex-direction:column;align-items:flex-start;gap:14px;min-width:0}
+.yv-linked-components .yv-linked{margin:0}
+.yv-linked-components .yv-linked[data-linked-component]:not(:first-child){padding-top:8px;border-top:1px dashed var(--yv-border)}
+.yv-linked-piece .yv-edge-external{color:var(--yv-warning,var(--yv-accent))}
