@@ -142,6 +142,20 @@ describe('string data structure visualization', () => {
     expect(html).toContain('class="yv-string-cell yv-cell-range " data-string-index="3"');
     expect(html).not.toContain('class="yv-string-cell yv-cell-range " data-string-index="4"');
   });
+  it('shows an exclusive end pointer at length() for substring ranges', () => {
+    const current = state({
+      line: 1,
+      variables: { s: 'banana', start: 3 },
+      lastEvent: { type: 'STEP', line: 1, data: { executionEvents: [
+        { type: 'STRING_RANGE_ACCESS', data: { name: 's', start: 3, end: 6, startVariable: 'start', endExpression: 's.length()', operation: 'substring', kind: 'read' } },
+      ] } },
+    });
+    const html = renderToStaticMarkup(<StringView value="banana" state={current} name="s" source="String suffix = s.substring(start, s.length());" />);
+    expect(html).toContain('data-string-pointer="start"');
+    expect(html).toContain('data-string-pointer="end"');
+    expect(html).toContain('yv-string-end-marker');
+  });
+
   it('shows scalar string operation results without inventing character reads', () => {
     const current = state({ lastEvent: { type: 'STEP', line: 4, data: { executionEvents: [
       { type: 'STRING_SEARCH_RESULT', data: { name: 's', operation: 'length', index: -1, end: -1, matched: false, result: 6, kind: 'search' } },
