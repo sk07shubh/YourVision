@@ -216,7 +216,9 @@ export function eventEffects(state?: TraceState): ExecutionEffect[] {
   }
 
   if ('returnValue' in data) {
-    effects.push({ kind: 'return', text: '↩  ' + compactValue(data.returnValue) });
+    // Use the semantic summary for object returns so linked-list nodes render
+    // as a stable node identity/value instead of leaking serialized snapshots.
+    effects.push({ kind: 'return', text: '↩  ' + variableSummary(data.returnValue) });
   }
 
   return effects;
