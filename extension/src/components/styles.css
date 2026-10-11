@@ -767,3 +767,18 @@
 
 /* Keep the terminal null box level with the node itself, not the taller metadata column. */
 .yv-linked-piece > .yv-edge-null { align-self: flex-start; }
+
+
+/* Collection insertions are tied to a real before/after snapshot delta. */
+.yv-collection-item-enter {
+  animation: yv-collection-item-enter 360ms cubic-bezier(.2,.75,.25,1) both;
+  border-color: color-mix(in srgb, var(--yv-success), var(--yv-border) 28%);
+}
+@keyframes yv-collection-item-enter {
+  0% { opacity: .35; transform: translateY(-6px) scale(.96); box-shadow: 0 0 0 3px color-mix(in srgb, var(--yv-success), transparent 78%); }
+  72% { opacity: 1; transform: translateY(1px) scale(1.015); }
+  100% { opacity: 1; transform: translateY(0) scale(1); box-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-collection-item-enter { animation: none; }
+}
