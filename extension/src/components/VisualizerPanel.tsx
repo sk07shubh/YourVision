@@ -3329,7 +3329,7 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
 
   const items = [...grouped.values()];
 
-  if (!items.length) {
+  if (!items.length && graphNodeEntries.length === 0) {
     return <div className="yv-empty">Structures appear here as your code creates or mutates them.</div>;
   }
 
