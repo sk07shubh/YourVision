@@ -133,10 +133,21 @@ describe('string data structure visualization', () => {
       { type: 'STRING_SEARCH_RESULT', data: { name: 's', operation: 'indexOf', query: 'ana', index: 1, end: 4, matched: true, result: 1, kind: 'search' } },
     ] } } });
     const html = renderToStaticMarkup(<StringView value="banana" state={current} name="s" />);
+    expect(html).toContain("indexOf → 1");
     expect(html).toContain('class="yv-string-cell yv-cell-range " data-string-index="1"');
     expect(html).toContain('class="yv-string-cell yv-cell-range " data-string-index="3"');
     expect(html).not.toContain('class="yv-string-cell yv-cell-range " data-string-index="4"');
   });
+  it('shows scalar string operation results without inventing character reads', () => {
+    const current = state({ lastEvent: { type: 'STEP', line: 4, data: { executionEvents: [
+      { type: 'STRING_SEARCH_RESULT', data: { name: 's', operation: 'length', index: -1, end: -1, matched: false, result: 6, kind: 'search' } },
+    ] } } });
+    const html = renderToStaticMarkup(<StringView value="banana" state={current} name="s" />);
+    expect(html).toContain('length → 6');
+    expect(html).toContain('UTF-16 units');
+    expect(html).not.toContain('yv-cell-range');
+  });
+
   it('animates StringBuilder insertions and deletion ghosts without moving index labels', () => {
     const deletedState = state({ lastEvent: { type: 'STEP', line: 6, data: { executionEvents: [
       { type: 'STRING_MUTATION', data: { name: 'builder', operation: 'deleteCharAt', before: 'cba', after: 'ca', index: 1, removed: 'b', kind: 'mutation' } },
