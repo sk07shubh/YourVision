@@ -1172,8 +1172,12 @@ function deriveStringEvents(
         if (value === undefined) continue;
         const args = splitTopLevel(match[3] ?? "", ",").map(part => part.trim());
         const delimiter = evaluateExpression(args[0] ?? "", variables);
-        const resultArray = asArraySnapshot(postVariables[resultName]);
+        const rawResultArray = postVariables[resultName];
+        const resultArray = asArraySnapshot(rawResultArray);
         if (typeof delimiter !== "string" || !resultArray) continue;
+        const partCount = isPlainObject(rawResultArray) && typeof rawResultArray.length === "number"
+            ? rawResultArray.length
+            : resultArray.values.length;
 
         const delimiterRanges: Array<{ start: number; end: number }> = [];
         const regexMetaCodes = [92, 94, 36, 46, 42, 43, 63, 40, 41, 91, 93, 123, 125, 124];
@@ -1200,7 +1204,7 @@ function deriveStringEvents(
                 resultName,
                 operation: "split",
                 delimiter,
-                partCount: resultArray.values.length,
+                partCount,
                 delimiterRanges,
                 kind: "split"
             }
