@@ -1279,89 +1279,6 @@ export function Variables({ state, previous }: { state?: TraceState; previous?: 
   );
 }
 
-
-type EnhancedForBinding = { variable: string; iterable: string; index: number; value: unknown };
-
-/**
- * Resolve the element currently assigned by a Java enhanced-for loop.
- * The iteration ordinal comes from recorded VARIABLE_UPDATE events, not from
- * searching by value, so repeated values still point at the correct cell.
- */
-function enhancedForBinding(source: string, state: TraceState | undefined, collectionName: string | undefined, values: unknown[]): EnhancedForBinding | undefined {
-  if (!state || !collectionName || !values.length) return undefined;
-  const pattern = /for\s*\(\s*(?:final\s+)?(?:[\w.$<>?,\[\]\s]+?)\s+([A-Za-z_$][\w$]*)\s*:\s*([A-Za-z_$][\w$]*)(?:\s*\.\s*toCharArray\s*\(\s*\))?\s*\)/g;
-  for (const match of source.matchAll(pattern)) {
-    const variable = match[1];
-    const iterable = match[2];
-    if (!variable || !iterable || !collectionName.split(' / ').includes(iterable)) continue;
-    const session = sessionStore.get();
-    const endIndex = Math.max(0, session.states.findIndex(candidate => candidate === state));
-    const currentIndex = session.states.indexOf(state);
-    const upto = currentIndex >= 0 ? currentIndex : endIndex;
-    let assignments = 0;
-    for (let i = 0; i <= upto; i++) {
-      const data = session.states[i]?.lastEvent?.data;
-      if (!isPlainObject(data) || !Array.isArray(data.executionEvents)) continue;
-      for (const event of data.executionEvents) {
-        if (!isPlainObject(event) || event.type !== 'VARIABLE_UPDATE' || !isPlainObject(event.data)) continue;
-        if (event.data.name === variable) assignments++;
-      }
-    }
-    // Determine the loop's source span so the card remains visible through
-    // the body, even on trace steps that omit the loop variable from snapshots.
-    const headerOffset = match.index ?? 0;
-    const headerLine = source.slice(0, headerOffset).split(/\r?\n/).length;
-    const openBrace = source.indexOf('{', headerOffset + match[0].length);
-    let loopEndLine = headerLine;
-    if (openBrace >= 0) {
-      let depth = 0;
-      let closeBrace = -1;
-      for (let i = openBrace; i < source.length; i++) {
-        if (source[i] === '{') depth++;
-        else if (source[i] === '}' && --depth === 0) { closeBrace = i; break; }
-      }
-      if (closeBrace >= 0) loopEndLine = source.slice(0, closeBrace).split(/\r?\n/).length;
-    }
-    const currentLine = state.line ?? headerLine;
-    if (currentLine < headerLine || currentLine > loopEndLine) continue;
-
-    // Count element assignments through this trace step. Clamp to the final
-    // cell while a trace event is missing; never lose the card mid-loop.
-    let index = assignments > 0 ? Math.min(assignments - 1, values.length - 1) : -1;
-    const variableValue = state.variables?.[variable];
-    if (index < 0) {
-      index = values.findIndex(item => !valueChanged(item, variableValue));
-    }
-    if (index < 0 || index >= values.length) continue;
-    return { variable, iterable, index, value: variableValue ?? values[index] };
-  }
-  return undefined;
-}
-
-function isEnhancedForVariable(source: string, name: string): boolean {
-  const pattern = /for\s*\(\s*(?:final\s+)?(?:[\w.$<>?,\[\]\s]+?)\s+([A-Za-z_$][\w$]*)\s*:/g;
-  return [...source.matchAll(pattern)].some(match => match[1] === name);
-}
-
-function EnhancedForValueCard({ binding }: { binding: EnhancedForBinding }) {
-  return (
-    <div className="yv-enhanced-for-card" data-enhanced-for-variable={binding.variable}
-      style={{ position: 'absolute', zIndex: 5, left: '50%', bottom: 'calc(100% + 9px)', transform: 'translateX(-50%)',
-        display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', padding: '4px 8px',
-        border: '1px solid var(--yv-accent, #65a9ff)', borderRadius: 7, background: 'var(--yv-panel, #101b2d)',
-        color: 'var(--yv-text, #f3f6ff)', boxShadow: '0 3px 12px rgba(0,0,0,.28)', fontSize: 12,
-        lineHeight: '16px', pointerEvents: 'none', transition: 'opacity 120ms ease' }}>
-      <span className="yv-enhanced-for-name" style={{ color: 'var(--yv-accent, #65a9ff)', fontWeight: 700 }}>{binding.variable}</span>
-      <span className="yv-enhanced-for-equals">=</span>
-      <span className="yv-enhanced-for-value">{compactValue(binding.value)}</span>
-      <span className="yv-enhanced-for-connector" aria-hidden="true"
-        style={{ position: 'absolute', left: '50%', top: '100%', height: 9, borderLeft: '1px solid var(--yv-accent, #65a9ff)' }} />
-      <span aria-hidden="true" style={{ position: 'absolute', left: 'calc(50% - 3px)', top: 'calc(100% + 6px)',
-        width: 6, height: 6, borderRadius: '50%', background: 'var(--yv-accent, #65a9ff)' }} />
-    </div>
-  );
-}
-
 function arrayIndexVariableNames(source: string, arrayName?: string): Set<string> {
   const names = new Set<string>();
   if (!arrayName) return names;
@@ -2099,7 +2016,6 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
     return () => observer.disconnect();
   }, [targetSignature, state?.sequence, value.length]);
 
-  const enhancedBinding = enhancedForBinding(source, state, arrayName, value);
   const changed = changedArrayIndices(state, arrayName);
   const accessed = accessedArrayIndices(state, arrayName);
   const compared = isComparisonStatement(source, state) && accessed.size >= 2 ? accessed : new Set<number>();
@@ -2124,8 +2040,7 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
         ))}
       </div>
       {value.map((item, index) => (
-        <div className="yv-cell" key={index} ref={element => { cellRefs.current[index] = element; }} style={enhancedBinding?.index === index ? { position: "relative" } : undefined}>
-          {enhancedBinding?.index === index && <EnhancedForValueCard binding={enhancedBinding} />}
+        <div className="yv-cell" key={index} ref={element => { cellRefs.current[index] = element; }}>
           <div
             key={`${index}-${state?.sequence ?? state?.line ?? 'initial'}`}
             className={`yv-cell-value ${rangeStart >= 0 && index >= rangeStart && index <= rangeEnd ? 'yv-cell-range ' : ''}${rangeStart >= 0 && index === rangeStart ? 'yv-cell-range-start ' : ''}${rangeEnd >= 0 && index === rangeEnd && rangeEnd !== rangeStart ? 'yv-cell-range-end ' : ''}${changed.has(index) ? 'yv-cell-written ' : ''}${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-cell-compared ' : ''}${accumulated.has(index) && !copied.has(index) ? 'yv-cell-accumulated ' : ''}${copied.has(index) ? 'yv-cell-copied ' : ''}${rotated.has(index) ? 'yv-cell-rotated-' + rotated.get(index) + ' ' : ''}${swapped.has(index) ? 'yv-cell-swapped' : ''}`}
@@ -2646,11 +2561,11 @@ export function StringView({ value, state, name, source = '' }: { value: string;
 
   // Java String indices count UTF-16 code units. split('') preserves that
   // mapping. Render a space as a blank cell, never as a visible abbreviation.
-  const enhancedBinding = enhancedForBinding(source, state, name, value.split(''));
   const characters = value.split('');
   const hasPointers = [...pointers.values()].some(index => index >= 0 && index <= value.length);
   return (
     <div className={`yv-string-view ${hasPointers ? 'has-pointers' : ''}`} data-string-structure={name} data-string-length={value.length}>
+      <div className="yv-string-meta"><span>length</span><strong>{value.length}</strong><span>UTF-16 units</span></div>
       {(transition || operationResult) && <div className="yv-string-operation">
         {transition && <span>{transition.operation} · {transition.kind === 'mutation' ? 'mutated' : 'result'}</span>}
         {operationResult && <span>{operationResult.operation} → {String(operationResult.result)}</span>}
@@ -2696,8 +2611,7 @@ export function StringView({ value, state, name, source = '' }: { value: string;
             index >= transition.index);
           const removedHere = transition?.kind === 'mutation' && transition.removed && transition.index === index ? transition.removed : undefined;
           return (
-            <div className="yv-string-cell-wrap" key={index} data-string-cell-index={index} style={enhancedBinding?.index === index ? { position: "relative" } : undefined}>
-              {enhancedBinding?.index === index && <EnhancedForValueCard binding={enhancedBinding} />}
+            <div className="yv-string-cell-wrap" key={index} data-string-cell-index={index}>
               {removedHere && <div className="yv-string-removed-overlay" aria-hidden="true">{removedHere}</div>}
               <div className={`yv-string-cell ${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-string-cell-compared ' : ''}${inRange ? 'yv-cell-range ' : ''}${changed ? 'yv-string-cell-changed ' : ''}${added ? 'yv-string-cell-added ' : ''}${swapFromRight ? 'yv-string-cell-swap-right ' : ''}${swapFromLeft ? 'yv-string-cell-swap-left ' : ''}${shiftsRight ? 'yv-string-cell-shift-right ' : ''}${shiftsLeft ? 'yv-string-cell-shift-left' : ''}`} data-string-index={index}>
                 <div className={`yv-string-character ${isSurrogateUnit ? 'yv-string-code-unit' : ''}`} title={isSurrogateUnit ? `UTF-16 code unit U+${codeUnit.toString(16).toUpperCase().padStart(4, '0')}` : undefined}>{characterLabel}</div>
@@ -2749,8 +2663,6 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
   // read-only character sequences in the Data Structures section.
   for (const [name, value] of Object.entries(state?.variables ?? {})) {
     if (name === 'this' || typeof value !== 'string') continue;
-    // Enhanced-for element variables are scalar loop bindings, not independent strings.
-    if (isEnhancedForVariable(source, name)) continue;
     grouped.set(`string:${name}`, { names: [name], value: { $stringValue: value } });
   }
 
@@ -2785,20 +2697,7 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
   return (
     <div className="yv-ds-list">
       {items.map(({ names, value }) => {
-        const uniqueNames = [...new Set(names)];
-        const primaryName = uniqueNames[0] ?? 'value';
-        const isString = isPlainObject(value) && typeof value.$stringValue === 'string';
-        const isArray = Array.isArray(value) || isArraySnapshot(value);
-        const isCharArray = isArray && uniqueNames.some(variable =>
-          /char\s*\[\s*\]\s+/.test(source) && source.includes(variable) && source.includes('.toCharArray')
-        );
-        const kind = isString ? 'String'
-          : isArray ? (isCharArray ? 'charArray' : 'Array')
-          : isPlainObject(value) && typeof value.$mapId === 'string' ? 'Map'
-          : isPlainObject(value) && typeof value.$collectionId === 'string' ? 'Collection'
-          : isPlainObject(value) && typeof value.$objectId === 'string' ? 'Object'
-          : 'Data Structure';
-        const title = kind + ' → ' + uniqueNames.join(' / ');
+        const title = [...new Set(names)].join(' / ');
         return (
           <div className="yv-ds" key={title}>
             <div className="yv-ds-title">{title}</div>
