@@ -2933,9 +2933,43 @@ export function LinkedListView({
   );
 }
 
-function TreeNodeView({ value, objects, depth=0 }: { value: unknown; objects: Record<string,unknown>; depth?: number }) {
-  const resolved=resolveRef(value,objects); if(!isPlainObject(resolved) || depth>6)return null;
-  const f=objectFields(resolved); return <div className="yv-tree-node"><div className="yv-node">{displayValue(nodeValue(resolved))}</div>{(f.left!=null||f.right!=null)&&<div className="yv-tree-children"><div>{f.left!=null?<TreeNodeView value={f.left} objects={objects} depth={depth+1}/>:<span className="yv-null">null</span>}</div><div>{f.right!=null?<TreeNodeView value={f.right} objects={objects} depth={depth+1}/>:<span className="yv-null">null</span>}</div></div>}</div>;
+export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>() }: {
+  value: unknown;
+  objects: Record<string, unknown>;
+  depth?: number;
+  seen?: Set<string>;
+}) {
+  const resolved = resolveRef(value, objects);
+  if (!isPlainObject(resolved)) return null;
+  if (depth > 12) return <span className="yv-code">…</span>;
+  const id = typeof resolved.$objectId === 'string' ? resolved.$objectId
+    : isPlainObject(value) && typeof value.$ref === 'string' ? value.$ref : undefined;
+  if (id && seen.has(id)) return <span className="yv-code yv-tree-cycle" data-tree-cycle-to={id}>↻ {displayValue(nodeValue(resolved))}</span>;
+  const nextSeen = new Set(seen);
+  if (id) nextSeen.add(id);
+  const fields = objectFields(resolved);
+  const hasChildren = fields.left != null || fields.right != null;
+  return (
+    <div className="yv-tree-node" data-tree-node-id={id}>
+      <div className="yv-node">{displayValue(nodeValue(resolved))}</div>
+      {hasChildren && (
+        <div className="yv-tree-children">
+          <div data-tree-edge="left">
+            <div className="yv-tree-edge-label">LEFT</div>
+            {fields.left != null
+              ? <TreeNodeView value={fields.left} objects={objects} depth={depth + 1} seen={nextSeen} />
+              : <span className="yv-null">null</span>}
+          </div>
+          <div data-tree-edge="right">
+            <div className="yv-tree-edge-label">RIGHT</div>
+            {fields.right != null
+              ? <TreeNodeView value={fields.right} objects={objects} depth={depth + 1} seen={nextSeen} />
+              : <span className="yv-null">null</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 function linkedListReturnText(root: unknown, objects: Record<string, unknown>): string | undefined {
   if (!isPlainObject(root) || !looksListNode(root)) return undefined;
