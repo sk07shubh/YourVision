@@ -1055,7 +1055,7 @@ function deriveStringEvents(
     const postVariables = getVariables(postEvent);
     const events: ExecutionEvent[] = [];
 
-    for (const match of statement.matchAll(/\b([A-Za-z_$][\w$]*)\s*\.\s*charAt\s*\(([^()]*)\)/g)) {
+    for (const match of statement.matchAll(/\b([A-Za-z_$][\w$]*)\s*\.\s*charAt\s*\(((?:[^()]|\([^()]*\))*)\)/g)) {
         const name = match[1];
         if (!name) continue;
         const value = typeof variables[name] === "string" ? variables[name] as string : stringBuilderContents(variables[name]);
@@ -1072,7 +1072,7 @@ function deriveStringEvents(
         });
     }
 
-    for (const match of statement.matchAll(/\b([A-Za-z_$][\w$]*)\s*\.\s*(substring|subSequence)\s*\(([^()]*)\)/g)) {
+    for (const match of statement.matchAll(/\b([A-Za-z_$][\w$]*)\s*\.\s*(substring|subSequence)\s*\(((?:[^()]|\([^()]*\))*)\)/g)) {
         const name = match[1];
         if (!name) continue;
         const value = typeof variables[name] === "string" ? variables[name] as string : stringBuilderContents(variables[name]);
@@ -1093,7 +1093,7 @@ function deriveStringEvents(
         });
     }
 
-    const searchPattern = /\b([A-Za-z_$][\w$]*)\s*\.\s*(indexOf|lastIndexOf|contains|startsWith|endsWith|equals|equalsIgnoreCase|compareTo|isEmpty|isBlank|length)\s*\(([^()]*)\)/g;
+    const searchPattern = /\b([A-Za-z_$][\w$]*)\s*\.\s*(indexOf|lastIndexOf|contains|startsWith|endsWith|equals|equalsIgnoreCase|compareTo|isEmpty|isBlank|length)\s*\(((?:[^()]|\([^()]*\))*)\)/g;
     for (const match of statement.matchAll(searchPattern)) {
         const name = match[1];
         const operation = match[2];
@@ -1197,7 +1197,7 @@ function deriveStringEvents(
 
     // StringBuilder is mutable; only emit a mutation event when the runtime
     // exposes string snapshots for both sides and proves a changed value.
-    const mutablePattern = /\b([A-Za-z_$][\w$]*)\s*\.\s*(append|insert|delete|deleteCharAt|setCharAt|replace|reverse)\s*\(([^()]*)\)/g;
+    const mutablePattern = /\b([A-Za-z_$][\w$]*)\s*\.\s*(append|insert|delete|deleteCharAt|setCharAt|replace|reverse)\s*\(((?:[^()]|\([^()]*\))*)\)/g;
     for (const match of statement.matchAll(mutablePattern)) {
         const name = match[1];
         const operation = match[2];
