@@ -729,10 +729,11 @@
 /* Next links begin at the small pointer dot and disappear underneath the
    next node's border, so there is no arrowhead or gap at the destination. */
 .yv-linked-connection-cross-next {
-  stroke: var(--yv-accent);
-  stroke-width: 1.8;
+  /* Per-link color is supplied by the renderer; never add arrowheads. */
+  stroke-width: 2;
   stroke-dasharray: none;
   stroke-linecap: round;
+  stroke-linejoin: round;
   opacity: 1;
 }
 .yv-linked-edge-accessible-label {
