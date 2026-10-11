@@ -782,3 +782,31 @@
 @media (prefers-reduced-motion: reduce) {
   .yv-collection-item-enter { animation: none; }
 }
+
+
+/* Map writes show insert/update/delete as distinct trace-backed transitions. */
+.yv-map-insert {
+  animation: yv-map-entry-insert 360ms cubic-bezier(.2,.75,.25,1) both;
+}
+.yv-map-update {
+  animation: yv-map-entry-update 420ms ease-out both;
+}
+.yv-map-delete {
+  animation: yv-map-entry-delete 420ms ease-in both;
+  transform-origin: left center;
+}
+@keyframes yv-map-entry-insert {
+  0% { opacity: .2; transform: translateX(-7px); background: color-mix(in srgb, var(--yv-success), transparent 84%); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+@keyframes yv-map-entry-update {
+  0% { background: color-mix(in srgb, var(--yv-accent), transparent 80%); }
+  100% { background: transparent; }
+}
+@keyframes yv-map-entry-delete {
+  0% { opacity: 1; transform: translateX(0); }
+  100% { opacity: .72; transform: translateX(4px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-map-insert, .yv-map-update, .yv-map-delete { animation: none; }
+}
