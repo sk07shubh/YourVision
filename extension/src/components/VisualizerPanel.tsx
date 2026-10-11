@@ -2502,8 +2502,8 @@ export function StringView({ value, state, name, source = '' }: { value: string;
           return (
             <div className="yv-string-cell-wrap" key={index} data-string-cell-index={index}>
               {removedHere && <div className="yv-string-removed-overlay" aria-hidden="true">{removedHere}</div>}
-              <div className={\`yv-string-cell \${accessed.has(index) ? 'yv-cell-read ' : ''}\${inRange ? 'yv-cell-range ' : ''}\${changed ? 'yv-string-cell-changed ' : ''}\${added ? 'yv-string-cell-added' : ''}\`} data-string-index={index}>
-                <div className="yv-string-character">{character === ' ' ? '\\u00a0' : character}</div>
+              <div className={`yv-string-cell ${accessed.has(index) ? 'yv-cell-read ' : ''}${inRange ? 'yv-cell-range ' : ''}${changed ? 'yv-string-cell-changed ' : ''}${added ? 'yv-string-cell-added' : ''}`} data-string-index={index}>
+                <div className="yv-string-character">{character === ' ' ? '\u00a0' : character}</div>
               </div>
               <div className="yv-string-index">{index}</div>
             </div>
