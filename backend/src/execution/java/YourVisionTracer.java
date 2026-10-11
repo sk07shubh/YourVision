@@ -1286,7 +1286,20 @@ public class YourVisionTracer {
                 "table"
             );
 
-            if (tableField != null) {
+            if (type.contains("LinkedHashMap")) {
+                // A LinkedHashMap's table is hash-bucket order, not its
+                // observable iteration order. Follow the linked entry chain.
+                Field headField = findField(object, "head");
+                Value headValue = headField == null
+                    ? null
+                    : object.getValue(headField);
+                collectLinkedHashEntries(
+                    headValue,
+                    entries,
+                    depth,
+                    activeObjects
+                );
+            } else if (tableField != null) {
                 Value tableValue =
                     object.getValue(tableField);
 
@@ -1376,13 +1389,12 @@ public class YourVisionTracer {
         } else if (type.contains("LinkedList")) {
             kind = "list";
         } else if (type.contains("TreeSet")) {
-            // TreeSet iteration follows comparator order; preserve that
-            // contract so the visualizer can distinguish it from HashSet.
+            // TreeSet iteration follows comparator order.
             kind = "sortedSet";
-        } else if (
-            type.contains("HashSet") ||
-            type.contains("LinkedHashSet")
-        ) {
+        } else if (type.contains("LinkedHashSet")) {
+            // LinkedHashSet preserves insertion order through its backing map.
+            kind = "insertionOrderedSet";
+        } else if (type.contains("HashSet")) {
             kind = "set";
         }
 
@@ -1660,6 +1672,28 @@ public class YourVisionTracer {
 
             current =
                 fieldValue(node, "next");
+        }
+    }
+
+    private static void collectLinkedHashEntries(
+        Value nodeValue,
+        List<Map<String, Object>> entries,
+        int depth,
+        Set<Long> activeObjects
+    ) {
+        Value current = nodeValue;
+        Set<Long> seen = new HashSet<>();
+
+        while (
+            current instanceof ObjectReference node &&
+            entries.size() < MAX_FIELDS &&
+            seen.add(node.uniqueID())
+        ) {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("key", snapshotValue(fieldValue(node, "key"), depth + 1, activeObjects));
+            entry.put("value", snapshotValue(fieldValue(node, "value"), depth + 1, activeObjects));
+            entries.add(entry);
+            current = fieldValue(node, "after");
         }
     }
 
