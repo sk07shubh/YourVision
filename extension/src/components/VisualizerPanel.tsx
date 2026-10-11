@@ -624,14 +624,14 @@ export function collectionDelta(
 ): { added?: unknown; removed?: unknown; index?: number } | undefined {
   if (before.length === after.length) {
     for (let i = 0; i < before.length; i++) {
-      if (valueChanged(before[i], after[i])) return { added: after[i], removed: before[i], index: i };
+      if (collectionItemIdentity(before[i]) !== collectionItemIdentity(after[i])) return { added: after[i], removed: before[i], index: i };
     }
     return undefined;
   }
   if (after.length === before.length + 1) {
     for (let i = 0; i < after.length; i++) {
       const matches = before.every((value, j) =>
-        valueChanged(value, after[j + (j >= i ? 1 : 0)]) === false
+        collectionItemIdentity(value) === collectionItemIdentity(after[j + (j >= i ? 1 : 0)])
       );
       if (matches) return { added: after[i], index: i };
     }
@@ -639,7 +639,7 @@ export function collectionDelta(
   if (before.length === after.length + 1) {
     for (let i = 0; i < before.length; i++) {
       const matches = after.every((value, j) =>
-        valueChanged(value, before[j + (j >= i ? 1 : 0)]) === false
+        collectionItemIdentity(value) === collectionItemIdentity(before[j + (j >= i ? 1 : 0)])
       );
       if (matches) return { removed: before[i], index: i };
     }
@@ -651,10 +651,10 @@ export function unorderedCollectionDelta(
   before: unknown[],
   after: unknown[]
 ): { added?: unknown; removed?: unknown } | undefined {
-  const remaining = before.map(value => ({ key: stableStringify(value), value }));
+  const remaining = before.map(value => ({ key: collectionItemIdentity(value), value }));
   const added: unknown[] = [];
   for (const value of after) {
-    const key = stableStringify(value);
+    const key = collectionItemIdentity(value);
     const index = remaining.findIndex(entry => entry.key === key);
     if (index >= 0) remaining.splice(index, 1);
     else added.push(value);
