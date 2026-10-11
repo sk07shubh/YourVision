@@ -1162,14 +1162,13 @@ function deriveStringEvents(
             .map(item => item[1])
             .filter((candidate): candidate is string => typeof candidate === "string" && candidate !== resultName && typeof variables[candidate] === "string");
         const sourceName = sourceNames[0];
-        if (!sourceName) continue;
         events.push({
             sequence: 0,
             type: "STRING_RESULT",
             line: sourceEvent.line,
             method: sourceEvent.method,
             depth: sourceEvent.depth,
-            data: { name: resultName, resultName, sourceName, operation: "concatenate", before: typeof before === "string" ? before : "", after, sourceBefore: variables[sourceName], kind: "derived" }
+            data: { name: resultName, resultName, sourceName, operation: "concatenate", before: typeof before === "string" ? before : "", after, sourceBefore: sourceName ? variables[sourceName] : undefined, kind: "derived" }
         });
     }
 
