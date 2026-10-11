@@ -2391,9 +2391,8 @@ export function StringView({ value, state, name, source = '' }: { value: string;
     if (!isPlainObject(event) || !isPlainObject(event.data)) continue;
     const effect = event.data;
     if ((event.type === 'STRING_ACCESS' || event.type === 'ARRAY_ACCESS') && effect.name === name) {
-      const index = event.type === 'STRING_ACCESS'
-        ? effect.index
-        : Array.isArray(effect.indices) ? effect.indices[0] : undefined;
+      const index = event.type === 'STRING_ACCESS' ? effect.index :
+        Array.isArray(effect.indices) ? effect.indices[0] : undefined;
       if (typeof index === 'number' && Number.isInteger(index) && index >= 0 && index < value.length) accessed.add(index);
       if (event.type === 'STRING_ACCESS' && typeof effect.indexVariable === 'string' && typeof effect.index === 'number') {
         pointers.set(effect.indexVariable, effect.index);
@@ -2415,85 +2414,25 @@ export function StringView({ value, state, name, source = '' }: { value: string;
     }
   }
 
-  // Add source-grounded pointer labels for common string-index expressions.
-  // Runtime access events take precedence; source scanning only locates named
-  // integer variables and never invents a read highlight.
+  // Runtime events control highlights. Source scanning only locates integer
+  // pointer variables for the currently executed string expression.
   const line = source.split(/\r?\n/)[Math.max(0, (state?.line ?? 1) - 1)] ?? '';
+  const escapedName = name.replace(/\$/g, '\\$');
   const indexExpressions: string[] = [];
-  for (const match of line.matchAll(new RegExp('\\b' + name.replace(/[$]/g, '\\\\export function StringView({ value, state, name }: { value: string; state?: TraceState; name: string }) {
-  const data = isPlainObject(state?.lastEvent?.data) ? state.lastEvent.data : {};
-  const executionEvents = Array.isArray(data.executionEvents) ? data.executionEvents : [];
-  const accessed = new Set<number>();
-  for (const event of executionEvents) {
-    if (!isPlainObject(event) || event.type !== 'ARRAY_ACCESS' || !isPlainObject(event.data)) continue;
-    const eventName = typeof event.data.name === 'string' ? event.data.name : undefined;
-    const indices = Array.isArray(event.data.indices) ? event.data.indices : [];
-    if (eventName === name && typeof indices[0] === 'number' && Number.isInteger(indices[0])) {
-      accessed.add(indices[0]);
-    }
-  }
-  // Java String indexing and charAt use UTF-16 code units, so split('') keeps
-  // visual cell indices aligned with the runtime trace.
-  const characters = value.split('');
-  return (
-    <div className="yv-array" data-string-structure={name}>
-      {characters.map((character, index) => (
-        <div className="yv-array-cell-wrap" key={index}>
-          <div className={`yv-array-cell ${accessed.has(index) ? 'yv-cell-read' : ''}`} data-string-index={index}>
-            <div className="yv-array-cell-content">{character === ' ' ? '␠' : character}</div>
-          </div>
-          <div className="yv-cell-index">{index}</div>
-        </div>
-      ))}
-      {!characters.length && <div className="yv-empty">Empty string</div>}
-    </div>
-  );
-}
-') + '\\s*\\.\\s*charAt\\s*\\(([^()]*)\\)', 'g'))) {
+  for (const match of line.matchAll(new RegExp('\\b' + escapedName + '\\s*\\.\\s*charAt\\s*\\(([^()]*)\\)', 'g'))) {
     indexExpressions.push((match[1] ?? '').trim());
   }
-  for (const match of line.matchAll(new RegExp('\\b' + name.replace(/[$]/g, '\\\\export function StringView({ value, state, name }: { value: string; state?: TraceState; name: string }) {
-  const data = isPlainObject(state?.lastEvent?.data) ? state.lastEvent.data : {};
-  const executionEvents = Array.isArray(data.executionEvents) ? data.executionEvents : [];
-  const accessed = new Set<number>();
-  for (const event of executionEvents) {
-    if (!isPlainObject(event) || event.type !== 'ARRAY_ACCESS' || !isPlainObject(event.data)) continue;
-    const eventName = typeof event.data.name === 'string' ? event.data.name : undefined;
-    const indices = Array.isArray(event.data.indices) ? event.data.indices : [];
-    if (eventName === name && typeof indices[0] === 'number' && Number.isInteger(indices[0])) {
-      accessed.add(indices[0]);
-    }
-  }
-  // Java String indexing and charAt use UTF-16 code units, so split('') keeps
-  // visual cell indices aligned with the runtime trace.
-  const characters = value.split('');
-  return (
-    <div className="yv-array" data-string-structure={name}>
-      {characters.map((character, index) => (
-        <div className="yv-array-cell-wrap" key={index}>
-          <div className={`yv-array-cell ${accessed.has(index) ? 'yv-cell-read' : ''}`} data-string-index={index}>
-            <div className="yv-array-cell-content">{character === ' ' ? '␠' : character}</div>
-          </div>
-          <div className="yv-cell-index">{index}</div>
-        </div>
-      ))}
-      {!characters.length && <div className="yv-empty">Empty string</div>}
-    </div>
-  );
-}
-') + '\\s*\\.\\s*(?:substring|subSequence)\\s*\\(([^()]*)\\)', 'g'))) {
+  for (const match of line.matchAll(new RegExp('\\b' + escapedName + '\\s*\\.\\s*(?:substring|subSequence)\\s*\\(([^()]*)\\)', 'g'))) {
     indexExpressions.push(...(match[1] ?? '').split(',').slice(0, 2).map(part => part.trim()));
   }
   for (const expression of indexExpressions) {
-    if (!/^[A-Za-z_$][\\w$]*$/.test(expression) || pointers.has(expression)) continue;
+    if (!/^[A-Za-z_$][\w$]*$/.test(expression) || pointers.has(expression)) continue;
     const index = state?.variables?.[expression];
-    if (typeof index === 'number' && Number.isInteger(index) && index >= 0 && index <= value.length) {
-      pointers.set(expression, index);
-    }
+    if (typeof index === 'number' && Number.isInteger(index) && index >= 0 && index <= value.length) pointers.set(expression, index);
   }
 
-  // Java String indexing is defined in UTF-16 code units. split('') preserves
-  // those indices, including the two cells of a supplementary character.
+  // Java String indices count UTF-16 code units. split('') preserves that
+  // mapping. Render a space as a blank cell, never as a visible abbreviation.
   const characters = value.split('');
   const hasPointers = [...pointers.values()].some(index => index >= 0 && index <= value.length);
   return (
