@@ -1150,7 +1150,7 @@ function deriveStringEvents(
         });
     }
 
-    const concatenationPattern = /\b([A-Za-z_$][\w$]*)\s*=\s*([^;\n]+);?/g;
+    const concatenationPattern = /\b([A-Za-z_$][\w$]*)\s*(?:\+=|=(?!=))\s*([^;\n]+);?/g;
     for (const match of statement.matchAll(concatenationPattern)) {
         const resultName = match[1];
         const expression = match[2] ?? "";
