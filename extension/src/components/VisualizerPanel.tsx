@@ -1173,6 +1173,54 @@ function collectionItemMotionClass(
   return occurrenceBefore > occurrencePreviously ? 'yv-collection-item-enter' : '';
 }
 
+function collectionRemovedItems(value: Obj & { $collectionId: string; values: unknown[] }, state?: TraceState, name?: string): unknown[] {
+  if (!state || !name) return [];
+  const session = sessionStore.get();
+  const selectedIndex = session.states.indexOf(state);
+  const currentIndex = selectedIndex >= 0 ? selectedIndex : session.index;
+  const previous = currentIndex > 0 ? session.states[currentIndex - 1] : undefined;
+  if (!previous || previous.sequence !== state.sequence) return [];
+  const priorCandidate = previous.variables[name] ?? previous.dataStructures[name];
+  if (!isPlainObject(priorCandidate) || priorCandidate.$collectionId !== value.$collectionId || !Array.isArray(priorCandidate.values)) return [];
+
+  // Multiset subtraction preserves duplicate occurrences without assuming iteration order.
+  const remainingCounts = new Map<string, number>();
+  for (const item of value.values) {
+    const signature = stableStringify(item);
+    remainingCounts.set(signature, (remainingCounts.get(signature) ?? 0) + 1);
+  }
+  const removed: unknown[] = [];
+  for (const item of priorCandidate.values) {
+    const signature = stableStringify(item);
+    const count = remainingCounts.get(signature) ?? 0;
+    if (count > 0) remainingCounts.set(signature, count - 1);
+    else removed.push(item);
+  }
+  return removed;
+}
+
+function CollectionRemovalCue({ value, state, name, source, depth, seen }: {
+  value: Obj & { $collectionId: string; values: unknown[] };
+  state?: TraceState;
+  name?: string;
+  source: string;
+  depth: number;
+  seen: Set<string>;
+}) {
+  const removed = collectionRemovedItems(value, state, name);
+  if (!removed.length) return null;
+  return (
+    <div className="yv-collection-removals" aria-label="Items removed on this step">
+      <span className="yv-collection-removal-label">REMOVED</span>
+      {removed.map((item, index) => (
+        <span className="yv-collection-item-exit" key={stableStringify(item) + ':' + index}>
+          <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function CollectionView({
   value,
   state,
@@ -1222,6 +1270,7 @@ function CollectionView({
           ))}
           {!value.values.length && <div className="yv-empty">Empty stack</div>}
         </div>
+        <CollectionRemovalCue value={value} state={state} name={name} source={source} depth={depth} seen={seen}/>
         <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
       </div>
     );
@@ -1244,6 +1293,7 @@ function CollectionView({
           <div className="yv-queue-end">REAR</div>
           {!value.values.length && <div className="yv-empty">Empty queue</div>}
         </div>
+        <CollectionRemovalCue value={value} state={state} name={name} source={source} depth={depth} seen={seen}/>
         <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
       </div>
     );
@@ -1264,6 +1314,7 @@ function CollectionView({
           ))}
           {!value.values.length && <div className="yv-empty">Empty set</div>}
         </div>
+        <CollectionRemovalCue value={value} state={state} name={name} source={source} depth={depth} seen={seen}/>
         <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
       </div>
     );
@@ -1296,6 +1347,7 @@ function CollectionView({
           })()}
         </div>
         <div className="yv-code yv-heap-note">Heap tree · root is index 0</div>
+        <CollectionRemovalCue value={value} state={state} name={name} source={source} depth={depth} seen={seen}/>
         <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
       </div>
     );
