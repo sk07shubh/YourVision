@@ -40,6 +40,7 @@ const source = [
     "  builder.append('d');",
     "  builder.setCharAt(0, 'x');",
     "  builder.delete(1, 2);",
+    "  String builderText = builder.toString();",
     "  return part + c + upper;",
     " }",
     "}"
@@ -65,6 +66,7 @@ assert(results.some(event => event.data?.resultName === "replaced" && event.data
 assert(results.some(event => event.data?.resultName === "compact" && event.data.after === "bnn" && event.data.operation === "replaceAll"), "replaceAll result missing");
 assert(results.some(event => event.data?.resultName === "trimmed" && event.data.after === "hi" && event.data.operation === "trim"), "trim result missing");
 assert(results.some(event => event.data?.resultName === "joined" && event.data.after === "bananax" && event.data.operation === "concat"), "concat result missing");
+assert(results.some(event => event.data?.resultName === "builderText" && event.data.after === "xad" && event.data.operation === "toString"), "StringBuilder.toString result missing");
 assert(results.some(event => event.data?.resultName === "combined" && event.data.after === "bananan" && event.data.operation === "concatenate"), "string plus result missing");
 assert(results.some(event => event.data?.resultName === "appended" && event.data.after === "ab" && event.data.operation === "concatenate"), "compound string concatenation result missing");
 const search = effects.find(event => event.type === "STRING_SEARCH_RESULT" && event.data?.operation === "contains");
