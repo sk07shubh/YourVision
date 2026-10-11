@@ -730,6 +730,25 @@ describe('execution visualization feature matrix', () => {
     });
   });
 
+  it('distinguishes sorted and insertion-ordered collection labels', () => {
+    const current = state({
+      dataStructures: {
+        sorted: { $collectionId: 'sorted', $type: 'java.util.TreeSet', $kind: 'sortedSet', values: [1, 2], size: 2 },
+        insertion: { $collectionId: 'insertion', $type: 'java.util.LinkedHashSet', $kind: 'insertionOrderedSet', values: [8, 3], size: 2 },
+        treeMap: { $mapId: 'tree-map', $type: 'java.util.TreeMap', entries: [{ key: 1, value: 'a' }, { key: 2, value: 'b' }] },
+        linkedMap: { $mapId: 'linked-map', $type: 'java.util.LinkedHashMap', entries: [{ key: 2, value: 'b' }, { key: 1, value: 'a' }] },
+      },
+    });
+    const html = renderToStaticMarkup(<DataStructures state={current} source="" />);
+    expect(html).toContain('SORTED · 2 elements');
+    expect(html).toContain('INSERTION ORDER · 2 elements');
+    expect(html).toContain('SORTED BY KEY · 2 entries');
+    expect(html).toContain('INSERTION ORDER · 2 entries');
+    expect(collectionOperation('insertionOrderedSet', 'add', { added: 6 })).toEqual({
+      operation: 'Add', value: 6, position: 'Element',
+    });
+  });
+
   it('classifies map insert/update/delete transitions', () => {
     expect(compareMapEntries(
       [{ key: 2, value: 1 }],
