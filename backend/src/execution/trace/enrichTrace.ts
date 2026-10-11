@@ -2,6 +2,7 @@ import type {
     ExecutionEvent,
     ExecutionTrace
 } from "./schema.js";
+import { inferSemanticRoles } from "./semanticRoles.js";
 
 type SnapshotRecord = Record<string, unknown>;
 
@@ -31,7 +32,8 @@ export function enrichTrace(
                 const executionEvents = [
                     ...deriveChanges(previousStep, event),
                     ...deriveMapChanges(previousStep, event),
-                    ...deriveArrayAccessEvents(previousStep, sourceLines)
+                    ...deriveArrayAccessEvents(previousStep, sourceLines),
+                    ...deriveStringEvents(previousStep, event, sourceLines)
                 ];
 
                 // Runtime checkpoints are authoritative. Keep derived effects
@@ -105,7 +107,8 @@ export function enrichTrace(
                 const executionEvents = [
                     ...deriveChanges(previousStep, event),
                     ...deriveMapChanges(previousStep, event),
-                    ...deriveArrayAccessEvents(previousStep, sourceLines)
+                    ...deriveArrayAccessEvents(previousStep, sourceLines),
+                    ...deriveStringEvents(previousStep, event, sourceLines)
                 ];
 
                 // MethodExitEvent is emitted after the method body has
@@ -154,12 +157,19 @@ export function enrichTrace(
         sourceLines
     );
 
+    const semanticRoles = inferSemanticRoles(source);
+
     return {
         version: 1,
-        events: normalized.map((event, index) => ({
-            ...event,
-            sequence: index + 1
-        }))
+        events: normalized.map((event, index) => {
+            if (event.type !== "STEP" || semanticRoles.length === 0) return { ...event, sequence: index + 1 };
+            const variables = event.data?.postVariables ?? event.data?.variables;
+            const activeNames = variables && typeof variables === "object" && !Array.isArray(variables)
+                ? new Set(Object.keys(variables as Record<string, unknown>)) : undefined;
+            const methodRoles = semanticRoles.filter(role => !role.method || !event.method || role.method === event.method);
+            const activeRoles = activeNames ? methodRoles.filter(role => activeNames.has(role.name)) : methodRoles;
+            return { ...event, sequence: index + 1, data: { ...(event.data ?? {}), semanticRoles: activeRoles } };
+        })
     };
 }
 
@@ -401,9 +411,12 @@ function annotateCondition(
 
 function extractConditionExpression(statement: string): string | undefined {
     const trimmed = statement.trim();
+    // A branch checkpoint can retain the full source spelling "else if (...)";
+    // normalize only the leading keyword so its condition is evaluated too.
+    const conditionStatement = trimmed.replace(/^(?:}\s*)?else\s+if\b/, "if");
     for (const keyword of ["if", "while"]) {
-        if (new RegExp("^" + keyword + "\\s*\\(").test(trimmed)) {
-            return balancedParenthesized(trimmed, trimmed.indexOf("("));
+        if (new RegExp("^" + keyword + "\\s*\\(").test(conditionStatement)) {
+            return balancedParenthesized(conditionStatement, conditionStatement.indexOf("("));
         }
     }
     if (/^for\s*\(/.test(trimmed)) {
@@ -1023,6 +1036,379 @@ function deriveArrayAccessEvents(
     }
 
     return accesses;
+}
+
+
+/**
+ * Derive string effects from the executed statement and adjacent runtime
+ * checkpoints. We only emit an access when its index/range and receiver are
+ * available in the runtime snapshot; source text alone never creates a hit.
+ */
+function deriveStringEvents(
+    sourceEvent: ExecutionEvent,
+    postEvent: ExecutionEvent,
+    sourceLines: string[]
+): ExecutionEvent[] {
+    if (typeof sourceEvent.line !== "number" || sourceEvent.line < 1) return [];
+    const statement = sourceLines[sourceEvent.line - 1] ?? "";
+    const variables = getVariables(sourceEvent);
+    const postVariables = getVariables(postEvent);
+    const events: ExecutionEvent[] = [];
+
+    for (const match of statement.matchAll(/\b([A-Za-z_$][\w$]*)\s*\.\s*charAt\s*\(((?:[^()]|\([^()]*\))*)\)/g)) {
+        const name = match[1];
+        if (!name) continue;
+        const value = typeof variables[name] === "string" ? variables[name] as string : stringBuilderContents(variables[name]);
+        if (value === undefined) continue;
+        const index = evaluateExpression(match[2] ?? "", variables);
+        if (typeof index !== "number" || !Number.isInteger(index) || index < 0 || index >= value.length) continue;
+        events.push({
+            sequence: 0,
+            type: "STRING_ACCESS",
+            line: sourceEvent.line,
+            method: sourceEvent.method,
+            depth: sourceEvent.depth,
+            data: { name, index, value: value.charAt(index), kind: "read", operation: "charAt", indexExpression: (match[2] ?? "").trim(), indexVariable: /^[A-Za-z_$][\w$]*$/.test((match[2] ?? "").trim()) ? (match[2] ?? "").trim() : undefined }
+        });
+    }
+
+    for (const match of statement.matchAll(/\b([A-Za-z_$][\w$]*)\s*\.\s*(substring|subSequence)\s*\(((?:[^()]|\([^()]*\))*)\)/g)) {
+        const name = match[1];
+        if (!name) continue;
+        const value = typeof variables[name] === "string" ? variables[name] as string : stringBuilderContents(variables[name]);
+        if (value === undefined) continue;
+        const args = splitTopLevel(match[3] ?? "", ",").map(part => part.trim());
+        const start = evaluateExpression(args[0] ?? "", variables);
+        const end = args.length > 1 ? evaluateExpression(args[1] ?? "", variables) : value.length;
+        if (typeof start !== "number" || typeof end !== "number" ||
+            !Number.isInteger(start) || !Number.isInteger(end) ||
+            start < 0 || end < start || end > value.length) continue;
+        events.push({
+            sequence: 0,
+            type: "STRING_RANGE_ACCESS",
+            line: sourceEvent.line,
+            method: sourceEvent.method,
+            depth: sourceEvent.depth,
+            data: { name, start, end, operation: match[2], kind: "read", startExpression: args[0], endExpression: args[1] ?? String(value.length), startVariable: /^[A-Za-z_$][\w$]*$/.test(args[0] ?? "") ? args[0] : undefined, endVariable: /^[A-Za-z_$][\w$]*$/.test(args[1] ?? "") ? args[1] : undefined }
+        });
+    }
+
+    const searchPattern = /\b([A-Za-z_$][\w$]*)\s*\.\s*(indexOf|lastIndexOf|contains|startsWith|endsWith|equals|equalsIgnoreCase|compareTo|isEmpty|isBlank|length)\s*\(((?:[^()]|\([^()]*\))*)\)/g;
+    for (const match of statement.matchAll(searchPattern)) {
+        const name = match[1];
+        const operation = match[2];
+        if (!name || !operation) continue;
+        const value = typeof variables[name] === "string" ? variables[name] as string : stringBuilderContents(variables[name]);
+        if (value === undefined) continue;
+        const argument = (match[3] ?? "").trim();
+        const queryValue = argument ? evaluateExpression(argument, variables) : undefined;
+        let index = -1;
+        let end = -1;
+        let result: string | number | boolean;
+        let matched = false;
+        if (operation === "length") result = value.length;
+        else if (operation === "isEmpty") result = value.length === 0;
+        else if (operation === "isBlank") result = value.trim().length === 0;
+        else {
+            if (typeof queryValue !== "string") continue;
+            const query = queryValue;
+            if (operation === "indexOf") { index = value.indexOf(query); result = index; matched = index >= 0; }
+            else if (operation === "lastIndexOf") { index = value.lastIndexOf(query); result = index; matched = index >= 0; }
+            else if (operation === "contains") { index = value.indexOf(query); result = index >= 0; matched = index >= 0; }
+            else if (operation === "startsWith") { index = value.startsWith(query) ? 0 : -1; result = index >= 0; matched = index >= 0; }
+            else if (operation === "endsWith") { index = value.endsWith(query) ? value.length - query.length : -1; result = index >= 0; matched = index >= 0; }
+            else if (operation === "equalsIgnoreCase") {
+                result = value.toLowerCase() === query.toLowerCase();
+                matched = result;
+                let offset = 0;
+                while (offset < value.length && offset < query.length &&
+                    value.charAt(offset).toLowerCase() === query.charAt(offset).toLowerCase()) offset++;
+                index = matched ? 0 : offset;
+            }
+            else if (operation === "equals") {
+                result = value === query;
+                matched = result;
+                let offset = 0;
+                while (offset < value.length && offset < query.length &&
+                    value.charCodeAt(offset) === query.charCodeAt(offset)) offset++;
+                index = matched ? 0 : offset;
+            }
+            else {
+                let offset = 0;
+                while (offset < value.length && offset < query.length && value.charCodeAt(offset) === query.charCodeAt(offset)) offset++;
+                result = offset < value.length && offset < query.length
+                    ? value.charCodeAt(offset) - query.charCodeAt(offset)
+                    : value.length - query.length;
+                matched = result === 0;
+                index = matched ? 0 : offset;
+            }
+            if (matched && index >= 0) end = operation === "equals" || operation === "equalsIgnoreCase" || operation === "compareTo"
+                ? value.length
+                : index + query.length;
+            else if ((operation === "compareTo" || operation === "equals" || operation === "equalsIgnoreCase") &&
+                index >= 0 && index < value.length) end = index + 1;
+        }
+        events.push({
+            sequence: 0,
+            type: "STRING_SEARCH_RESULT",
+            line: sourceEvent.line,
+            method: sourceEvent.method,
+            depth: sourceEvent.depth,
+            data: { name, operation, query: argument ? queryValue : undefined, index, end, matched, result, kind: "search" }
+        });
+    }
+
+    // split() creates a distinct String[]; its cells are rendered by the existing
+    // array visualizer. This event links the result to its source and highlights
+    // delimiters only when the regex is provably a literal delimiter.
+    const splitPattern = /\b([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*\.\s*split\s*\(((?:[^()]|\([^()]*\))*)\)/g;
+    for (const match of statement.matchAll(splitPattern)) {
+        const resultName = match[1];
+        const name = match[2];
+        if (!resultName || !name) continue;
+        const value = typeof variables[name] === "string"
+            ? variables[name] as string
+            : stringBuilderContents(variables[name]);
+        if (value === undefined) continue;
+        const args = splitTopLevel(match[3] ?? "", ",").map(part => part.trim());
+        const delimiter = evaluateExpression(args[0] ?? "", variables);
+        const rawResultArray = postVariables[resultName];
+        const resultArray = asArraySnapshot(rawResultArray);
+        if (typeof delimiter !== "string" || !resultArray) continue;
+        const partCount = isPlainObject(rawResultArray) && typeof rawResultArray.length === "number"
+            ? rawResultArray.length
+            : resultArray.values.length;
+
+        const delimiterRanges: Array<{ start: number; end: number }> = [];
+        const regexMetaCodes = [92, 94, 36, 46, 42, 43, 63, 40, 41, 91, 93, 123, 125, 124];
+        const literalDelimiter = delimiter.length > 0 &&
+            ![...delimiter].some(character => regexMetaCodes.includes(character.charCodeAt(0)));
+        if (literalDelimiter) {
+            let cursor = 0;
+            while (cursor <= value.length - delimiter.length) {
+                const index = value.indexOf(delimiter, cursor);
+                if (index < 0) break;
+                delimiterRanges.push({ start: index, end: index + delimiter.length });
+                cursor = index + delimiter.length;
+            }
+        }
+
+        events.push({
+            sequence: 0,
+            type: "STRING_SPLIT_RESULT",
+            line: sourceEvent.line,
+            method: sourceEvent.method,
+            depth: sourceEvent.depth,
+            data: {
+                name,
+                resultName,
+                operation: "split",
+                delimiter,
+                partCount,
+                delimiterRanges,
+                kind: "split"
+            }
+        });
+    }
+
+    // toCharArray() creates a distinct char[]; the array itself remains owned
+    // by the existing array visualizer. Also support enhanced-for expressions
+    // where the temporary array has no user-declared result variable.
+    const charArrayPattern = /(?:\b([A-Za-z_$][\w$]*)\s*=\s*)?\b([A-Za-z_$][\w$]*)\s*\.\s*toCharArray\s*\(\s*\)/g;
+    for (const match of statement.matchAll(charArrayPattern)) {
+        const resultName = match[1];
+        const name = match[2];
+        if (!name) continue;
+        const value = typeof variables[name] === "string" ? variables[name] as string : undefined;
+        if (value === undefined) continue;
+        if (resultName && !asArraySnapshot(postVariables[resultName])) continue;
+        events.push({
+            sequence: 0,
+            type: "STRING_CONVERSION_RESULT",
+            line: sourceEvent.line,
+            method: sourceEvent.method,
+            depth: sourceEvent.depth,
+            data: {
+                name,
+                resultName,
+                operation: "toCharArray",
+                resultLength: value.length,
+                kind: "conversion"
+            }
+        });
+    }
+
+    const assignmentPattern = /\b([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*\.\s*(substring|subSequence|concat|replace|replaceAll|toLowerCase|toUpperCase|trim|strip|toString)\s*\(((?:[^()]|\([^()]*\))*)\)/g;
+    for (const match of statement.matchAll(assignmentPattern)) {
+        const resultName = match[1];
+        const sourceName = match[2];
+        const operation = match[3];
+        const suffix = statement.slice((match.index ?? 0) + match[0].length).trim();
+        if (suffix && !suffix.startsWith(";")) continue;
+        if (!resultName || !sourceName || !operation) continue;
+        const beforeResult = variables[resultName];
+        const afterResult = postVariables[resultName];
+        const sourceValue = typeof variables[sourceName] === "string" ? variables[sourceName] as string : stringBuilderContents(variables[sourceName]);
+        if (typeof afterResult !== "string" || sourceValue === undefined ||
+            beforeResult === afterResult) continue;
+        events.push({
+            sequence: 0,
+            type: "STRING_RESULT",
+            line: sourceEvent.line,
+            method: sourceEvent.method,
+            depth: sourceEvent.depth,
+            data: {
+                name: resultName,
+                resultName,
+                sourceName,
+                operation,
+                before: typeof beforeResult === "string" ? beforeResult : undefined,
+                after: afterResult,
+                sourceBefore: sourceValue,
+                kind: "derived"
+            }
+        });
+    }
+
+    const staticStringPattern = /\b([A-Za-z_$][\w$]*)\s*=\s*String\s*\.\s*(valueOf|join|format|copyValueOf)\s*\(((?:[^()]|\([^()]*\))*)\)/g;
+    for (const match of statement.matchAll(staticStringPattern)) {
+        const resultName = match[1];
+        const operation = match[2];
+        const args = match[3] ?? "";
+        if (!resultName || !operation) continue;
+        const beforeResult = variables[resultName];
+        const afterResult = postVariables[resultName];
+        if (typeof afterResult !== "string" || beforeResult === afterResult) continue;
+        const firstArg = args.split(",")[0]?.trim();
+        const sourceName = firstArg && /^[A-Za-z_$][\w$]*$/.test(firstArg) ? firstArg : undefined;
+        events.push({
+            sequence: 0,
+            type: "STRING_RESULT",
+            line: sourceEvent.line,
+            method: sourceEvent.method,
+            depth: sourceEvent.depth,
+            data: { name: resultName, resultName, sourceName, operation: "String." + operation, before: typeof beforeResult === "string" ? beforeResult : "", after: afterResult, sourceBefore: sourceName ? variables[sourceName] : undefined, kind: "derived" }
+        });
+    }
+
+    const stringConstructorPattern = /\b([A-Za-z_$][\w$]*)\s*=\s*new\s+String\s*\(((?:[^()]|\([^()]*\))*)\)/g;
+    for (const match of statement.matchAll(stringConstructorPattern)) {
+        const resultName = match[1];
+        if (!resultName) continue;
+        const beforeResult = variables[resultName];
+        const afterResult = postVariables[resultName];
+        if (typeof afterResult !== "string" || beforeResult === afterResult) continue;
+        events.push({
+            sequence: 0,
+            type: "STRING_RESULT",
+            line: sourceEvent.line,
+            method: sourceEvent.method,
+            depth: sourceEvent.depth,
+            data: { name: resultName, resultName, operation: "new String", before: typeof beforeResult === "string" ? beforeResult : "", after: afterResult, kind: "derived" }
+        });
+    }
+
+    const concatenationPattern = /\b([A-Za-z_$][\w$]*)\s*(\+=|=(?!=))\s*([^;\n]+);?/g;
+    for (const match of statement.matchAll(concatenationPattern)) {
+        const resultName = match[1];
+        const operator = match[2];
+        const expression = match[3] ?? "";
+        const after = resultName ? postVariables[resultName] : undefined;
+        const before = resultName ? variables[resultName] : undefined;
+        if (!resultName || !operator || (operator !== "+=" && !expression.includes("+")) || typeof after !== "string" || before === after) continue;
+        const sourceNames = [...expression.matchAll(/\b([A-Za-z_$][\w$]*)\b/g)]
+            .map(item => item[1])
+            .filter((candidate): candidate is string => typeof candidate === "string" && candidate !== resultName && typeof variables[candidate] === "string");
+        const sourceName = sourceNames[0];
+        events.push({
+            sequence: 0,
+            type: "STRING_RESULT",
+            line: sourceEvent.line,
+            method: sourceEvent.method,
+            depth: sourceEvent.depth,
+            data: { name: resultName, resultName, sourceName, operation: "concatenate", before: typeof before === "string" ? before : "", after, sourceBefore: sourceName ? variables[sourceName] : undefined, kind: "derived" }
+        });
+    }
+
+    // StringBuilder is mutable; only emit a mutation event when the runtime
+    // exposes string snapshots for both sides and proves a changed value.
+    const mutablePattern = /\b([A-Za-z_$][\w$]*)\s*\.\s*(append|insert|delete|deleteCharAt|setCharAt|replace|reverse)\s*\(((?:[^()]|\([^()]*\))*)\)/g;
+    for (const match of statement.matchAll(mutablePattern)) {
+        const name = match[1];
+        const operation = match[2];
+        if (!name || !operation) continue;
+        const before = stringBuilderContents(variables[name]);
+        const after = stringBuilderContents(postVariables[name]);
+        if (before === undefined || after === undefined || before === after) continue;
+        const args = splitTopLevel(match[3] ?? "", ",").map(part => part.trim());
+        const firstArg = evaluateExpression(args[0] ?? "", variables);
+        const secondArg = evaluateExpression(args[1] ?? "", variables);
+        const index = typeof firstArg === "number" && Number.isInteger(firstArg)
+            ? firstArg
+            : operation === "append" ? before.length : undefined;
+        let removed = "";
+        let inserted = "";
+        if (operation === "deleteCharAt" && index !== undefined) removed = before.charAt(index);
+        else if (operation === "delete" && index !== undefined) {
+            const end = typeof secondArg === "number" && Number.isInteger(secondArg) ? secondArg : before.length;
+            removed = before.slice(index, end);
+        } else if (operation === "insert" && index !== undefined) {
+            const amount = Math.max(0, after.length - before.length);
+            inserted = after.slice(index, index + amount);
+        } else if (operation === "append" && after.startsWith(before)) {
+            inserted = after.slice(before.length);
+        } else if (operation === "setCharAt" && index !== undefined) {
+            inserted = after.charAt(index);
+            removed = before.charAt(index);
+        } else if (operation === "replace" && index !== undefined && typeof secondArg === "number") {
+            removed = before.slice(index, secondArg);
+            inserted = after.slice(index, index + Math.max(0, after.length - (before.length - removed.length)));
+        }
+        events.push({
+            sequence: 0,
+            type: "STRING_MUTATION",
+            line: sourceEvent.line,
+            method: sourceEvent.method,
+            depth: sourceEvent.depth,
+            data: { name, operation, before, after, index, removed: removed || undefined, inserted: inserted || undefined, kind: "mutation" }
+        });
+    }
+
+    return events;
+}
+
+function stringBuilderContents(value: unknown): string | undefined {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+    const record = value as Record<string, unknown>;
+    const type = typeof record.$type === "string" ? record.$type : "";
+    if (!/StringBuilder|StringBuffer/.test(type)) return undefined;
+    const fields = record.fields && typeof record.fields === "object" && !Array.isArray(record.fields)
+        ? record.fields as Record<string, unknown>
+        : {};
+    for (const candidate of [record.value, record.stringValue, record.text, fields.stringValue, fields.text]) {
+        if (typeof candidate === "string") return candidate;
+    }
+    const fieldValue = fields.value;
+    const values = fieldValue && typeof fieldValue === "object" && !Array.isArray(fieldValue) &&
+        Array.isArray((fieldValue as Record<string, unknown>).values)
+        ? (fieldValue as { values: unknown[] }).values
+        : Array.isArray(fieldValue) ? fieldValue : undefined;
+    if (!values || !values.every(item => typeof item === "string" || typeof item === "number")) return undefined;
+    const count = typeof fields.count === "number" ? fields.count : values.length;
+    const coder = typeof fields.coder === "number" ? fields.coder : 0;
+    let text: string;
+    if (values.every(item => typeof item === "string" && item.length <= 1)) {
+        text = (values as string[]).join("");
+    } else if (coder === 1) {
+        let decoded = "";
+        for (let i = 0; i + 1 < values.length; i += 2) {
+            decoded += String.fromCharCode(((Number(values[i]) & 255) << 8) | (Number(values[i + 1]) & 255));
+        }
+        text = decoded;
+    } else {
+        text = values.map(item => String.fromCharCode(Number(item) & 255)).join("");
+    }
+    return text.slice(0, count);
 }
 
 function evaluateExpression(

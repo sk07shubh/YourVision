@@ -1,4 +1,8 @@
 import { runJava } from "../src/execution/java/runner.js";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 
 function assert(condition: boolean, message: string): void {
     if (!condition) throw new Error(message);
@@ -31,6 +35,10 @@ class Solution {
         for (int i = 0; i < 1000000000; i++) sum += i;
         return sum;
     }
+
+    public void spinForever() {
+        while (true) {}
+    }
 }
 `;
 
@@ -59,4 +67,55 @@ assert(
     "expanded trace exceeded the 5,000-event safety limit"
 );
 
-console.log("PASS: Java safety - large snapshots, deep objects, execution timeout");
+const infinite = await runJava(source, { method: "spinForever" });
+
+assert(
+    infinite.kind === "TIMEOUT",
+    "infinite Java loop was not timed out: " + infinite.kind
+);
+assert(infinite.success === false, "infinite-loop timeout must not report success");
+assert(
+    typeof infinite.message === "string" && infinite.message.length > 0,
+    "infinite-loop timeout must expose a useful message"
+);
+
+// Allow a short grace period for OS process-table updates, then check for
+// any surviving tracer/debuggee JVM whose command line contains the runtime.
+const deadline = Date.now() + 2000;
+let survivingRuntime: string | undefined;
+
+do {
+    try {
+        const { stdout } = await execFileAsync(
+            "pgrep",
+            ["-f", "YourVisionRuntime"],
+            { timeout: 1000 }
+        );
+        survivingRuntime = stdout.trim() || undefined;
+    } catch (error) {
+        // pgrep exits 1 when no process matches; execFile surfaces the
+        // numeric exit code on the error object.
+        const code = (error as unknown as { code?: unknown }).code;
+
+        if (code === 1) {
+            // pgrep found no matching process.
+            survivingRuntime = undefined;
+        } else {
+            throw error;
+        }
+    }
+
+    if (survivingRuntime === undefined) break;
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+} while (Date.now() < deadline);
+
+assert(
+    survivingRuntime === undefined,
+    "orphaned YourVisionRuntime process remained after runJava timeout: " +
+        survivingRuntime
+);
+
+console.log(
+    "PASS: Java safety - large snapshots, deep objects, execution timeout, no orphaned debuggee"
+);
