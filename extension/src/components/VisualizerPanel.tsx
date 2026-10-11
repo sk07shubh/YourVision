@@ -2333,6 +2333,9 @@ function DataValue({
     return <div className="yv-code">…</div>;
   }
 
+  const builderText = stringBuilderText(value);
+  if (builderText !== undefined) return <StringView value={builderText} state={state} name={name ?? ''} source={source} />;
+
   if (isPlainObject(value) && typeof value.$stringValue === 'string') {
     return <StringView value={value.$stringValue} state={state} name={name ?? ''} source={source} />;
   }
@@ -2379,6 +2382,31 @@ function isStructuralObject(value: unknown): value is Obj {
     (('left' in fields || 'right' in fields) && ('val' in fields || 'value' in fields));
 }
 
+function stringBuilderText(value: unknown): string | undefined {
+  if (!isPlainObject(value) || typeof value.$type !== 'string' || !/StringBuilder|StringBuffer/.test(value.$type)) return undefined;
+  const fields = isPlainObject(value.fields) ? value.fields : {};
+  for (const candidate of [fields.stringValue, fields.text]) if (typeof candidate === 'string') return candidate;
+  const fieldValue = fields.value;
+  const values = isPlainObject(fieldValue) && Array.isArray(fieldValue.values) ? fieldValue.values :
+    Array.isArray(fieldValue) ? fieldValue : undefined;
+  if (!values || !values.every(item => typeof item === 'string' || typeof item === 'number')) return undefined;
+  const count = typeof fields.count === 'number' ? fields.count : values.length;
+  const coder = typeof fields.coder === 'number' ? fields.coder : 0;
+  let text: string;
+  if (values.every(item => typeof item === 'string' && item.length <= 1)) {
+    text = (values as string[]).join('');
+  } else if (coder === 1) {
+    const chars: string[] = [];
+    for (let i = 0; i + 1 < values.length; i += 2) {
+      chars.push(String.fromCharCode(((Number(values[i]) & 255) << 8) | (Number(values[i + 1]) & 255)));
+    }
+    text = chars.join('');
+  } else {
+    text = values.map(item => String.fromCharCode(Number(item) & 255)).join('');
+  }
+  return text.slice(0, count);
+}
+
 export function StringView({ value, state, name, source = '' }: { value: string; state?: TraceState; name: string; source?: string }) {
   const data = isPlainObject(state?.lastEvent?.data) ? state.lastEvent.data : {};
   const executionEvents = Array.isArray(data.executionEvents) ? data.executionEvents : [];
@@ -2397,6 +2425,11 @@ export function StringView({ value, state, name, source = '' }: { value: string;
       if (event.type === 'STRING_ACCESS' && typeof effect.indexVariable === 'string' && typeof effect.index === 'number') {
         pointers.set(effect.indexVariable, effect.index);
       }
+    }
+    if (event.type === 'STRING_SEARCH_RESULT' && effect.name === name && effect.matched === true &&
+        typeof effect.index === 'number' && typeof effect.end === 'number' &&
+        effect.index >= 0 && effect.end >= effect.index && effect.end <= value.length) {
+      ranges.push({ start: effect.index, end: effect.end });
     }
     if (event.type === 'STRING_RANGE_ACCESS' && effect.name === name &&
         typeof effect.start === 'number' && typeof effect.end === 'number') {
