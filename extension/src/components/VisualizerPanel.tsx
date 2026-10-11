@@ -2137,7 +2137,7 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
   const rangeEnd = targets.length >= 2 ? Math.max(...targets.map(target => target.index)) : -1;
 
   return (
-    <div className={`yv-array yv-array-pointer-host ${targets.length ? 'has-pointers' : ''}`} ref={arrayRef} style={enhancedBinding ? { paddingTop: 52, boxSizing: 'border-box' } : undefined}>
+    <div className={`yv-array yv-array-pointer-host ${targets.length ? 'has-pointers' : ''}`} ref={arrayRef} style={enhancedBinding ? { paddingTop: 52, paddingLeft: 44, boxSizing: 'border-box' } : undefined}>
       <div className="yv-pointer-layer" aria-hidden="true">
         {targets.map(target => (
           <div
@@ -2680,7 +2680,7 @@ export function StringView({ value, state, name, source = '' }: { value: string;
         {transition && <span>{transition.operation} · {transition.kind === 'mutation' ? 'mutated' : 'result'}</span>}
         {operationResult && <span>{operationResult.operation} → {String(operationResult.result)}</span>}
       </div>}
-      <div className="yv-string-cells" style={enhancedBinding ? { paddingTop: 52, boxSizing: 'border-box' } : undefined}>
+      <div className="yv-string-cells" style={enhancedBinding ? { paddingTop: 52, paddingLeft: 44, boxSizing: 'border-box' } : undefined}>
         {hasPointers && <div className="yv-string-pointer-layer" aria-hidden="true">
           {[...new Set(pointers.values())].map(pointerIndex => (
             <span className="yv-string-pointer-group" key={pointerIndex} data-string-pointer-index={pointerIndex}
