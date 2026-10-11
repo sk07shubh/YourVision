@@ -814,12 +814,6 @@
 /* Collection removals are shown as a compact, snapshot-derived cue. The live
    collection remains the exact current state, while the removed value remains
    visible for this step so pop/poll/remove operations are easy to follow. */
-.yv-collection-removals{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:6px;width:fit-content;max-width:100%;box-sizing:border-box;margin:8px auto 0;padding:6px 8px;border:1px dashed color-mix(in srgb,var(--yv-danger,var(--yv-warning,#f59e0b)),var(--yv-border) 38%);border-radius:7px}.yv-stack-view+.yv-collection-removals{width:100%;max-width:260px}
-.yv-collection-removal-label{font-size:9px;font-weight:750;letter-spacing:.08em;color:var(--yv-danger,var(--yv-warning,#f59e0b))}
-.yv-collection-item-exit{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;width:max-content;max-width:100%;min-width:0;flex:0 1 auto;padding:4px 8px;border:1px solid color-mix(in srgb,var(--yv-danger,var(--yv-warning,#f59e0b)),var(--yv-border) 35%);border-radius:5px;color:var(--yv-muted);text-align:center;overflow-wrap:anywhere;text-decoration:line-through;animation:yv-collection-item-exit 360ms ease-out both}
-.yv-collection-item-exit>*{min-width:0;max-width:100%;text-align:center}
-@keyframes yv-collection-item-exit{0%{opacity:1;transform:translateY(0);background:color-mix(in srgb,var(--yv-danger,var(--yv-warning,#f59e0b)),transparent 84%)}100%{opacity:.8;transform:translateY(-2px);background:transparent}}
-@media(prefers-reduced-motion:reduce){.yv-collection-item-exit{animation:none}}
 
 /* Trace-backed graph state: the node reached by a moved pointer gets a brief
    accent ring; mutated node snapshots receive a separate, quieter pulse. */
