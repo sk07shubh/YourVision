@@ -2541,11 +2541,11 @@ export function StringView({ value, state, name, source = '' }: { value: string;
   const sourceName = structureNames[0] ?? name;
   const escapedName = sourceName.replace(/\$/g, '\\$');
   const indexExpressions: string[] = [];
-  const isActiveIdentifier = (expression: string) => {
-    if (!/^[A-Za-z_$][\w$]*$/.test(expression)) return false;
-    const escaped = expression.replace(/\$/g, '\\$');
-    return new RegExp('\\b' + escaped + '\\b').test(line);
-  };
+  // Discover string index variables from the whole method, not only the
+  // currently highlighted line. Pointer position is persistent state; the
+  // current STRING_ACCESS event should control highlighting, not visibility.
+  const isActiveIdentifier = (expression: string) =>
+    /^[A-Za-z_$][\w$]*$/.test(expression);
   for (const match of source.matchAll(new RegExp('\\b' + escapedName + '\\s*\\.\\s*charAt\\s*\\(([^()]*)\\)', 'g'))) {
     const expression = (match[1] ?? '').trim();
     if (isActiveIdentifier(expression)) indexExpressions.push(expression);
