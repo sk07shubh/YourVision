@@ -209,6 +209,35 @@ describe('binary-tree visualization', () => {
     expect(html).toContain('RIGHT');
   });
 
+  it('highlights a mutated tree node and a pointer arrival on the current step', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 101,
+      variables: { current: { $objectId: 't1' } },
+      objects: {
+        t1: { $objectId: 't1', $type: 'TreeNode', fields: { val: 1, left: { $ref: 't2' }, right: null } },
+        t2: { $objectId: 't2', $type: 'TreeNode', fields: { val: 2, left: null, right: null } },
+      },
+    });
+    const current = state({
+      sequence: 102,
+      variables: { current: { $objectId: 't2' } },
+      objects: {
+        t1: { $objectId: 't1', $type: 'TreeNode', fields: { val: 1, left: { $ref: 't2' }, right: null } },
+        t2: { $objectId: 't2', $type: 'TreeNode', fields: { val: 3, left: null, right: null } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'current.val = 3;', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 't1' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-tree-node-id="t2" data-tree-changed="true" data-tree-entered="true"');
+      expect(html).toContain('yv-tree-node-entered');
+      expect(html).toContain('yv-tree-node-changed');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
   it('renders a cycle reference instead of recursing into a duplicate tree node', () => {
     const html = renderToStaticMarkup(<TreeNodeView
       value={{ $objectId: 'cycle-root' }}
