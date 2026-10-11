@@ -1143,11 +1143,13 @@ function deriveStringEvents(
         });
     }
 
-    const assignmentPattern = /\b([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*\.\s*(substring|subSequence|concat|replace|replaceAll|toLowerCase|toUpperCase|trim|strip|toString)\s*\(/g;
+    const assignmentPattern = /\b([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*\.\s*(substring|subSequence|concat|replace|replaceAll|toLowerCase|toUpperCase|trim|strip|toString)\s*\(((?:[^()]|\([^()]*\))*)\)/g;
     for (const match of statement.matchAll(assignmentPattern)) {
         const resultName = match[1];
         const sourceName = match[2];
         const operation = match[3];
+        const suffix = statement.slice((match.index ?? 0) + match[0].length).trim();
+        if (suffix && !suffix.startsWith(";")) continue;
         if (!resultName || !sourceName || !operation) continue;
         const beforeResult = variables[resultName];
         const afterResult = postVariables[resultName];
