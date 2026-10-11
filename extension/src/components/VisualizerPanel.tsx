@@ -2312,12 +2312,12 @@ function resolveRef(value: unknown, objects: Record<string,unknown>): unknown {
 }
 function nodeValue(value: Obj): unknown { const f=objectFields(value); return f.val ?? f.value ?? f.data ?? '?'; }
 
-function LinkedListView({
+export function LinkedListView({
   root,
   objects,
   variables = {}
 }: {
-  root: Obj;
+  root: unknown;
   objects: Record<string, unknown>;
   variables?: Record<string, unknown>;
 }) {
