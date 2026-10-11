@@ -2327,10 +2327,11 @@ export function LinkedListView({
   const nullPointers: string[] = [];
   for (const [name, value] of Object.entries(variables)) {
     if (name === 'this') continue;
-    if (isPlainObject(value) && typeof value.$objectId === 'string') {
-      const names = pointerNames.get(value.$objectId) ?? [];
+    if (isPlainObject(value) && (typeof value.$objectId === 'string' || typeof value.$ref === 'string')) {
+      const id = String(value.$objectId ?? value.$ref);
+      const names = pointerNames.get(id) ?? [];
       names.push(name);
-      pointerNames.set(value.$objectId, names);
+      pointerNames.set(id, names);
     } else if (value == null) {
       nullPointers.push(name);
     }
@@ -2389,8 +2390,9 @@ export function LinkedListView({
   const startIds: string[] = [];
   if (isPlainObject(resolvedRoot) && looksListNode(resolvedRoot)) startIds.push(String(resolvedRoot.$objectId ?? 'root'));
   for (const value of Object.values(variables)) {
-    if (!isPlainObject(value) || typeof value.$objectId !== 'string') continue;
-    if (records.has(value.$objectId) && !startIds.includes(value.$objectId)) startIds.push(value.$objectId);
+    if (!isPlainObject(value)) continue;
+    const id = typeof value.$objectId === 'string' ? value.$objectId : typeof value.$ref === 'string' ? value.$ref : null;
+    if (id && records.has(id) && !startIds.includes(id)) startIds.push(id);
   }
   for (const id of records.keys()) if (!startIds.includes(id)) startIds.push(id);
 
@@ -3004,7 +3006,7 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
           : 'Data Structure';
         const title = kind + ' → ' + uniqueNames.join(' / ');
         return (
-          <div className="yv-ds" key={title}>
+          <div className="yv-ds" key={kind === 'Linked List' ? 'Linked List → runtime graph' : title}>
             <div className="yv-ds-title">{title}</div>
             <DataValue value={value} state={state} source={source} name={uniqueNames.join(' / ')}/>
           </div>
