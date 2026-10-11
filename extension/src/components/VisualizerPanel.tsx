@@ -1370,7 +1370,7 @@ function isEnhancedForVariable(source: string, name: string): boolean {
 
 function EnhancedForValueCard({ binding }: { binding: EnhancedForBinding }) {
   return (
-    <div className="yv-enhanced-for-card" data-enhanced-for-variable={binding.variable}
+    <div className="yv-enhanced-for-card" data-enhanced-for-variable={binding.variable} data-enhanced-for-index={binding.index}
       style={{ position: 'absolute', zIndex: 5, left: '50%', bottom: 'calc(100% + 9px)', transform: 'translateX(-50%)',
         display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', padding: '4px 8px',
         border: '1px solid var(--yv-accent, #65a9ff)', borderRadius: 7, background: 'var(--yv-panel, #101b2d)',
