@@ -1156,7 +1156,7 @@ function deriveStringEvents(
         if (!resultName || !expression.includes("+") || typeof after !== "string" || before === after) continue;
         const sourceNames = [...expression.matchAll(/\b([A-Za-z_$][\w$]*)\b/g)]
             .map(item => item[1])
-            .filter((candidate): candidate is string => Boolean(candidate) && candidate !== resultName && typeof variables[candidate] === "string");
+            .filter((candidate): candidate is string => typeof candidate === "string" && candidate !== resultName && typeof variables[candidate] === "string");
         const sourceName = sourceNames[0];
         if (!sourceName) continue;
         events.push({
