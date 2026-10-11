@@ -3509,7 +3509,7 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
     isPlainObject(value) && typeof value.$objectId === 'string' ? value.$objectId : id
   ));
 
-  const dsuContext = /\\b(?:find|union)\\s*\\(/i.test(source) && /\\b(?:parent|parents|par)\\s*\\[/i.test(source);
+  const dsuContext = /\b(?:find|union)\s*\(/i.test(source) && /\b(?:parent|parents|par)\s*\[/i.test(source);
   const dsuParentEntry = dsuContext ? Object.entries(state?.arrays ?? {}).find(([name, value]) =>
     /^(?:parent|parents|par)$/i.test(name) && isArraySnapshot(value) &&
     value.values.length > 0 && value.values.every(item => typeof item === 'number' && Number.isInteger(item) && item >= -1 && item < value.values.length)
