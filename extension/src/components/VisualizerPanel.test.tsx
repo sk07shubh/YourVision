@@ -115,6 +115,36 @@ describe('string data structure visualization', () => {
     expect(html).toContain('reverse · mutated');
     expect(html).toContain('yv-string-cell-changed');
   });
+  it('highlights only a confirmed search match range', () => {
+    const current = state({ lastEvent: { type: 'STEP', line: 4, data: { executionEvents: [
+      { type: 'STRING_SEARCH_RESULT', data: { name: 's', operation: 'indexOf', query: 'ana', index: 1, end: 4, matched: true, result: 1, kind: 'search' } },
+    ] } } });
+    const html = renderToStaticMarkup(<StringView value="banana" state={current} name="s" />);
+    expect(html).toContain('class="yv-string-cell yv-cell-range " data-string-index="1"');
+    expect(html).toContain('class="yv-string-cell yv-cell-range " data-string-index="3"');
+    expect(html).not.toContain('class="yv-string-cell yv-cell-range " data-string-index="4"');
+  });
+
+  it('renders StringBuilder snapshots as an indexed mutable character sequence', () => {
+    const current = state({
+      variables: { builder: { $objectId: '1', $type: 'java.lang.StringBuilder' } },
+      objects: { '1': {
+        $objectId: '1',
+        $type: 'java.lang.StringBuilder',
+        fields: {
+          count: 3,
+          coder: 0,
+          value: { $arrayId: '2', $type: 'byte[]', values: [97, 98, 99] },
+        },
+      } },
+    });
+    const html = renderToStaticMarkup(<DataStructures state={current} source="builder.append('d')" />);
+    expect(html).toContain('data-string-structure="builder"');
+    expect(html).toContain('data-string-index="2"');
+    expect(html).toContain('>a</div>');
+    expect(html).toContain('>b</div>');
+    expect(html).toContain('>c</div>');
+  });
 });
 
 describe('execution visualization feature matrix', () => {
