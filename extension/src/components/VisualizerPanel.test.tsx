@@ -1029,6 +1029,39 @@ describe('execution visualization feature matrix', () => {
     }
   });
 
+  it.each([
+    ['queue', 'java.util.ArrayDeque'],
+    ['deque', 'java.util.ArrayDeque'],
+    ['set', 'java.util.HashSet'],
+    ['priorityQueue', 'java.util.PriorityQueue'],
+    ['list', 'java.util.ArrayList'],
+  ])('uses the shared compact removal cue for %s', (kind, type) => {
+    const previousSession = sessionStore.get();
+    const id = `remove-${kind}`;
+    const previous = state({
+      sequence: 72,
+      dataStructures: {
+        items: { $collectionId: id, $type: type, $kind: kind, values: [1, 2], size: 2 },
+      },
+    });
+    const current = state({
+      sequence: 73,
+      dataStructures: {
+        items: { $collectionId: id, $type: type, $kind: kind, values: [1], size: 1 },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'items.remove();', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source="items.remove();" />);
+      expect(html).toContain('yv-collection-removals');
+      expect(html).toContain('yv-collection-item-exit');
+      expect(html).toContain('REMOVED');
+      expect(html).toContain('>2</');
+    } finally {
+      sessionStore.set(previousSession);
+    }
+  });
+
   it('tracks collection insertion and removal across variable aliases by collection identity', () => {
     const previousSession = sessionStore.get();
     const previous = state({
