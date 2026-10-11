@@ -21,6 +21,10 @@ class Solution {
         map.put(2, 7);
         HashSet<Integer> set = new HashSet<>();
         set.add(10);
+        TreeSet<Integer> sortedSet = new TreeSet<>();
+        sortedSet.add(11);
+        sortedSet.add(3);
+        sortedSet.add(7);
         Stack<Integer> stack = new Stack<>();
         stack.push(5);
         Queue<Integer> queue = new ArrayDeque<>();
@@ -160,13 +164,14 @@ assert(!("nums" in variables), "array leaked into Variables");
 assert(!("map" in variables), "map leaked into Variables");
 assert("nums" in arrays, "array missing from Data Structures");
 
-for (const name of ["map","set","stack","queue","priorityQueue","list"]) {
+for (const name of ["map","set","sortedSet","stack","queue","priorityQueue","list"]) {
     assert(name in structures, name + " missing from Data Structures");
 }
 
 const nums = arrays.nums as Record<string, unknown>;
 const map = structures.map as Record<string, unknown>;
 const set = structures.set as Record<string, unknown>;
+const sortedSet = structures.sortedSet as Record<string, unknown>;
 const stack = structures.stack as Record<string, unknown>;
 const queue = structures.queue as Record<string, unknown>;
 const priorityQueue = structures.priorityQueue as Record<string, unknown>;
@@ -175,6 +180,8 @@ const list = structures.list as Record<string, unknown>;
 assert(JSON.stringify(nums.values) === "[99,7,11]", "array values incorrect");
 assert(Array.isArray(map.entries) && (map.entries as unknown[]).length === 2, "map entries incorrect");
 assert(JSON.stringify(set.values) === "[10,11]", "set values incorrect");
+assert(sortedSet.$kind === "sortedSet", "TreeSet ordering kind is incorrect");
+assert(JSON.stringify(sortedSet.values) === "[3,7,11]", "TreeSet comparator order was not preserved");
 assert(JSON.stringify(stack.values) === "[5,6]", "stack values incorrect");
 assert(JSON.stringify(queue.values) === "[8,12]", "queue values incorrect");
 assert(priorityQueue.$kind === "priorityQueue", "priority queue kind is incorrect");
