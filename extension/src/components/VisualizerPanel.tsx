@@ -2606,7 +2606,7 @@ export function LinkedListView({
                     </div>
                     {nextInComponent && <span className="yv-linked-edge-accessible-label" data-edge-kind="next" data-edge-from={node.id} data-edge-to={node.nextId} aria-label={`next points to ${idLabel(node.nextId)}`} />}
                     {nextIsCycle && <div className={`yv-edge yv-edge-cycle ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="cycle" data-edge-from={node.id} data-edge-to={component.cycleTo ?? 'unknown'} aria-label={`cycle back to ${idLabel(component.cycleTo)}`}>↶ {idLabel(component.cycleTo)}</div>}
-                    {isLast && !nextIsCycle && nextField == null && <div className={`yv-edge yv-edge-null ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="null" data-edge-from={node.id}><span className="yv-linked-null-line" aria-hidden="true" /> <span>null</span></div>}
+                    {isLast && !nextIsCycle && nextField == null && <div className={`yv-edge yv-edge-null ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="null" data-edge-from={node.id}><span className="yv-linked-null-line" aria-hidden="true" /> <span className="yv-null-value-box">null</span></div>}
                     {isLast && !nextIsCycle && nextField != null && !nextInComponent && <div className={`yv-edge yv-edge-external ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="external" data-edge-from={node.id} data-edge-to={node.nextId ?? 'external'}>→ <span>{idLabel(node.nextId)}</span></div>}
                   </div>
                 );
