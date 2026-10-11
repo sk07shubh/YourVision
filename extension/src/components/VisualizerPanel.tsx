@@ -1371,7 +1371,7 @@ function isEnhancedForVariable(source: string, name: string): boolean {
 function EnhancedForValueCard({ binding }: { binding: EnhancedForBinding }) {
   return (
     <div className="yv-enhanced-for-card" data-enhanced-for-variable={binding.variable} data-enhanced-for-index={binding.index}
-      style={{ position: 'absolute', zIndex: 5, left: '50%', bottom: 'calc(100% + 9px)', transform: 'translateX(-50%)',
+      style={{ position: 'absolute', zIndex: 5, left: '50%', bottom: 'calc(100% + 38px)', transform: 'translateX(-50%)',
         display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', padding: '4px 8px',
         border: '1px solid var(--yv-accent, #65a9ff)', borderRadius: 7, background: 'var(--yv-panel, #101b2d)',
         color: 'var(--yv-text, #f3f6ff)', boxShadow: '0 3px 12px rgba(0,0,0,.28)', fontSize: 12,
@@ -1380,8 +1380,8 @@ function EnhancedForValueCard({ binding }: { binding: EnhancedForBinding }) {
       <span className="yv-enhanced-for-equals">=</span>
       <span className="yv-enhanced-for-value">{compactValue(binding.value)}</span>
       <span className="yv-enhanced-for-connector" aria-hidden="true"
-        style={{ position: 'absolute', left: '50%', top: '100%', height: 9, borderLeft: '1px solid var(--yv-accent, #65a9ff)' }} />
-      <span aria-hidden="true" style={{ position: 'absolute', left: 'calc(50% - 3px)', top: 'calc(100% + 6px)',
+        style={{ position: 'absolute', left: '50%', top: '100%', height: 38, borderLeft: '1px solid var(--yv-accent, #65a9ff)' }} />
+      <span aria-hidden="true" style={{ position: 'absolute', left: 'calc(50% - 3px)', top: 'calc(100% + 35px)',
         width: 6, height: 6, borderRadius: '50%', background: 'var(--yv-accent, #65a9ff)' }} />
     </div>
   );
