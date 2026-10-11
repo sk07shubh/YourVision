@@ -1007,6 +1007,32 @@ describe('execution visualization feature matrix', () => {
     }
   });
 
+  it('tracks collection insertion and removal across variable aliases by collection identity', () => {
+    const previousSession = sessionStore.get();
+    const previous = state({
+      sequence: 80,
+      dataStructures: {
+        oldName: { $collectionId: 'aliased-collection', $type: 'java.util.ArrayDeque', $kind: 'deque', values: [1, 2], size: 2 },
+      },
+    });
+    const current = state({
+      sequence: 81,
+      dataStructures: {
+        newName: { $collectionId: 'aliased-collection', $type: 'java.util.ArrayDeque', $kind: 'deque', values: [1, 3], size: 2 },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'newName.addLast(3);', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source="newName.addLast(3);" />);
+      expect(html).toContain('yv-collection-item-enter');
+      expect(html).toContain('yv-collection-removals');
+      expect(html).toContain('REMOVED');
+      expect(html).toContain('>2</');
+    } finally {
+      sessionStore.set(previousSession);
+    }
+  });
+
   it('maps stack, queue, deque, priority queue, list, and set operations', () => {
     expect(collectionOperation('stack', 'push', { added: 5 })).toEqual({
       operation: 'Push', value: 5, position: 'Top',
