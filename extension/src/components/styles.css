@@ -536,3 +536,6 @@
 .yv-string-removal-tail .yv-string-removed-overlay{top:0}
 @keyframes yv-string-remove{0%{opacity:1;transform:translateX(-50%) scale(1)}70%{opacity:.65;transform:translateX(-50%) translateY(-5px) scale(.96)}100%{opacity:0;transform:translateX(-50%) translateY(-10px) scale(.92)}}
 @media(prefers-reduced-motion:reduce){.yv-string-removed-overlay{animation:none;opacity:.55}}
+
+.yv-string-meta{display:flex;align-items:center;gap:5px;margin:0 0 6px;color:var(--yv-muted);font:10px ui-monospace,SFMono-Regular,Menlo,monospace}.yv-string-meta strong{color:var(--yv-text);font-weight:700}.yv-string-meta span:last-child{opacity:.75}
+.yv-string-operation{display:flex;flex-wrap:wrap;gap:8px}
