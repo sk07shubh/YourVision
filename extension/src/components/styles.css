@@ -591,3 +591,23 @@
 }
 
 .yv-string-character.yv-string-code-unit{font-size:9px;letter-spacing:-.035em;white-space:nowrap}
+
+
+/* Linked-list graph: keep object identity, pointer aliases, and terminal topology explicit. */
+.yv-linked-graph{min-width:0;overflow-x:auto;padding:4px 0 7px}
+.yv-linked{align-items:flex-start;gap:8px;width:max-content;min-width:100%;padding:7px 2px 8px}
+.yv-linked-piece{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
+.yv-linked-piece .yv-node{position:relative;flex-direction:column;gap:3px;min-width:54px;min-height:48px;padding:7px 9px;overflow:visible}
+.yv-node-value{font-weight:600;max-width:140px;overflow-wrap:anywhere}
+.yv-node-identity{font-size:9px;line-height:12px;color:var(--yv-muted)}
+.yv-node-link-meta{font-size:9px;line-height:12px;color:var(--yv-muted);white-space:nowrap}
+.yv-linked-piece .yv-edge{align-self:center;display:flex;align-items:center;gap:3px;min-height:24px;padding:0 2px;font-size:18px;white-space:nowrap}
+.yv-linked-piece .yv-edge-null,.yv-linked-piece .yv-edge-external,.yv-linked-piece .yv-edge-cycle{font-size:12px}
+.yv-linked-piece .yv-edge-null span,.yv-linked-piece .yv-edge-external span{font-size:10px;color:var(--yv-muted)}
+.yv-linked-piece .yv-edge-cycle{color:var(--yv-warning,var(--yv-accent))}
+.yv-linked-null-pointers{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 6px}
+.yv-node-pointer-null{color:var(--yv-muted);border-style:dashed}
+.yv-linked-empty{display:flex;align-items:center;gap:8px;padding:8px 2px;color:var(--yv-muted)}
+.yv-linked-empty-label{font-size:11px}
+.yv-linked-piece[data-next-target="null"] .yv-node{border-color:color-mix(in srgb,var(--yv-border),var(--yv-accent) 25%)}
+@media(prefers-reduced-motion:reduce){.yv-linked-piece,.yv-linked-piece .yv-node,.yv-linked-piece .yv-edge{animation:none;transition:none}}
