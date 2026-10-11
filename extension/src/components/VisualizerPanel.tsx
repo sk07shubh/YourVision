@@ -99,6 +99,43 @@ export function eventEffects(state?: TraceState): ExecutionEffect[] {
           text: fields + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
         });
       }
+    } else if (eventType === 'STRING_ACCESS') {
+      const name = typeof eventData.name === 'string' ? eventData.name : 'string';
+      const index = typeof eventData.index === 'number' ? '[' + eventData.index + ']' : '';
+      effects.push({ kind: 'structural', text: name + index + ' = ' + compactValue(eventData.value) });
+    } else if (eventType === 'STRING_RANGE_ACCESS') {
+      const name = typeof eventData.name === 'string' ? eventData.name : 'string';
+      const start = typeof eventData.start === 'number' ? eventData.start : '?';
+      const end = typeof eventData.end === 'number' ? eventData.end : '?';
+      effects.push({ kind: 'structural', text: name + '[' + start + ':' + end + ')' });
+    } else if (eventType === 'STRING_SEARCH_RESULT') {
+      const name = typeof eventData.name === 'string' ? eventData.name : 'string';
+      const operation = typeof eventData.operation === 'string' ? eventData.operation : 'operation';
+      if ('result' in eventData) effects.push({
+        kind: 'structural',
+        text: name + '.' + operation + ' → ' + compactValue(eventData.result)
+      });
+    } else if (eventType === 'STRING_SPLIT_RESULT') {
+      const name = typeof eventData.name === 'string' ? eventData.name : 'string';
+      const resultName = typeof eventData.resultName === 'string' ? eventData.resultName : 'parts';
+      const count = typeof eventData.partCount === 'number' ? eventData.partCount : '?';
+      effects.push({ kind: 'structural', text: name + '.split → ' + resultName + ' (' + count + ' parts)' });
+    } else if (eventType === 'STRING_CONVERSION_RESULT') {
+      const name = typeof eventData.name === 'string' ? eventData.name : 'string';
+      const operation = typeof eventData.operation === 'string' ? eventData.operation : 'conversion';
+      const length = typeof eventData.resultLength === 'number' ? eventData.resultLength : '?';
+      effects.push({ kind: 'structural', text: name + '.' + operation + ' → char[' + length + ']' });
+    } else if (eventType === 'STRING_RESULT') {
+      const resultName = typeof eventData.resultName === 'string' ? eventData.resultName : 'result';
+      const before = typeof eventData.before === 'string' ? compactValue(eventData.before) + '  →  ' : '';
+      effects.push({ kind: 'change', text: resultName + '  ' + before + compactValue(eventData.after) });
+    } else if (eventType === 'STRING_MUTATION') {
+      const name = typeof eventData.name === 'string' ? eventData.name : 'string';
+      const operation = typeof eventData.operation === 'string' ? eventData.operation : 'mutate';
+      effects.push({
+        kind: 'change',
+        text: name + '.' + operation + '  ' + compactValue(eventData.before) + '  →  ' + compactValue(eventData.after)
+      });
     }
   }
 
