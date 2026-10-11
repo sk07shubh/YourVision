@@ -101,9 +101,10 @@ export function eventEffects(state?: TraceState): ExecutionEffect[] {
       for (const change of changes.slice(0, 3)) {
         if (!isPlainObject(change)) continue;
         const fields = Array.isArray(change.fields) ? change.fields.join('.') : 'field';
+        const objectName = typeof eventData.name === 'string' ? eventData.name : 'object';
         effects.push({
           kind: 'change',
-          text: fields + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
+          text: objectName + '.' + fields + '  ' + variableSummary(change.before) + '  →  ' + variableSummary(change.after)
         });
       }
     } else if (eventType === 'STRING_ACCESS') {
