@@ -2382,10 +2382,16 @@ function mapChanges(state?: TraceState, mapId?: string): Array<{
   const data = state?.lastEvent?.data;
   const changes: unknown[] = [];
   if (isPlainObject(data)) {
-    if (Array.isArray(data.changes)) changes.push(...data.changes);
+    // A trace step may carry writes for several maps. Never apply a write to
+    // a different map just because its key happens to compare equal.
+    if (Array.isArray(data.changes) &&
+        (typeof data.mapId !== 'string' || data.mapId === mapId)) {
+      changes.push(...data.changes);
+    }
     if (Array.isArray(data.executionEvents)) {
       for (const event of data.executionEvents) {
         if (!isPlainObject(event) || event.type !== 'MAP_WRITE' || !isPlainObject(event.data)) continue;
+        if (typeof event.data.mapId === 'string' && event.data.mapId !== mapId) continue;
         if (Array.isArray(event.data.changes)) changes.push(...event.data.changes);
       }
     }
