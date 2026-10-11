@@ -21,6 +21,7 @@ import {
   ArrayView,
   DataStructures,
   GraphView,
+  TrieView,
   LinkedListView,
   StringView,
 } from './VisualizerPanel';
@@ -184,6 +185,35 @@ describe('linked-list graph visualization', () => {
     expect(html).toContain('empty list');
     expect(html).toContain('head = null');
     expect(html).not.toContain('data-node-id=');
+  });
+});
+
+describe('trie data structure visualization', () => {
+  it('renders child edges and terminal-word state from captured trie nodes', () => {
+    const current = state({
+      variables: { trie: { $objectId: 'container' } },
+      objects: {
+        container: { $objectId: 'container', $type: 'Trie', fields: { root: { $ref: 't1' } } },
+        t1: {
+          $objectId: 't1',
+          $type: 'TrieNode',
+          fields: { isEnd: false, children: { $mapId: 'children-1', $type: 'java.util.HashMap', entries: [{ key: 'a', value: { $ref: 't2' } }] } },
+        },
+        t2: {
+          $objectId: 't2',
+          $type: 'TrieNode',
+          fields: { isEnd: true, children: { $mapId: 'children-2', $type: 'java.util.HashMap', entries: [] } },
+        },
+      },
+    });
+    const html = renderToStaticMarkup(<DataStructures state={current} source="" />);
+    expect(html).toContain('Trie → trie');
+    expect(html).toContain('data-trie-node-count="2"');
+    expect(html).toContain('data-trie-node-id="t1"');
+    expect(html).toContain('data-trie-node-id="t2"');
+    expect(html).toContain('data-trie-edge-label="a"');
+    expect(html).toContain('WORD END');
+    expect(html).not.toContain('Object → trie');
   });
 });
 
