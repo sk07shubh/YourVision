@@ -1158,9 +1158,9 @@ function collectionItemMotionClass(
   const current = session.states[selectedIndex];
   const previous = selectedIndex > 0 ? session.states[selectedIndex - 1] : undefined;
   if (!current || !previous || current.sequence !== state?.sequence) return '';
-  const previousVariables = previous.variables;
-  const prior = previousVariables[name];
-  if (!isCollectionSnapshot(prior) || prior.$collectionId !== value.$collectionId) return '';
+  const priorCandidate = previous.variables[name] ?? previous.dataStructures[name];
+  const prior = isCollectionSnapshot(priorCandidate) ? priorCandidate : undefined;
+  if (!prior || prior.$collectionId !== value.$collectionId) return '';
 
   // Count equal values rather than using a Set: collections may legally hold
   // duplicate values (queues, deques and priority queues), and each occurrence
