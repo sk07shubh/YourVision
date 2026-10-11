@@ -16,7 +16,7 @@ const source = [
     "  int foundAt = s.indexOf(\"na\");",
     "  StringBuilder builder = new StringBuilder(\"abc\");",
     "  builder.reverse();",
-    "  return part + c + upper;"
+    "  return part + c + upper;",
     " }",
     "}"
 ].join("\n");
