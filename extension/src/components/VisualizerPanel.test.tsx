@@ -137,6 +137,21 @@ describe('string data structure visualization', () => {
     expect(html).toContain('class="yv-string-cell yv-cell-range " data-string-index="3"');
     expect(html).not.toContain('class="yv-string-cell yv-cell-range " data-string-index="4"');
   });
+  it('animates StringBuilder insertions and deletion ghosts without moving index labels', () => {
+    const deletedState = state({ lastEvent: { type: 'STEP', line: 6, data: { executionEvents: [
+      { type: 'STRING_MUTATION', data: { name: 'builder', operation: 'deleteCharAt', before: 'cba', after: 'ca', index: 1, removed: 'b', kind: 'mutation' } },
+    ] } } });
+    const deletedHtml = renderToStaticMarkup(<StringView value="ca" state={deletedState} name="builder" />);
+    expect(deletedHtml).toContain('yv-string-removed-overlay');
+    expect(deletedHtml).toContain('>b</div>');
+
+    const insertedState = state({ lastEvent: { type: 'STEP', line: 7, data: { executionEvents: [
+      { type: 'STRING_MUTATION', data: { name: 'builder', operation: 'insert', before: 'ca', after: 'cba', index: 1, inserted: 'b', kind: 'mutation' } },
+    ] } } });
+    const insertedHtml = renderToStaticMarkup(<StringView value="cba" state={insertedState} name="builder" />);
+    expect(insertedHtml).toContain('yv-string-cell-added');
+    expect(insertedHtml).toContain('data-string-index="1"');
+  });
 
   it('renders StringBuilder snapshots as an indexed mutable character sequence', () => {
     const current = state({
