@@ -89,6 +89,19 @@ describe('string data structure visualization', () => {
     expect(html).toContain('data-string-pointer="i"');
     expect(html).not.toContain('class="yv-string-cell yv-cell-read " data-string-index="1"');
   });
+  it('keeps left and right string pointers visible on the loop-condition step', () => {
+    const source = [
+      'while (left < right) {',
+      '  if (s.charAt(left) != s.charAt(right)) return false;',
+      '}',
+    ].join('\n');
+    const current = state({ line: 1, variables: { s: 'radar', left: 0, right: 4 } });
+    const html = renderToStaticMarkup(<StringView value="radar" state={current} name="s" source={source} />);
+    expect(html).toContain('data-string-pointer="left"');
+    expect(html).toContain('data-string-pointer="right"');
+    expect(html).toContain('data-string-index="0"');
+    expect(html).toContain('data-string-index="4"');
+  });
 
   it('highlights half-open substring ranges and animates derived string results', () => {
     const rangeState = state({ lastEvent: { type: 'STEP', line: 4, data: { executionEvents: [
