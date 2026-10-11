@@ -321,6 +321,36 @@ describe('graph data structure visualization', () => {
     expect(html).toContain('start');
   });
 
+  it('highlights graph nodes entered by a pointer moving on the current trace step', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 81,
+      variables: { current: { $objectId: 'g1' } },
+      objects: {
+        g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'g2' }] } } },
+        g2: { $objectId: 'g2', $type: 'Node', fields: { val: 2, neighbors: { values: [{ $ref: 'g1' }] } } },
+      },
+    });
+    const current = state({
+      sequence: 82,
+      variables: { current: { $objectId: 'g2' } },
+      objects: {
+        g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'g2' }] } } },
+        g2: { $objectId: 'g2', $type: 'Node', fields: { val: 2, neighbors: { values: [{ $ref: 'g1' }] } } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'current = current.neighbors.get(0);', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<GraphView objects={current.objects} variables={current.variables} state={current} />);
+      expect(html).toContain('data-graph-node-id="g2" data-graph-changed=');
+      expect(html).toContain('data-graph-entered="true"');
+      expect(html).toContain('yv-graph-node-entered');
+      expect(html).not.toContain('data-graph-node-id="g1" data-graph-changed=');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
   it('handles a self-loop without duplicating the graph node', () => {
     const html = renderToStaticMarkup(<GraphView
       objects={{
