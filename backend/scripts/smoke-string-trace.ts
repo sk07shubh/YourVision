@@ -11,6 +11,7 @@ const source = [
     "  int i = 2;",
     "  char c = s.charAt(i);",
     "  String part = s.substring(1, 4);",
+    "  String suffix = s.substring(3, s.length());",
     "  String upper = s.toUpperCase();",
     "  String combined = s + c;",
     '  String appended = "a";',
@@ -43,6 +44,8 @@ assert(Boolean(range), "substring must emit STRING_RANGE_ACCESS");
 assert(range?.data?.start === 1 && range.data.end === 4, "substring range must be [1,4)");
 const results = effects.filter(event => event.type === "STRING_RESULT");
 assert(results.some(event => event.data?.resultName === "part" && event.data.after === "ana"), "substring result missing");
+assert(results.some(event => event.data?.resultName === "suffix" && event.data.after === "ana"), "substring with nested length() result missing");
+assert(effects.some(event => event.type === "STRING_RANGE_ACCESS" && event.data?.start === 3 && event.data.end === 6), "substring with nested length() range missing");
 assert(results.some(event => event.data?.resultName === "upper" && event.data.after === "BANANA"), "case-conversion result missing");
 assert(results.some(event => event.data?.resultName === "combined" && event.data.after === "bananan" && event.data.operation === "concatenate"), "string plus result missing");
 assert(results.some(event => event.data?.resultName === "appended" && event.data.after === "ab" && event.data.operation === "concatenate"), "compound string concatenation result missing");
