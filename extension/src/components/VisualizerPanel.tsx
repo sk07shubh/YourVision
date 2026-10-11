@@ -2446,10 +2446,23 @@ export function StringView({ value, state, name, source = '' }: { value: string;
     if (event.type === 'STRING_RESULT' && (matchesName(effect.resultName) || matchesName(effect.name)) &&
         typeof effect.after === 'string' && effect.after === value && typeof effect.operation === 'string') {
       transition = { operation: effect.operation, before: typeof effect.before === 'string' ? effect.before : '', after: effect.after, kind: 'result' };
+    } else if (event.type === 'STRING_RESULT' && (matchesName(effect.resultName) || matchesName(effect.name)) &&
+        typeof effect.before === 'string' && effect.before === value && typeof effect.after === 'string' && typeof effect.operation === 'string') {
+      transition = { operation: effect.operation, before: effect.after, after: effect.before, kind: 'result' };
     }
     if (event.type === 'STRING_MUTATION' && matchesName(effect.name) &&
-        typeof effect.after === 'string' && effect.after === value && typeof effect.operation === 'string') {
-      transition = { operation: effect.operation, before: typeof effect.before === 'string' ? effect.before : '', after: effect.after, kind: 'mutation', index: typeof effect.index === 'number' ? effect.index : undefined, removed: typeof effect.removed === 'string' ? effect.removed : undefined, inserted: typeof effect.inserted === 'string' ? effect.inserted : undefined };
+        typeof effect.after === 'string' && typeof effect.before === 'string' && typeof effect.operation === 'string') {
+      if (effect.after === value) {
+        transition = { operation: effect.operation, before: effect.before, after: effect.after, kind: 'mutation', index: typeof effect.index === 'number' ? effect.index : undefined, removed: typeof effect.removed === 'string' ? effect.removed : undefined, inserted: typeof effect.inserted === 'string' ? effect.inserted : undefined };
+      } else if (effect.before === value) {
+        const operation = effect.operation === 'append' || effect.operation === 'insert' ? 'delete'
+          : effect.operation === 'delete' || effect.operation === 'deleteCharAt' ? 'insert'
+          : effect.operation;
+        transition = { operation, before: effect.after, after: effect.before, kind: 'mutation',
+          index: typeof effect.index === 'number' ? effect.index : undefined,
+          removed: typeof effect.inserted === 'string' ? effect.inserted : undefined,
+          inserted: typeof effect.removed === 'string' ? effect.removed : undefined };
+      }
     }
   }
 
