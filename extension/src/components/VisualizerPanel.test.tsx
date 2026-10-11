@@ -162,7 +162,7 @@ describe('linked-list graph visualization', () => {
       }
       expect(html).toContain('data-pointer-name="head"');
       for (const name of ['prev', 'curr']) {
-        const pointerValue = snapshot.variables[name];
+        const pointerValue = snapshot.variables[name as 'prev' | 'curr'];
         if (pointerValue == null) expect(html).toContain(`${name} = null`);
         else expect(html).toContain(`data-pointer-name="${name}"`);
       }
