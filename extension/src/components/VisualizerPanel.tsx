@@ -2331,6 +2331,7 @@ export function LinkedListView({
   type ListNodeRecord = { id: string; value: unknown; fields: Obj; nextId: string | null; cycleTo: string | null };
   type ListComponent = { nodes: ListNodeRecord[]; cycleTo: string | null };
   const pointerNames = new Map<string, string[]>();
+  const maxPointerLabelCount = Math.max(0, ...Array.from(pointerNames.values(), names => names.length));
   const nullPointers: string[] = [];
   for (const [name, value] of Object.entries(variables)) {
     if (name === 'this') continue;
@@ -2582,7 +2583,7 @@ export function LinkedListView({
                 return (
                   <div className="yv-linked-piece" key={node.id} data-node-id={node.id} data-node-index={allNodes.findIndex(candidate => candidate.id === node.id)} data-next-target={node.nextId ?? 'null'} data-prev-target={prevId ?? 'null'}>
                     <div className="yv-linked-node-column">
-                      <div className="yv-linked-pointer-labels">
+                      <div className="yv-linked-pointer-labels" style={{ height: `${Math.max(22, maxPointerLabelCount * 22)}px`, minHeight: `${Math.max(22, maxPointerLabelCount * 22)}px` }}>
                         {pointerNames.get(node.id)?.map(name => <div className={`yv-node-pointer ${movedPointerNames.has(name) ? 'yv-node-pointer-moved' : ''}`} data-pointer-name={name} key={name}>{name}</div>)}
                       </div>
                       <div
