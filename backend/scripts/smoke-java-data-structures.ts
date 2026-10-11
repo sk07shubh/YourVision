@@ -23,6 +23,10 @@ class Solution {
         linkedMap.put(5, 50);
         linkedMap.put(1, 10);
         linkedMap.put(3, 30);
+        TreeMap<Integer, Integer> treeMap = new TreeMap<>();
+        treeMap.put(5, 50);
+        treeMap.put(1, 10);
+        treeMap.put(3, 30);
         HashSet<Integer> set = new HashSet<>();
         set.add(10);
         TreeSet<Integer> sortedSet = new TreeSet<>();
@@ -172,13 +176,14 @@ assert(!("nums" in variables), "array leaked into Variables");
 assert(!("map" in variables), "map leaked into Variables");
 assert("nums" in arrays, "array missing from Data Structures");
 
-for (const name of ["map","linkedMap","set","sortedSet","insertionOrderedSet","stack","queue","priorityQueue","list"]) {
+for (const name of ["map","linkedMap","treeMap","set","sortedSet","insertionOrderedSet","stack","queue","priorityQueue","list"]) {
     assert(name in structures, name + " missing from Data Structures");
 }
 
 const nums = arrays.nums as Record<string, unknown>;
 const map = structures.map as Record<string, unknown>;
 const linkedMap = structures.linkedMap as Record<string, any>;
+const treeMap = structures.treeMap as Record<string, any>;
 const set = structures.set as Record<string, unknown>;
 const sortedSet = structures.sortedSet as Record<string, unknown>;
 const insertionOrderedSet = structures.insertionOrderedSet as Record<string, unknown>;
@@ -190,6 +195,7 @@ const list = structures.list as Record<string, unknown>;
 assert(JSON.stringify(nums.values) === "[99,7,11]", "array values incorrect");
 assert(Array.isArray(map.entries) && (map.entries as unknown[]).length === 2, "map entries incorrect");
 assert(JSON.stringify(linkedMap.entries.map((entry: any) => entry.key)) === "[5,1,3]", "LinkedHashMap insertion order was not preserved");
+assert(JSON.stringify(treeMap.entries.map((entry: any) => entry.key)) === "[1,3,5]", "TreeMap comparator order was not preserved");
 assert(JSON.stringify(set.values) === "[10,11]", "set values incorrect");
 assert(sortedSet.$kind === "sortedSet", "TreeSet ordering kind is incorrect");
 assert(JSON.stringify(sortedSet.values) === "[3,7,11]", "TreeSet comparator order was not preserved");
