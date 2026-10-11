@@ -342,10 +342,10 @@ describe('graph data structure visualization', () => {
     try {
       sessionStore.set({ source: 'current = current.neighbors.get(0);', states: [previous, current], index: 1 });
       const html = renderToStaticMarkup(<GraphView objects={current.objects} variables={current.variables} state={current} />);
-      expect(html).toContain('data-graph-node-id="g2" data-graph-changed=');
+      expect(html).toContain('data-graph-node-id="g2" data-graph-entered="true"');
       expect(html).toContain('data-graph-entered="true"');
       expect(html).toContain('yv-graph-node-entered');
-      expect(html).not.toContain('data-graph-node-id="g1" data-graph-changed=');
+      expect(html).not.toContain('data-graph-node-id="g1" data-graph-entered="true"');
     } finally {
       sessionStore.set(priorSession);
     }
