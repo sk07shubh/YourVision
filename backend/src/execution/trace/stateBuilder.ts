@@ -341,20 +341,36 @@ function collectSnapshots(
     const record =
         value as Record<string, unknown>;
 
-    // A structural reference points back to an already-snapshotted array,
-    // map, or collection. Do not recursively walk it again: JSON decoding
-    // materializes each $ref as a fresh object, so identity-based cycle guards
-    // cannot catch this case.
-    if (
-        typeof record.$ref === "string" &&
-        (
-            typeof record.$objectId === "string" ||
-            typeof record.$arrayId === "string" ||
-            typeof record.$mapId === "string" ||
-            typeof record.$collectionId === "string"
-        )
-    ) {
-        return;
+    // A $ref is only safe to skip when its target has already been
+    // materialized in this snapshot. In linked structures, the first path to
+    // a node may itself be encoded as a reference; skipping it unconditionally
+    // drops that node (and its descendants) until another variable points to
+    // it later. This is why linked-list values appeared as '?' and nodes
+    // arrived several execution steps late.
+    if (typeof record.$ref === "string") {
+        const objectId = typeof record.$objectId === "string"
+            ? record.$objectId
+            : undefined;
+        const hasObjectSnapshot = objectId !== undefined &&
+            Object.prototype.hasOwnProperty.call(objects, objectId);
+        const hasStructuralSnapshot =
+            (typeof record.$arrayId === "string" && Object.prototype.hasOwnProperty.call(arrays, record.$arrayId)) ||
+            (typeof record.$mapId === "string" && Object.values(dataStructures).some(
+                item => !!item && typeof item === "object" &&
+                    (item as Record<string, unknown>).$mapId === record.$mapId
+            )) ||
+            (typeof record.$collectionId === "string" && Object.values(dataStructures).some(
+                item => !!item && typeof item === "object" &&
+                    (item as Record<string, unknown>).$collectionId === record.$collectionId
+            ));
+        if (hasObjectSnapshot || hasStructuralSnapshot) return;
+
+        // Some reference records are intentionally just IDs. There is no
+        // field data to register, so leave them unresolved until a full
+        // snapshot is available rather than creating a fake empty object.
+        if (!record.fields || typeof record.fields !== "object" || Array.isArray(record.fields)) {
+            return;
+        }
     }
 
     if (
