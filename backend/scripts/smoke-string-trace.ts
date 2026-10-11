@@ -31,6 +31,10 @@ const source = [
     "  int length = s.length();",
     "  boolean empty = s.isEmpty();",
     "  boolean blank = s.isBlank();",
+    '  String emptyText = ""; ',
+    "  boolean reallyEmpty = emptyText.isEmpty();",
+    '  String whitespace = "  "; ',
+    "  boolean whitespaceOnly = whitespace.isBlank();",
     "  int comparison = s.compareTo(\"banana\");",
     "  StringBuilder builder = new StringBuilder(\"abc\");",
     "  builder.reverse();",
@@ -79,6 +83,8 @@ const search = effects.find(event => event.type === "STRING_SEARCH_RESULT" && ev
 assert(search?.data?.matched === true && search.data.query === "ana", "contains must expose the confirmed match");
 assert(effects.some(event => event.type === "STRING_SEARCH_RESULT" && event.data?.operation === "length" && event.data.result === 6), "length must emit metadata without a character access");
 assert(effects.some(event => event.type === "STRING_SEARCH_RESULT" && event.data?.operation === "isBlank" && event.data.result === false), "isBlank must emit its boolean result");
+assert(effects.some(event => event.type === "STRING_SEARCH_RESULT" && event.data?.name === "emptyText" && event.data.operation === "isEmpty" && event.data.result === true), "empty string isEmpty result missing");
+assert(effects.some(event => event.type === "STRING_SEARCH_RESULT" && event.data?.name === "whitespace" && event.data.operation === "isBlank" && event.data.result === true), "whitespace-only isBlank result missing");
 assert(effects.some(event => event.type === "STRING_SEARCH_RESULT" && event.data?.operation === "compareTo" && event.data.result === 0), "compareTo must emit its comparison result");
 assert(effects.some(event => event.type === "STRING_SEARCH_RESULT" && event.data?.operation === "equals" && event.data.result === true), "equals must emit its result");
 assert(effects.some(event => event.type === "STRING_SEARCH_RESULT" && event.data?.operation === "equalsIgnoreCase" && event.data.result === true), "equalsIgnoreCase must emit its result");
