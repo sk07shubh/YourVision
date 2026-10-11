@@ -1083,8 +1083,16 @@ public class YourVisionTracer {
                 object.referenceType().name()
             );
 
+            // Linked-list nodes are a special case: a function argument or
+            // return value may be the only root reference to the entire chain.
+            // Applying the generic object-depth limit here truncates long lists
+            // into unresolved $ref markers (often displaying '?' for tail nodes).
+            // Keep following next links until null or a repeated object identity;
+            // retain the normal depth limit for all other object graphs.
+            boolean linkedListNode = isLinkedListNode(object);
+
             if (
-                depth >= MAX_OBJECT_DEPTH ||
+                (depth >= MAX_OBJECT_DEPTH && !linkedListNode) ||
                 !activeObjects.add(id)
             ) {
                 result.put(
@@ -1152,6 +1160,40 @@ public class YourVisionTracer {
         }
 
         return String.valueOf(value);
+    }
+
+    private static boolean isLinkedListNode(
+        ObjectReference object
+    ) {
+        boolean hasNext = false;
+        boolean hasPayload = false;
+
+        try {
+            for (Field field : object.referenceType().allFields()) {
+                if (field.isStatic()) {
+                    continue;
+                }
+
+                String name = field.name();
+                if (name.equals("next")) {
+                    hasNext = true;
+                } else if (
+                    name.equals("val") ||
+                    name.equals("value") ||
+                    name.equals("data")
+                ) {
+                    hasPayload = true;
+                }
+
+                if (hasNext && hasPayload) {
+                    return true;
+                }
+            }
+        } catch (Exception ignored) {
+            // Fall back to the generic depth guard if JDI cannot inspect fields.
+        }
+
+        return false;
     }
 
     private static Object snapshotBoxedPrimitive(
