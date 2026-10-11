@@ -20,6 +20,7 @@ import {
   Variables,
   ArrayView,
   DataStructures,
+  LinkedListView,
   StringView,
 } from './VisualizerPanel';
 
@@ -40,6 +41,150 @@ function markup(nodes: ReactNode[]): string {
   return renderToStaticMarkup(<>{nodes}</>);
 }
 
+
+
+describe('linked-list graph visualization', () => {
+  it('preserves node identity, aliases, and explicit null termination', () => {
+    const current = state({
+      variables: { head: { $objectId: 'n1' }, curr: { $objectId: 'n2' }, prev: null },
+      objects: {
+        n1: { $objectId: 'n1', $type: 'ListNode', fields: { val: 10, next: { $ref: 'n2' } } },
+        n2: { $objectId: 'n2', $type: 'ListNode', fields: { val: 20, next: null } },
+      },
+    });
+    const html = renderToStaticMarkup(<LinkedListView root={{ $objectId: 'n1' }} objects={current.objects} variables={current.variables} />);
+    expect(html).toContain('data-node-id="n1"');
+    expect(html).toContain('data-node-id="n2"');
+    expect(html).toContain('data-edge-kind="next"');
+    expect(html).toContain('data-edge-kind="null"');
+    expect(html).toContain('data-pointer-name="head"');
+    expect(html).toContain('data-pointer-name="curr"');
+    expect(html).toContain('prev = null');
+    expect(html).toContain('data-next-target="n2"');
+    expect(html).toContain('class="yv-node yv-linked-node');
+    expect(html).toContain('class="yv-linked-node-next"');
+    expect(html).toContain('class="yv-linked-next-port"');
+    expect(html).toContain('data-edge-kind="next"');
+    expect(html).not.toContain('>→</div>');
+  });
+
+  it('groups all runtime ListNode objects into one graph instead of duplicate per-node lists', () => {
+    const current = state({
+      variables: { head: { $objectId: 'n1' }, curr: { $objectId: 'n2' } },
+      objects: {
+        n1: { $objectId: 'n1', $type: 'ListNode', fields: { val: 10, next: { $ref: 'n2' } } },
+        n2: { $objectId: 'n2', $type: 'ListNode', fields: { val: 20, next: null } },
+      },
+    });
+    const html = renderToStaticMarkup(<DataStructures state={current} source="curr = curr.next;" />);
+    expect(html).toContain('Linked List → head / curr');
+    expect((html.match(/data-node-id="n1"/g) ?? []).length).toBe(1);
+    expect((html.match(/data-node-id="n2"/g) ?? []).length).toBe(1);
+  });
+
+  it('keeps disconnected chains visible after a pointer rewrite disconnects them from head', () => {
+    const current = state({
+      variables: { head: { $objectId: 'n1' }, prev: { $objectId: 'n2' } },
+      objects: {
+        n1: { $objectId: 'n1', $type: 'ListNode', fields: { val: 10, next: null } },
+        n2: { $objectId: 'n2', $type: 'ListNode', fields: { val: 20, next: { $ref: 'n3' } } },
+        n3: { $objectId: 'n3', $type: 'ListNode', fields: { val: 30, next: null } },
+      },
+    });
+    const html = renderToStaticMarkup(<LinkedListView root={{ $objectId: 'n1' }} objects={current.objects} variables={current.variables} />);
+    expect(html).toContain('data-linked-component="0"');
+    expect(html).toContain('data-linked-component="1"');
+    expect(html).toContain('data-node-id="n1"');
+    expect(html).toContain('data-node-id="n2"');
+    expect(html).toContain('data-node-id="n3"');
+    expect(html).toContain('data-edge-kind="null"');
+  });
+
+  it('renders a cycle as a reference back to an existing node instead of a fake node', () => {
+    const current = state({
+      variables: { head: { $objectId: 'n1' } },
+      objects: {
+        n1: { $objectId: 'n1', $type: 'ListNode', fields: { val: 1, next: { $ref: 'n2' } } },
+        n2: { $objectId: 'n2', $type: 'ListNode', fields: { val: 2, next: { $ref: 'n1' } } },
+      },
+    });
+    const html = renderToStaticMarkup(<LinkedListView root={{ $objectId: 'n1' }} objects={current.objects} variables={current.variables} />);
+    expect(html).toContain('data-edge-kind="cycle"');
+    expect(html).toContain('data-edge-to="n1"');
+    expect(html).not.toContain('data-node-id="cycle"');
+    expect((html.match(/class="yv-node-value"/g) ?? []).length).toBeGreaterThanOrEqual(2);
+  });
+
+
+  it('renders each linked-list reversal checkpoint from the actual next references', () => {
+    const snapshots = [
+      {
+        label: 'initial',
+        root: 'n1',
+        variables: { head: { $objectId: 'n1' }, prev: null, curr: { $objectId: 'n1' }, nextTemp: null },
+        next: { n1: 'n2', n2: 'n3', n3: null },
+      },
+      {
+        label: 'first link reversed',
+        root: 'n1',
+        variables: { head: { $objectId: 'n1' }, prev: { $objectId: 'n1' }, curr: { $objectId: 'n2' }, nextTemp: { $objectId: 'n2' } },
+        next: { n1: null, n2: 'n3', n3: null },
+      },
+      {
+        label: 'second link reversed',
+        root: 'n1',
+        variables: { head: { $objectId: 'n1' }, prev: { $objectId: 'n2' }, curr: { $objectId: 'n3' }, nextTemp: { $objectId: 'n3' } },
+        next: { n1: null, n2: 'n1', n3: null },
+      },
+      {
+        label: 'reversed chain completed',
+        root: 'n3',
+        variables: { head: { $objectId: 'n3' }, prev: { $objectId: 'n3' }, curr: null, nextTemp: null },
+        next: { n1: null, n2: 'n1', n3: 'n2' },
+      },
+    ] as const;
+
+    for (const snapshot of snapshots) {
+      const objects = Object.fromEntries(Object.entries(snapshot.next).map(([id, next]) => [
+        id,
+        { $objectId: id, $type: 'ListNode', fields: { val: Number(id.slice(1)), next: next ? { $ref: next } : null } },
+      ]));
+      const html = renderToStaticMarkup(
+        <LinkedListView root={{ $objectId: snapshot.root }} objects={objects} variables={snapshot.variables} />,
+      );
+
+      // The graph must keep every allocated node visible, including the old
+      // head after it becomes detached from the new head during reversal.
+      for (const id of ['n1', 'n2', 'n3']) expect(html).toContain(`data-node-id="${id}"`);
+      for (const [from, to] of Object.entries(snapshot.next)) {
+        expect(html).toContain(`data-node-id="${from}"`);
+        if (to) {
+          expect(html).toContain(`data-next-target="${to}"`);
+          expect(html).toContain(`data-edge-to="${to}"`);
+        } else {
+          expect(html).toContain(`data-next-target="null"`);
+        }
+      }
+      expect(html).toContain('data-pointer-name="head"');
+      for (const name of ['prev', 'curr']) {
+        const pointerValue = snapshot.variables[name as 'prev' | 'curr'];
+        if (pointerValue == null) expect(html).toContain(`${name} = null`);
+        else expect(html).toContain(`data-pointer-name="${name}"`);
+      }
+    }
+  });
+
+  it('shows an empty list for a null head without inventing a node', () => {
+    const current = state({
+      variables: { head: null },
+      objects: {},
+    });
+    const html = renderToStaticMarkup(<LinkedListView root={null} objects={current.objects} variables={current.variables} />);
+    expect(html).toContain('empty list');
+    expect(html).toContain('head = null');
+    expect(html).not.toContain('data-node-id=');
+  });
+});
 
 describe('string data structure visualization', () => {
   it('keeps strings in Variables and also renders them as indexed character cells', () => {

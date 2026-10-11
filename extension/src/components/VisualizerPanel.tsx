@@ -7,6 +7,13 @@ import type { TraceState } from '../types/trace';
 
 type Obj = Record<string, unknown>;
 
+const LINK_PALETTE = ['#60a5fa', '#34d399', '#fbbf24', '#c084fc', '#fb7185', '#22d3ee', '#a3e635', '#f97316'];
+function linkedConnectionColor(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i += 1) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return LINK_PALETTE[hash % LINK_PALETTE.length]!;
+}
+
 function eventLabel(state?: TraceState): string {
   const t = state?.lastEvent?.type;
   if (!t) return state ? 'Execution state' : 'Ready';
@@ -94,9 +101,10 @@ export function eventEffects(state?: TraceState): ExecutionEffect[] {
       for (const change of changes.slice(0, 3)) {
         if (!isPlainObject(change)) continue;
         const fields = Array.isArray(change.fields) ? change.fields.join('.') : 'field';
+        const objectName = typeof eventData.name === 'string' ? eventData.name : 'object';
         effects.push({
           kind: 'change',
-          text: fields + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
+          text: objectName + '.' + fields + '  ' + variableSummary(change.before) + '  →  ' + variableSummary(change.after)
         });
       }
     } else if (eventType === 'STRING_ACCESS') {
@@ -208,7 +216,9 @@ export function eventEffects(state?: TraceState): ExecutionEffect[] {
   }
 
   if ('returnValue' in data) {
-    effects.push({ kind: 'return', text: '↩  ' + compactValue(data.returnValue) });
+    // Use the semantic summary for object returns so linked-list nodes render
+    // as a stable node identity/value instead of leaking serialized snapshots.
+    effects.push({ kind: 'return', text: '↩  ' + variableSummary(data.returnValue) });
   }
 
   return effects;
@@ -350,6 +360,39 @@ function debugValue(value: unknown): string {
   try { return JSON.stringify(value, null, 2); } catch { return String(value); }
 }
 
+function buildExecutionPanelTrace(states: TraceState[], source: string): string {
+  const lines = source.split(/\r?\n/);
+  return states.map((state, index) => {
+    const previous = index > 0 ? states[index - 1] : undefined;
+    const lineNumber = state.line ?? 0;
+    const statement = lineNumber > 0 ? (lines[lineNumber - 1] ?? '').trim() : '';
+    const data = isPlainObject(state.lastEvent?.data) ? state.lastEvent.data : {};
+    const condition = typeof data.conditionResult === 'boolean'
+      ? (data.conditionResult ? 'TRUE' : 'FALSE')
+      : '—';
+    const before = previous?.variables ?? {};
+    const after = state.variables ?? {};
+    const changedVariables = Object.entries(after)
+      .filter(([name, value]) => name !== 'this' && (!Object.prototype.hasOwnProperty.call(before, name) || stableStringify(before[name]) !== stableStringify(value)))
+      .map(([name, value]) => name + ': ' + (Object.prototype.hasOwnProperty.call(before, name) ? debugValue(before[name]) + ' → ' : '') + debugValue(value));
+    const events = Array.isArray(data.executionEvents) ? data.executionEvents : [];
+    const eventEffects = events.map((event: any) => {
+      const eventData = isPlainObject(event?.data) ? event.data : {};
+      return (event?.type ?? 'EVENT') + (Object.keys(eventData).length ? ': ' + debugValue(eventData) : '');
+    });
+    return [
+      'STEP ' + (index + 1) + ' / ' + states.length,
+      'EXECUTED LINE ' + lineNumber + ': ' + statement,
+      'CONDITION RESULT: ' + condition,
+      'VARIABLE / STATE CHANGES:',
+      ...(changedVariables.length ? changedVariables : ['—']),
+      'TRACE EVENTS:',
+      ...(eventEffects.length ? eventEffects : ['—']),
+      ''
+    ].join('\n');
+  }).join('\n' + '-'.repeat(72) + '\n');
+}
+
 function buildDebugTrace(states: TraceState[], source: string): string {
   const lines = source.split(/\r?\n/);
   return states.map((state, index) => {
@@ -418,7 +461,19 @@ function variableResultChanges(current?: TraceState, previous?: TraceState): Rea
   const before = previous?.variables ?? {};
   const results = Object.entries(current.variables ?? {})
     .filter(([, value]) => !isStructuralValue(value))
-    .filter(([name, value]) => name !== 'this' && (!(name in before) || valueChanged(before[name], value)))
+    .filter(([name, value]) => {
+      if (name === 'this') return false;
+      const oldValue = before[name];
+      if (!(name in before)) return true;
+      const oldId = isPlainObject(oldValue) && looksListNode(oldValue)
+        ? (typeof oldValue.$objectId === 'string' ? oldValue.$objectId : oldValue.$ref)
+        : undefined;
+      const newId = isPlainObject(value) && looksListNode(value)
+        ? (typeof value.$objectId === 'string' ? value.$objectId : value.$ref)
+        : undefined;
+      if (oldId !== undefined && newId !== undefined && oldId === newId) return false;
+      return valueChanged(oldValue, value);
+    })
     .map(([name, value]) => (
       <VariableResult key={name} name={name} oldValue={before[name]} value={value} initialized={!(name in before)} />
     ));
@@ -950,6 +1005,30 @@ function ExecutionInspector({ state, previous, statement, index, total }: { stat
         >
           Copy DS Debug Trace
         </button>
+        <button
+          className="yv-btn"
+          type="button"
+          tabIndex={-1}
+          onMouseDown={e => e.preventDefault()}
+          onClick={async () => {
+            const current = sessionStore.get();
+            const trace = buildExecutionPanelTrace(current.states, current.source);
+            try {
+              await navigator.clipboard.writeText(trace);
+            } catch {
+              const textarea = document.createElement('textarea');
+              textarea.value = trace;
+              textarea.style.position = 'fixed';
+              textarea.style.opacity = '0';
+              document.body.appendChild(textarea);
+              textarea.select();
+              document.execCommand('copy');
+              textarea.remove();
+            }
+          }}
+        >
+          Copy Execution Trace
+        </button>
       </div>
 
       <div className="yv-execution-code">{substatement || 'Select a testcase and press Visualize.'}</div>
@@ -1204,6 +1283,14 @@ function CollectionView({
 }
 
 function variableSummary(value: unknown): string {
+  if (isPlainObject(value) && looksListNode(value)) {
+    const id = typeof value.$objectId === 'string' ? value.$objectId
+      : typeof value.$ref === 'string' ? value.$ref : undefined;
+    const fields = objectFields(value);
+    const nodeValue = fields.val ?? fields.value ?? fields.data;
+    const shortId = id ? (id.length > 8 ? id.slice(-6) : id) : '?';
+    return 'node #' + shortId + (nodeValue !== undefined ? ' (val=' + compactValue(nodeValue) + ')' : '');
+  }
   if (isArraySnapshot(value)) {
     const type =
       typeof value.$type === 'string'
@@ -2312,41 +2399,346 @@ function resolveRef(value: unknown, objects: Record<string,unknown>): unknown {
 }
 function nodeValue(value: Obj): unknown { const f=objectFields(value); return f.val ?? f.value ?? f.data ?? '?'; }
 
-function LinkedListView({
+export function LinkedListView({
   root,
   objects,
   variables = {}
 }: {
-  root: Obj;
+  root: unknown;
   objects: Record<string, unknown>;
   variables?: Record<string, unknown>;
 }) {
+  type ListNodeRecord = { id: string; value: unknown; fields: Obj; nextId: string | null; cycleTo: string | null };
+  type ListComponent = { nodes: ListNodeRecord[]; cycleTo: string | null };
   const pointerNames = new Map<string, string[]>();
+  const nullPointers: string[] = [];
   for (const [name, value] of Object.entries(variables)) {
     if (name === 'this') continue;
-    if (isPlainObject(value) && typeof value.$objectId === 'string') {
-      const names = pointerNames.get(value.$objectId) ?? [];
+    if (isPlainObject(value) && (typeof value.$objectId === 'string' || typeof value.$ref === 'string')) {
+      const id = String(value.$objectId ?? value.$ref);
+      const names = pointerNames.get(id) ?? [];
       names.push(name);
-      pointerNames.set(value.$objectId, names);
+      pointerNames.set(id, names);
+    } else if (value == null) {
+      nullPointers.push(name);
+    }
+  }
+  const maxPointerLabelCount = Math.max(0, ...Array.from(pointerNames.values(), names => names.length));
+
+  const records = new Map<string, ListNodeRecord>();
+  for (const [key, raw] of Object.entries(objects)) {
+    const value = resolveRef(raw, objects);
+    if (!isPlainObject(value) || !looksListNode(value)) continue;
+    const id = String(value.$objectId ?? key);
+    const fields = objectFields(value);
+    const next = fields.next;
+    const resolvedNext = next == null ? null : resolveRef(next, objects);
+    const nextId = isPlainObject(resolvedNext) ? String(resolvedNext.$objectId ?? resolvedNext.$ref ?? '') || null : null;
+    records.set(id, { id, value: nodeValue(value), fields, nextId, cycleTo: null });
+  }
+  const resolvedRoot = resolveRef(root, objects);
+  if (isPlainObject(resolvedRoot) && looksListNode(resolvedRoot)) {
+    const id = String(resolvedRoot.$objectId ?? 'root');
+    if (!records.has(id)) {
+      const fields = objectFields(resolvedRoot);
+      const next = fields.next;
+      const resolvedNext = next == null ? null : resolveRef(next, objects);
+      records.set(id, {
+        id, value: nodeValue(resolvedRoot), fields,
+        nextId: isPlainObject(resolvedNext) ? String(resolvedNext.$objectId ?? resolvedNext.$ref ?? '') || null : null,
+        cycleTo: null
+      });
     }
   }
 
-  const nodes: Array<{id:string;value:unknown}> = []; const seen=new Set<string>(); let cur: unknown=root;
-  for(let guard=0;guard<40;guard++){
-    cur=resolveRef(cur,objects); if(!isPlainObject(cur))break;
-    const id=String(cur.$objectId ?? `node-${guard}`); if(seen.has(id)){nodes.push({id:'cycle',value:'↻'});break;} seen.add(id);
-    nodes.push({id,value:nodeValue(cur)}); const f=objectFields(cur); if(f.next==null)break; cur=f.next;
+  // Include nodes referenced by fields even when a trace snapshot has not
+  // materialized them in the top-level objects table yet.
+  const pending: unknown[] = [
+    resolvedRoot,
+    ...[...records.values()].flatMap(node => [node.fields.next, node.fields.prev]),
+  ];
+  const expanded = new Set<string>();
+  for (let guard = 0; pending.length > 0 && guard < 300; guard++) {
+    const candidate = resolveRef(pending.shift(), objects);
+    if (!isPlainObject(candidate) || !looksListNode(candidate)) continue;
+    const id = String(candidate.$objectId ?? '');
+    if (!id || expanded.has(id)) continue;
+    expanded.add(id);
+    const fields = objectFields(candidate);
+    if (!records.has(id)) {
+      const next = fields.next;
+      const resolvedNext = next == null ? null : resolveRef(next, objects);
+      const nextId = isPlainObject(resolvedNext) ? String(resolvedNext.$objectId ?? resolvedNext.$ref ?? '') || null : null;
+      records.set(id, { id, value: nodeValue(candidate), fields, nextId, cycleTo: null });
+    }
+    if (fields.next != null) pending.push(fields.next);
+    if (fields.prev != null) pending.push(fields.prev);
   }
-  return <div className="yv-linked">{nodes.map((n,i)=><div className="yv-linked-piece" key={`${n.id}-${i}`}>
-    {pointerNames.get(n.id)?.map(name => <div className="yv-node-pointer" key={name}>{name}</div>)}
-    <div className="yv-node">{displayValue(n.value)}</div>{i<nodes.length-1&&<div className="yv-edge">→</div>}
-  </div>)}</div>;
+
+  const startIds: string[] = [];
+  // Lay out the actual next-chain from its structural head (a node that is
+  // not targeted by another node's next field). Variable aliases such as
+  // "head" can still point at the old first node after reversal; prioritizing
+  // aliases splits the reversed chain into an isolated component.
+  const targetedIds = new Set<string>();
+  for (const node of records.values()) if (node.nextId && records.has(node.nextId)) targetedIds.add(node.nextId);
+  for (const id of records.keys()) if (!targetedIds.has(id)) startIds.push(id);
+  if (isPlainObject(resolvedRoot) && looksListNode(resolvedRoot)) {
+    const id = String(resolvedRoot.$objectId ?? 'root');
+    if (!startIds.includes(id)) startIds.push(id);
+  }
+  for (const value of Object.values(variables)) {
+    if (!isPlainObject(value)) continue;
+    const id = typeof value.$objectId === 'string' ? value.$objectId : typeof value.$ref === 'string' ? value.$ref : null;
+    if (id && records.has(id) && !startIds.includes(id)) startIds.push(id);
+  }
+  for (const id of records.keys()) if (!startIds.includes(id)) startIds.push(id);
+
+  const visited = new Set<string>();
+  const components: ListComponent[] = [];
+  for (const startId of startIds) {
+    if (visited.has(startId)) continue;
+    const componentNodes: ListNodeRecord[] = [];
+    const local = new Map<string, number>();
+    let currentId: string | null = startId;
+    let cycleTo: string | null = null;
+    for (let guard = 0; currentId && guard < 100; guard++) {
+      if (local.has(currentId)) {
+        cycleTo = currentId;
+        break;
+      }
+      if (visited.has(currentId)) break;
+      const node = records.get(currentId);
+      if (!node) break;
+      local.set(currentId, componentNodes.length);
+      visited.add(currentId);
+      componentNodes.push(node);
+      currentId = node.nextId;
+    }
+    if (componentNodes.length) {
+      if (cycleTo) componentNodes[componentNodes.length - 1].cycleTo = cycleTo;
+      components.push({ nodes: componentNodes, cycleTo });
+    }
+  }
+
+  const allNodes = components.flatMap(component => component.nodes);
+  const edgeSnapshot = new Map(allNodes.map(node => [node.id, node.nextId] as const));
+  const pointerSnapshot = new Map<string, string>();
+  for (const [nodeId, names] of pointerNames) for (const name of names) pointerSnapshot.set(name, nodeId);
+  const edgeSignature = [...edgeSnapshot.entries()].map(([id, target]) => `${id}:${target ?? 'null'}`).join('|');
+  const pointerSignature = [...pointerSnapshot.entries()].map(([name, id]) => `${name}:${id}`).join('|');
+  const graphRef = useRef<HTMLDivElement | null>(null);
+  const [connectionPaths, setConnectionPaths] = useState<Array<{ key: string; d: string; kind: 'prev' | 'cross-next' | 'null-next' | 'cycle'; from: string; to: string }>>([]);
+  const previousEdges = useRef<Map<string, string | null>>(new Map());
+  const previousPointers = useRef<Map<string, string>>(new Map());
+  const changedEdgeIds = new Set<string>();
+  for (const [id, target] of edgeSnapshot) {
+    if (previousEdges.current.has(id) && previousEdges.current.get(id) !== target) changedEdgeIds.add(id);
+  }
+  const movedPointerNames = new Set<string>();
+  for (const [name, nodeId] of pointerSnapshot) {
+    const previousNode = previousPointers.current.get(name);
+    if (previousNode && previousNode !== nodeId) movedPointerNames.add(name);
+  }
+  useEffect(() => {
+    previousEdges.current = new Map(edgeSnapshot);
+    previousPointers.current = new Map(pointerSnapshot);
+  }, [edgeSignature, pointerSignature]);
+  useLayoutEffect(() => {
+    const graph = graphRef.current;
+    if (!graph) return;
+    const measure = () => {
+      const graphRect = graph.getBoundingClientRect();
+      const nodes = new Map<string, DOMRect>();
+      graph.querySelectorAll<HTMLElement>('[data-linked-node-value]').forEach(element => {
+        const id = element.dataset.linkedNodeValue;
+        if (id) nodes.set(id, element.getBoundingClientRect());
+      });
+      graph.querySelectorAll<HTMLElement>('[data-linked-null-target]').forEach(element => {
+        const id = element.dataset.linkedNullTarget;
+        if (id) nodes.set('null:' + id, element.getBoundingClientRect());
+      });
+      const nextPaths: Array<{ key: string; d: string; kind: 'prev' | 'cross-next' | 'null-next' | 'cycle'; from: string; to: string }> = [];
+      const addPath = (from: string, to: string, kind: 'prev' | 'cross-next' | 'null-next' | 'cycle') => {
+        const a = nodes.get(from), b = nodes.get(to);
+        if (!a || !b) return;
+        const sourcePort = graph.querySelector<HTMLElement>(`[data-linked-node-value="${CSS.escape(from)}"] .yv-linked-next-port`);
+        const sourceRect = sourcePort?.getBoundingClientRect() ?? a;
+        // Next links begin at the outer edge of the source dot, so the stroke
+        // visibly touches the dot instead of passing underneath its fill.
+        const ax = (kind === 'prev' ? a.left : sourceRect.right) - graphRect.left + graph.scrollLeft;
+        const ay = (kind === 'prev' ? a.top + a.height / 2 : sourceRect.top + sourceRect.height / 2) - graphRect.top + graph.scrollTop;
+        const bx = (kind === 'cycle' ? b.right : b.left) - graphRect.left + graph.scrollLeft;
+        const by = b.top + b.height / 2 - graphRect.top + graph.scrollTop;
+        let d: string;
+        if (kind === 'cycle') {
+          // Keep cycle back-edges distinct by routing them above the chain.
+          const lift = Math.max(34, Math.min(90, Math.abs(ax - bx) * 0.28 + 24));
+          const top = Math.max(4, Math.min(ay, by) - lift);
+          d = `M ${ax} ${ay} C ${ax + 22} ${top}, ${bx + 22} ${top}, ${bx} ${by}`;
+        } else if (kind === 'null-next') {
+          // Connect the source port to the exact vertical center of the null box,
+          // matching how links meet the centerline of other node targets.
+          d = `M ${ax} ${ay} L ${bx} ${by}`;
+        } else if (kind === 'cross-next' && bx > ax && Math.abs(by - ay) <= 10) {
+          // Side-by-side nodes on the same row get a genuinely straight link.
+          d = `M ${ax} ${ay} L ${bx} ${by}`;
+        } else if (kind === 'cross-next' && by < ay) {
+          // Route cross-row links around the other nodes.
+          const midX = ax + (bx - ax) * 0.5;
+          const midY = ay + (by - ay) * 0.5;
+          d = `M ${ax} ${ay} H ${midX} L ${midX} ${midY} L ${bx - 12} ${by} H ${bx}`;
+        } else {
+          const lift = Math.max(28, Math.min(72, Math.abs(bx - ax) * 0.22));
+          const direction = kind === 'prev' ? -1 : 1;
+          const controlY = Math.min(ay, by) - lift;
+          d = `M ${ax} ${ay} C ${ax + direction * lift} ${controlY}, ${bx - direction * lift} ${controlY}, ${bx} ${by}`;
+        }
+        nextPaths.push({ key: `${kind}:${from}:${to}`, d, kind, from, to });
+      };
+      for (const node of allNodes) {
+        // Every next link is drawn from the actual pointer dot to the next
+        // node's left outline, including ordinary adjacent nodes in a chain.
+        if (node.nextId && nodes.has(node.nextId)) {
+          addPath(node.id, node.nextId, 'cross-next');
+        } else if (node.nextId == null && node.fields.next == null && nodes.has('null:' + node.id)) {
+          addPath(node.id, 'null:' + node.id, 'null-next');
+        }
+        const prev = resolveRef(node.fields.prev, objects);
+        const prevId = isPlainObject(prev) ? String(prev.$objectId ?? prev.$ref ?? '') : '';
+        if (prevId && nodes.has(prevId)) addPath(node.id, prevId, 'prev');
+      }
+      for (const component of components) {
+        if (component.cycleTo && component.nodes.length) {
+          addPath(component.nodes[component.nodes.length - 1]!.id, component.cycleTo, 'cycle');
+        }
+      }
+      setConnectionPaths(previous => {
+        if (previous.length === nextPaths.length && previous.every((path, i) => path.key === nextPaths[i]?.key && path.d === nextPaths[i]?.d)) return previous;
+        return nextPaths;
+      });
+    };
+    measure();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    observer?.observe(graph);
+    graph.querySelectorAll<HTMLElement>('[data-linked-node-value]').forEach(node => observer?.observe(node));
+    graph.addEventListener('scroll', measure, { passive: true });
+    return () => {
+      observer?.disconnect();
+      graph.removeEventListener('scroll', measure);
+    };
+  }, [edgeSignature, pointerSignature, objects, components]);
+  const idLabel = (id: string | null) => {
+    if (id == null) return 'null';
+    const node = allNodes.find(candidate => candidate.id === id);
+    return node ? `#${node.id.length > 8 ? node.id.slice(-6) : node.id}` : 'external node';
+  };
+
+  return (
+    <div ref={graphRef} className="yv-linked-graph" data-linked-list-root={isPlainObject(resolvedRoot) ? String(resolvedRoot.$objectId ?? 'root') : 'null'}>
+      {connectionPaths.length > 0 && (
+        <svg className="yv-linked-connections" aria-hidden="true" width={Math.max(graphRef.current?.scrollWidth ?? 0, graphRef.current?.clientWidth ?? 0)} height={Math.max(graphRef.current?.scrollHeight ?? 0, graphRef.current?.clientHeight ?? 0)}>
+          {connectionPaths.map(path => (
+            <path
+              key={path.key}
+              className={`yv-linked-connection yv-linked-connection-${path.kind}`}
+              d={path.d}
+              data-connection-from={path.from}
+              data-connection-to={path.to}
+              style={path.kind === 'cross-next' ? { stroke: linkedConnectionColor(path.from) } : path.kind === 'null-next' ? { stroke: '#fff' } : undefined}
+            />
+          ))}
+        </svg>
+      )}
+      {nullPointers.length > 0 && (
+        <div className="yv-linked-null-pointers" aria-label="Null references">
+          {nullPointers.map(name => <span className="yv-node-pointer yv-node-pointer-null" key={name}>{name} = null</span>)}
+        </div>
+      )}
+      {allNodes.length === 0 ? (
+        <div className="yv-linked-empty"><span className="yv-linked-empty-label">empty list</span><span className="yv-null">null</span></div>
+      ) : (
+        <div className="yv-linked-components" role="group" aria-label="Linked list reference graph">
+          {components.map((component, componentIndex) => (
+            <div className="yv-linked" data-linked-component={componentIndex} key={component.nodes[0]?.id ?? componentIndex} role="group" aria-label={`Linked-list component ${componentIndex + 1}`}>
+              {component.nodes.map((node, index) => {
+                const nextField = node.fields.next;
+                const hasPrev = 'prev' in node.fields;
+                const prevValue = hasPrev ? resolveRef(node.fields.prev, objects) : null;
+                const prevId = isPlainObject(prevValue) ? String(prevValue.$objectId ?? prevValue.$ref ?? '') || null : null;
+                const isLast = index === component.nodes.length - 1;
+                const nextInComponent = component.nodes[index + 1]?.id === node.nextId;
+                const nextIsCycle = isLast && component.cycleTo != null;
+                return (
+                  <div className="yv-linked-piece" key={node.id} data-node-id={node.id} data-node-index={allNodes.findIndex(candidate => candidate.id === node.id)} data-next-target={node.nextId ?? 'null'} data-prev-target={prevId ?? 'null'}>
+                    <div className="yv-linked-node-column">
+                      <div className="yv-linked-pointer-labels" style={{ height: `${Math.max(22, maxPointerLabelCount * 22)}px`, minHeight: `${Math.max(22, maxPointerLabelCount * 22)}px` }}>
+                        {pointerNames.get(node.id)?.map(name => <div className={`yv-node-pointer ${movedPointerNames.has(name) ? 'yv-node-pointer-moved' : ''}`} data-pointer-name={name} key={name}>{name}</div>)}
+                      </div>
+                      <div
+                        className={`yv-node yv-linked-node ${changedEdgeIds.has(node.id) ? 'yv-node-link-changed' : ''}`}
+                        data-linked-node-value={node.id}
+                        style={(() => {
+                          const incoming = allNodes.find(candidate => candidate.nextId === node.id);
+                          return incoming ? { borderColor: linkedConnectionColor(incoming.id), boxShadow: `inset 0 0 0 1.5px ${linkedConnectionColor(incoming.id)}` } : undefined;
+                        })()}
+                      >
+                        <span className="yv-linked-node-data">
+                          <span className="yv-node-value">{displayValue(node.value)}</span>
+                        </span>
+                        <span className="yv-linked-node-next" aria-label={`next pointer slot; target ${idLabel(node.nextId)}`}>
+                          <span className="yv-linked-next-port" style={node.nextId ? { borderColor: linkedConnectionColor(node.id), boxShadow: `0 0 0 2px ${linkedConnectionColor(node.id)}33` } : undefined} />
+                        </span>
+                      </div>
+                      <span className="yv-node-identity" title={`Stable object identity: ${node.id}`}>#{node.id.length > 8 ? node.id.slice(-6) : node.id}</span>
+                      {hasPrev && <span className="yv-node-link-meta" title={`prev references ${prevId ?? 'null'}`}>prev: {idLabel(prevId)}</span>}
+                    </div>
+                    {nextInComponent && <span className="yv-linked-edge-accessible-label" data-edge-kind="next" data-edge-from={node.id} data-edge-to={node.nextId} aria-label={`next points to ${idLabel(node.nextId)}`} />}
+                    {nextIsCycle && <div className={`yv-edge yv-edge-cycle ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="cycle" data-edge-from={node.id} data-edge-to={component.cycleTo ?? 'unknown'} aria-label={`cycle back to ${idLabel(component.cycleTo)}`}>↶ {idLabel(component.cycleTo)}</div>}
+                    {isLast && !nextIsCycle && nextField == null && <div className={`yv-edge yv-edge-null ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} style={{ marginTop: `${Math.max(22, maxPointerLabelCount * 22) + 17}px` }} data-edge-kind="null" data-edge-from={node.id}><span className="yv-null-value-box" data-linked-null-target={node.id}>null</span></div>}
+                    {isLast && !nextIsCycle && nextField != null && !nextInComponent && <div className={`yv-edge yv-edge-external ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="external" data-edge-from={node.id} data-edge-to={node.nextId ?? 'external'}>→ <span>{idLabel(node.nextId)}</span></div>}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function TreeNodeView({ value, objects, depth=0 }: { value: unknown; objects: Record<string,unknown>; depth?: number }) {
   const resolved=resolveRef(value,objects); if(!isPlainObject(resolved) || depth>6)return null;
   const f=objectFields(resolved); return <div className="yv-tree-node"><div className="yv-node">{displayValue(nodeValue(resolved))}</div>{(f.left!=null||f.right!=null)&&<div className="yv-tree-children"><div>{f.left!=null?<TreeNodeView value={f.left} objects={objects} depth={depth+1}/>:<span className="yv-null">null</span>}</div><div>{f.right!=null?<TreeNodeView value={f.right} objects={objects} depth={depth+1}/>:<span className="yv-null">null</span>}</div></div>}</div>;
 }
+function linkedListReturnText(root: unknown, objects: Record<string, unknown>): string | undefined {
+  if (!isPlainObject(root) || !looksListNode(root)) return undefined;
+
+  const values: unknown[] = [];
+  const visited = new Set<string>();
+  let current: unknown = root;
+
+  // Follow the returned head through the captured object graph. Use object
+  // identities to stop safely if the list contains a cycle.
+  while (isPlainObject(current) && looksListNode(current) && values.length < 500) {
+    const resolved = resolveRef(current, objects);
+    if (!isPlainObject(resolved) || !looksListNode(resolved)) break;
+    const id = typeof resolved.$objectId === 'string'
+      ? resolved.$objectId
+      : typeof resolved.$ref === 'string' ? resolved.$ref : undefined;
+    if (id && visited.has(id)) break;
+    if (id) visited.add(id);
+
+    values.push(nodeValue(resolved));
+    const next = objectFields(resolved).next;
+    if (next == null) break;
+    current = resolveRef(next, objects);
+  }
+
+  return '[' + values.map(item => displayValue(item)).join(',') + ']';
+}
+
 function ReturnValueView({
   text,
   value,
@@ -2357,13 +2749,8 @@ function ReturnValueView({
   state?: TraceState;
 }) {
   if (isPlainObject(value) && looksListNode(value)) {
-    return (
-      <div className="yv-return-object">
-        <div className="yv-return-reference yv-code">{text}</div>
-        <div className="yv-return-caption">Returned node and reachable chain</div>
-        <LinkedListView root={value} objects={state?.objects ?? {}} variables={state?.variables ?? {}} />
-      </div>
-    );
+    const listText = linkedListReturnText(value, state?.objects ?? {});
+    return <div className="yv-code">{listText ?? text}</div>;
   }
 
   if (isPlainObject(value) && looksTreeNode(value)) {
@@ -2795,7 +3182,34 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
     }
   }
 
-  for (const [id, value] of Object.entries(state?.objects ?? {})) {
+  const objectEntries = Object.entries(state?.objects ?? {});
+  const listNodeEntries = objectEntries.filter(([, value]) => isPlainObject(value) && looksListNode(value));
+  if (listNodeEntries.length > 0) {
+    const listNodeIds = new Set(listNodeEntries.map(([id, value]) =>
+      isPlainObject(value) && typeof value.$objectId === 'string' ? value.$objectId : id
+    ));
+    const listVariableEntries = Object.entries(state?.variables ?? {}).filter(([, value]) =>
+      isPlainObject(value) && typeof value.$objectId === 'string' && listNodeIds.has(value.$objectId)
+    );
+    const preferredRoot = listVariableEntries.find(([name]) => /^(head|root|first)$/i.test(name));
+    const rootVariable = preferredRoot ?? listVariableEntries[0];
+    const rootId = rootVariable && isPlainObject(rootVariable[1]) && typeof rootVariable[1].$objectId === 'string'
+      ? rootVariable[1].$objectId
+      : null;
+    const rootEntry = rootId
+      ? listNodeEntries.find(([id, value]) => id === rootId || (isPlainObject(value) && value.$objectId === rootId))
+      : listNodeEntries[0];
+    const rootValue = rootEntry?.[1];
+    if (rootValue !== undefined) {
+      grouped.set('linked-list:runtime', {
+        names: listVariableEntries.map(([name]) => name).filter((name, index, all) => all.indexOf(name) === index),
+        value: rootValue,
+      });
+    }
+  }
+
+  for (const [id, value] of objectEntries) {
+    if (isPlainObject(value) && looksListNode(value)) continue;
     const names = namedObjectIds.get(id);
     if (!names?.length) continue;
     grouped.set(`object:${id}`, { names, value });
@@ -2821,11 +3235,12 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
           : isArray ? (isCharArray ? 'charArray' : 'Array')
           : isPlainObject(value) && typeof value.$mapId === 'string' ? 'Map'
           : isPlainObject(value) && typeof value.$collectionId === 'string' ? 'Collection'
+          : isPlainObject(value) && looksListNode(value) ? 'Linked List'
           : isPlainObject(value) && typeof value.$objectId === 'string' ? 'Object'
           : 'Data Structure';
         const title = kind + ' → ' + uniqueNames.join(' / ');
         return (
-          <div className="yv-ds" key={title}>
+          <div className="yv-ds" key={kind === 'Linked List' ? 'Linked List → runtime graph' : title}>
             <div className="yv-ds-title">{title}</div>
             <DataValue value={value} state={state} source={source} name={uniqueNames.join(' / ')}/>
           </div>
