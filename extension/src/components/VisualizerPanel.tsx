@@ -2334,7 +2334,7 @@ function DataValue({
   }
 
   if (isPlainObject(value) && typeof value.$stringValue === 'string') {
-    return <StringView value={value.$stringValue} state={state} name={name ?? ''} />;
+    return <StringView value={value.$stringValue} state={state} name={name ?? ''} source={source} />;
   }
 
   if (isMapSnapshot(value)) {
@@ -2379,7 +2379,48 @@ function isStructuralObject(value: unknown): value is Obj {
     (('left' in fields || 'right' in fields) && ('val' in fields || 'value' in fields));
 }
 
-export function StringView({ value, state, name }: { value: string; state?: TraceState; name: string }) {
+export function StringView({ value, state, name, source = '' }: { value: string; state?: TraceState; name: string; source?: string }) {
+  const data = isPlainObject(state?.lastEvent?.data) ? state.lastEvent.data : {};
+  const executionEvents = Array.isArray(data.executionEvents) ? data.executionEvents : [];
+  const accessed = new Set<number>();
+  const ranges: Array<{ start: number; end: number }> = [];
+  const pointers = new Map<string, number>();
+  let transition: { operation: string; before: string; after: string; kind: 'result' | 'mutation' } | undefined;
+
+  for (const event of executionEvents) {
+    if (!isPlainObject(event) || !isPlainObject(event.data)) continue;
+    const effect = event.data;
+    if ((event.type === 'STRING_ACCESS' || event.type === 'ARRAY_ACCESS') && effect.name === name) {
+      const index = event.type === 'STRING_ACCESS'
+        ? effect.index
+        : Array.isArray(effect.indices) ? effect.indices[0] : undefined;
+      if (typeof index === 'number' && Number.isInteger(index) && index >= 0 && index < value.length) accessed.add(index);
+      if (event.type === 'STRING_ACCESS' && typeof effect.indexVariable === 'string' && typeof effect.index === 'number') {
+        pointers.set(effect.indexVariable, effect.index);
+      }
+    }
+    if (event.type === 'STRING_RANGE_ACCESS' && effect.name === name &&
+        typeof effect.start === 'number' && typeof effect.end === 'number') {
+      ranges.push({ start: effect.start, end: effect.end });
+      if (typeof effect.startVariable === 'string') pointers.set(effect.startVariable, effect.start);
+      if (typeof effect.endVariable === 'string' && effect.end < value.length) pointers.set(effect.endVariable, effect.end);
+    }
+    if (event.type === 'STRING_RESULT' && (effect.resultName === name || effect.name === name) &&
+        typeof effect.after === 'string' && effect.after === value && typeof effect.operation === 'string') {
+      transition = { operation: effect.operation, before: typeof effect.before === 'string' ? effect.before : '', after: effect.after, kind: 'result' };
+    }
+    if (event.type === 'STRING_MUTATION' && effect.name === name &&
+        typeof effect.after === 'string' && effect.after === value && typeof effect.operation === 'string') {
+      transition = { operation: effect.operation, before: typeof effect.before === 'string' ? effect.before : '', after: effect.after, kind: 'mutation' };
+    }
+  }
+
+  // Add source-grounded pointer labels for common string-index expressions.
+  // Runtime access events take precedence; source scanning only locates named
+  // integer variables and never invents a read highlight.
+  const line = source.split(/\r?\n/)[Math.max(0, (state?.line ?? 1) - 1)] ?? '';
+  const indexExpressions: string[] = [];
+  for (const match of line.matchAll(new RegExp('\\b' + name.replace(/[$]/g, '\\\\export function StringView({ value, state, name }: { value: string; state?: TraceState; name: string }) {
   const data = isPlainObject(state?.lastEvent?.data) ? state.lastEvent.data : {};
   const executionEvents = Array.isArray(data.executionEvents) ? data.executionEvents : [];
   const accessed = new Set<number>();
@@ -2405,6 +2446,86 @@ export function StringView({ value, state, name }: { value: string; state?: Trac
         </div>
       ))}
       {!characters.length && <div className="yv-empty">Empty string</div>}
+    </div>
+  );
+}
+') + '\\s*\\.\\s*charAt\\s*\\(([^()]*)\\)', 'g'))) {
+    indexExpressions.push((match[1] ?? '').trim());
+  }
+  for (const match of line.matchAll(new RegExp('\\b' + name.replace(/[$]/g, '\\\\export function StringView({ value, state, name }: { value: string; state?: TraceState; name: string }) {
+  const data = isPlainObject(state?.lastEvent?.data) ? state.lastEvent.data : {};
+  const executionEvents = Array.isArray(data.executionEvents) ? data.executionEvents : [];
+  const accessed = new Set<number>();
+  for (const event of executionEvents) {
+    if (!isPlainObject(event) || event.type !== 'ARRAY_ACCESS' || !isPlainObject(event.data)) continue;
+    const eventName = typeof event.data.name === 'string' ? event.data.name : undefined;
+    const indices = Array.isArray(event.data.indices) ? event.data.indices : [];
+    if (eventName === name && typeof indices[0] === 'number' && Number.isInteger(indices[0])) {
+      accessed.add(indices[0]);
+    }
+  }
+  // Java String indexing and charAt use UTF-16 code units, so split('') keeps
+  // visual cell indices aligned with the runtime trace.
+  const characters = value.split('');
+  return (
+    <div className="yv-array" data-string-structure={name}>
+      {characters.map((character, index) => (
+        <div className="yv-array-cell-wrap" key={index}>
+          <div className={`yv-array-cell ${accessed.has(index) ? 'yv-cell-read' : ''}`} data-string-index={index}>
+            <div className="yv-array-cell-content">{character === ' ' ? '␠' : character}</div>
+          </div>
+          <div className="yv-cell-index">{index}</div>
+        </div>
+      ))}
+      {!characters.length && <div className="yv-empty">Empty string</div>}
+    </div>
+  );
+}
+') + '\\s*\\.\\s*(?:substring|subSequence)\\s*\\(([^()]*)\\)', 'g'))) {
+    indexExpressions.push(...(match[1] ?? '').split(',').slice(0, 2).map(part => part.trim()));
+  }
+  for (const expression of indexExpressions) {
+    if (!/^[A-Za-z_$][\\w$]*$/.test(expression) || pointers.has(expression)) continue;
+    const index = state?.variables?.[expression];
+    if (typeof index === 'number' && Number.isInteger(index) && index >= 0 && index <= value.length) {
+      pointers.set(expression, index);
+    }
+  }
+
+  // Java String indexing is defined in UTF-16 code units. split('') preserves
+  // those indices, including the two cells of a supplementary character.
+  const characters = value.split('');
+  const hasPointers = [...pointers.values()].some(index => index >= 0 && index <= value.length);
+  return (
+    <div className={`yv-string-view ${hasPointers ? 'has-pointers' : ''}`} data-string-structure={name} data-string-length={value.length}>
+      {transition && <div className="yv-string-operation">{transition.operation} · {transition.kind === 'mutation' ? 'mutated' : 'result'}</div>}
+      <div className="yv-string-cells">
+        {characters.map((character, index) => {
+          const inRange = ranges.some(range => index >= range.start && index < range.end);
+          const previousCharacter = transition?.before[index];
+          const changed = Boolean(transition && transition.before !== transition.after && previousCharacter !== character);
+          const added = Boolean(transition && index >= transition.before.length && index < transition.after.length);
+          const cellPointers = [...pointers.entries()].filter(([, pointerIndex]) => pointerIndex === index);
+          return (
+            <div className="yv-string-cell-wrap" key={index} data-string-cell-index={index}>
+              {cellPointers.length > 0 && <div className="yv-string-pointers" aria-hidden="true">
+                {cellPointers.map(([pointer]) => <span className="yv-string-pointer" key={pointer} data-string-pointer={pointer}>{pointer}</span>)}
+              </div>}
+              <div className={`yv-string-cell ${accessed.has(index) ? 'yv-cell-read ' : ''}${inRange ? 'yv-cell-range ' : ''}${changed ? 'yv-string-cell-changed ' : ''}${added ? 'yv-string-cell-added' : ''}`} data-string-index={index}>
+                <div className="yv-string-character">{character === ' ' ? '\u00a0' : character}</div>
+              </div>
+              <div className="yv-string-index">{index}</div>
+            </div>
+          );
+        })}
+        {!characters.length && <div className="yv-empty">Empty string</div>}
+        {[...pointers.entries()].some(([, index]) => index === value.length) &&
+          <div className="yv-string-cell-wrap yv-string-end-pointer">
+            <div className="yv-string-pointers">{[...pointers.entries()].filter(([, index]) => index === value.length).map(([pointer]) => <span className="yv-string-pointer" key={pointer}>{pointer}</span>)}</div>
+            <div className="yv-string-end-marker" aria-label="String end">∅</div>
+            <div className="yv-string-index">{value.length}</div>
+          </div>}
+      </div>
     </div>
   );
 }
