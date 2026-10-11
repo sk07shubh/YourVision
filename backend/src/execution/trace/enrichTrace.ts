@@ -1174,7 +1174,7 @@ function deriveStringEvents(
 
     // StringBuilder is mutable; only emit a mutation event when the runtime
     // exposes string snapshots for both sides and proves a changed value.
-    const mutablePattern = /\b([A-Za-z_$][\w$]*)\s*\.\s*(append|insert|delete|deleteCharAt|setCharAt|replace|reverse)\s*\(/g;
+    const mutablePattern = /\b([A-Za-z_$][\w$]*)\s*\.\s*(append|insert|delete|deleteCharAt|setCharAt|replace|reverse)\s*\(([^()]*)\)/g;
     for (const match of statement.matchAll(mutablePattern)) {
         const name = match[1];
         const operation = match[2];
@@ -1182,13 +1182,37 @@ function deriveStringEvents(
         const before = stringBuilderContents(variables[name]);
         const after = stringBuilderContents(postVariables[name]);
         if (before === undefined || after === undefined || before === after) continue;
+        const args = (match[3] ?? "").split(",").map(part => part.trim());
+        const firstArg = evaluateExpression(args[0] ?? "", variables);
+        const secondArg = evaluateExpression(args[1] ?? "", variables);
+        const index = typeof firstArg === "number" && Number.isInteger(firstArg)
+            ? firstArg
+            : operation === "append" ? before.length : undefined;
+        let removed = "";
+        let inserted = "";
+        if (operation === "deleteCharAt" && index !== undefined) removed = before.charAt(index);
+        else if (operation === "delete" && index !== undefined) {
+            const end = typeof secondArg === "number" && Number.isInteger(secondArg) ? secondArg : before.length;
+            removed = before.slice(index, end);
+        } else if (operation === "insert" && index !== undefined) {
+            const amount = Math.max(0, after.length - before.length);
+            inserted = after.slice(index, index + amount);
+        } else if (operation === "append" && after.startsWith(before)) {
+            inserted = after.slice(before.length);
+        } else if (operation === "setCharAt" && index !== undefined) {
+            inserted = after.charAt(index);
+            removed = before.charAt(index);
+        } else if (operation === "replace" && index !== undefined && typeof secondArg === "number") {
+            removed = before.slice(index, secondArg);
+            inserted = after.slice(index, Math.max(index, after.length - (before.length - removed.length)));
+        }
         events.push({
             sequence: 0,
             type: "STRING_MUTATION",
             line: sourceEvent.line,
             method: sourceEvent.method,
             depth: sourceEvent.depth,
-            data: { name, operation, before, after, kind: "mutation" }
+            data: { name, operation, before, after, index, removed: removed || undefined, inserted: inserted || undefined, kind: "mutation" }
         });
     }
 
