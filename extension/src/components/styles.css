@@ -764,3 +764,6 @@
 .yv-linked-connections {
   overflow: visible;
 }
+
+/* Keep the terminal null box level with the node itself, not the taller metadata column. */
+.yv-linked-piece > .yv-edge-null { align-self: flex-start; }
