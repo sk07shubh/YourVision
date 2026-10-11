@@ -41,6 +41,54 @@ function markup(nodes: ReactNode[]): string {
 }
 
 
+
+describe('linked-list graph visualization', () => {
+  it('preserves node identity, aliases, and explicit null termination', () => {
+    const current = state({
+      variables: { head: { $objectId: 'n1' }, curr: { $objectId: 'n2' }, prev: null },
+      objects: {
+        n1: { $objectId: 'n1', $type: 'ListNode', fields: { val: 10, next: { $ref: 'n2' } } },
+        n2: { $objectId: 'n2', $type: 'ListNode', fields: { val: 20, next: null } },
+      },
+    });
+    const html = renderToStaticMarkup(<DataStructures state={current} source="curr = curr.next;" />);
+    expect(html).toContain('data-node-id="n1"');
+    expect(html).toContain('data-node-id="n2"');
+    expect(html).toContain('data-edge-kind="next"');
+    expect(html).toContain('data-edge-kind="null"');
+    expect(html).toContain('data-pointer-name="head"');
+    expect(html).toContain('data-pointer-name="curr"');
+    expect(html).toContain('prev = null');
+    expect(html).toContain('data-next-target="n2"');
+  });
+
+  it('renders a cycle as a reference back to an existing node instead of a fake node', () => {
+    const current = state({
+      variables: { head: { $objectId: 'n1' } },
+      objects: {
+        n1: { $objectId: 'n1', $type: 'ListNode', fields: { val: 1, next: { $ref: 'n2' } } },
+        n2: { $objectId: 'n2', $type: 'ListNode', fields: { val: 2, next: { $ref: 'n1' } } },
+      },
+    });
+    const html = renderToStaticMarkup(<DataStructures state={current} source="fast = fast.next.next;" />);
+    expect(html).toContain('data-edge-kind="cycle"');
+    expect(html).toContain('data-edge-to="n1"');
+    expect(html).not.toContain('data-node-id="cycle"');
+    expect((html.match(/class="yv-node-value"/g) ?? []).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('shows an empty list for a null head without inventing a node', () => {
+    const current = state({
+      variables: { head: null },
+      objects: {},
+    });
+    const html = renderToStaticMarkup(<DataStructures state={current} source="head = null;" />);
+    expect(html).toContain('empty list');
+    expect(html).toContain('head = null');
+    expect(html).not.toContain('data-node-id=');
+  });
+});
+
 describe('string data structure visualization', () => {
   it('keeps strings in Variables and also renders them as indexed character cells', () => {
     const current = state({ variables: { s: '({[]})', count: 6 } });
