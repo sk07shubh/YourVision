@@ -23,6 +23,7 @@ import {
   DisjointSetView,
   GraphView,
   TrieView,
+  TreeNodeView,
   LinkedListView,
   StringView,
 } from './VisualizerPanel';
@@ -186,6 +187,37 @@ describe('linked-list graph visualization', () => {
     expect(html).toContain('empty list');
     expect(html).toContain('head = null');
     expect(html).not.toContain('data-node-id=');
+  });
+});
+
+describe('binary-tree visualization', () => {
+  it('labels left and right branches and keeps stable node ids', () => {
+    const html = renderToStaticMarkup(<TreeNodeView
+      value={{ $objectId: 't1' }}
+      objects={{
+        t1: { $objectId: 't1', $type: 'TreeNode', fields: { val: 1, left: { $ref: 't2' }, right: { $ref: 't3' } } },
+        t2: { $objectId: 't2', $type: 'TreeNode', fields: { val: 2, left: null, right: null } },
+        t3: { $objectId: 't3', $type: 'TreeNode', fields: { val: 3, left: null, right: null } },
+      }}
+    />);
+    expect(html).toContain('data-tree-node-id="t1"');
+    expect(html).toContain('data-tree-node-id="t2"');
+    expect(html).toContain('data-tree-node-id="t3"');
+    expect(html).toContain('data-tree-edge="left"');
+    expect(html).toContain('data-tree-edge="right"');
+    expect(html).toContain('LEFT');
+    expect(html).toContain('RIGHT');
+  });
+
+  it('renders a cycle reference instead of recursing into a duplicate tree node', () => {
+    const html = renderToStaticMarkup(<TreeNodeView
+      value={{ $objectId: 'cycle-root' }}
+      objects={{
+        'cycle-root': { $objectId: 'cycle-root', $type: 'TreeNode', fields: { val: 7, left: { $ref: 'cycle-root' }, right: null } },
+      }}
+    />);
+    expect(html).toContain('data-tree-cycle-to="cycle-root"');
+    expect((html.match(/data-tree-node-id="cycle-root"/g) ?? []).length).toBe(1);
   });
 });
 
