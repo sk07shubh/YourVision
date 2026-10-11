@@ -542,8 +542,8 @@
 
 .yv-string-cells{position:relative}
 .yv-string-pointer-layer{position:absolute;left:0;top:0;width:100%;height:21px;pointer-events:none;z-index:5}
-.yv-string-pointer{position:absolute;top:0;left:0;transform:translateX(-50%);transition:left 180ms cubic-bezier(.4,0,.2,1)}
-@media(prefers-reduced-motion:reduce){.yv-string-pointer{transition:none}}
+.yv-string-pointer-group{position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;gap:3px;width:max-content;max-width:180px;transform:translateX(-50%);transition:left 180ms cubic-bezier(.4,0,.2,1);pointer-events:none}.yv-string-pointer{position:static;left:auto;top:auto;transform:none;transition:none;max-width:72px}
+@media(prefers-reduced-motion:reduce){.yv-string-pointer-group{transition:none}}
 
 .yv-string-cell.yv-string-cell-shift-right{animation:yv-string-shift-right 380ms cubic-bezier(.2,.75,.25,1)}
 .yv-string-cell.yv-string-cell-shift-left{animation:yv-string-shift-left 380ms cubic-bezier(.2,.75,.25,1)}
