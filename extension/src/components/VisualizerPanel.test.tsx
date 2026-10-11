@@ -20,6 +20,7 @@ import {
   Variables,
   ArrayView,
   DataStructures,
+  LinkedListView,
   StringView,
 } from './VisualizerPanel';
 
@@ -51,7 +52,7 @@ describe('linked-list graph visualization', () => {
         n2: { $objectId: 'n2', $type: 'ListNode', fields: { val: 20, next: null } },
       },
     });
-    const html = renderToStaticMarkup(<DataStructures state={current} source="curr = curr.next;" />);
+    const html = renderToStaticMarkup(<LinkedListView root={{ $objectId: 'n1' }} objects={current.objects} variables={current.variables} />);
     expect(html).toContain('data-node-id="n1"');
     expect(html).toContain('data-node-id="n2"');
     expect(html).toContain('data-edge-kind="next"');
@@ -70,7 +71,7 @@ describe('linked-list graph visualization', () => {
         n2: { $objectId: 'n2', $type: 'ListNode', fields: { val: 2, next: { $ref: 'n1' } } },
       },
     });
-    const html = renderToStaticMarkup(<DataStructures state={current} source="fast = fast.next.next;" />);
+    const html = renderToStaticMarkup(<LinkedListView root={{ $objectId: 'n1' }} objects={current.objects} variables={current.variables} />);
     expect(html).toContain('data-edge-kind="cycle"');
     expect(html).toContain('data-edge-to="n1"');
     expect(html).not.toContain('data-node-id="cycle"');
@@ -82,7 +83,7 @@ describe('linked-list graph visualization', () => {
       variables: { head: null },
       objects: {},
     });
-    const html = renderToStaticMarkup(<DataStructures state={current} source="head = null;" />);
+    const html = renderToStaticMarkup(<LinkedListView root={null} objects={current.objects} variables={current.variables} />);
     expect(html).toContain('empty list');
     expect(html).toContain('head = null');
     expect(html).not.toContain('data-node-id=');
