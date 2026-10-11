@@ -1157,14 +1157,15 @@ function deriveStringEvents(
         const sourceNames = [...expression.matchAll(/\b([A-Za-z_$][\w$]*)\b/g)]
             .map(item => item[1])
             .filter((candidate): candidate is string => Boolean(candidate) && candidate !== resultName && typeof variables[candidate] === "string");
-        if (sourceNames.length === 0) continue;
+        const sourceName = sourceNames[0];
+        if (!sourceName) continue;
         events.push({
             sequence: 0,
             type: "STRING_RESULT",
             line: sourceEvent.line,
             method: sourceEvent.method,
             depth: sourceEvent.depth,
-            data: { name: resultName, resultName, sourceName: sourceNames[0], operation: "concatenate", before: typeof before === "string" ? before : "", after, sourceBefore: variables[sourceNames[0]], kind: "derived" }
+            data: { name: resultName, resultName, sourceName, operation: "concatenate", before: typeof before === "string" ? before : "", after, sourceBefore: variables[sourceName], kind: "derived" }
         });
     }
 
