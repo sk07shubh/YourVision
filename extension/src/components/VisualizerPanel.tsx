@@ -859,8 +859,10 @@ export function dataStructureResults(current?: TraceState, previous?: TraceState
     if(bc && ac && bc.$collectionId===ac.$collectionId){
       const method=sourceCall(statement,name);
       const args=sourceCallArgs(statement,name);
-      let delta=collectionDelta(bc.values,ac.values);
-      if (!delta && (ac.$kind === 'priorityQueue' || ac.$kind === 'set')) delta=unorderedCollectionDelta(bc.values,ac.values);
+      const isUnordered = ac.$kind === 'priorityQueue' || ac.$kind === 'set';
+      const delta = isUnordered
+        ? unorderedCollectionDelta(bc.values, ac.values)
+        : collectionDelta(bc.values, ac.values);
       const op=delta ? collectionOperation(ac.$kind ?? '',method,delta,args.length) : undefined;
       if(delta && op) add('col-'+name+'-'+stableStringify([delta.added,delta.removed,delta.index]),name,op.operation,op.value,op.position,op.oldValue,op.showOld);
       continue;
