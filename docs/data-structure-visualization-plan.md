@@ -484,3 +484,31 @@ Read the current `backend/package.json` scripts and workflow files before choosi
 - Arrays and linked lists remain unchanged and their existing tests pass.
 - No AI/API/semantic-trace integration is added as part of this branch.
 - The implementation is reviewed and all relevant CI checks pass before a PR is opened or merged.
+
+
+---
+
+## Implementation progress — feature branch
+
+This section records code that has been implemented after the design audit. It does not imply that CI has passed; the focused regression tests listed below must run before merging.
+
+### Implemented slices
+
+- **Ordered collections:** runtime snapshots distinguish TreeSet (sortedSet) and LinkedHashSet (insertionOrderedSet) from unordered HashSet. The visualizer labels sorted and insertion-ordered sets accurately.
+- **Ordered maps:** TreeMap snapshots use the existing in-order tree traversal and the UI labels sorted-key order. LinkedHashMap snapshots now follow the linked entry chain (head / after) rather than hash-table bucket order, preserving its observable insertion order.
+- **Priority queues:** the UI says HEAP, not MIN-HEAP, because the snapshot does not establish whether a custom comparator reverses priority.
+- **Adjacency graphs:** an initial graph view renders captured nodes with neighbors fields, their recorded references, cycles, self-links, and variable aliases. It caps rendering at 80 nodes.
+- **Trie nodes:** an initial trie view renders captured child relationships, map-key or array-index edge labels, and common terminal flags (isEnd, isWord, endOfWord, isEndOfWord, terminal, isTerminal). Rendering is depth-bounded and node-bounded.
+- **Disjoint sets:** an initial parent-forest view is enabled only when the source contains conventional find/union and parent/parents/par array patterns. It displays parent relationships and highlights recorded parent-array writes. It supports self-parent roots and -1 root sentinels.
+
+### Regression coverage added
+
+- extension/src/components/VisualizerPanel.test.tsx: sorted/insertion-ordered collection labels, comparator-agnostic heap label, graph cycles/self-loops, trie child edges and terminal nodes, and disjoint-set forest rendering.
+- backend/scripts/smoke-java-data-structures.ts: TreeSet comparator order, LinkedHashSet insertion order, LinkedHashMap insertion order, and TreeMap key order.
+
+### Remaining verification and scope
+
+- Run the extension test suite, typecheck, and production build.
+- Run the full backend regression suite, especially test:data-structures.
+- Confirm graph/trie/DSU rendering against actual runtime traces from representative Java solutions; synthetic component tests alone are not sufficient.
+- Expand structure-specific behavior only after inspecting the corresponding runtime snapshot/event shape. Keep arrays and linked lists as the established baseline and avoid problem-specific rules.
