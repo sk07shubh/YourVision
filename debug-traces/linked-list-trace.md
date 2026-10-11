@@ -1,610 +1,32 @@
-STEP 1 / 24
-LINE: 12
-CODE: public ListNode reverseList(ListNode head) {
-EVENT: METHOD_ENTER
-METHOD: reverseList
-DEPTH: 1
-CONDITION: —
-EXECUTION EVENTS:
-[]
-VARIABLES:
-{
-  "head": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "297",
-            "$type": "ListNode",
-            "fields": {
-              "val": 3,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "this": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "297",
-            "$type": "ListNode",
-            "fields": {
-              "val": 3,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "297",
-        "$type": "ListNode",
-        "fields": {
-          "val": 3,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "298": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-CALL STACK:
-[
-  "reverseList"
-]
-LAST EVENT DATA:
-{
-  "variables": {
-    "head": {
-      "$objectId": "294",
+STEP 1 / 36
+EXECUTED LINE 12: public ListNode reverseList(ListNode head) {
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+head: {
+  "$objectId": "294",
+  "$type": "ListNode",
+  "fields": {
+    "val": 1,
+    "next": {
+      "$objectId": "296",
       "$type": "ListNode",
       "fields": {
-        "val": 1,
+        "val": 2,
         "next": {
-          "$objectId": "296",
+          "$objectId": "297",
           "$type": "ListNode",
           "fields": {
-            "val": 2,
+            "val": 3,
             "next": {
-              "$objectId": "297",
+              "$objectId": "298",
               "$type": "ListNode",
               "fields": {
-                "val": 3,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "displayLine": 12
-}
-
-================================================================================
-
-STEP 2 / 24
-LINE: 13
-CODE: ListNode prev = null;
-EVENT: STEP
-METHOD: reverseList
-DEPTH: 1
-CONDITION: —
-EXECUTION EVENTS:
-[
-  {
-    "sequence": 0,
-    "type": "VARIABLE_UPDATE",
-    "line": 13,
-    "method": "reverseList",
-    "depth": 1,
-    "data": {
-      "name": "prev",
-      "value": null
-    }
-  }
-]
-VARIABLES:
-{
-  "head": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "297",
-            "$type": "ListNode",
-            "fields": {
-              "val": 3,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "prev": null,
-  "this": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "297",
-            "$type": "ListNode",
-            "fields": {
-              "val": 3,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "297",
-        "$type": "ListNode",
-        "fields": {
-          "val": 3,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "298": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-CALL STACK:
-[
-  "reverseList"
-]
-LAST EVENT DATA:
-{
-  "variables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "297",
-              "$type": "ListNode",
-              "fields": {
-                "val": 3,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "arrayReferences": [],
-  "postVariables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "297",
-              "$type": "ListNode",
-              "fields": {
-                "val": 3,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "prev": null,
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "executionEvents": [
-    {
-      "sequence": 0,
-      "type": "VARIABLE_UPDATE",
-      "line": 13,
-      "method": "reverseList",
-      "depth": 1,
-      "data": {
-        "name": "prev",
-        "value": null
-      }
-    }
-  ],
-  "semanticRoles": [
-    {
-      "name": "prev",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "prev is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used to compute next",
-        "derived from curr",
-        "contributes to the returned expression"
-      ],
-      "method": "reverseList"
-    }
-  ]
-}
-
-================================================================================
-
-STEP 3 / 24
-LINE: 14
-CODE: ListNode curr = head;
-EVENT: STEP
-METHOD: reverseList
-DEPTH: 1
-CONDITION: —
-EXECUTION EVENTS:
-[
-  {
-    "sequence": 0,
-    "type": "VARIABLE_UPDATE",
-    "line": 14,
-    "method": "reverseList",
-    "depth": 1,
-    "data": {
-      "name": "curr",
-      "value": {
-        "$objectId": "294",
-        "$type": "ListNode",
-        "fields": {
-          "val": 1,
-          "next": {
-            "$objectId": "296",
-            "$type": "ListNode",
-            "fields": {
-              "val": 2,
-              "next": {
-                "$objectId": "297",
-                "$type": "ListNode",
-                "fields": {
-                  "val": 3,
-                  "next": null
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-]
-VARIABLES:
-{
-  "head": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "297",
-            "$type": "ListNode",
-            "fields": {
-              "val": 3,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "prev": null,
-  "curr": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "297",
-            "$type": "ListNode",
-            "fields": {
-              "val": 3,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "this": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "297",
-            "$type": "ListNode",
-            "fields": {
-              "val": 3,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "297",
-        "$type": "ListNode",
-        "fields": {
-          "val": 3,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "298": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-CALL STACK:
-[
-  "reverseList"
-]
-LAST EVENT DATA:
-{
-  "variables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "297",
-              "$type": "ListNode",
-              "fields": {
-                "val": 3,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "prev": null,
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "arrayReferences": [],
-  "postVariables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "297",
-              "$type": "ListNode",
-              "fields": {
-                "val": 3,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "prev": null,
-    "curr": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "297",
-              "$type": "ListNode",
-              "fields": {
-                "val": 3,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "executionEvents": [
-    {
-      "sequence": 0,
-      "type": "VARIABLE_UPDATE",
-      "line": 14,
-      "method": "reverseList",
-      "depth": 1,
-      "data": {
-        "name": "curr",
-        "value": {
-          "$objectId": "294",
-          "$type": "ListNode",
-          "fields": {
-            "val": 1,
-            "next": {
-              "$objectId": "296",
-              "$type": "ListNode",
-              "fields": {
-                "val": 2,
+                "val": 4,
                 "next": {
-                  "$objectId": "297",
+                  "$objectId": "299",
                   "$type": "ListNode",
                   "fields": {
-                    "val": 3,
+                    "val": 5,
                     "next": null
                   }
                 }
@@ -614,565 +36,33 @@ LAST EVENT DATA:
         }
       }
     }
-  ],
-  "semanticRoles": [
-    {
-      "name": "curr",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "curr is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used in a condition",
-        "derived from head, next",
-        "used to compute next",
-        "used to compute prev"
-      ],
-      "method": "reverseList"
-    },
-    {
-      "name": "prev",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "prev is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used to compute next",
-        "derived from curr",
-        "contributes to the returned expression"
-      ],
-      "method": "reverseList"
-    }
-  ]
+  }
+}
+TRACE EVENTS:
+—
+
+------------------------------------------------------------------------
+STEP 2 / 36
+EXECUTED LINE 13: ListNode prev = null;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+prev: null
+TRACE EVENTS:
+VARIABLE_UPDATE: {
+  "name": "prev",
+  "value": null
 }
 
-================================================================================
-
-STEP 4 / 24
-LINE: 16
-CODE: while(curr != null){
-EVENT: STEP
-METHOD: reverseList
-DEPTH: 1
-CONDITION: TRUE
-EXECUTION EVENTS:
-[]
-VARIABLES:
-{
-  "head": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "297",
-            "$type": "ListNode",
-            "fields": {
-              "val": 3,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "prev": null,
-  "curr": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "297",
-            "$type": "ListNode",
-            "fields": {
-              "val": 3,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "this": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "297",
-            "$type": "ListNode",
-            "fields": {
-              "val": 3,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "297",
-        "$type": "ListNode",
-        "fields": {
-          "val": 3,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "298": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-CALL STACK:
-[
-  "reverseList"
-]
-LAST EVENT DATA:
-{
-  "variables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "297",
-              "$type": "ListNode",
-              "fields": {
-                "val": 3,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "prev": null,
-    "curr": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "297",
-              "$type": "ListNode",
-              "fields": {
-                "val": 3,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "arrayReferences": [],
-  "conditionResult": true,
-  "postVariables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "297",
-              "$type": "ListNode",
-              "fields": {
-                "val": 3,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "prev": null,
-    "curr": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "297",
-              "$type": "ListNode",
-              "fields": {
-                "val": 3,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "semanticRoles": [
-    {
-      "name": "curr",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "curr is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used in a condition",
-        "derived from head, next",
-        "used to compute next",
-        "used to compute prev"
-      ],
-      "method": "reverseList"
-    },
-    {
-      "name": "prev",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "prev is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used to compute next",
-        "derived from curr",
-        "contributes to the returned expression"
-      ],
-      "method": "reverseList"
-    }
-  ]
-}
-
-================================================================================
-
-STEP 5 / 24
-LINE: 17
-CODE: ListNode next = curr.next;
-EVENT: STEP
-METHOD: reverseList
-DEPTH: 1
-CONDITION: —
-EXECUTION EVENTS:
-[
-  {
-    "sequence": 0,
-    "type": "VARIABLE_UPDATE",
-    "line": 17,
-    "method": "reverseList",
-    "depth": 1,
-    "data": {
-      "name": "next",
-      "value": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "297",
-            "$type": "ListNode",
-            "fields": {
-              "val": 3,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  }
-]
-VARIABLES:
-{
-  "head": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "297",
-            "$type": "ListNode",
-            "fields": {
-              "val": 3,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "prev": null,
-  "curr": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "297",
-            "$type": "ListNode",
-            "fields": {
-              "val": 3,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "next": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "297",
-        "$type": "ListNode",
-        "fields": {
-          "val": 3,
-          "next": null
-        }
-      }
-    }
-  },
-  "this": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "297",
-            "$type": "ListNode",
-            "fields": {
-              "val": 3,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "297",
-        "$type": "ListNode",
-        "fields": {
-          "val": 3,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "298": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-CALL STACK:
-[
-  "reverseList"
-]
-LAST EVENT DATA:
-{
-  "variables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "297",
-              "$type": "ListNode",
-              "fields": {
-                "val": 3,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "prev": null,
-    "curr": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "297",
-              "$type": "ListNode",
-              "fields": {
-                "val": 3,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "arrayReferences": [],
-  "postVariables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "297",
-              "$type": "ListNode",
-              "fields": {
-                "val": 3,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "prev": null,
-    "curr": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "297",
-              "$type": "ListNode",
-              "fields": {
-                "val": 3,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
+------------------------------------------------------------------------
+STEP 3 / 36
+EXECUTED LINE 14: ListNode curr = head;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+curr: {
+  "$objectId": "294",
+  "$type": "ListNode",
+  "fields": {
+    "val": 1,
     "next": {
       "$objectId": "296",
       "$type": "ListNode",
@@ -1183,679 +73,36 @@ LAST EVENT DATA:
           "$type": "ListNode",
           "fields": {
             "val": 3,
-            "next": null
-          }
-        }
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "executionEvents": [
-    {
-      "sequence": 0,
-      "type": "VARIABLE_UPDATE",
-      "line": 17,
-      "method": "reverseList",
-      "depth": 1,
-      "data": {
-        "name": "next",
-        "value": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
             "next": {
-              "$objectId": "297",
+              "$objectId": "298",
               "$type": "ListNode",
               "fields": {
-                "val": 3,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    }
-  ],
-  "semanticRoles": [
-    {
-      "name": "curr",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "curr is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used in a condition",
-        "derived from head, next",
-        "used to compute next",
-        "used to compute prev"
-      ],
-      "method": "reverseList"
-    },
-    {
-      "name": "prev",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "prev is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used to compute next",
-        "derived from curr",
-        "contributes to the returned expression"
-      ],
-      "method": "reverseList"
-    }
-  ]
-}
-
-================================================================================
-
-STEP 6 / 24
-LINE: 18
-CODE: curr.next = prev;
-EVENT: STEP
-METHOD: reverseList
-DEPTH: 1
-CONDITION: —
-EXECUTION EVENTS:
-[
-  {
-    "sequence": 0,
-    "type": "OBJECT_FIELD_WRITE",
-    "line": 18,
-    "method": "reverseList",
-    "depth": 1,
-    "data": {
-      "name": "head",
-      "objectId": "294",
-      "changes": [
-        {
-          "fields": [
-            "next"
-          ],
-          "before": {
-            "$objectId": "296",
-            "$type": "ListNode",
-            "fields": {
-              "val": 2,
-              "next": {
-                "$objectId": "297",
-                "$type": "ListNode",
-                "fields": {
-                  "val": 3,
-                  "next": null
-                }
-              }
-            }
-          },
-          "after": null
-        }
-      ],
-      "value": {
-        "$objectId": "294",
-        "$type": "ListNode",
-        "fields": {
-          "val": 1,
-          "next": null
-        }
-      }
-    }
-  }
-]
-VARIABLES:
-{
-  "head": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "prev": null,
-  "curr": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "next": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "297",
-        "$type": "ListNode",
-        "fields": {
-          "val": 3,
-          "next": null
-        }
-      }
-    }
-  },
-  "this": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "297",
-        "$type": "ListNode",
-        "fields": {
-          "val": 3,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "298": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-CALL STACK:
-[
-  "reverseList"
-]
-LAST EVENT DATA:
-{
-  "variables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "297",
-              "$type": "ListNode",
-              "fields": {
-                "val": 3,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "prev": null,
-    "curr": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "297",
-              "$type": "ListNode",
-              "fields": {
-                "val": 3,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "next": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "297",
-          "$type": "ListNode",
-          "fields": {
-            "val": 3,
-            "next": null
-          }
-        }
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "arrayReferences": [],
-  "postVariables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": null,
-    "curr": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "next": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "297",
-          "$type": "ListNode",
-          "fields": {
-            "val": 3,
-            "next": null
-          }
-        }
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "executionEvents": [
-    {
-      "sequence": 0,
-      "type": "OBJECT_FIELD_WRITE",
-      "line": 18,
-      "method": "reverseList",
-      "depth": 1,
-      "data": {
-        "name": "head",
-        "objectId": "294",
-        "changes": [
-          {
-            "fields": [
-              "next"
-            ],
-            "before": {
-              "$objectId": "296",
-              "$type": "ListNode",
-              "fields": {
-                "val": 2,
+                "val": 4,
                 "next": {
-                  "$objectId": "297",
+                  "$objectId": "299",
                   "$type": "ListNode",
                   "fields": {
-                    "val": 3,
+                    "val": 5,
                     "next": null
                   }
                 }
               }
-            },
-            "after": null
-          }
-        ],
-        "value": {
-          "$objectId": "294",
-          "$type": "ListNode",
-          "fields": {
-            "val": 1,
-            "next": null
+            }
           }
         }
       }
     }
-  ],
-  "semanticRoles": [
-    {
-      "name": "curr",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "curr is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used in a condition",
-        "derived from head, next",
-        "used to compute next",
-        "used to compute prev"
-      ],
-      "method": "reverseList"
-    },
-    {
-      "name": "prev",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "prev is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used to compute next",
-        "derived from curr",
-        "contributes to the returned expression"
-      ],
-      "method": "reverseList"
-    }
-  ]
-}
-
-================================================================================
-
-STEP 7 / 24
-LINE: 19
-CODE: prev = curr;
-EVENT: STEP
-METHOD: reverseList
-DEPTH: 1
-CONDITION: —
-EXECUTION EVENTS:
-[
-  {
-    "sequence": 0,
-    "type": "VARIABLE_UPDATE",
-    "line": 19,
-    "method": "reverseList",
-    "depth": 1,
-    "data": {
-      "name": "prev",
-      "value": {
-        "$objectId": "294",
-        "$type": "ListNode",
-        "fields": {
-          "val": 1,
-          "next": null
-        }
-      },
-      "before": null
-    }
   }
-]
-VARIABLES:
-{
-  "head": {
+}
+TRACE EVENTS:
+VARIABLE_UPDATE: {
+  "name": "curr",
+  "value": {
     "$objectId": "294",
     "$type": "ListNode",
     "fields": {
       "val": 1,
-      "next": null
-    }
-  },
-  "prev": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "curr": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "next": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
       "next": {
-        "$objectId": "297",
-        "$type": "ListNode",
-        "fields": {
-          "val": 3,
-          "next": null
-        }
-      }
-    }
-  },
-  "this": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "297",
-        "$type": "ListNode",
-        "fields": {
-          "val": 3,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "298": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-CALL STACK:
-[
-  "reverseList"
-]
-LAST EVENT DATA:
-{
-  "variables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": null,
-    "curr": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "next": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "297",
-          "$type": "ListNode",
-          "fields": {
-            "val": 3,
-            "next": null
-          }
-        }
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "arrayReferences": [],
-  "postVariables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "curr": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "next": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "297",
-          "$type": "ListNode",
-          "fields": {
-            "val": 3,
-            "next": null
-          }
-        }
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "executionEvents": [
-    {
-      "sequence": 0,
-      "type": "VARIABLE_UPDATE",
-      "line": 19,
-      "method": "reverseList",
-      "depth": 1,
-      "data": {
-        "name": "prev",
-        "value": {
-          "$objectId": "294",
-          "$type": "ListNode",
-          "fields": {
-            "val": 1,
-            "next": null
-          }
-        },
-        "before": null
-      }
-    }
-  ],
-  "semanticRoles": [
-    {
-      "name": "curr",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "curr is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used in a condition",
-        "derived from head, next",
-        "used to compute next",
-        "used to compute prev"
-      ],
-      "method": "reverseList"
-    },
-    {
-      "name": "prev",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "prev is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used to compute next",
-        "derived from curr",
-        "contributes to the returned expression"
-      ],
-      "method": "reverseList"
-    }
-  ]
-}
-
-================================================================================
-
-STEP 8 / 24
-LINE: 20
-CODE: curr = next;
-EVENT: STEP
-METHOD: reverseList
-DEPTH: 1
-CONDITION: —
-EXECUTION EVENTS:
-[
-  {
-    "sequence": 0,
-    "type": "VARIABLE_UPDATE",
-    "line": 20,
-    "method": "reverseList",
-    "depth": 1,
-    "data": {
-      "name": "curr",
-      "value": {
         "$objectId": "296",
         "$type": "ListNode",
         "fields": {
@@ -1865,1308 +112,265 @@ EXECUTION EVENTS:
             "$type": "ListNode",
             "fields": {
               "val": 3,
-              "next": null
-            }
-          }
-        }
-      },
-      "before": {
-        "$objectId": "294",
-        "$type": "ListNode",
-        "fields": {
-          "val": 1,
-          "next": null
-        }
-      }
-    }
-  }
-]
-VARIABLES:
-{
-  "head": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "prev": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "curr": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "297",
-        "$type": "ListNode",
-        "fields": {
-          "val": 3,
-          "next": null
-        }
-      }
-    }
-  },
-  "this": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "297",
-        "$type": "ListNode",
-        "fields": {
-          "val": 3,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "298": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-CALL STACK:
-[
-  "reverseList"
-]
-LAST EVENT DATA:
-{
-  "variables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "curr": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "next": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "297",
-          "$type": "ListNode",
-          "fields": {
-            "val": 3,
-            "next": null
-          }
-        }
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "arrayReferences": [],
-  "postVariables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "curr": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "297",
-          "$type": "ListNode",
-          "fields": {
-            "val": 3,
-            "next": null
-          }
-        }
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "executionEvents": [
-    {
-      "sequence": 0,
-      "type": "VARIABLE_UPDATE",
-      "line": 20,
-      "method": "reverseList",
-      "depth": 1,
-      "data": {
-        "name": "curr",
-        "value": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "297",
-              "$type": "ListNode",
-              "fields": {
-                "val": 3,
-                "next": null
+              "next": {
+                "$objectId": "298",
+                "$type": "ListNode",
+                "fields": {
+                  "val": 4,
+                  "next": {
+                    "$objectId": "299",
+                    "$type": "ListNode",
+                    "fields": {
+                      "val": 5,
+                      "next": null
+                    }
+                  }
+                }
               }
             }
           }
-        },
-        "before": {
-          "$objectId": "294",
-          "$type": "ListNode",
-          "fields": {
-            "val": 1,
-            "next": null
-          }
         }
       }
     }
-  ],
-  "semanticRoles": [
-    {
-      "name": "curr",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "curr is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used in a condition",
-        "derived from head, next",
-        "used to compute next",
-        "used to compute prev"
-      ],
-      "method": "reverseList"
-    },
-    {
-      "name": "prev",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "prev is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used to compute next",
-        "derived from curr",
-        "contributes to the returned expression"
-      ],
-      "method": "reverseList"
-    }
-  ]
+  }
 }
 
-================================================================================
+------------------------------------------------------------------------
+STEP 4 / 36
+EXECUTED LINE 16: while(curr != null){
+CONDITION RESULT: TRUE
+VARIABLE / STATE CHANGES:
+—
+TRACE EVENTS:
+—
 
-STEP 9 / 24
-LINE: 21
-CODE: }
-EVENT: STEP
-METHOD: reverseList
-DEPTH: 1
-CONDITION: —
-EXECUTION EVENTS:
-[]
-VARIABLES:
-{
-  "head": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "prev": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "curr": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "297",
-        "$type": "ListNode",
-        "fields": {
-          "val": 3,
-          "next": null
-        }
-      }
-    }
-  },
-  "this": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "297",
-        "$type": "ListNode",
-        "fields": {
-          "val": 3,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "298": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-CALL STACK:
-[
-  "reverseList"
-]
-LAST EVENT DATA:
-{
-  "variables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "curr": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "297",
-          "$type": "ListNode",
-          "fields": {
-            "val": 3,
-            "next": null
-          }
-        }
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "arrayReferences": [],
-  "postVariables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "curr": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "297",
-          "$type": "ListNode",
-          "fields": {
-            "val": 3,
-            "next": null
-          }
-        }
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "semanticRoles": [
-    {
-      "name": "curr",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "curr is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used in a condition",
-        "derived from head, next",
-        "used to compute next",
-        "used to compute prev"
-      ],
-      "method": "reverseList"
-    },
-    {
-      "name": "prev",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "prev is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used to compute next",
-        "derived from curr",
-        "contributes to the returned expression"
-      ],
-      "method": "reverseList"
-    }
-  ]
-}
-
-================================================================================
-
-STEP 10 / 24
-LINE: 16
-CODE: while(curr != null){
-EVENT: STEP
-METHOD: reverseList
-DEPTH: 1
-CONDITION: TRUE
-EXECUTION EVENTS:
-[]
-VARIABLES:
-{
-  "head": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "prev": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "curr": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "297",
-        "$type": "ListNode",
-        "fields": {
-          "val": 3,
-          "next": null
-        }
-      }
-    }
-  },
-  "this": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "297",
-        "$type": "ListNode",
-        "fields": {
-          "val": 3,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "298": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-CALL STACK:
-[
-  "reverseList"
-]
-LAST EVENT DATA:
-{
-  "variables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "curr": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "297",
-          "$type": "ListNode",
-          "fields": {
-            "val": 3,
-            "next": null
-          }
-        }
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "arrayReferences": [],
-  "conditionResult": true,
-  "postVariables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "curr": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "297",
-          "$type": "ListNode",
-          "fields": {
-            "val": 3,
-            "next": null
-          }
-        }
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "semanticRoles": [
-    {
-      "name": "curr",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "curr is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used in a condition",
-        "derived from head, next",
-        "used to compute next",
-        "used to compute prev"
-      ],
-      "method": "reverseList"
-    },
-    {
-      "name": "prev",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "prev is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used to compute next",
-        "derived from curr",
-        "contributes to the returned expression"
-      ],
-      "method": "reverseList"
-    }
-  ]
-}
-
-================================================================================
-
-STEP 11 / 24
-LINE: 17
-CODE: ListNode next = curr.next;
-EVENT: STEP
-METHOD: reverseList
-DEPTH: 1
-CONDITION: —
-EXECUTION EVENTS:
-[
-  {
-    "sequence": 0,
-    "type": "VARIABLE_UPDATE",
-    "line": 17,
-    "method": "reverseList",
-    "depth": 1,
-    "data": {
-      "name": "next",
-      "value": {
-        "$objectId": "297",
-        "$type": "ListNode",
-        "fields": {
-          "val": 3,
-          "next": null
-        }
-      }
-    }
-  }
-]
-VARIABLES:
-{
-  "head": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "prev": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "curr": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "297",
-        "$type": "ListNode",
-        "fields": {
-          "val": 3,
-          "next": null
-        }
-      }
-    }
-  },
-  "next": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "this": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "297",
-        "$type": "ListNode",
-        "fields": {
-          "val": 3,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "298": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-CALL STACK:
-[
-  "reverseList"
-]
-LAST EVENT DATA:
-{
-  "variables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "curr": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "297",
-          "$type": "ListNode",
-          "fields": {
-            "val": 3,
-            "next": null
-          }
-        }
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "arrayReferences": [],
-  "postVariables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "curr": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "297",
-          "$type": "ListNode",
-          "fields": {
-            "val": 3,
-            "next": null
-          }
-        }
-      }
-    },
+------------------------------------------------------------------------
+STEP 5 / 36
+EXECUTED LINE 17: ListNode next = curr.next;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+next: {
+  "$objectId": "296",
+  "$type": "ListNode",
+  "fields": {
+    "val": 2,
     "next": {
       "$objectId": "297",
       "$type": "ListNode",
       "fields": {
         "val": 3,
-        "next": null
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "executionEvents": [
-    {
-      "sequence": 0,
-      "type": "VARIABLE_UPDATE",
-      "line": 17,
-      "method": "reverseList",
-      "depth": 1,
-      "data": {
-        "name": "next",
-        "value": {
-          "$objectId": "297",
+        "next": {
+          "$objectId": "298",
           "$type": "ListNode",
           "fields": {
-            "val": 3,
-            "next": null
+            "val": 4,
+            "next": {
+              "$objectId": "299",
+              "$type": "ListNode",
+              "fields": {
+                "val": 5,
+                "next": null
+              }
+            }
           }
         }
       }
     }
-  ],
-  "semanticRoles": [
-    {
-      "name": "curr",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "curr is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used in a condition",
-        "derived from head, next",
-        "used to compute next",
-        "used to compute prev"
-      ],
-      "method": "reverseList"
-    },
-    {
-      "name": "prev",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "prev is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used to compute next",
-        "derived from curr",
-        "contributes to the returned expression"
-      ],
-      "method": "reverseList"
+  }
+}
+TRACE EVENTS:
+VARIABLE_UPDATE: {
+  "name": "next",
+  "value": {
+    "$objectId": "296",
+    "$type": "ListNode",
+    "fields": {
+      "val": 2,
+      "next": {
+        "$objectId": "297",
+        "$type": "ListNode",
+        "fields": {
+          "val": 3,
+          "next": {
+            "$objectId": "298",
+            "$type": "ListNode",
+            "fields": {
+              "val": 4,
+              "next": {
+                "$objectId": "299",
+                "$type": "ListNode",
+                "fields": {
+                  "val": 5,
+                  "next": null
+                }
+              }
+            }
+          }
+        }
+      }
     }
-  ]
+  }
 }
 
-================================================================================
-
-STEP 12 / 24
-LINE: 18
-CODE: curr.next = prev;
-EVENT: STEP
-METHOD: reverseList
-DEPTH: 1
-CONDITION: —
-EXECUTION EVENTS:
-[
-  {
-    "sequence": 0,
-    "type": "OBJECT_FIELD_WRITE",
-    "line": 18,
-    "method": "reverseList",
-    "depth": 1,
-    "data": {
-      "name": "curr",
-      "objectId": "296",
-      "changes": [
-        {
-          "fields": [
-            "next"
-          ],
-          "before": {
+------------------------------------------------------------------------
+STEP 6 / 36
+EXECUTED LINE 18: curr.next = prev;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+head: {
+  "$objectId": "294",
+  "$type": "ListNode",
+  "fields": {
+    "val": 1,
+    "next": {
+      "$objectId": "296",
+      "$type": "ListNode",
+      "fields": {
+        "val": 2,
+        "next": {
+          "$objectId": "297",
+          "$type": "ListNode",
+          "fields": {
+            "val": 3,
+            "next": {
+              "$objectId": "298",
+              "$type": "ListNode",
+              "fields": {
+                "val": 4,
+                "next": {
+                  "$objectId": "299",
+                  "$type": "ListNode",
+                  "fields": {
+                    "val": 5,
+                    "next": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+} → {
+  "$objectId": "294",
+  "$type": "ListNode",
+  "fields": {
+    "val": 1,
+    "next": null
+  }
+}
+curr: {
+  "$objectId": "294",
+  "$type": "ListNode",
+  "fields": {
+    "val": 1,
+    "next": {
+      "$objectId": "296",
+      "$type": "ListNode",
+      "fields": {
+        "val": 2,
+        "next": {
+          "$objectId": "297",
+          "$type": "ListNode",
+          "fields": {
+            "val": 3,
+            "next": {
+              "$objectId": "298",
+              "$type": "ListNode",
+              "fields": {
+                "val": 4,
+                "next": {
+                  "$objectId": "299",
+                  "$type": "ListNode",
+                  "fields": {
+                    "val": 5,
+                    "next": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+} → {
+  "$objectId": "294",
+  "$type": "ListNode",
+  "fields": {
+    "val": 1,
+    "next": null
+  }
+}
+TRACE EVENTS:
+OBJECT_FIELD_WRITE: {
+  "name": "head",
+  "objectId": "294",
+  "changes": [
+    {
+      "fields": [
+        "next"
+      ],
+      "before": {
+        "$objectId": "296",
+        "$type": "ListNode",
+        "fields": {
+          "val": 2,
+          "next": {
             "$objectId": "297",
             "$type": "ListNode",
             "fields": {
               "val": 3,
-              "next": null
-            }
-          },
-          "after": {
-            "$objectId": "294",
-            "$type": "ListNode",
-            "fields": {
-              "val": 1,
-              "next": null
-            }
-          }
-        }
-      ],
-      "value": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "294",
-            "$type": "ListNode",
-            "fields": {
-              "val": 1,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  }
-]
-VARIABLES:
-{
-  "head": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "prev": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "curr": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "294",
-        "$type": "ListNode",
-        "fields": {
-          "val": 1,
-          "next": null
-        }
-      }
-    }
-  },
-  "next": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "this": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "294",
-        "$type": "ListNode",
-        "fields": {
-          "val": 1,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "298": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-CALL STACK:
-[
-  "reverseList"
-]
-LAST EVENT DATA:
-{
-  "variables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "curr": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "297",
-          "$type": "ListNode",
-          "fields": {
-            "val": 3,
-            "next": null
-          }
-        }
-      }
-    },
-    "next": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
-        "next": null
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "arrayReferences": [],
-  "postVariables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "curr": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "294",
-          "$type": "ListNode",
-          "fields": {
-            "val": 1,
-            "next": null
-          }
-        }
-      }
-    },
-    "next": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
-        "next": null
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "executionEvents": [
-    {
-      "sequence": 0,
-      "type": "OBJECT_FIELD_WRITE",
-      "line": 18,
-      "method": "reverseList",
-      "depth": 1,
-      "data": {
-        "name": "curr",
-        "objectId": "296",
-        "changes": [
-          {
-            "fields": [
-              "next"
-            ],
-            "before": {
-              "$objectId": "297",
-              "$type": "ListNode",
-              "fields": {
-                "val": 3,
-                "next": null
+              "next": {
+                "$objectId": "298",
+                "$type": "ListNode",
+                "fields": {
+                  "val": 4,
+                  "next": {
+                    "$objectId": "299",
+                    "$type": "ListNode",
+                    "fields": {
+                      "val": 5,
+                      "next": null
+                    }
+                  }
+                }
               }
-            },
-            "after": {
-              "$objectId": "294",
-              "$type": "ListNode",
-              "fields": {
-                "val": 1,
-                "next": null
-              }
-            }
-          }
-        ],
-        "value": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "294",
-              "$type": "ListNode",
-              "fields": {
-                "val": 1,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    }
-  ],
-  "semanticRoles": [
-    {
-      "name": "curr",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "curr is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used in a condition",
-        "derived from head, next",
-        "used to compute next",
-        "used to compute prev"
-      ],
-      "method": "reverseList"
-    },
-    {
-      "name": "prev",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "prev is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used to compute next",
-        "derived from curr",
-        "contributes to the returned expression"
-      ],
-      "method": "reverseList"
-    }
-  ]
-}
-
-================================================================================
-
-STEP 13 / 24
-LINE: 19
-CODE: prev = curr;
-EVENT: STEP
-METHOD: reverseList
-DEPTH: 1
-CONDITION: —
-EXECUTION EVENTS:
-[
-  {
-    "sequence": 0,
-    "type": "VARIABLE_UPDATE",
-    "line": 19,
-    "method": "reverseList",
-    "depth": 1,
-    "data": {
-      "name": "prev",
-      "value": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "294",
-            "$type": "ListNode",
-            "fields": {
-              "val": 1,
-              "next": null
             }
           }
         }
       },
-      "before": {
-        "$objectId": "294",
-        "$type": "ListNode",
-        "fields": {
-          "val": 1,
-          "next": null
-        }
-      }
+      "after": null
+    }
+  ],
+  "value": {
+    "$objectId": "294",
+    "$type": "ListNode",
+    "fields": {
+      "val": 1,
+      "next": null
     }
   }
-]
-VARIABLES:
-{
-  "head": {
+}
+
+------------------------------------------------------------------------
+STEP 7 / 36
+EXECUTED LINE 19: prev = curr;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+prev: null → {
+  "$objectId": "294",
+  "$type": "ListNode",
+  "fields": {
+    "val": 1,
+    "next": null
+  }
+}
+TRACE EVENTS:
+VARIABLE_UPDATE: {
+  "name": "prev",
+  "value": {
     "$objectId": "294",
     "$type": "ListNode",
     "fields": {
@@ -3174,291 +378,561 @@ VARIABLES:
       "next": null
     }
   },
-  "prev": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "294",
-        "$type": "ListNode",
-        "fields": {
-          "val": 1,
-          "next": null
-        }
-      }
-    }
-  },
-  "curr": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "294",
-        "$type": "ListNode",
-        "fields": {
-          "val": 1,
-          "next": null
-        }
-      }
-    }
-  },
-  "next": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "this": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
+  "before": null
 }
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "294",
-        "$type": "ListNode",
-        "fields": {
-          "val": 1,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "298": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
+
+------------------------------------------------------------------------
+STEP 8 / 36
+EXECUTED LINE 20: curr = next;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+curr: {
+  "$objectId": "294",
+  "$type": "ListNode",
+  "fields": {
+    "val": 1,
+    "next": null
   }
-}
-CALL STACK:
-[
-  "reverseList"
-]
-LAST EVENT DATA:
-{
-  "variables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "curr": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "294",
-          "$type": "ListNode",
-          "fields": {
-            "val": 1,
-            "next": null
-          }
-        }
-      }
-    },
+} → {
+  "$objectId": "296",
+  "$type": "ListNode",
+  "fields": {
+    "val": 2,
     "next": {
       "$objectId": "297",
       "$type": "ListNode",
       "fields": {
         "val": 3,
-        "next": null
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "arrayReferences": [],
-  "postVariables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
         "next": {
-          "$objectId": "294",
+          "$objectId": "298",
           "$type": "ListNode",
           "fields": {
-            "val": 1,
-            "next": null
-          }
-        }
-      }
-    },
-    "curr": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "294",
-          "$type": "ListNode",
-          "fields": {
-            "val": 1,
-            "next": null
-          }
-        }
-      }
-    },
-    "next": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
-        "next": null
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "executionEvents": [
-    {
-      "sequence": 0,
-      "type": "VARIABLE_UPDATE",
-      "line": 19,
-      "method": "reverseList",
-      "depth": 1,
-      "data": {
-        "name": "prev",
-        "value": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
+            "val": 4,
             "next": {
-              "$objectId": "294",
+              "$objectId": "299",
               "$type": "ListNode",
               "fields": {
-                "val": 1,
+                "val": 5,
                 "next": null
               }
             }
           }
-        },
-        "before": {
-          "$objectId": "294",
-          "$type": "ListNode",
-          "fields": {
-            "val": 1,
-            "next": null
-          }
         }
       }
     }
-  ],
-  "semanticRoles": [
-    {
-      "name": "curr",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "curr is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used in a condition",
-        "derived from head, next",
-        "used to compute next",
-        "used to compute prev"
-      ],
-      "method": "reverseList"
-    },
-    {
-      "name": "prev",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "prev is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used to compute next",
-        "derived from curr",
-        "contributes to the returned expression"
-      ],
-      "method": "reverseList"
-    }
-  ]
+  }
 }
-
-================================================================================
-
-STEP 14 / 24
-LINE: 20
-CODE: curr = next;
-EVENT: STEP
-METHOD: reverseList
-DEPTH: 1
-CONDITION: —
-EXECUTION EVENTS:
-[
-  {
-    "sequence": 0,
-    "type": "VARIABLE_UPDATE",
-    "line": 20,
-    "method": "reverseList",
-    "depth": 1,
-    "data": {
-      "name": "curr",
-      "value": {
+TRACE EVENTS:
+VARIABLE_UPDATE: {
+  "name": "curr",
+  "value": {
+    "$objectId": "296",
+    "$type": "ListNode",
+    "fields": {
+      "val": 2,
+      "next": {
         "$objectId": "297",
         "$type": "ListNode",
         "fields": {
           "val": 3,
-          "next": null
+          "next": {
+            "$objectId": "298",
+            "$type": "ListNode",
+            "fields": {
+              "val": 4,
+              "next": {
+                "$objectId": "299",
+                "$type": "ListNode",
+                "fields": {
+                  "val": 5,
+                  "next": null
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "before": {
+    "$objectId": "294",
+    "$type": "ListNode",
+    "fields": {
+      "val": 1,
+      "next": null
+    }
+  }
+}
+
+------------------------------------------------------------------------
+STEP 9 / 36
+EXECUTED LINE 21: }
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+—
+TRACE EVENTS:
+—
+
+------------------------------------------------------------------------
+STEP 10 / 36
+EXECUTED LINE 16: while(curr != null){
+CONDITION RESULT: TRUE
+VARIABLE / STATE CHANGES:
+—
+TRACE EVENTS:
+—
+
+------------------------------------------------------------------------
+STEP 11 / 36
+EXECUTED LINE 17: ListNode next = curr.next;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+next: {
+  "$objectId": "297",
+  "$type": "ListNode",
+  "fields": {
+    "val": 3,
+    "next": {
+      "$objectId": "298",
+      "$type": "ListNode",
+      "fields": {
+        "val": 4,
+        "next": {
+          "$objectId": "299",
+          "$type": "ListNode",
+          "fields": {
+            "val": 5,
+            "next": null
+          }
+        }
+      }
+    }
+  }
+}
+TRACE EVENTS:
+VARIABLE_UPDATE: {
+  "name": "next",
+  "value": {
+    "$objectId": "297",
+    "$type": "ListNode",
+    "fields": {
+      "val": 3,
+      "next": {
+        "$objectId": "298",
+        "$type": "ListNode",
+        "fields": {
+          "val": 4,
+          "next": {
+            "$objectId": "299",
+            "$type": "ListNode",
+            "fields": {
+              "val": 5,
+              "next": null
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+------------------------------------------------------------------------
+STEP 12 / 36
+EXECUTED LINE 18: curr.next = prev;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+curr: {
+  "$objectId": "296",
+  "$type": "ListNode",
+  "fields": {
+    "val": 2,
+    "next": {
+      "$objectId": "297",
+      "$type": "ListNode",
+      "fields": {
+        "val": 3,
+        "next": {
+          "$objectId": "298",
+          "$type": "ListNode",
+          "fields": {
+            "val": 4,
+            "next": {
+              "$objectId": "299",
+              "$type": "ListNode",
+              "fields": {
+                "val": 5,
+                "next": null
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+} → {
+  "$objectId": "296",
+  "$type": "ListNode",
+  "fields": {
+    "val": 2,
+    "next": {
+      "$objectId": "294",
+      "$type": "ListNode",
+      "fields": {
+        "val": 1,
+        "next": null
+      }
+    }
+  }
+}
+TRACE EVENTS:
+OBJECT_FIELD_WRITE: {
+  "name": "curr",
+  "objectId": "296",
+  "changes": [
+    {
+      "fields": [
+        "next"
+      ],
+      "before": {
+        "$objectId": "297",
+        "$type": "ListNode",
+        "fields": {
+          "val": 3,
+          "next": {
+            "$objectId": "298",
+            "$type": "ListNode",
+            "fields": {
+              "val": 4,
+              "next": {
+                "$objectId": "299",
+                "$type": "ListNode",
+                "fields": {
+                  "val": 5,
+                  "next": null
+                }
+              }
+            }
+          }
         }
       },
+      "after": {
+        "$objectId": "294",
+        "$type": "ListNode",
+        "fields": {
+          "val": 1,
+          "next": null
+        }
+      }
+    }
+  ],
+  "value": {
+    "$objectId": "296",
+    "$type": "ListNode",
+    "fields": {
+      "val": 2,
+      "next": {
+        "$objectId": "294",
+        "$type": "ListNode",
+        "fields": {
+          "val": 1,
+          "next": null
+        }
+      }
+    }
+  }
+}
+
+------------------------------------------------------------------------
+STEP 13 / 36
+EXECUTED LINE 19: prev = curr;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+prev: {
+  "$objectId": "294",
+  "$type": "ListNode",
+  "fields": {
+    "val": 1,
+    "next": null
+  }
+} → {
+  "$objectId": "296",
+  "$type": "ListNode",
+  "fields": {
+    "val": 2,
+    "next": {
+      "$objectId": "294",
+      "$type": "ListNode",
+      "fields": {
+        "val": 1,
+        "next": null
+      }
+    }
+  }
+}
+TRACE EVENTS:
+VARIABLE_UPDATE: {
+  "name": "prev",
+  "value": {
+    "$objectId": "296",
+    "$type": "ListNode",
+    "fields": {
+      "val": 2,
+      "next": {
+        "$objectId": "294",
+        "$type": "ListNode",
+        "fields": {
+          "val": 1,
+          "next": null
+        }
+      }
+    }
+  },
+  "before": {
+    "$objectId": "294",
+    "$type": "ListNode",
+    "fields": {
+      "val": 1,
+      "next": null
+    }
+  }
+}
+
+------------------------------------------------------------------------
+STEP 14 / 36
+EXECUTED LINE 20: curr = next;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+curr: {
+  "$objectId": "296",
+  "$type": "ListNode",
+  "fields": {
+    "val": 2,
+    "next": {
+      "$objectId": "294",
+      "$type": "ListNode",
+      "fields": {
+        "val": 1,
+        "next": null
+      }
+    }
+  }
+} → {
+  "$objectId": "297",
+  "$type": "ListNode",
+  "fields": {
+    "val": 3,
+    "next": {
+      "$objectId": "298",
+      "$type": "ListNode",
+      "fields": {
+        "val": 4,
+        "next": {
+          "$objectId": "299",
+          "$type": "ListNode",
+          "fields": {
+            "val": 5,
+            "next": null
+          }
+        }
+      }
+    }
+  }
+}
+TRACE EVENTS:
+VARIABLE_UPDATE: {
+  "name": "curr",
+  "value": {
+    "$objectId": "297",
+    "$type": "ListNode",
+    "fields": {
+      "val": 3,
+      "next": {
+        "$objectId": "298",
+        "$type": "ListNode",
+        "fields": {
+          "val": 4,
+          "next": {
+            "$objectId": "299",
+            "$type": "ListNode",
+            "fields": {
+              "val": 5,
+              "next": null
+            }
+          }
+        }
+      }
+    }
+  },
+  "before": {
+    "$objectId": "296",
+    "$type": "ListNode",
+    "fields": {
+      "val": 2,
+      "next": {
+        "$objectId": "294",
+        "$type": "ListNode",
+        "fields": {
+          "val": 1,
+          "next": null
+        }
+      }
+    }
+  }
+}
+
+------------------------------------------------------------------------
+STEP 15 / 36
+EXECUTED LINE 21: }
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+—
+TRACE EVENTS:
+—
+
+------------------------------------------------------------------------
+STEP 16 / 36
+EXECUTED LINE 16: while(curr != null){
+CONDITION RESULT: TRUE
+VARIABLE / STATE CHANGES:
+—
+TRACE EVENTS:
+—
+
+------------------------------------------------------------------------
+STEP 17 / 36
+EXECUTED LINE 17: ListNode next = curr.next;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+next: {
+  "$objectId": "298",
+  "$type": "ListNode",
+  "fields": {
+    "val": 4,
+    "next": {
+      "$objectId": "299",
+      "$type": "ListNode",
+      "fields": {
+        "val": 5,
+        "next": null
+      }
+    }
+  }
+}
+TRACE EVENTS:
+VARIABLE_UPDATE: {
+  "name": "next",
+  "value": {
+    "$objectId": "298",
+    "$type": "ListNode",
+    "fields": {
+      "val": 4,
+      "next": {
+        "$objectId": "299",
+        "$type": "ListNode",
+        "fields": {
+          "val": 5,
+          "next": null
+        }
+      }
+    }
+  }
+}
+
+------------------------------------------------------------------------
+STEP 18 / 36
+EXECUTED LINE 18: curr.next = prev;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+curr: {
+  "$objectId": "297",
+  "$type": "ListNode",
+  "fields": {
+    "val": 3,
+    "next": {
+      "$objectId": "298",
+      "$type": "ListNode",
+      "fields": {
+        "val": 4,
+        "next": {
+          "$objectId": "299",
+          "$type": "ListNode",
+          "fields": {
+            "val": 5,
+            "next": null
+          }
+        }
+      }
+    }
+  }
+} → {
+  "$objectId": "297",
+  "$type": "ListNode",
+  "fields": {
+    "val": 3,
+    "next": {
+      "$objectId": "296",
+      "$type": "ListNode",
+      "fields": {
+        "val": 2,
+        "next": {
+          "$objectId": "294",
+          "$type": "ListNode",
+          "fields": {
+            "val": 1,
+            "next": null
+          }
+        }
+      }
+    }
+  }
+}
+TRACE EVENTS:
+OBJECT_FIELD_WRITE: {
+  "name": "curr",
+  "objectId": "297",
+  "changes": [
+    {
+      "fields": [
+        "next"
+      ],
       "before": {
+        "$objectId": "298",
+        "$type": "ListNode",
+        "fields": {
+          "val": 4,
+          "next": {
+            "$objectId": "299",
+            "$type": "ListNode",
+            "fields": {
+              "val": 5,
+              "next": null
+            }
+          }
+        }
+      },
+      "after": {
+        "$objectId": "296",
+        "$type": "ListNode",
+        "fields": {
+          "val": 2,
+          "next": {
+            "$objectId": "294",
+            "$type": "ListNode",
+            "fields": {
+              "val": 1,
+              "next": null
+            }
+          }
+        }
+      }
+    }
+  ],
+  "value": {
+    "$objectId": "297",
+    "$type": "ListNode",
+    "fields": {
+      "val": 3,
+      "next": {
         "$objectId": "296",
         "$type": "ListNode",
         "fields": {
@@ -3475,105 +949,33 @@ EXECUTION EVENTS:
       }
     }
   }
-]
-VARIABLES:
-{
-  "head": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "prev": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "294",
-        "$type": "ListNode",
-        "fields": {
-          "val": 1,
-          "next": null
-        }
-      }
-    }
-  },
-  "curr": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "this": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
 }
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "294",
-        "$type": "ListNode",
-        "fields": {
-          "val": 1,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "298": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-CALL STACK:
-[
-  "reverseList"
-]
-LAST EVENT DATA:
-{
-  "variables": {
-    "head": {
+
+------------------------------------------------------------------------
+STEP 19 / 36
+EXECUTED LINE 19: prev = curr;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+prev: {
+  "$objectId": "296",
+  "$type": "ListNode",
+  "fields": {
+    "val": 2,
+    "next": {
       "$objectId": "294",
       "$type": "ListNode",
       "fields": {
         "val": 1,
         "next": null
       }
-    },
-    "prev": {
+    }
+  }
+} → {
+  "$objectId": "297",
+  "$type": "ListNode",
+  "fields": {
+    "val": 3,
+    "next": {
       "$objectId": "296",
       "$type": "ListNode",
       "fields": {
@@ -3587,8 +989,62 @@ LAST EVENT DATA:
           }
         }
       }
-    },
-    "curr": {
+    }
+  }
+}
+TRACE EVENTS:
+VARIABLE_UPDATE: {
+  "name": "prev",
+  "value": {
+    "$objectId": "297",
+    "$type": "ListNode",
+    "fields": {
+      "val": 3,
+      "next": {
+        "$objectId": "296",
+        "$type": "ListNode",
+        "fields": {
+          "val": 2,
+          "next": {
+            "$objectId": "294",
+            "$type": "ListNode",
+            "fields": {
+              "val": 1,
+              "next": null
+            }
+          }
+        }
+      }
+    }
+  },
+  "before": {
+    "$objectId": "296",
+    "$type": "ListNode",
+    "fields": {
+      "val": 2,
+      "next": {
+        "$objectId": "294",
+        "$type": "ListNode",
+        "fields": {
+          "val": 1,
+          "next": null
+        }
+      }
+    }
+  }
+}
+
+------------------------------------------------------------------------
+STEP 20 / 36
+EXECUTED LINE 20: curr = next;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+curr: {
+  "$objectId": "297",
+  "$type": "ListNode",
+  "fields": {
+    "val": 3,
+    "next": {
       "$objectId": "296",
       "$type": "ListNode",
       "fields": {
@@ -3602,78 +1058,139 @@ LAST EVENT DATA:
           }
         }
       }
-    },
+    }
+  }
+} → {
+  "$objectId": "298",
+  "$type": "ListNode",
+  "fields": {
+    "val": 4,
+    "next": {
+      "$objectId": "299",
+      "$type": "ListNode",
+      "fields": {
+        "val": 5,
+        "next": null
+      }
+    }
+  }
+}
+TRACE EVENTS:
+VARIABLE_UPDATE: {
+  "name": "curr",
+  "value": {
+    "$objectId": "298",
+    "$type": "ListNode",
+    "fields": {
+      "val": 4,
+      "next": {
+        "$objectId": "299",
+        "$type": "ListNode",
+        "fields": {
+          "val": 5,
+          "next": null
+        }
+      }
+    }
+  },
+  "before": {
+    "$objectId": "297",
+    "$type": "ListNode",
+    "fields": {
+      "val": 3,
+      "next": {
+        "$objectId": "296",
+        "$type": "ListNode",
+        "fields": {
+          "val": 2,
+          "next": {
+            "$objectId": "294",
+            "$type": "ListNode",
+            "fields": {
+              "val": 1,
+              "next": null
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+------------------------------------------------------------------------
+STEP 21 / 36
+EXECUTED LINE 21: }
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+—
+TRACE EVENTS:
+—
+
+------------------------------------------------------------------------
+STEP 22 / 36
+EXECUTED LINE 16: while(curr != null){
+CONDITION RESULT: TRUE
+VARIABLE / STATE CHANGES:
+—
+TRACE EVENTS:
+—
+
+------------------------------------------------------------------------
+STEP 23 / 36
+EXECUTED LINE 17: ListNode next = curr.next;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+next: {
+  "$objectId": "299",
+  "$type": "ListNode",
+  "fields": {
+    "val": 5,
+    "next": null
+  }
+}
+TRACE EVENTS:
+VARIABLE_UPDATE: {
+  "name": "next",
+  "value": {
+    "$objectId": "299",
+    "$type": "ListNode",
+    "fields": {
+      "val": 5,
+      "next": null
+    }
+  }
+}
+
+------------------------------------------------------------------------
+STEP 24 / 36
+EXECUTED LINE 18: curr.next = prev;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+curr: {
+  "$objectId": "298",
+  "$type": "ListNode",
+  "fields": {
+    "val": 4,
+    "next": {
+      "$objectId": "299",
+      "$type": "ListNode",
+      "fields": {
+        "val": 5,
+        "next": null
+      }
+    }
+  }
+} → {
+  "$objectId": "298",
+  "$type": "ListNode",
+  "fields": {
+    "val": 4,
     "next": {
       "$objectId": "297",
       "$type": "ListNode",
       "fields": {
         "val": 3,
-        "next": null
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "arrayReferences": [],
-  "postVariables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
         "next": {
-          "$objectId": "294",
-          "$type": "ListNode",
-          "fields": {
-            "val": 1,
-            "next": null
-          }
-        }
-      }
-    },
-    "curr": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
-        "next": null
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "executionEvents": [
-    {
-      "sequence": 0,
-      "type": "VARIABLE_UPDATE",
-      "line": 20,
-      "method": "reverseList",
-      "depth": 1,
-      "data": {
-        "name": "curr",
-        "value": {
-          "$objectId": "297",
-          "$type": "ListNode",
-          "fields": {
-            "val": 3,
-            "next": null
-          }
-        },
-        "before": {
           "$objectId": "296",
           "$type": "ListNode",
           "fields": {
@@ -3690,706 +1207,31 @@ LAST EVENT DATA:
         }
       }
     }
-  ],
-  "semanticRoles": [
-    {
-      "name": "curr",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "curr is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used in a condition",
-        "derived from head, next",
-        "used to compute next",
-        "used to compute prev"
-      ],
-      "method": "reverseList"
-    },
-    {
-      "name": "prev",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "prev is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used to compute next",
-        "derived from curr",
-        "contributes to the returned expression"
-      ],
-      "method": "reverseList"
-    }
-  ]
+  }
 }
-
-================================================================================
-
-STEP 15 / 24
-LINE: 21
-CODE: }
-EVENT: STEP
-METHOD: reverseList
-DEPTH: 1
-CONDITION: —
-EXECUTION EVENTS:
-[]
-VARIABLES:
-{
-  "head": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "prev": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "294",
+TRACE EVENTS:
+OBJECT_FIELD_WRITE: {
+  "name": "curr",
+  "objectId": "298",
+  "changes": [
+    {
+      "fields": [
+        "next"
+      ],
+      "before": {
+        "$objectId": "299",
         "$type": "ListNode",
         "fields": {
-          "val": 1,
+          "val": 5,
           "next": null
         }
-      }
-    }
-  },
-  "curr": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "this": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "294",
+      },
+      "after": {
+        "$objectId": "297",
         "$type": "ListNode",
         "fields": {
-          "val": 1,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "298": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-CALL STACK:
-[
-  "reverseList"
-]
-LAST EVENT DATA:
-{
-  "variables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "294",
-          "$type": "ListNode",
-          "fields": {
-            "val": 1,
-            "next": null
-          }
-        }
-      }
-    },
-    "curr": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
-        "next": null
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "arrayReferences": [],
-  "postVariables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "294",
-          "$type": "ListNode",
-          "fields": {
-            "val": 1,
-            "next": null
-          }
-        }
-      }
-    },
-    "curr": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
-        "next": null
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "semanticRoles": [
-    {
-      "name": "curr",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "curr is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used in a condition",
-        "derived from head, next",
-        "used to compute next",
-        "used to compute prev"
-      ],
-      "method": "reverseList"
-    },
-    {
-      "name": "prev",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "prev is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used to compute next",
-        "derived from curr",
-        "contributes to the returned expression"
-      ],
-      "method": "reverseList"
-    }
-  ]
-}
-
-================================================================================
-
-STEP 16 / 24
-LINE: 16
-CODE: while(curr != null){
-EVENT: STEP
-METHOD: reverseList
-DEPTH: 1
-CONDITION: TRUE
-EXECUTION EVENTS:
-[]
-VARIABLES:
-{
-  "head": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "prev": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "294",
-        "$type": "ListNode",
-        "fields": {
-          "val": 1,
-          "next": null
-        }
-      }
-    }
-  },
-  "curr": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "this": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "294",
-        "$type": "ListNode",
-        "fields": {
-          "val": 1,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "298": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-CALL STACK:
-[
-  "reverseList"
-]
-LAST EVENT DATA:
-{
-  "variables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "294",
-          "$type": "ListNode",
-          "fields": {
-            "val": 1,
-            "next": null
-          }
-        }
-      }
-    },
-    "curr": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
-        "next": null
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "arrayReferences": [],
-  "conditionResult": true,
-  "postVariables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "294",
-          "$type": "ListNode",
-          "fields": {
-            "val": 1,
-            "next": null
-          }
-        }
-      }
-    },
-    "curr": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
-        "next": null
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "semanticRoles": [
-    {
-      "name": "curr",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "curr is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used in a condition",
-        "derived from head, next",
-        "used to compute next",
-        "used to compute prev"
-      ],
-      "method": "reverseList"
-    },
-    {
-      "name": "prev",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "prev is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used to compute next",
-        "derived from curr",
-        "contributes to the returned expression"
-      ],
-      "method": "reverseList"
-    }
-  ]
-}
-
-================================================================================
-
-STEP 17 / 24
-LINE: 17
-CODE: ListNode next = curr.next;
-EVENT: STEP
-METHOD: reverseList
-DEPTH: 1
-CONDITION: —
-EXECUTION EVENTS:
-[
-  {
-    "sequence": 0,
-    "type": "VARIABLE_UPDATE",
-    "line": 17,
-    "method": "reverseList",
-    "depth": 1,
-    "data": {
-      "name": "next",
-      "value": null
-    }
-  }
-]
-VARIABLES:
-{
-  "head": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "prev": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "294",
-        "$type": "ListNode",
-        "fields": {
-          "val": 1,
-          "next": null
-        }
-      }
-    }
-  },
-  "curr": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "next": null,
-  "this": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "294",
-        "$type": "ListNode",
-        "fields": {
-          "val": 1,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": null
-    }
-  },
-  "298": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-CALL STACK:
-[
-  "reverseList"
-]
-LAST EVENT DATA:
-{
-  "variables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "294",
-          "$type": "ListNode",
-          "fields": {
-            "val": 1,
-            "next": null
-          }
-        }
-      }
-    },
-    "curr": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
-        "next": null
-      }
-    },
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "arrayReferences": [],
-  "postVariables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "294",
-          "$type": "ListNode",
-          "fields": {
-            "val": 1,
-            "next": null
-          }
-        }
-      }
-    },
-    "curr": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
-        "next": null
-      }
-    },
-    "next": null,
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "executionEvents": [
-    {
-      "sequence": 0,
-      "type": "VARIABLE_UPDATE",
-      "line": 17,
-      "method": "reverseList",
-      "depth": 1,
-      "data": {
-        "name": "next",
-        "value": null
-      }
-    }
-  ],
-  "semanticRoles": [
-    {
-      "name": "curr",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "curr is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used in a condition",
-        "derived from head, next",
-        "used to compute next",
-        "used to compute prev"
-      ],
-      "method": "reverseList"
-    },
-    {
-      "name": "prev",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "prev is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used to compute next",
-        "derived from curr",
-        "contributes to the returned expression"
-      ],
-      "method": "reverseList"
-    }
-  ]
-}
-
-================================================================================
-
-STEP 18 / 24
-LINE: 18
-CODE: curr.next = prev;
-EVENT: STEP
-METHOD: reverseList
-DEPTH: 1
-CONDITION: —
-EXECUTION EVENTS:
-[
-  {
-    "sequence": 0,
-    "type": "OBJECT_FIELD_WRITE",
-    "line": 18,
-    "method": "reverseList",
-    "depth": 1,
-    "data": {
-      "name": "curr",
-      "objectId": "297",
-      "changes": [
-        {
-          "fields": [
-            "next"
-          ],
-          "before": null,
-          "after": {
+          "val": 3,
+          "next": {
             "$objectId": "296",
             "$type": "ListNode",
             "fields": {
@@ -4405,8 +1247,15 @@ EXECUTION EVENTS:
             }
           }
         }
-      ],
-      "value": {
+      }
+    }
+  ],
+  "value": {
+    "$objectId": "298",
+    "$type": "ListNode",
+    "fields": {
+      "val": 4,
+      "next": {
         "$objectId": "297",
         "$type": "ListNode",
         "fields": {
@@ -4430,134 +1279,19 @@ EXECUTION EVENTS:
       }
     }
   }
-]
-VARIABLES:
-{
-  "head": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "prev": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "294",
-        "$type": "ListNode",
-        "fields": {
-          "val": 1,
-          "next": null
-        }
-      }
-    }
-  },
-  "curr": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "294",
-            "$type": "ListNode",
-            "fields": {
-              "val": 1,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "next": null,
-  "this": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
 }
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "294",
-        "$type": "ListNode",
-        "fields": {
-          "val": 1,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "294",
-            "$type": "ListNode",
-            "fields": {
-              "val": 1,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "298": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-CALL STACK:
-[
-  "reverseList"
-]
-LAST EVENT DATA:
-{
-  "variables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
+
+------------------------------------------------------------------------
+STEP 25 / 36
+EXECUTED LINE 19: prev = curr;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+prev: {
+  "$objectId": "297",
+  "$type": "ListNode",
+  "fields": {
+    "val": 3,
+    "next": {
       "$objectId": "296",
       "$type": "ListNode",
       "fields": {
@@ -4571,48 +1305,14 @@ LAST EVENT DATA:
           }
         }
       }
-    },
-    "curr": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
-        "next": null
-      }
-    },
-    "next": null,
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
     }
-  },
-  "arrayReferences": [],
-  "postVariables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "294",
-          "$type": "ListNode",
-          "fields": {
-            "val": 1,
-            "next": null
-          }
-        }
-      }
-    },
-    "curr": {
+  }
+} → {
+  "$objectId": "298",
+  "$type": "ListNode",
+  "fields": {
+    "val": 4,
+    "next": {
       "$objectId": "297",
       "$type": "ListNode",
       "fields": {
@@ -4633,121 +1333,18 @@ LAST EVENT DATA:
           }
         }
       }
-    },
-    "next": null,
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
     }
-  },
-  "executionEvents": [
-    {
-      "sequence": 0,
-      "type": "OBJECT_FIELD_WRITE",
-      "line": 18,
-      "method": "reverseList",
-      "depth": 1,
-      "data": {
-        "name": "curr",
-        "objectId": "297",
-        "changes": [
-          {
-            "fields": [
-              "next"
-            ],
-            "before": null,
-            "after": {
-              "$objectId": "296",
-              "$type": "ListNode",
-              "fields": {
-                "val": 2,
-                "next": {
-                  "$objectId": "294",
-                  "$type": "ListNode",
-                  "fields": {
-                    "val": 1,
-                    "next": null
-                  }
-                }
-              }
-            }
-          }
-        ],
-        "value": {
-          "$objectId": "297",
-          "$type": "ListNode",
-          "fields": {
-            "val": 3,
-            "next": {
-              "$objectId": "296",
-              "$type": "ListNode",
-              "fields": {
-                "val": 2,
-                "next": {
-                  "$objectId": "294",
-                  "$type": "ListNode",
-                  "fields": {
-                    "val": 1,
-                    "next": null
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  ],
-  "semanticRoles": [
-    {
-      "name": "curr",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "curr is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used in a condition",
-        "derived from head, next",
-        "used to compute next",
-        "used to compute prev"
-      ],
-      "method": "reverseList"
-    },
-    {
-      "name": "prev",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "prev is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used to compute next",
-        "derived from curr",
-        "contributes to the returned expression"
-      ],
-      "method": "reverseList"
-    }
-  ]
+  }
 }
-
-================================================================================
-
-STEP 19 / 24
-LINE: 19
-CODE: prev = curr;
-EVENT: STEP
-METHOD: reverseList
-DEPTH: 1
-CONDITION: —
-EXECUTION EVENTS:
-[
-  {
-    "sequence": 0,
-    "type": "VARIABLE_UPDATE",
-    "line": 19,
-    "method": "reverseList",
-    "depth": 1,
-    "data": {
-      "name": "prev",
-      "value": {
+TRACE EVENTS:
+VARIABLE_UPDATE: {
+  "name": "prev",
+  "value": {
+    "$objectId": "298",
+    "$type": "ListNode",
+    "fields": {
+      "val": 4,
+      "next": {
         "$objectId": "297",
         "$type": "ListNode",
         "fields": {
@@ -4768,8 +1365,15 @@ EXECUTION EVENTS:
             }
           }
         }
-      },
-      "before": {
+      }
+    }
+  },
+  "before": {
+    "$objectId": "297",
+    "$type": "ListNode",
+    "fields": {
+      "val": 3,
+      "next": {
         "$objectId": "296",
         "$type": "ListNode",
         "fields": {
@@ -4786,344 +1390,66 @@ EXECUTION EVENTS:
       }
     }
   }
-]
-VARIABLES:
-{
-  "head": {
-    "$objectId": "294",
+}
+
+------------------------------------------------------------------------
+STEP 26 / 36
+EXECUTED LINE 20: curr = next;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+curr: {
+  "$objectId": "298",
+  "$type": "ListNode",
+  "fields": {
+    "val": 4,
+    "next": {
+      "$objectId": "297",
+      "$type": "ListNode",
+      "fields": {
+        "val": 3,
+        "next": {
+          "$objectId": "296",
+          "$type": "ListNode",
+          "fields": {
+            "val": 2,
+            "next": {
+              "$objectId": "294",
+              "$type": "ListNode",
+              "fields": {
+                "val": 1,
+                "next": null
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+} → {
+  "$objectId": "299",
+  "$type": "ListNode",
+  "fields": {
+    "val": 5,
+    "next": null
+  }
+}
+TRACE EVENTS:
+VARIABLE_UPDATE: {
+  "name": "curr",
+  "value": {
+    "$objectId": "299",
     "$type": "ListNode",
     "fields": {
-      "val": 1,
+      "val": 5,
       "next": null
     }
   },
-  "prev": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "294",
-            "$type": "ListNode",
-            "fields": {
-              "val": 1,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "curr": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "294",
-            "$type": "ListNode",
-            "fields": {
-              "val": 1,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "next": null,
-  "this": {
+  "before": {
     "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
     "$type": "ListNode",
     "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
+      "val": 4,
       "next": {
-        "$objectId": "294",
-        "$type": "ListNode",
-        "fields": {
-          "val": 1,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "294",
-            "$type": "ListNode",
-            "fields": {
-              "val": 1,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "298": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-CALL STACK:
-[
-  "reverseList"
-]
-LAST EVENT DATA:
-{
-  "variables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "296",
-      "$type": "ListNode",
-      "fields": {
-        "val": 2,
-        "next": {
-          "$objectId": "294",
-          "$type": "ListNode",
-          "fields": {
-            "val": 1,
-            "next": null
-          }
-        }
-      }
-    },
-    "curr": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "294",
-              "$type": "ListNode",
-              "fields": {
-                "val": 1,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "next": null,
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "arrayReferences": [],
-  "postVariables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "294",
-              "$type": "ListNode",
-              "fields": {
-                "val": 1,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "curr": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "294",
-              "$type": "ListNode",
-              "fields": {
-                "val": 1,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "next": null,
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "executionEvents": [
-    {
-      "sequence": 0,
-      "type": "VARIABLE_UPDATE",
-      "line": 19,
-      "method": "reverseList",
-      "depth": 1,
-      "data": {
-        "name": "prev",
-        "value": {
-          "$objectId": "297",
-          "$type": "ListNode",
-          "fields": {
-            "val": 3,
-            "next": {
-              "$objectId": "296",
-              "$type": "ListNode",
-              "fields": {
-                "val": 2,
-                "next": {
-                  "$objectId": "294",
-                  "$type": "ListNode",
-                  "fields": {
-                    "val": 1,
-                    "next": null
-                  }
-                }
-              }
-            }
-          }
-        },
-        "before": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "294",
-              "$type": "ListNode",
-              "fields": {
-                "val": 1,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    }
-  ],
-  "semanticRoles": [
-    {
-      "name": "curr",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "curr is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used in a condition",
-        "derived from head, next",
-        "used to compute next",
-        "used to compute prev"
-      ],
-      "method": "reverseList"
-    },
-    {
-      "name": "prev",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "prev is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used to compute next",
-        "derived from curr",
-        "contributes to the returned expression"
-      ],
-      "method": "reverseList"
-    }
-  ]
-}
-
-================================================================================
-
-STEP 20 / 24
-LINE: 20
-CODE: curr = next;
-EVENT: STEP
-METHOD: reverseList
-DEPTH: 1
-CONDITION: —
-EXECUTION EVENTS:
-[
-  {
-    "sequence": 0,
-    "type": "VARIABLE_UPDATE",
-    "line": 20,
-    "method": "reverseList",
-    "depth": 1,
-    "data": {
-      "name": "curr",
-      "value": null,
-      "before": {
         "$objectId": "297",
         "$type": "ListNode",
         "fields": {
@@ -5147,219 +1473,61 @@ EXECUTION EVENTS:
       }
     }
   }
-]
-VARIABLES:
-{
-  "head": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "prev": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "294",
-            "$type": "ListNode",
-            "fields": {
-              "val": 1,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "curr": null,
-  "this": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
 }
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "294",
-        "$type": "ListNode",
-        "fields": {
-          "val": 1,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "294",
-            "$type": "ListNode",
-            "fields": {
-              "val": 1,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "298": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
+
+------------------------------------------------------------------------
+STEP 27 / 36
+EXECUTED LINE 21: }
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+—
+TRACE EVENTS:
+—
+
+------------------------------------------------------------------------
+STEP 28 / 36
+EXECUTED LINE 16: while(curr != null){
+CONDITION RESULT: TRUE
+VARIABLE / STATE CHANGES:
+—
+TRACE EVENTS:
+—
+
+------------------------------------------------------------------------
+STEP 29 / 36
+EXECUTED LINE 17: ListNode next = curr.next;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+next: null
+TRACE EVENTS:
+VARIABLE_UPDATE: {
+  "name": "next",
+  "value": null
 }
-CALL STACK:
-[
-  "reverseList"
-]
-LAST EVENT DATA:
-{
-  "variables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "294",
-              "$type": "ListNode",
-              "fields": {
-                "val": 1,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "curr": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "294",
-              "$type": "ListNode",
-              "fields": {
-                "val": 1,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "next": null,
-    "this": {
+
+------------------------------------------------------------------------
+STEP 30 / 36
+EXECUTED LINE 18: curr.next = prev;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+curr: {
+  "$objectId": "299",
+  "$type": "ListNode",
+  "fields": {
+    "val": 5,
+    "next": null
+  }
+} → {
+  "$objectId": "299",
+  "$type": "ListNode",
+  "fields": {
+    "val": 5,
+    "next": {
       "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "arrayReferences": [],
-  "postVariables": {
-    "head": {
-      "$objectId": "294",
       "$type": "ListNode",
       "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
+        "val": 4,
         "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "294",
-              "$type": "ListNode",
-              "fields": {
-                "val": 1,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "curr": null,
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "executionEvents": [
-    {
-      "sequence": 0,
-      "type": "VARIABLE_UPDATE",
-      "line": 20,
-      "method": "reverseList",
-      "depth": 1,
-      "data": {
-        "name": "curr",
-        "value": null,
-        "before": {
           "$objectId": "297",
           "$type": "ListNode",
           "fields": {
@@ -5383,565 +1551,301 @@ LAST EVENT DATA:
         }
       }
     }
+  }
+}
+TRACE EVENTS:
+OBJECT_FIELD_WRITE: {
+  "name": "curr",
+  "objectId": "299",
+  "changes": [
+    {
+      "fields": [
+        "next"
+      ],
+      "before": null,
+      "after": {
+        "$objectId": "298",
+        "$type": "ListNode",
+        "fields": {
+          "val": 4,
+          "next": {
+            "$objectId": "297",
+            "$type": "ListNode",
+            "fields": {
+              "val": 3,
+              "next": {
+                "$objectId": "296",
+                "$type": "ListNode",
+                "fields": {
+                  "val": 2,
+                  "next": {
+                    "$objectId": "294",
+                    "$type": "ListNode",
+                    "fields": {
+                      "val": 1,
+                      "next": null
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   ],
-  "semanticRoles": [
-    {
-      "name": "curr",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "curr is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used in a condition",
-        "derived from head, next",
-        "used to compute next",
-        "used to compute prev"
-      ],
-      "method": "reverseList"
-    },
-    {
-      "name": "prev",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "prev is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used to compute next",
-        "derived from curr",
-        "contributes to the returned expression"
-      ],
-      "method": "reverseList"
-    }
-  ]
-}
-
-================================================================================
-
-STEP 21 / 24
-LINE: 21
-CODE: }
-EVENT: STEP
-METHOD: reverseList
-DEPTH: 1
-CONDITION: —
-EXECUTION EVENTS:
-[]
-VARIABLES:
-{
-  "head": {
-    "$objectId": "294",
+  "value": {
+    "$objectId": "299",
     "$type": "ListNode",
     "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "prev": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
+      "val": 5,
       "next": {
-        "$objectId": "296",
+        "$objectId": "298",
         "$type": "ListNode",
         "fields": {
-          "val": 2,
+          "val": 4,
           "next": {
-            "$objectId": "294",
+            "$objectId": "297",
             "$type": "ListNode",
             "fields": {
-              "val": 1,
-              "next": null
+              "val": 3,
+              "next": {
+                "$objectId": "296",
+                "$type": "ListNode",
+                "fields": {
+                  "val": 2,
+                  "next": {
+                    "$objectId": "294",
+                    "$type": "ListNode",
+                    "fields": {
+                      "val": 1,
+                      "next": null
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+------------------------------------------------------------------------
+STEP 31 / 36
+EXECUTED LINE 19: prev = curr;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+prev: {
+  "$objectId": "298",
+  "$type": "ListNode",
+  "fields": {
+    "val": 4,
+    "next": {
+      "$objectId": "297",
+      "$type": "ListNode",
+      "fields": {
+        "val": 3,
+        "next": {
+          "$objectId": "296",
+          "$type": "ListNode",
+          "fields": {
+            "val": 2,
+            "next": {
+              "$objectId": "294",
+              "$type": "ListNode",
+              "fields": {
+                "val": 1,
+                "next": null
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+} → {
+  "$objectId": "299",
+  "$type": "ListNode",
+  "fields": {
+    "val": 5,
+    "next": {
+      "$objectId": "298",
+      "$type": "ListNode",
+      "fields": {
+        "val": 4,
+        "next": {
+          "$objectId": "297",
+          "$type": "ListNode",
+          "fields": {
+            "val": 3,
+            "next": {
+              "$objectId": "296",
+              "$type": "ListNode",
+              "fields": {
+                "val": 2,
+                "next": {
+                  "$objectId": "294",
+                  "$type": "ListNode",
+                  "fields": {
+                    "val": 1,
+                    "next": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+TRACE EVENTS:
+VARIABLE_UPDATE: {
+  "name": "prev",
+  "value": {
+    "$objectId": "299",
+    "$type": "ListNode",
+    "fields": {
+      "val": 5,
+      "next": {
+        "$objectId": "298",
+        "$type": "ListNode",
+        "fields": {
+          "val": 4,
+          "next": {
+            "$objectId": "297",
+            "$type": "ListNode",
+            "fields": {
+              "val": 3,
+              "next": {
+                "$objectId": "296",
+                "$type": "ListNode",
+                "fields": {
+                  "val": 2,
+                  "next": {
+                    "$objectId": "294",
+                    "$type": "ListNode",
+                    "fields": {
+                      "val": 1,
+                      "next": null
+                    }
+                  }
+                }
+              }
             }
           }
         }
       }
     }
   },
-  "curr": null,
-  "this": {
+  "before": {
     "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
     "$type": "ListNode",
     "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
+      "val": 4,
       "next": {
-        "$objectId": "294",
+        "$objectId": "297",
         "$type": "ListNode",
         "fields": {
-          "val": 1,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
+          "val": 3,
           "next": {
-            "$objectId": "294",
+            "$objectId": "296",
             "$type": "ListNode",
             "fields": {
-              "val": 1,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "298": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-CALL STACK:
-[
-  "reverseList"
-]
-LAST EVENT DATA:
-{
-  "variables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "294",
-              "$type": "ListNode",
-              "fields": {
-                "val": 1,
-                "next": null
+              "val": 2,
+              "next": {
+                "$objectId": "294",
+                "$type": "ListNode",
+                "fields": {
+                  "val": 1,
+                  "next": null
+                }
               }
             }
           }
         }
       }
-    },
-    "curr": null,
-    "this": {
+    }
+  }
+}
+
+------------------------------------------------------------------------
+STEP 32 / 36
+EXECUTED LINE 20: curr = next;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+curr: {
+  "$objectId": "299",
+  "$type": "ListNode",
+  "fields": {
+    "val": 5,
+    "next": {
       "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "arrayReferences": [],
-  "postVariables": {
-    "head": {
-      "$objectId": "294",
       "$type": "ListNode",
       "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
+        "val": 4,
         "next": {
-          "$objectId": "296",
+          "$objectId": "297",
           "$type": "ListNode",
           "fields": {
-            "val": 2,
+            "val": 3,
             "next": {
-              "$objectId": "294",
+              "$objectId": "296",
               "$type": "ListNode",
               "fields": {
-                "val": 1,
-                "next": null
+                "val": 2,
+                "next": {
+                  "$objectId": "294",
+                  "$type": "ListNode",
+                  "fields": {
+                    "val": 1,
+                    "next": null
+                  }
+                }
               }
             }
           }
         }
       }
-    },
-    "curr": null,
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
     }
-  },
-  "semanticRoles": [
-    {
-      "name": "curr",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "curr is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used in a condition",
-        "derived from head, next",
-        "used to compute next",
-        "used to compute prev"
-      ],
-      "method": "reverseList"
-    },
-    {
-      "name": "prev",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "prev is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used to compute next",
-        "derived from curr",
-        "contributes to the returned expression"
-      ],
-      "method": "reverseList"
-    }
-  ]
-}
-
-================================================================================
-
-STEP 22 / 24
-LINE: 16
-CODE: while(curr != null){
-EVENT: STEP
-METHOD: reverseList
-DEPTH: 1
-CONDITION: FALSE
-EXECUTION EVENTS:
-[]
-VARIABLES:
-{
-  "head": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "prev": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "294",
-            "$type": "ListNode",
-            "fields": {
-              "val": 1,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "curr": null,
-  "this": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
   }
-}
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
+} → null
+TRACE EVENTS:
+VARIABLE_UPDATE: {
+  "name": "curr",
+  "value": null,
+  "before": {
+    "$objectId": "299",
     "$type": "ListNode",
     "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
+      "val": 5,
       "next": {
-        "$objectId": "294",
+        "$objectId": "298",
         "$type": "ListNode",
         "fields": {
-          "val": 1,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
+          "val": 4,
           "next": {
-            "$objectId": "294",
+            "$objectId": "297",
             "$type": "ListNode",
             "fields": {
-              "val": 1,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "298": {
-    "$objectId": "298",
-    "$type": "Solution",
-    "fields": {}
-  }
-}
-CALL STACK:
-[
-  "reverseList"
-]
-LAST EVENT DATA:
-{
-  "variables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "294",
-              "$type": "ListNode",
-              "fields": {
-                "val": 1,
-                "next": null
+              "val": 3,
+              "next": {
+                "$objectId": "296",
+                "$type": "ListNode",
+                "fields": {
+                  "val": 2,
+                  "next": {
+                    "$objectId": "294",
+                    "$type": "ListNode",
+                    "fields": {
+                      "val": 1,
+                      "next": null
+                    }
+                  }
+                }
               }
-            }
-          }
-        }
-      }
-    },
-    "curr": null,
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "arrayReferences": [],
-  "conditionResult": false,
-  "postVariables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "294",
-              "$type": "ListNode",
-              "fields": {
-                "val": 1,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "curr": null,
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "semanticRoles": [
-    {
-      "name": "curr",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "curr is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used in a condition",
-        "derived from head, next",
-        "used to compute next",
-        "used to compute prev"
-      ],
-      "method": "reverseList"
-    },
-    {
-      "name": "prev",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "prev is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used to compute next",
-        "derived from curr",
-        "contributes to the returned expression"
-      ],
-      "method": "reverseList"
-    }
-  ]
-}
-
-================================================================================
-
-STEP 23 / 24
-LINE: 22
-CODE: return prev;
-EVENT: STEP
-METHOD: reverseList
-DEPTH: 1
-CONDITION: —
-EXECUTION EVENTS:
-[]
-VARIABLES:
-{
-  "head": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "prev": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "294",
-            "$type": "ListNode",
-            "fields": {
-              "val": 1,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "curr": null
-}
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "294",
-        "$type": "ListNode",
-        "fields": {
-          "val": 1,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "294",
-            "$type": "ListNode",
-            "fields": {
-              "val": 1,
-              "next": null
             }
           }
         }
@@ -5949,291 +1853,39 @@ OBJECTS:
     }
   }
 }
-CALL STACK:
-[
-  "reverseList"
-]
-LAST EVENT DATA:
-{
-  "variables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "294",
-              "$type": "ListNode",
-              "fields": {
-                "val": 1,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "curr": null,
-    "this": {
-      "$objectId": "298",
-      "$type": "Solution",
-      "fields": {}
-    }
-  },
-  "arrayReferences": [],
-  "postVariables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "294",
-              "$type": "ListNode",
-              "fields": {
-                "val": 1,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "curr": null
-  },
-  "returnValue": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "294",
-            "$type": "ListNode",
-            "fields": {
-              "val": 1,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "semanticRoles": [
-    {
-      "name": "curr",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "curr is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used in a condition",
-        "derived from head, next",
-        "used to compute next",
-        "used to compute prev"
-      ],
-      "method": "reverseList"
-    },
-    {
-      "name": "prev",
-      "role": "pointer",
-      "confidence": 0.76,
-      "evidence": "prev is updated in a loop and matches a pointer-role convention",
-      "usage": [
-        "used to compute next",
-        "derived from curr",
-        "contributes to the returned expression"
-      ],
-      "method": "reverseList"
-    }
-  ]
-}
 
-================================================================================
+------------------------------------------------------------------------
+STEP 33 / 36
+EXECUTED LINE 21: }
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+—
+TRACE EVENTS:
+—
 
-STEP 24 / 24
-LINE: 22
-CODE: return prev;
-EVENT: METHOD_EXIT
-METHOD: reverseList
-DEPTH: 1
-CONDITION: —
-EXECUTION EVENTS:
-[]
-VARIABLES:
-{
-  "head": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "prev": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "294",
-            "$type": "ListNode",
-            "fields": {
-              "val": 1,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "curr": null
-}
-ARRAYS:
-{}
-DATA STRUCTURES:
-{}
-OBJECTS:
-{
-  "294": {
-    "$objectId": "294",
-    "$type": "ListNode",
-    "fields": {
-      "val": 1,
-      "next": null
-    }
-  },
-  "296": {
-    "$objectId": "296",
-    "$type": "ListNode",
-    "fields": {
-      "val": 2,
-      "next": {
-        "$objectId": "294",
-        "$type": "ListNode",
-        "fields": {
-          "val": 1,
-          "next": null
-        }
-      }
-    }
-  },
-  "297": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "294",
-            "$type": "ListNode",
-            "fields": {
-              "val": 1,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  }
-}
-CALL STACK:
-[]
-LAST EVENT DATA:
-{
-  "returnValue": {
-    "$objectId": "297",
-    "$type": "ListNode",
-    "fields": {
-      "val": 3,
-      "next": {
-        "$objectId": "296",
-        "$type": "ListNode",
-        "fields": {
-          "val": 2,
-          "next": {
-            "$objectId": "294",
-            "$type": "ListNode",
-            "fields": {
-              "val": 1,
-              "next": null
-            }
-          }
-        }
-      }
-    }
-  },
-  "variables": {
-    "head": {
-      "$objectId": "294",
-      "$type": "ListNode",
-      "fields": {
-        "val": 1,
-        "next": null
-      }
-    },
-    "prev": {
-      "$objectId": "297",
-      "$type": "ListNode",
-      "fields": {
-        "val": 3,
-        "next": {
-          "$objectId": "296",
-          "$type": "ListNode",
-          "fields": {
-            "val": 2,
-            "next": {
-              "$objectId": "294",
-              "$type": "ListNode",
-              "fields": {
-                "val": 1,
-                "next": null
-              }
-            }
-          }
-        }
-      }
-    },
-    "curr": null
-  }
-}
+------------------------------------------------------------------------
+STEP 34 / 36
+EXECUTED LINE 16: while(curr != null){
+CONDITION RESULT: FALSE
+VARIABLE / STATE CHANGES:
+—
+TRACE EVENTS:
+—
 
-================================================================================
+------------------------------------------------------------------------
+STEP 35 / 36
+EXECUTED LINE 22: return prev;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+—
+TRACE EVENTS:
+—
+
+------------------------------------------------------------------------
+STEP 36 / 36
+EXECUTED LINE 22: return prev;
+CONDITION RESULT: —
+VARIABLE / STATE CHANGES:
+—
+TRACE EVENTS:
+—
