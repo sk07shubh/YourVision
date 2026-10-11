@@ -624,3 +624,13 @@
 @keyframes yv-linked-edge-rewire{0%{color:var(--yv-success,var(--yv-accent));transform:scale(1.2)}100%{color:var(--yv-accent);transform:scale(1)}}
 @keyframes yv-linked-pointer-move{0%{opacity:.25;transform:translateY(7px) scale(.94)}100%{opacity:1;transform:translateY(0) scale(1)}}
 @media(prefers-reduced-motion:reduce){.yv-node-link-changed,.yv-edge-rewired,.yv-node-pointer-moved{animation:none}}
+
+
+.yv-linked-graph{position:relative;isolation:isolate}
+.yv-linked-connections{position:absolute;inset:0;z-index:0;overflow:visible;pointer-events:none}
+.yv-linked-components,.yv-linked-null-pointers,.yv-linked-empty{position:relative;z-index:1}
+.yv-linked-connection{fill:none;stroke-width:1.6;stroke-dasharray:4 3;opacity:.82;vector-effect:non-scaling-stroke}
+.yv-linked-connection-prev{stroke:var(--yv-muted);stroke-dasharray:3 4}
+.yv-linked-connection-cross-next{stroke:var(--yv-accent)}
+.yv-linked-piece .yv-node{z-index:2}
+@media(prefers-reduced-motion:reduce){.yv-linked-connection{animation:none;transition:none}}
