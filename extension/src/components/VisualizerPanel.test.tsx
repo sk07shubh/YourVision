@@ -265,6 +265,25 @@ describe('disjoint-set visualization', () => {
 });
 
 describe('trie data structure visualization', () => {
+  it('highlights the trie node reached by a pointer move', () => {
+    const priorSession = sessionStore.get();
+    const objects = {
+      t1: { $objectId: 't1', $type: 'TrieNode', fields: { isEnd: false, children: { entries: [{ key: 'a', value: { $ref: 't2' } }] } } },
+      t2: { $objectId: 't2', $type: 'TrieNode', fields: { isEnd: true, children: { entries: [] } } },
+    };
+    const previous = state({ sequence: 91, variables: { current: { $objectId: 't1' } }, objects });
+    const current = state({ sequence: 92, variables: { current: { $objectId: 't2' } }, objects });
+    try {
+      sessionStore.set({ source: 'current = current.children.get(ch);', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source="current = current.children.get(ch);" />);
+      expect(html).toContain('data-trie-node-id="t2"');
+      expect(html).toContain('data-trie-entered="true"');
+      expect(html).toContain('yv-trie-node-entered');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
   it('renders child edges and terminal-word state from captured trie nodes', () => {
     const current = state({
       variables: { trie: { $objectId: 'container' } },
