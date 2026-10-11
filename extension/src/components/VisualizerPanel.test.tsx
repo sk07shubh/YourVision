@@ -707,6 +707,29 @@ describe('execution visualization feature matrix', () => {
     });
   });
 
+  it('renders TreeSet as sorted and keeps its add/remove operations recognizable', () => {
+    const current = state({
+      dataStructures: {
+        ordered: {
+          $collectionId: 'tree-set-1',
+          $type: 'java.util.TreeSet',
+          $kind: 'sortedSet',
+          values: [2, 5, 9],
+          size: 3,
+        },
+      },
+    });
+    const html = renderToStaticMarkup(<DataStructures state={current} source="" />);
+    expect(html).toContain('SORTED · 3 elements');
+    expect(html).not.toContain('UNORDERED · 3 elements');
+    expect(collectionOperation('sortedSet', 'add', { added: 7 })).toEqual({
+      operation: 'Add', value: 7, position: 'Element',
+    });
+    expect(collectionOperation('sortedSet', 'remove', { removed: 5 })).toEqual({
+      operation: 'Remove', value: 5, position: 'Element',
+    });
+  });
+
   it('classifies map insert/update/delete transitions', () => {
     expect(compareMapEntries(
       [{ key: 2, value: 1 }],
