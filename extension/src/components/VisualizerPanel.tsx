@@ -7,6 +7,15 @@ import type { TraceState } from '../types/trace';
 
 type Obj = Record<string, unknown>;
 
+function mapKeySignature(key: unknown): string {
+  if (isPlainObject(key)) {
+    for (const identityField of ['$objectId', '$ref', '$arrayId', '$mapId', '$collectionId']) {
+      if (typeof key[identityField] === 'string') return identityField + ':' + key[identityField];
+    }
+  }
+  return stableStringify(key);
+}
+
 const LINK_PALETTE = ['#60a5fa', '#34d399', '#fbbf24', '#c084fc', '#fb7185', '#22d3ee', '#a3e635', '#f97316'];
 function linkedConnectionColor(id: string): string {
   let hash = 0;
@@ -778,11 +787,11 @@ export function compareMapEntries(
   const afterMap = new Map<string, { key: unknown; value: unknown }>();
 
   for (const entry of before) {
-    beforeMap.set(stableStringify(entry.key), entry);
+    beforeMap.set(mapKeySignature(entry.key), entry);
   }
 
   for (const entry of after) {
-    afterMap.set(stableStringify(entry.key), entry);
+    afterMap.set(mapKeySignature(entry.key), entry);
   }
 
   for (const [key, entry] of afterMap) {
@@ -2444,8 +2453,8 @@ function MapView({
   const findChange = (key: unknown) =>
     changes.find(
       change =>
-        stableStringify(change.key) ===
-        stableStringify(key)
+        mapKeySignature(change.key) ===
+        mapKeySignature(key)
     );
 
   const deleted = changes.filter(
