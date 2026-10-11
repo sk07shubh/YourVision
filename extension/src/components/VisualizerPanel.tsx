@@ -2686,8 +2686,27 @@ export function GraphView({ objects, variables = {}, state }: {
   });
   const edges = nodes.flatMap(node => node.neighbors.flatMap((neighbor, index) => {
     const target = graphReferenceId(neighbor, objects);
-    return target && ids.has(target) ? [{ key: node.id + ':' + target + ':' + index, from: node.id, to: target }] : [];
+    if (!target || !ids.has(target)) return [];
+    const key = node.id + ':' + target + ':' + index;
+    const previousHadEdge = Object.entries(previousObjects).some(([previousKey, previousValue]) => {
+      if (!isPlainObject(previousValue) || !looksGraphNode(previousValue)) return false;
+      const from = typeof previousValue.$objectId === 'string' ? previousValue.$objectId : previousKey;
+      return from === node.id && (graphNeighborValues(previousValue) ?? []).some(previousNeighbor =>
+        graphReferenceId(previousNeighbor, previousObjects) === target);
+    });
+    return [{ key, from: node.id, to: target, status: previous && !previousHadEdge ? 'added' as const : 'steady' as const }];
   }));
+  const currentEdgePairs = new Set(edges.map(edge => edge.from + ':' + edge.to));
+  const removedEdges = previous ? Object.entries(previousObjects).flatMap(([key, value]) => {
+    if (!isPlainObject(value) || !looksGraphNode(value)) return [];
+    const from = typeof value.$objectId === 'string' ? value.$objectId : key;
+    if (!ids.has(from)) return [];
+    return (graphNeighborValues(value) ?? []).flatMap((neighbor, index) => {
+      const to = graphReferenceId(neighbor, previousObjects);
+      if (!to || !ids.has(to) || currentEdgePairs.has(from + ':' + to)) return [];
+      return [{ key: 'removed:' + from + ':' + to + ':' + index, from, to, status: 'removed' as const }];
+    });
+  }) : [];
   const pointerNames = new Map<string, string[]>();
   for (const [name, value] of Object.entries(variables)) {
     const id = graphReferenceId(value, objects);
@@ -2712,20 +2731,26 @@ export function GraphView({ objects, variables = {}, state }: {
                 <path d="M0,0 L7,3.5 L0,7 z" fill="var(--yv-muted, #8b9bb4)" />
               </marker>
             </defs>
-            {edges.map(edge => {
+            {[...edges, ...removedEdges].map(edge => {
               const from = positions.get(edge.from)!;
               const to = positions.get(edge.to)!;
+              const stroke = edge.status === 'added' ? 'var(--yv-accent, #65a9ff)'
+                : edge.status === 'removed' ? 'var(--yv-warning, #f59e0b)' : 'var(--yv-muted, #8b9bb4)';
               if (edge.from === edge.to) {
                 return <path key={edge.key} data-graph-edge-from={edge.from} data-graph-edge-to={edge.to}
+                  data-graph-edge-status={edge.status}
                   d={`M ${from.x + 20} ${from.y - 12} C ${from.x + 70} ${from.y - 65}, ${from.x - 45} ${from.y - 65}, ${from.x - 20} ${from.y - 12}`}
-                  fill="none" stroke="var(--yv-muted, #8b9bb4)" strokeWidth="1.5" markerEnd="url(#yv-graph-arrow)" />;
+                  fill="none" stroke={stroke} strokeDasharray={edge.status === 'removed' ? '4 3' : undefined}
+                  opacity={edge.status === 'removed' ? 0.65 : 1} strokeWidth="1.5" markerEnd="url(#yv-graph-arrow)" />;
               }
               const dx = to.x - from.x, dy = to.y - from.y;
               const length = Math.max(1, Math.hypot(dx, dy));
               return <line key={edge.key} data-graph-edge-from={edge.from} data-graph-edge-to={edge.to}
+                data-graph-edge-status={edge.status}
                 x1={from.x + dx / length * 43} y1={from.y + dy / length * 25}
                 x2={to.x - dx / length * 50} y2={to.y - dy / length * 30}
-                stroke="var(--yv-muted, #8b9bb4)" strokeWidth="1.5" markerEnd="url(#yv-graph-arrow)" />;
+                stroke={stroke} strokeDasharray={edge.status === 'removed' ? '4 3' : undefined}
+                opacity={edge.status === 'removed' ? 0.65 : 1} strokeWidth="1.5" markerEnd="url(#yv-graph-arrow)" />;
             })}
           </svg>
           {nodes.map(node => {
