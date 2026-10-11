@@ -836,9 +836,14 @@ assert(
 );
 
 console.log("PASS: Java state integration");
+const linkedListInputValues = [1, 2, 3, 4, 5, 8, 9, 0, 0, 66];
+const linkedListInput = linkedListInputValues.reduceRight<unknown>(
+    (next, val) => ({ val, next }),
+    null
+);
 const reversedList = await runJava(source, {
     method: "reverseList",
-    arguments: ["{\"val\":1,\"next\":{\"val\":2,\"next\":{\"val\":3}}}"]
+    arguments: [JSON.stringify(linkedListInput)]
 });
 
 assert(
@@ -854,14 +859,40 @@ assert(
     "linked-list reverse did not emit object field writes"
 );
 
-const reversedHead = reversedList.states?.at(-1)?.variables.previous;
-const reversedNext = snapshotField(snapshotField(reversedHead, "fields"), "next");
-const reversedTail = snapshotField(snapshotField(reversedNext, "fields"), "next");
+function linkedListSnapshotValues(root: unknown, objects: Record<string, unknown>): unknown[] {
+    const values: unknown[] = [];
+    const visited = new Set<string>();
+    let current = root;
+    for (let guard = 0; guard < 100 && current && typeof current === "object" && !Array.isArray(current); guard++) {
+        const node = current as Record<string, unknown>;
+        const id = typeof node.$objectId === "string"
+            ? node.$objectId
+            : typeof node.$ref === "string" ? node.$ref : undefined;
+        if (id && visited.has(id)) break;
+        if (id) visited.add(id);
+        const canonical = id && objects[id] && typeof objects[id] === "object"
+            ? objects[id] as Record<string, unknown>
+            : node;
+        const fields = snapshotField(canonical, "fields") as Record<string, unknown> | undefined;
+        const directFields = fields ?? canonical;
+        if (!("val" in directFields)) break;
+        values.push(directFields.val);
+        current = directFields.next;
+    }
+    return values;
+}
+
+const firstReverseState = reversedList.states?.find((state) => state.callStack.includes("reverseList"));
 assert(
-    snapshotField(snapshotField(reversedHead, "fields"), "val") === 3 &&
-    snapshotField(snapshotField(reversedNext, "fields"), "val") === 2 &&
-    snapshotField(snapshotField(reversedTail, "fields"), "val") === 1,
-    "linked-list reverse state did not preserve the reversed structure"
+    JSON.stringify(linkedListSnapshotValues(firstReverseState?.variables.head, firstReverseState?.objects ?? {})) === JSON.stringify(linkedListInputValues),
+    "initial linked-list trace did not materialize every node/value immediately (including duplicate zeros and 66)"
+);
+
+const reversedHead = reversedList.states?.at(-1)?.variables.previous;
+assert(
+    JSON.stringify(linkedListSnapshotValues(reversedHead, reversedList.states?.at(-1)?.objects ?? {})) ===
+        JSON.stringify([...linkedListInputValues].reverse()),
+    "linked-list reverse state did not preserve all values in the reversed structure"
 );
 
 const treeDepth = await runJava(source, {
