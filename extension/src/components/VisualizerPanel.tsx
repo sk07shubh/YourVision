@@ -864,7 +864,7 @@ export function dataStructureResults(current?: TraceState, previous?: TraceState
         ? unorderedCollectionDelta(bc.values, ac.values)
         : collectionDelta(bc.values, ac.values);
       const op=delta ? collectionOperation(ac.$kind ?? '',method,delta,args.length) : undefined;
-      if(delta && op) add('col-'+name+'-'+stableStringify([delta.added,delta.removed,delta.index]),name,op.operation,op.value,op.position,op.oldValue,op.showOld);
+      if(delta && op) add('col-'+name+'-'+stableStringify([delta.added,delta.removed]),name,op.operation,op.value,op.position,op.oldValue,op.showOld);
       continue;
     }
 
