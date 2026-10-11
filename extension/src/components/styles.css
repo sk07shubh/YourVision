@@ -789,7 +789,7 @@
   animation: yv-map-entry-insert 360ms cubic-bezier(.2,.75,.25,1) both;
 }
 .yv-map-update {
-  animation: yv-map-entry-update 420ms ease-out both;
+  animation: yv-map-entry-update 420ms ease-out;
 }
 .yv-map-delete {
   animation: yv-map-entry-delete 420ms ease-in both;
