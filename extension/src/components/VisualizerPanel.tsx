@@ -2395,7 +2395,17 @@ export function LinkedListView({
   }
 
   const startIds: string[] = [];
-  if (isPlainObject(resolvedRoot) && looksListNode(resolvedRoot)) startIds.push(String(resolvedRoot.$objectId ?? 'root'));
+  // Lay out the actual next-chain from its structural head (a node that is
+  // not targeted by another node's next field). Variable aliases such as
+  // "head" can still point at the old first node after reversal; prioritizing
+  // aliases splits the reversed chain into an isolated component.
+  const targetedIds = new Set<string>();
+  for (const node of records.values()) if (node.nextId && records.has(node.nextId)) targetedIds.add(node.nextId);
+  for (const id of records.keys()) if (!targetedIds.has(id)) startIds.push(id);
+  if (isPlainObject(resolvedRoot) && looksListNode(resolvedRoot)) {
+    const id = String(resolvedRoot.$objectId ?? 'root');
+    if (!startIds.includes(id)) startIds.push(id);
+  }
   for (const value of Object.values(variables)) {
     if (!isPlainObject(value)) continue;
     const id = typeof value.$objectId === 'string' ? value.$objectId : typeof value.$ref === 'string' ? value.$ref : null;
@@ -2485,11 +2495,11 @@ export function LinkedListView({
           // Side-by-side nodes on the same row get a genuinely straight link.
           d = `M ${ax} ${ay} L ${bx} ${by}`;
         } else if (kind === 'cross-next' && by < ay) {
-          // Upward links use a clean S: leave horizontally, then curve back
-          // into the target's left outline (never spiral around it).
-          const span = Math.max(18, bx - ax);
-          const handle = Math.min(64, Math.max(16, span * 0.48));
-          d = `M ${ax} ${ay} C ${ax + handle} ${ay}, ${bx - handle} ${by}, ${bx} ${by}`;
+          // Angular S-curve: horizontal departure, a sharp diagonal middle,
+          // then a horizontal approach to the destination's left outline.
+          const midX = ax + (bx - ax) * 0.5;
+          const midY = ay + (by - ay) * 0.5;
+          d = `M ${ax} ${ay} H ${midX} L ${midX} ${midY} L ${bx - 12} ${by} H ${bx}`;
         } else {
           const lift = Math.max(28, Math.min(72, Math.abs(bx - ax) * 0.22));
           const direction = kind === 'prev' ? -1 : 1;
