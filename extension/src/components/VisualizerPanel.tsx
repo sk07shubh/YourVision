@@ -2457,8 +2457,6 @@ export function LinkedListView({
         if (id) nodes.set(id, element.getBoundingClientRect());
       });
       const nextPaths: Array<{ key: string; d: string; kind: 'prev' | 'cross-next' | 'cycle'; from: string; to: string }> = [];
-      const componentForNode = new Map<string, number>();
-      components.forEach((component, index) => component.nodes.forEach(node => componentForNode.set(node.id, index)));
       const addPath = (from: string, to: string, kind: 'prev' | 'cross-next' | 'cycle') => {
         const a = nodes.get(from), b = nodes.get(to);
         if (!a || !b) return;
