@@ -110,6 +110,62 @@ describe('linked-list graph visualization', () => {
     expect((html.match(/class="yv-node-value"/g) ?? []).length).toBeGreaterThanOrEqual(2);
   });
 
+
+  it('renders each linked-list reversal checkpoint from the actual next references', () => {
+    const snapshots = [
+      {
+        label: 'initial',
+        root: 'n1',
+        variables: { head: { $objectId: 'n1' }, prev: null, curr: { $objectId: 'n1' }, nextTemp: null },
+        next: { n1: 'n2', n2: 'n3', n3: null },
+      },
+      {
+        label: 'first link reversed',
+        root: 'n1',
+        variables: { head: { $objectId: 'n1' }, prev: { $objectId: 'n1' }, curr: { $objectId: 'n2' }, nextTemp: { $objectId: 'n2' } },
+        next: { n1: null, n2: 'n3', n3: null },
+      },
+      {
+        label: 'second link reversed',
+        root: 'n1',
+        variables: { head: { $objectId: 'n1' }, prev: { $objectId: 'n2' }, curr: { $objectId: 'n3' }, nextTemp: { $objectId: 'n3' } },
+        next: { n1: null, n2: 'n1', n3: null },
+      },
+      {
+        label: 'reversed chain completed',
+        root: 'n3',
+        variables: { head: { $objectId: 'n3' }, prev: { $objectId: 'n3' }, curr: null, nextTemp: null },
+        next: { n1: null, n2: 'n1', n3: 'n2' },
+      },
+    ] as const;
+
+    for (const snapshot of snapshots) {
+      const objects = Object.fromEntries(Object.entries(snapshot.next).map(([id, next]) => [
+        id,
+        { $objectId: id, $type: 'ListNode', fields: { val: Number(id.slice(1)), next: next ? { $ref: next } : null } },
+      ]));
+      const html = renderToStaticMarkup(
+        <LinkedListView root={{ $objectId: snapshot.root }} objects={objects} variables={snapshot.variables} />,
+      );
+
+      // The graph must keep every allocated node visible, including the old
+      // head after it becomes detached from the new head during reversal.
+      for (const id of ['n1', 'n2', 'n3']) expect(html).toContain(`data-node-id="${id}"`);
+      for (const [from, to] of Object.entries(snapshot.next)) {
+        expect(html).toContain(`data-node-id="${from}"`);
+        if (to) {
+          expect(html).toContain(`data-next-target="${to}"`);
+          expect(html).toContain(`data-edge-to="${to}"`);
+        } else {
+          expect(html).toContain(`data-next-target="null"`);
+        }
+      }
+      expect(html).toContain('data-pointer-name="head"');
+      expect(html).toContain('data-pointer-name="prev"');
+      expect(html).toContain('data-pointer-name="curr"');
+    }
+  });
+
   it('shows an empty list for a null head without inventing a node', () => {
     const current = state({
       variables: { head: null },
