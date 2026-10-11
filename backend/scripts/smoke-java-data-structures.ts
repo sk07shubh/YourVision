@@ -15,6 +15,21 @@ class Solution {
         Box(int value) { this.value = value; }
     }
 
+    static class GraphNode {
+        int val;
+        ArrayList<GraphNode> neighbors = new ArrayList<>();
+        GraphNode(int val) { this.val = val; }
+    }
+
+    static class TrieNode {
+        boolean isEnd;
+        HashMap<Character, TrieNode> children = new HashMap<>();
+    }
+
+    static class Trie {
+        TrieNode root = new TrieNode();
+    }
+
     public int structures() {
         int[] nums = {2, 7, 11};
         HashMap<Integer, Integer> map = new HashMap<>();
@@ -58,6 +73,22 @@ class Solution {
 
         return nums[0] + map.get(3) + set.size() +
             stack.peek() + queue.peek() + priorityQueue.peek() + list.get(1);
+    }
+
+    public GraphNode graph() {
+        GraphNode first = new GraphNode(1);
+        GraphNode second = new GraphNode(2);
+        first.neighbors.add(second);
+        second.neighbors.add(first);
+        return first;
+    }
+
+    public Trie trie() {
+        Trie trie = new Trie();
+        TrieNode terminal = new TrieNode();
+        terminal.isEnd = true;
+        trie.root.children.put('a', terminal);
+        return trie;
     }
 
     public int nested() {
@@ -206,6 +237,25 @@ assert(JSON.stringify(queue.values) === "[8,12]", "queue values incorrect");
 assert(priorityQueue.$kind === "priorityQueue", "priority queue kind is incorrect");
 assert(JSON.stringify(priorityQueue.values) === "[1,2,5,9]", "priority queue heap snapshot incorrect");
 assert(JSON.stringify(list.values) === "[3,4]", "list values incorrect");
+
+const graph = await runJava(source, { method: "graph" });
+assert(graph.kind === "OK", "graph structure execution failed");
+const graphState = graph.states?.at(-1);
+const graphObjects = Object.values(graphState?.objects ?? {}).filter((value: any) =>
+    value && typeof value === "object" && typeof value.$type === "string" && value.$type.includes("GraphNode")
+);
+assert(graphObjects.length >= 2, "graph node snapshots were not preserved");
+assert(graphObjects.some((value: any) => Array.isArray(value.fields?.neighbors?.values)), "graph adjacency collection was not preserved");
+
+const trie = await runJava(source, { method: "trie" });
+assert(trie.kind === "OK", "trie structure execution failed");
+const trieState = trie.states?.at(-1);
+const trieObjects = Object.values(trieState?.objects ?? {}).filter((value: any) =>
+    value && typeof value === "object" && typeof value.$type === "string" && value.$type.includes("TrieNode")
+);
+assert(trieObjects.length >= 2, "trie node snapshots were not preserved");
+assert(trieObjects.some((value: any) => value.fields?.isEnd === true), "trie terminal state was not preserved");
+assert(trieObjects.some((value: any) => Array.isArray(value.fields?.children?.entries)), "trie child map snapshot was not preserved");
 
 const nested = await runJava(source, { method: "nested" });
 assert(nested.kind === "OK", "nested data structure execution failed");
