@@ -62,8 +62,8 @@ describe('string data structure visualization', () => {
     });
     const html = renderToStaticMarkup(<StringView value="stack" state={current} name="s" />);
     expect(html).toContain('data-string-index="2"');
-    expect(html).toContain('class="yv-array-cell yv-cell-read" data-string-index="2"');
-    expect(html).not.toContain('class="yv-array-cell yv-cell-read" data-string-index="1"');
+    expect(html).toContain('class="yv-string-cell yv-cell-read " data-string-index="2"');
+    expect(html).not.toContain('class="yv-string-cell yv-cell-read " data-string-index="1"');
   });
   it('renders spaces as blank fixed-width cells and keeps every index in its own aligned wrapper', () => {
     const html = renderToStaticMarkup(<StringView value="a b  c" state={state()} name="s" />);
