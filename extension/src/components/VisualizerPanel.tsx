@@ -2425,6 +2425,120 @@ function graphReferenceId(value: unknown, objects: Record<string, unknown>): str
   return undefined;
 }
 
+function looksTrieNode(value: Obj): boolean {
+  const fields = objectFields(value);
+  return /TrieNode/i.test(objectType(value)) ||
+    ('children' in fields && ['isEnd', 'isWord', 'endOfWord', 'isEndOfWord', 'terminal', 'isTerminal'].some(name => name in fields));
+}
+
+function trieChildEntries(value: Obj, source: string): Array<{ label: string; target: unknown }> {
+  const children = objectFields(value).children;
+  const characterIndexed = /children\s*\[\s*[A-Za-z_$][\w$]*\s*-\s*['"]a['"]\s*\]/.test(source);
+  if (isPlainObject(children) && Array.isArray(children.entries)) {
+    return children.entries.flatMap((entry: unknown) => {
+      if (!isPlainObject(entry) || entry.value == null) return [];
+      return [{ label: typeof entry.key === 'string' ? entry.key : displayValue(entry.key), target: entry.value }];
+    });
+  }
+  const values = Array.isArray(children) ? children :
+    isPlainObject(children) && Array.isArray(children.values) ? children.values : undefined;
+  if (values) {
+    return values.flatMap((target, index) => target == null ? [] : [{
+      label: characterIndexed && index < 26 ? String.fromCharCode(97 + index) : '[' + index + ']',
+      target,
+    }]);
+  }
+  if (isPlainObject(children)) {
+    return Object.entries(children).flatMap(([label, target]) => target == null ? [] : [{ label, target }]);
+  }
+  return [];
+}
+
+function trieTerminal(value: Obj): boolean {
+  const fields = objectFields(value);
+  return ['isEnd', 'isWord', 'endOfWord', 'isEndOfWord', 'terminal', 'isTerminal']
+    .some(name => fields[name] === true);
+}
+
+export function TrieView({ objects, variables = {}, source = '' }: {
+  objects: Record<string, unknown>;
+  variables?: Record<string, unknown>;
+  source?: string;
+}) {
+  const nodes = Object.entries(objects).flatMap(([key, value]) => {
+    if (!isPlainObject(value) || !looksTrieNode(value)) return [];
+    const id = typeof value.$objectId === 'string' ? value.$objectId : key;
+    return [{ id, value, children: trieChildEntries(value, source), terminal: trieTerminal(value) }];
+  }).slice(0, 500);
+  const byId = new Map(nodes.map(node => [node.id, node]));
+  const childIds = new Set(nodes.flatMap(node => node.children.flatMap(child => {
+    const id = graphReferenceId(child.target, objects);
+    return id && byId.has(id) ? [id] : [];
+  })));
+  const roots = nodes.filter(node => !childIds.has(node.id));
+  const rootNodes = roots.length ? roots : nodes.slice(0, 1);
+  const pointerNames = new Map<string, string[]>();
+  for (const [name, value] of Object.entries(variables)) {
+    const directId = graphReferenceId(value, objects);
+    if (directId && byId.has(directId)) {
+      pointerNames.set(directId, [...(pointerNames.get(directId) ?? []), name]);
+      continue;
+    }
+    const resolved = directId ? objects[directId] : undefined;
+    if (isPlainObject(resolved)) {
+      const rootId = graphReferenceId(objectFields(resolved).root, objects);
+      if (rootId && byId.has(rootId)) pointerNames.set(rootId, [...(pointerNames.get(rootId) ?? []), name]);
+    }
+  }
+
+  if (!nodes.length) return <div className="yv-empty">No trie nodes captured.</div>;
+
+  const renderNode = (id: string, edgeLabel: string, depth: number, path: Set<string>): React.ReactNode => {
+    const node = byId.get(id);
+    if (!node) return <span className="yv-code">unresolved</span>;
+    if (depth > 12) return <span className="yv-code">…</span>;
+    if (path.has(id)) return <span className="yv-code" data-trie-cycle={id}>↻ {id}</span>;
+    const nextPath = new Set(path);
+    nextPath.add(id);
+    const pointers = pointerNames.get(id) ?? [];
+    return (
+      <div className="yv-trie-branch" key={id + ':' + edgeLabel} data-trie-node-id={id}
+        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: 6 }}>
+        {edgeLabel && <span data-trie-edge-label={edgeLabel} style={{ color: 'var(--yv-muted, #8b9bb4)', fontSize: 11 }}>{edgeLabel}</span>}
+        <div className="yv-trie-node" style={{ minWidth: 54, padding: '7px 10px', border: '1px solid var(--yv-accent, #65a9ff)',
+          borderRadius: 9, background: 'var(--yv-panel, #101b2d)', color: 'var(--yv-text, #f3f6ff)', textAlign: 'center', fontSize: 12 }}>
+          <div>{node.terminal ? '● WORD END' : '○ PREFIX'}</div>
+          <div style={{ color: 'var(--yv-muted, #8b9bb4)', fontSize: 10 }}>{id}</div>
+          {pointers.map(pointer => <div key={pointer} style={{ color: 'var(--yv-accent, #65a9ff)', fontSize: 10 }}>{pointer}</div>)}
+        </div>
+        {node.children.length > 0 && (
+          <div className="yv-trie-children" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 10, flexWrap: 'wrap',
+            borderTop: '1px solid var(--yv-border, #334155)', paddingTop: 8 }}>
+            {node.children.map((child, index) => {
+              const childId = graphReferenceId(child.target, objects);
+              if (!childId || !byId.has(childId)) return <span key={child.label + ':' + index} className="yv-code">[{child.label}] unresolved</span>;
+              return <div key={child.label + ':' + childId + ':' + index} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                {renderNode(childId, child.label, depth + 1, nextPath)}
+              </div>;
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="yv-trie" data-trie-node-count={nodes.length}>
+      <div className="yv-collection-meta"><span>Trie</span><span>{nodes.length} nodes · {nodes.filter(node => node.terminal).length} word ends</span></div>
+      <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
+        <div className="yv-trie-roots" style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', gap: 14, minWidth: 'max-content' }}>
+          {rootNodes.map(root => renderNode(root.id, 'root', 0, new Set<string>()))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function GraphView({ objects, variables = {} }: {
   objects: Record<string, unknown>;
   variables?: Record<string, unknown>;
@@ -3319,9 +3433,25 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
   const graphNodeEntries = objectEntries.filter(([, value]) =>
     isPlainObject(value) && looksGraphNode(value)
   );
+  const trieNodeEntries = objectEntries.filter(([, value]) =>
+    isPlainObject(value) && looksTrieNode(value)
+  );
+  const trieNodeIds = new Set(trieNodeEntries.map(([id, value]) =>
+    isPlainObject(value) && typeof value.$objectId === 'string' ? value.$objectId : id
+  ));
+
+  const trieNames = Object.entries(state?.variables ?? {}).flatMap(([name, value]) => {
+    const id = graphReferenceId(value, state?.objects ?? {});
+    if (id && trieNodeIds.has(id)) return [name];
+    const resolved = id ? state?.objects?.[id] : undefined;
+    const rootId = isPlainObject(resolved) ? graphReferenceId(objectFields(resolved).root, state?.objects ?? {}) : undefined;
+    return rootId && trieNodeIds.has(rootId) ? [name] : [];
+  });
 
   for (const [id, value] of objectEntries) {
-    if (isPlainObject(value) && (looksListNode(value) || looksGraphNode(value))) continue;
+    if (isPlainObject(value) && (looksListNode(value) || looksGraphNode(value) || looksTrieNode(value))) continue;
+    if (isPlainObject(value) && /Trie$/.test(objectType(value)) &&
+        graphReferenceId(objectFields(value).root, state?.objects ?? '') !== undefined) continue;
     const names = namedObjectIds.get(id);
     if (!names?.length) continue;
     grouped.set(`object:${id}`, { names, value });
@@ -3329,7 +3459,7 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
 
   const items = [...grouped.values()];
 
-  if (!items.length && graphNodeEntries.length === 0) {
+  if (!items.length && graphNodeEntries.length === 0 && trieNodeEntries.length === 0) {
     return <div className="yv-empty">Structures appear here as your code creates or mutates them.</div>;
   }
 
@@ -3358,6 +3488,12 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
           </div>
         );
       })}
+      {trieNodeEntries.length > 0 && (
+        <div className="yv-ds" key="Trie → runtime nodes">
+          <div className="yv-ds-title">Trie → {trieNames.join(' / ') || 'runtime nodes'}</div>
+          <TrieView objects={state?.objects ?? {}} variables={state?.variables ?? {}} source={source} />
+        </div>
+      )}
       {graphNodeEntries.length > 0 && (
         <div className="yv-ds" key="Graph → runtime nodes">
           <div className="yv-ds-title">Graph → {[...new Set(Object.entries(state?.variables ?? {}).flatMap(([name, value]) => {
