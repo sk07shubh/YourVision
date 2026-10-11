@@ -447,8 +447,7 @@ public class YourVisionTracer {
         ExceptionRequest exception =
             manager.createExceptionRequest(
                 null,
-                true,
-                true
+                true,                true
             );
 
         exception.addClassFilter(tracedClass);
@@ -897,8 +896,7 @@ public class YourVisionTracer {
         } catch (Exception ignored) {
         }
 
-        return variables;
-    }
+        return variables;    }
 
     private static Map<String, Object> readLocals(
         StackFrame frame
@@ -1083,8 +1081,19 @@ public class YourVisionTracer {
                 object.referenceType().name()
             );
 
+            // Snapshot the full next-chain on the initial checkpoint. The generic
+            // object-depth cap otherwise truncates longer ListNode inputs, causing
+            // tail nodes to appear only after execution reaches them. Cycle detection
+            // still applies through activeObjects.
+            boolean linkedListNode =
+                object.referenceType().name().toLowerCase().contains("listnode") ||
+                (findField(object, "next") != null &&
+                 (findField(object, "val") != null ||
+                  findField(object, "value") != null ||
+                  findField(object, "data") != null));
+
             if (
-                depth >= MAX_OBJECT_DEPTH ||
+                (!linkedListNode && depth >= MAX_OBJECT_DEPTH) ||
                 !activeObjects.add(id)
             ) {
                 result.put(
@@ -1347,8 +1356,7 @@ public class YourVisionTracer {
 
         long id = object.uniqueID();
 
-        Map<String, Object> result =
-            new LinkedHashMap<>();
+        Map<String, Object> result =            new LinkedHashMap<>();
 
         result.put("$collectionId", String.valueOf(id));
         result.put("$type", type);
@@ -1797,8 +1805,7 @@ public class YourVisionTracer {
         InputStream stream,
         boolean error
     ) {
-        Thread pipe =
-            new Thread(
+        Thread pipe =            new Thread(
                 () -> {
                     try (
                         BufferedReader reader =
