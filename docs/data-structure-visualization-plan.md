@@ -513,3 +513,12 @@ This section records code that has been implemented after the design audit. It d
 - Run the full backend regression suite, especially test:data-structures.
 - Confirm graph/trie/DSU rendering against actual runtime traces from representative Java solutions; synthetic component tests alone are not sufficient.
 - Expand structure-specific behavior only after inspecting the corresponding runtime snapshot/event shape. Keep arrays and linked lists as the established baseline and avoid problem-specific rules.
+
+
+## Implementation log — collection insertion motion
+
+- Added a trace-backed insertion entrance animation for stack, queue/deque, set, and priority-queue entries.
+- The renderer compares the current collection snapshot with the immediately preceding captured snapshot for the same collection identity. It animates only occurrences newly present in that snapshot; it does not infer an insertion from a method name alone.
+- Duplicate values are counted by occurrence, rather than collapsed into a set. The animation respects `prefers-reduced-motion`.
+- Added a regression test for a stack push where the previous snapshot contains `[1, 2]` and the current snapshot contains `[1, 2, 3]`.
+- **Verification status:** code and test are committed, but tests/typecheck/build have not yet been executed in this environment. This is one operation slice, not completion of collection animations or the full DS scope.
