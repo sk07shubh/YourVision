@@ -20,6 +20,7 @@ import {
   Variables,
   ArrayView,
   DataStructures,
+  DisjointSetView,
   GraphView,
   TrieView,
   LinkedListView,
@@ -185,6 +186,49 @@ describe('linked-list graph visualization', () => {
     expect(html).toContain('empty list');
     expect(html).toContain('head = null');
     expect(html).not.toContain('data-node-id=');
+  });
+});
+
+describe('disjoint-set visualization', () => {
+  it('renders the parent forest and highlights parent-array writes', () => {
+    const current = state({
+      arrays: {
+        parent: { $arrayId: 'parent-array', $type: 'int[]', values: [0, 0, 2, 2, 0] },
+        rank: { $arrayId: 'rank-array', $type: 'int[]', values: [1, 0, 1, 0, 0] },
+      },
+      lastEvent: {
+        type: 'STEP',
+        line: 8,
+        data: {
+          executionEvents: [{
+            type: 'ARRAY_WRITE',
+            data: { name: 'parent', changes: [{ indices: [4], before: 4, after: 0 }] },
+          }],
+        },
+      },
+    });
+    const source = [
+      'int find(int x) {',
+      '  return parent[x] == x ? x : find(parent[x]);',
+      '}',
+      'void union(int a, int b) {',
+      '  parent[find(a)] = find(b);',
+      '}',
+    ].join('\n');
+    const html = renderToStaticMarkup(<DataStructures state={current} source={source} />);
+    expect(html).toContain('Disjoint Set → parent');
+    expect(html).toContain('data-dsu-node-count="5"');
+    expect(html).toContain('data-dsu-node-index="0"');
+    expect(html).toContain('data-dsu-node-index="4"');
+    expect(html).toContain('data-dsu-parent="0"');
+    expect(html).toContain('rank 1');
+    expect(html).toContain('yv-dsu-changed');
+  });
+
+  it('renders the component safely for an empty parent forest', () => {
+    const html = renderToStaticMarkup(<DisjointSetView parent={[]} name="parent" />);
+    expect(html).toContain('data-dsu-node-count="0"');
+    expect(html).toContain('0 roots');
   });
 });
 
