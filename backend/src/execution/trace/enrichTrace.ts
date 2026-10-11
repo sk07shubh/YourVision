@@ -1126,11 +1126,12 @@ function deriveStringEvents(
                     ? value.charCodeAt(offset) - query.charCodeAt(offset)
                     : value.length - query.length;
                 matched = result === 0;
-                index = matched ? -1 : offset;
+                index = matched ? 0 : offset;
             }
-            if (matched && index >= 0) end = operation === "equals" || operation === "equalsIgnoreCase"
+            if (matched && index >= 0) end = operation === "equals" || operation === "equalsIgnoreCase" || operation === "compareTo"
                 ? value.length
                 : index + query.length;
+            else if (operation === "compareTo" && index >= 0) end = index + 1;
         }
         events.push({
             sequence: 0,
