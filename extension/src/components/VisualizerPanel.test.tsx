@@ -65,6 +65,56 @@ describe('string data structure visualization', () => {
     expect(html).toContain('class="yv-array-cell yv-cell-read" data-string-index="2"');
     expect(html).not.toContain('class="yv-array-cell yv-cell-read" data-string-index="1"');
   });
+  it('renders spaces as blank fixed-width cells and keeps every index in its own aligned wrapper', () => {
+    const html = renderToStaticMarkup(<StringView value="a b  c" state={state()} name="s" />);
+    expect(html).toContain('data-string-length="6"');
+    expect(html).toContain('class="yv-string-cell-wrap"');
+    expect(html).toContain('class="yv-string-index">0</div>');
+    expect(html).toContain('class="yv-string-index">5</div>');
+    expect(html).not.toContain('␠');
+    expect(html).not.toContain('>sp<');
+    expect((html.match(/class="yv-string-cell-wrap"/g) ?? []).length).toBe(6);
+  });
+
+  it('uses STRING_ACCESS to highlight the runtime character and display its pointer', () => {
+    const current = state({
+      line: 4,
+      variables: { s: 'banana', i: 2 },
+      lastEvent: { type: 'STEP', line: 4, data: { executionEvents: [
+        { type: 'STRING_ACCESS', data: { name: 's', index: 2, value: 'n', kind: 'read', indexVariable: 'i' } },
+      ] } },
+    });
+    const html = renderToStaticMarkup(<StringView value="banana" state={current} name="s" source={'char c = s.charAt(i);'} />);
+    expect(html).toContain('class="yv-string-cell yv-cell-read " data-string-index="2"');
+    expect(html).toContain('data-string-pointer="i"');
+    expect(html).not.toContain('class="yv-string-cell yv-cell-read " data-string-index="1"');
+  });
+
+  it('highlights half-open substring ranges and animates derived string results', () => {
+    const rangeState = state({ lastEvent: { type: 'STEP', line: 4, data: { executionEvents: [
+      { type: 'STRING_RANGE_ACCESS', data: { name: 's', start: 1, end: 4, operation: 'substring', kind: 'read' } },
+    ] } } });
+    const rangeHtml = renderToStaticMarkup(<StringView value="banana" state={rangeState} name="s" />);
+    expect(rangeHtml).toContain('class="yv-string-cell yv-cell-range " data-string-index="1"');
+    expect(rangeHtml).toContain('class="yv-string-cell yv-cell-range " data-string-index="3"');
+    expect(rangeHtml).not.toContain('class="yv-string-cell yv-cell-range " data-string-index="4"');
+
+    const resultState = state({ lastEvent: { type: 'STEP', line: 5, data: { executionEvents: [
+      { type: 'STRING_RESULT', data: { resultName: 'upper', sourceName: 's', operation: 'toUpperCase', before: '', after: 'BANANA', kind: 'derived' } },
+    ] } } });
+    const resultHtml = renderToStaticMarkup(<StringView value="BANANA" state={resultState} name="upper" />);
+    expect(resultHtml).toContain('toUpperCase · result');
+    expect(resultHtml).toContain('yv-string-cell-added');
+  });
+
+  it('animates mutable string-sequence snapshots only when before and after differ', () => {
+    const current = state({ lastEvent: { type: 'STEP', line: 6, data: { executionEvents: [
+      { type: 'STRING_MUTATION', data: { name: 'builder', operation: 'reverse', before: 'abc', after: 'cba', kind: 'mutation' } },
+    ] } } });
+    const html = renderToStaticMarkup(<StringView value="cba" state={current} name="builder" />);
+    expect(html).toContain('reverse · mutated');
+    expect(html).toContain('yv-string-cell-changed');
+  });
 });
 
 describe('execution visualization feature matrix', () => {
