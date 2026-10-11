@@ -1057,9 +1057,10 @@ function deriveStringEvents(
 
     for (const match of statement.matchAll(/\b([A-Za-z_$][\w$]*)\s*\.\s*charAt\s*\(([^()]*)\)/g)) {
         const name = match[1];
-        if (!name || typeof variables[name] !== "string") continue;
+        if (!name) continue;
+        const value = typeof variables[name] === "string" ? variables[name] as string : stringBuilderContents(variables[name]);
+        if (value === undefined) continue;
         const index = evaluateExpression(match[2] ?? "", variables);
-        const value = variables[name] as string;
         if (typeof index !== "number" || !Number.isInteger(index) || index < 0 || index >= value.length) continue;
         events.push({
             sequence: 0,
@@ -1073,11 +1074,12 @@ function deriveStringEvents(
 
     for (const match of statement.matchAll(/\b([A-Za-z_$][\w$]*)\s*\.\s*(substring|subSequence)\s*\(([^()]*)\)/g)) {
         const name = match[1];
-        if (!name || typeof variables[name] !== "string") continue;
+        if (!name) continue;
+        const value = typeof variables[name] === "string" ? variables[name] as string : stringBuilderContents(variables[name]);
+        if (value === undefined) continue;
         const args = (match[3] ?? "").split(",").map(part => part.trim());
         const start = evaluateExpression(args[0] ?? "", variables);
-        const end = args.length > 1 ? evaluateExpression(args[1] ?? "", variables) : (variables[name] as string).length;
-        const value = variables[name] as string;
+        const end = args.length > 1 ? evaluateExpression(args[1] ?? "", variables) : value.length;
         if (typeof start !== "number" || typeof end !== "number" ||
             !Number.isInteger(start) || !Number.isInteger(end) ||
             start < 0 || end < start || end > value.length) continue;
@@ -1096,8 +1098,9 @@ function deriveStringEvents(
         const name = match[1];
         const operation = match[2];
         const query = evaluateExpression(match[3] ?? "", variables);
-        if (!name || !operation || typeof variables[name] !== "string" || typeof query !== "string") continue;
-        const value = variables[name] as string;
+        if (!name || !operation || typeof query !== "string") continue;
+        const value = typeof variables[name] === "string" ? variables[name] as string : stringBuilderContents(variables[name]);
+        if (value === undefined) continue;
         let index = -1;
         let result: string | number | boolean;
         if (operation === "indexOf") { index = value.indexOf(query); result = index; }
@@ -1117,7 +1120,7 @@ function deriveStringEvents(
         });
     }
 
-    const assignmentPattern = /\b([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*\.\s*(substring|subSequence|concat|replace|replaceAll|toLowerCase|toUpperCase|trim|strip)\s*\(/g;
+    const assignmentPattern = /\b([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*\.\s*(substring|subSequence|concat|replace|replaceAll|toLowerCase|toUpperCase|trim|strip|toString)\s*\(/g;
     for (const match of statement.matchAll(assignmentPattern)) {
         const resultName = match[1];
         const sourceName = match[2];
@@ -1125,8 +1128,8 @@ function deriveStringEvents(
         if (!resultName || !sourceName || !operation) continue;
         const beforeResult = variables[resultName];
         const afterResult = postVariables[resultName];
-        const sourceValue = variables[sourceName];
-        if (typeof afterResult !== "string" || typeof sourceValue !== "string" ||
+        const sourceValue = typeof variables[sourceName] === "string" ? variables[sourceName] as string : stringBuilderContents(variables[sourceName]);
+        if (typeof afterResult !== "string" || sourceValue === undefined ||
             beforeResult === afterResult) continue;
         events.push({
             sequence: 0,
