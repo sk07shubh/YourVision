@@ -2574,12 +2574,15 @@ export function LinkedListView({
           const lift = Math.max(34, Math.min(90, Math.abs(ax - bx) * 0.28 + 24));
           const top = Math.max(4, Math.min(ay, by) - lift);
           d = `M ${ax} ${ay} C ${ax + 22} ${top}, ${bx + 22} ${top}, ${bx} ${by}`;
-        } else if ((kind === 'cross-next' || kind === 'null-next') && bx > ax && Math.abs(by - ay) <= 10) {
+        } else if (kind === 'null-next') {
+          // A terminal null belongs directly beside its node: keep this
+          // connector horizontal rather than routing it through an S-curve.
+          d = `M ${ax} ${ay} L ${bx} ${ay}`;
+        } else if (kind === 'cross-next' && bx > ax && Math.abs(by - ay) <= 10) {
           // Side-by-side nodes on the same row get a genuinely straight link.
           d = `M ${ax} ${ay} L ${bx} ${by}`;
-        } else if ((kind === 'cross-next' || kind === 'null-next') && by < ay) {
-          // Angular S-curve: horizontal departure, a sharp diagonal middle,
-          // then a horizontal approach to the destination's left outline.
+        } else if (kind === 'cross-next' && by < ay) {
+          // Route cross-row links around the other nodes.
           const midX = ax + (bx - ax) * 0.5;
           const midY = ay + (by - ay) * 0.5;
           d = `M ${ax} ${ay} H ${midX} L ${midX} ${midY} L ${bx - 12} ${by} H ${bx}`;
