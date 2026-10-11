@@ -23,6 +23,11 @@ const source = [
     '  appended += "b";',
     "  boolean found = s.contains(\"ana\");",
     "  int foundAt = s.indexOf(\"na\");",
+    '  boolean equal = s.equals("banana");',
+    '  boolean equalIgnoreCase = s.equalsIgnoreCase("BANANA");',
+    '  boolean starts = s.startsWith("ban");',
+    '  boolean ends = s.endsWith("ana");',
+    '  int lastFound = s.lastIndexOf("na");',
     "  int length = s.length();",
     "  boolean empty = s.isEmpty();",
     "  boolean blank = s.isBlank();",
@@ -67,6 +72,11 @@ assert(search?.data?.matched === true && search.data.query === "ana", "contains 
 assert(effects.some(event => event.type === "STRING_SEARCH_RESULT" && event.data?.operation === "length" && event.data.result === 6), "length must emit metadata without a character access");
 assert(effects.some(event => event.type === "STRING_SEARCH_RESULT" && event.data?.operation === "isBlank" && event.data.result === false), "isBlank must emit its boolean result");
 assert(effects.some(event => event.type === "STRING_SEARCH_RESULT" && event.data?.operation === "compareTo" && event.data.result === 0), "compareTo must emit its comparison result");
+assert(effects.some(event => event.type === "STRING_SEARCH_RESULT" && event.data?.operation === "equals" && event.data.result === true), "equals must emit its result");
+assert(effects.some(event => event.type === "STRING_SEARCH_RESULT" && event.data?.operation === "equalsIgnoreCase" && event.data.result === true), "equalsIgnoreCase must emit its result");
+assert(effects.some(event => event.type === "STRING_SEARCH_RESULT" && event.data?.operation === "startsWith" && event.data.index === 0 && event.data.end === 3), "startsWith must identify its matching range");
+assert(effects.some(event => event.type === "STRING_SEARCH_RESULT" && event.data?.operation === "endsWith" && event.data.index === 3 && event.data.end === 6), "endsWith must identify its matching range");
+assert(effects.some(event => event.type === "STRING_SEARCH_RESULT" && event.data?.operation === "lastIndexOf" && event.data.result === 4), "lastIndexOf must return the last match");
 const mutation = effects.find(event => event.type === "STRING_MUTATION" && event.data?.name === "builder");
 assert(mutation?.data?.operation === "reverse" && mutation.data.before === "abc" && mutation.data.after === "cba",
     "StringBuilder reverse must expose its real before/after snapshot: " + JSON.stringify(mutation?.data));
