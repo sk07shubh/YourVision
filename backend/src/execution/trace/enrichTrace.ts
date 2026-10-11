@@ -1093,30 +1093,52 @@ function deriveStringEvents(
         });
     }
 
-    const searchPattern = /\b([A-Za-z_$][\w$]*)\s*\.\s*(indexOf|lastIndexOf|contains|startsWith|endsWith|equals|equalsIgnoreCase)\s*\(([^()]*)\)/g;
+    const searchPattern = /\b([A-Za-z_$][\w$]*)\s*\.\s*(indexOf|lastIndexOf|contains|startsWith|endsWith|equals|equalsIgnoreCase|compareTo|isEmpty|isBlank|length)\s*\(([^()]*)\)/g;
     for (const match of statement.matchAll(searchPattern)) {
         const name = match[1];
         const operation = match[2];
-        const query = evaluateExpression(match[3] ?? "", variables);
-        if (!name || !operation || typeof query !== "string") continue;
+        if (!name || !operation) continue;
         const value = typeof variables[name] === "string" ? variables[name] as string : stringBuilderContents(variables[name]);
         if (value === undefined) continue;
+        const argument = (match[3] ?? "").trim();
+        const queryValue = argument ? evaluateExpression(argument, variables) : undefined;
         let index = -1;
+        let end = -1;
         let result: string | number | boolean;
-        if (operation === "indexOf") { index = value.indexOf(query); result = index; }
-        else if (operation === "lastIndexOf") { index = value.lastIndexOf(query); result = index; }
-        else if (operation === "contains") { index = value.indexOf(query); result = index >= 0; }
-        else if (operation === "startsWith") { index = value.startsWith(query) ? 0 : -1; result = index >= 0; }
-        else if (operation === "endsWith") { index = value.endsWith(query) ? value.length - query.length : -1; result = index >= 0; }
-        else if (operation === "equalsIgnoreCase") { result = value.toLowerCase() === query.toLowerCase(); index = result ? 0 : -1; }
-        else { result = value === query; index = result ? 0 : -1; }
+        let matched = false;
+        if (operation === "length") result = value.length;
+        else if (operation === "isEmpty") result = value.length === 0;
+        else if (operation === "isBlank") result = value.trim().length === 0;
+        else {
+            if (typeof queryValue !== "string") continue;
+            const query = queryValue;
+            if (operation === "indexOf") { index = value.indexOf(query); result = index; matched = index >= 0; }
+            else if (operation === "lastIndexOf") { index = value.lastIndexOf(query); result = index; matched = index >= 0; }
+            else if (operation === "contains") { index = value.indexOf(query); result = index >= 0; matched = index >= 0; }
+            else if (operation === "startsWith") { index = value.startsWith(query) ? 0 : -1; result = index >= 0; matched = index >= 0; }
+            else if (operation === "endsWith") { index = value.endsWith(query) ? value.length - query.length : -1; result = index >= 0; matched = index >= 0; }
+            else if (operation === "equalsIgnoreCase") { result = value.toLowerCase() === query.toLowerCase(); matched = result; index = matched ? 0 : -1; }
+            else if (operation === "equals") { result = value === query; matched = result; index = matched ? 0 : -1; }
+            else {
+                let offset = 0;
+                while (offset < value.length && offset < query.length && value.charCodeAt(offset) === query.charCodeAt(offset)) offset++;
+                result = offset < value.length && offset < query.length
+                    ? value.charCodeAt(offset) - query.charCodeAt(offset)
+                    : value.length - query.length;
+                matched = result === 0;
+                index = matched ? -1 : offset;
+            }
+            if (matched && index >= 0) end = operation === "equals" || operation === "equalsIgnoreCase"
+                ? value.length
+                : index + query.length;
+        }
         events.push({
             sequence: 0,
             type: "STRING_SEARCH_RESULT",
             line: sourceEvent.line,
             method: sourceEvent.method,
             depth: sourceEvent.depth,
-            data: { name, operation, query, index, end: index < 0 ? -1 : index + query.length, matched: index >= 0, result, kind: "search" }
+            data: { name, operation, query: argument ? queryValue : undefined, index, end, matched, result, kind: "search" }
         });
     }
 
