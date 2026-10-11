@@ -3353,6 +3353,75 @@ export function StringView({ value, state, name, source = '' }: { value: string;
   );
 }
 
+export function DisjointSetView({ parent, name, state, rank, size }: {
+  parent: unknown[];
+  name: string;
+  state?: TraceState;
+  rank?: unknown[];
+  size?: unknown[];
+}) {
+  const count = Math.min(parent.length, 100);
+  const values = parent.slice(0, count);
+  const children = Array.from({ length: count }, () => [] as number[]);
+  const roots: number[] = [];
+  values.forEach((value, index) => {
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < -1 || value >= count) return;
+    if (value === index || value === -1) roots.push(index);
+    else children[value]!.push(index);
+  });
+  const changed = changedArrayIndices(state, name);
+  const visited = new Set<number>();
+  const renderNode = (index: number, path: Set<number>): React.ReactNode => {
+    if (path.has(index)) return <span className="yv-code" data-dsu-cycle={index}>↻ {index}</span>;
+    if (visited.has(index)) return <span className="yv-code" data-dsu-reference={index}>↗ {index}</span>;
+    visited.add(index);
+    const nextPath = new Set(path);
+    nextPath.add(index);
+    const parentIndex = values[index];
+    const isRoot = parentIndex === index || parentIndex === -1;
+    return (
+      <div className={'yv-dsu-branch' + (changed.has(index) ? ' yv-dsu-changed' : '')} key={index}
+        data-dsu-node-index={index} data-dsu-parent={typeof parentIndex === 'number' ? parentIndex : 'invalid'}
+        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, padding: 7 }}>
+        <div className="yv-dsu-node" style={{ minWidth: 52, padding: '7px 9px', border: '1px solid var(--yv-accent, #65a9ff)',
+          borderRadius: 9, background: changed.has(index) ? 'var(--yv-highlight, #203b5b)' : 'var(--yv-panel, #101b2d)',
+          color: 'var(--yv-text, #f3f6ff)', textAlign: 'center', fontSize: 12 }}>
+          <div>{index}</div>
+          <div style={{ fontSize: 10, color: isRoot ? 'var(--yv-accent, #65a9ff)' : 'var(--yv-muted, #8b9bb4)' }}>
+            {isRoot ? 'ROOT' : 'parent → ' + String(parentIndex)}
+          </div>
+          {rank?.[index] !== undefined && <div style={{ fontSize: 10 }}>rank {displayValue(rank[index])}</div>}
+          {size?.[index] !== undefined && <div style={{ fontSize: 10 }}>size {displayValue(size[index])}</div>}
+        </div>
+        {children[index]!.length > 0 && (
+          <div className="yv-dsu-children" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+            gap: 8, flexWrap: 'wrap', borderTop: '1px solid var(--yv-border, #334155)', paddingTop: 8 }}>
+            {children[index]!.map(child => renderNode(child, nextPath))}
+          </div>
+        )}
+      </div>
+    );
+  };
+  const forestRoots = roots.length ? roots : values.map((_, index) => index);
+  const trees = forestRoots.map(index => renderNode(index, new Set<number>()));
+  const disconnected = values.map((_, index) => index).filter(index => !visited.has(index));
+  disconnected.forEach(index => trees.push(renderNode(index, new Set<number>())));
+
+  return (
+    <div className="yv-dsu" data-dsu-array={name} data-dsu-node-count={count}>
+      <div className="yv-collection-meta">
+        <span>Disjoint-set forest · {name}</span>
+        <span>{roots.length} roots · {count} elements{parent.length > count ? ' · display limit reached' : ''}</span>
+      </div>
+      <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
+        <div className="yv-dsu-forest" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 12, minWidth: 'max-content' }}>
+          {trees}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function DataStructures({ state, source }: { state?: TraceState; source: string }) {
   const namedObjectIds = new Map<string, string[]>();
 
@@ -3440,6 +3509,18 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
     isPlainObject(value) && typeof value.$objectId === 'string' ? value.$objectId : id
   ));
 
+  const dsuContext = /\\b(?:find|union)\\s*\\(/i.test(source) && /\\b(?:parent|parents|par)\\s*\\[/i.test(source);
+  const dsuParentEntry = dsuContext ? Object.entries(state?.arrays ?? {}).find(([name, value]) =>
+    /^(?:parent|parents|par)$/i.test(name) && isArraySnapshot(value) &&
+    value.values.length > 0 && value.values.every(item => typeof item === 'number' && Number.isInteger(item) && item >= -1 && item < value.values.length)
+  ) : undefined;
+  const dsuRankEntry = dsuContext ? Object.entries(state?.arrays ?? {}).find(([name, value]) =>
+    /^(?:rank|ranks)$/i.test(name) && isArraySnapshot(value)
+  ) : undefined;
+  const dsuSizeEntry = dsuContext ? Object.entries(state?.arrays ?? {}).find(([name, value]) =>
+    /^(?:size|sizes)$/i.test(name) && isArraySnapshot(value)
+  ) : undefined;
+
   const trieNames = Object.entries(state?.variables ?? {}).flatMap(([name, value]) => {
     const id = graphReferenceId(value, state?.objects ?? {});
     if (id && trieNodeIds.has(id)) return [name];
@@ -3461,7 +3542,7 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
 
   const items = [...grouped.values()];
 
-  if (!items.length && graphNodeEntries.length === 0 && trieNodeEntries.length === 0) {
+  if (!items.length && graphNodeEntries.length === 0 && trieNodeEntries.length === 0 && !dsuParentEntry) {
     return <div className="yv-empty">Structures appear here as your code creates or mutates them.</div>;
   }
 
@@ -3490,6 +3571,18 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
           </div>
         );
       })}
+      {dsuParentEntry && isArraySnapshot(dsuParentEntry[1]) && (
+        <div className="yv-ds" key="Disjoint-set forest">
+          <div className="yv-ds-title">Disjoint Set → {dsuParentEntry[0]}</div>
+          <DisjointSetView
+            parent={dsuParentEntry[1].values}
+            name={dsuParentEntry[0]}
+            state={state}
+            rank={dsuRankEntry && isArraySnapshot(dsuRankEntry[1]) ? dsuRankEntry[1].values : undefined}
+            size={dsuSizeEntry && isArraySnapshot(dsuSizeEntry[1]) ? dsuSizeEntry[1].values : undefined}
+          />
+        </div>
+      )}
       {trieNodeEntries.length > 0 && (
         <div className="yv-ds" key="Trie → runtime nodes">
           <div className="yv-ds-title">Trie → {trieNames.join(' / ') || 'runtime nodes'}</div>
