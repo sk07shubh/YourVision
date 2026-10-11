@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ReactNode } from 'react';
 import type { TraceState } from '../types/trace';
+import { sessionStore } from '../state/store';
 import {
   collectionDelta,
   collectionOperation,
@@ -269,7 +270,8 @@ describe('string data structure visualization', () => {
     ] } } });
     const html = renderToStaticMarkup(<StringView value="banana" state={current} name="s" />);
     expect(html).toContain('length → 6');
-    expect(html).toContain('UTF-16 units');
+    expect(html).not.toContain('yv-string-meta');
+    expect(html).not.toContain('UTF-16 units');
     expect(html).not.toContain('yv-cell-range');
   });
 
@@ -392,6 +394,55 @@ describe('execution visualization feature matrix', () => {
     expect(executionSubstatement(statement, condition, update)).toBe('i < n');
     expect(isForLoopUpdateStep(statement, update, init)).toBe(true);
     expect(isForLoopUpdateStep(statement, condition, update)).toBe(false);
+  });
+
+  it('keeps an enhanced-for binding attached to the correct duplicate-valued array cell through body steps', () => {
+    const previousSession = sessionStore.get();
+    const source = 'for (int x : nums) {\n  consume(x);\n}';
+    const checkpoint = (sequence: number, value: number, line: number) => state({
+      sequence,
+      line,
+      variables: { x: value },
+      lastEvent: { type: 'STEP', line, data: { executionEvents: [
+        { type: 'VARIABLE_UPDATE', line: 1, data: { name: 'x', value } },
+      ] } },
+    });
+    const states = [checkpoint(1, 7, 1), checkpoint(2, 7, 1), state({
+      sequence: 3, line: 2, variables: { x: 7 }, lastEvent: { type: 'STEP', line: 2, data: {} },
+    })];
+    try {
+      sessionStore.set({ source, states, index: 2 });
+      const html = renderToStaticMarkup(<ArrayView value={[7, 7, 7]} state={states[2]} source={source} arrayName="nums" />);
+      expect(html).toContain('data-enhanced-for-variable="x"');
+      expect(html).toContain('data-enhanced-for-index="1"');
+      expect(html).toContain('x</span><span class="yv-enhanced-for-equals">=</span><span class="yv-enhanced-for-value">7</span>');
+    } finally {
+      sessionStore.set(previousSession);
+    }
+  });
+
+  it('renders an enhanced-for char binding above its string cell without creating a second string structure', () => {
+    const previousSession = sessionStore.get();
+    const source = 'for (char ch : s.toCharArray()) {\n  consume(ch);\n}';
+    const checkpoint = (sequence: number, line: number, value: string) => state({
+      sequence, line, variables: { ch: value, s: 'aaa' },
+      lastEvent: { type: 'STEP', line, data: { executionEvents: [
+        { type: 'VARIABLE_UPDATE', line: 1, data: { name: 'ch', value } },
+      ] } },
+    });
+    const states = [checkpoint(1, 1, 'a'), checkpoint(2, 1, 'a'), state({
+      sequence: 3, line: 2, variables: { ch: 'a', s: 'aaa' }, lastEvent: { type: 'STEP', line: 2, data: {} },
+    })];
+    try {
+      sessionStore.set({ source, states, index: 2 });
+      const html = renderToStaticMarkup(<DataStructures state={states[2]} source={source} />);
+      expect(html).toContain('data-enhanced-for-variable="ch"');
+      expect(html).toContain('data-enhanced-for-index="1"');
+      expect(html).not.toContain('String → ch');
+      expect(html).toContain('String → s');
+    } finally {
+      sessionStore.set(previousSession);
+    }
   });
 
   it('renders every enhanced-for header generically', () => {
