@@ -1229,7 +1229,7 @@ function deriveStringEvents(
             removed = before.charAt(index);
         } else if (operation === "replace" && index !== undefined && typeof secondArg === "number") {
             removed = before.slice(index, secondArg);
-            inserted = after.slice(index, Math.max(index, after.length - (before.length - removed.length)));
+            inserted = after.slice(index, index + Math.max(0, after.length - (before.length - removed.length)));
         }
         events.push({
             sequence: 0,
