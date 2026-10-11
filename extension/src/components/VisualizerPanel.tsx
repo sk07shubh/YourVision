@@ -1244,7 +1244,7 @@ function CollectionView({
       <div className="yv-collection">
         <div className="yv-collection-meta">
           <span>{type}</span>
-          <span>MIN-HEAP · {itemCount} items</span>
+          <span>HEAP · {itemCount} items</span>
         </div>
         <div className="yv-heap-tree">
           {(() => {
