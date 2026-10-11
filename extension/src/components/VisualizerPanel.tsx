@@ -1237,28 +1237,6 @@ function collectionRemovedItems(value: Obj & { $collectionId: string; values: un
   return removed;
 }
 
-function CollectionRemovalCue({ value, state, name, source, depth, seen }: {
-  value: Obj & { $collectionId: string; values: unknown[] };
-  state?: TraceState;
-  name?: string;
-  source: string;
-  depth: number;
-  seen: Set<string>;
-}) {
-  const removed = collectionRemovedItems(value, state, name);
-  if (!removed.length) return null;
-  return (
-    <div className="yv-collection-removals" aria-label="Items removed on this step">
-      <span className="yv-collection-removal-label">REMOVED</span>
-      {removed.map((item, index) => (
-        <span className="yv-collection-item-exit" key={stableStringify(item) + ':' + index}>
-          <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
-        </span>
-      ))}
-    </div>
-  );
-}
-
 function CollectionView({
   value,
   state,
@@ -1308,7 +1286,6 @@ function CollectionView({
           ))}
           {!value.values.length && <div className="yv-empty">Empty stack</div>}
         </div>
-        <CollectionRemovalCue value={value} state={state} name={name} source={source} depth={depth} seen={seen}/>
         <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
       </div>
     );
@@ -1331,7 +1308,6 @@ function CollectionView({
           <div className="yv-queue-end">REAR</div>
           {!value.values.length && <div className="yv-empty">Empty queue</div>}
         </div>
-        <CollectionRemovalCue value={value} state={state} name={name} source={source} depth={depth} seen={seen}/>
         <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
       </div>
     );
@@ -1352,7 +1328,6 @@ function CollectionView({
           ))}
           {!value.values.length && <div className="yv-empty">Empty set</div>}
         </div>
-        <CollectionRemovalCue value={value} state={state} name={name} source={source} depth={depth} seen={seen}/>
         <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
       </div>
     );
@@ -1385,7 +1360,6 @@ function CollectionView({
           })()}
         </div>
         <div className="yv-code yv-heap-note">Heap tree · root is index 0</div>
-        <CollectionRemovalCue value={value} state={state} name={name} source={source} depth={depth} seen={seen}/>
         <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
       </div>
     );
@@ -1397,7 +1371,6 @@ function CollectionView({
         <span>{type}</span>
         <span>{kind} · {itemCount} items</span>
       </div>
-      <CollectionRemovalCue value={value} state={state} name={name} source={source} depth={depth} seen={seen}/>
       <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
     </div>
   );
