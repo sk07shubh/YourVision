@@ -2552,11 +2552,16 @@ export function LinkedListView({
                   <div className="yv-linked-piece" key={node.id} data-node-id={node.id} data-node-index={allNodes.findIndex(candidate => candidate.id === node.id)} data-next-target={node.nextId ?? 'null'} data-prev-target={prevId ?? 'null'}>
                     <div className="yv-linked-node-column">
                       {pointerNames.get(node.id)?.map(name => <div className={`yv-node-pointer ${movedPointerNames.has(name) ? 'yv-node-pointer-moved' : ''}`} data-pointer-name={name} key={name}>{name}</div>)}
-                      <div className={`yv-node ${changedEdgeIds.has(node.id) ? 'yv-node-link-changed' : ''}`} data-linked-node-value={node.id}>
-                        <span className="yv-node-value">{displayValue(node.value)}</span>
-                        <span className="yv-node-identity" title={`Stable object identity: ${node.id}`}>#{node.id.length > 8 ? node.id.slice(-6) : node.id}</span>
-                        {hasPrev && <span className="yv-node-link-meta" title={`prev references ${prevId ?? 'null'}`}>prev: {idLabel(prevId)}</span>}
+                      <div className={`yv-node yv-linked-node ${changedEdgeIds.has(node.id) ? 'yv-node-link-changed' : ''}`} data-linked-node-value={node.id}>
+                        <span className="yv-linked-node-data">
+                          <span className="yv-node-value">{displayValue(node.value)}</span>
+                        </span>
+                        <span className="yv-linked-node-next" aria-label={`next pointer slot; target ${idLabel(node.nextId)}`}>
+                          <span className="yv-linked-next-port" />
+                        </span>
                       </div>
+                      <span className="yv-node-identity" title={`Stable object identity: ${node.id}`}>#{node.id.length > 8 ? node.id.slice(-6) : node.id}</span>
+                      {hasPrev && <span className="yv-node-link-meta" title={`prev references ${prevId ?? 'null'}`}>prev: {idLabel(prevId)}</span>}
                     </div>
                     {nextInComponent && <div className={`yv-edge ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="next" data-edge-from={node.id} data-edge-to={node.nextId} aria-label={`next points to ${idLabel(node.nextId)}`}>→</div>}
                     {nextIsCycle && <div className={`yv-edge yv-edge-cycle ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="cycle" data-edge-from={node.id} data-edge-to={component.cycleTo ?? 'unknown'} aria-label={`cycle back to ${idLabel(component.cycleTo)}`}>↶ {idLabel(component.cycleTo)}</div>}
