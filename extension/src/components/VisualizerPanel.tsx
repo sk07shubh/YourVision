@@ -696,7 +696,7 @@ export function collectionOperation(kind: string, method: string | undefined, de
     if (['remove','removelast','poll'].includes(m)) return {operation:'Remove',value:delta.removed,position:typeof delta.index === 'number' ? 'Index: ' + delta.index : 'End'};
     if (m === 'set') return {operation:'Set',value:delta.added,oldValue:delta.removed,position:'Index: ' + (delta.index ?? '?'),showOld:true};
   }
-  if (kind === 'set' || kind === 'sortedSet') {
+  if (kind === 'set' || kind === 'sortedSet' || kind === 'insertionOrderedSet') {
     if (m === 'add') return {operation:'Add',value:delta.added,position:'Element'};
     if (m === 'remove') return {operation:'Remove',value:delta.removed,position:'Element'};
   }
@@ -1219,12 +1219,12 @@ function CollectionView({
     );
   }
 
-  if (kind === 'set' || kind === 'sortedSet') {
+  if (kind === 'set' || kind === 'sortedSet' || kind === 'insertionOrderedSet') {
     return (
       <div className="yv-collection">
         <div className="yv-collection-meta">
           <span>{type}</span>
-          <span>{kind === 'sortedSet' ? 'SORTED · ' : 'UNORDERED · '}{itemCount} elements</span>
+          <span>{kind === 'sortedSet' ? 'SORTED · ' : kind === 'insertionOrderedSet' ? 'INSERTION ORDER · ' : 'UNORDERED · '}{itemCount} elements</span>
         </div>
         <div className="yv-set-view">
           {value.values.map((item, index) => (
@@ -2322,7 +2322,11 @@ function MapView({
             ? value.$type.split('.').pop()
             : 'Map'}
         </span>
-        <span>{value.entries.length} entries</span>
+        <span>{typeof value.$type === 'string' && value.$type.endsWith('TreeMap')
+          ? 'SORTED BY KEY · ' + value.entries.length + ' entries'
+          : typeof value.$type === 'string' && value.$type.endsWith('LinkedHashMap')
+            ? 'INSERTION ORDER · ' + value.entries.length + ' entries'
+            : value.entries.length + ' entries'}</span>
       </div>
 
       <div className="yv-map-table">
