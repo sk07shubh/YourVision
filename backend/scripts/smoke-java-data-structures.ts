@@ -19,12 +19,20 @@ class Solution {
         int[] nums = {2, 7, 11};
         HashMap<Integer, Integer> map = new HashMap<>();
         map.put(2, 7);
+        LinkedHashMap<Integer, Integer> linkedMap = new LinkedHashMap<>();
+        linkedMap.put(5, 50);
+        linkedMap.put(1, 10);
+        linkedMap.put(3, 30);
         HashSet<Integer> set = new HashSet<>();
         set.add(10);
         TreeSet<Integer> sortedSet = new TreeSet<>();
         sortedSet.add(11);
         sortedSet.add(3);
         sortedSet.add(7);
+        LinkedHashSet<Integer> insertionOrderedSet = new LinkedHashSet<>();
+        insertionOrderedSet.add(9);
+        insertionOrderedSet.add(2);
+        insertionOrderedSet.add(7);
         Stack<Integer> stack = new Stack<>();
         stack.push(5);
         Queue<Integer> queue = new ArrayDeque<>();
@@ -164,14 +172,16 @@ assert(!("nums" in variables), "array leaked into Variables");
 assert(!("map" in variables), "map leaked into Variables");
 assert("nums" in arrays, "array missing from Data Structures");
 
-for (const name of ["map","set","sortedSet","stack","queue","priorityQueue","list"]) {
+for (const name of ["map","linkedMap","set","sortedSet","insertionOrderedSet","stack","queue","priorityQueue","list"]) {
     assert(name in structures, name + " missing from Data Structures");
 }
 
 const nums = arrays.nums as Record<string, unknown>;
 const map = structures.map as Record<string, unknown>;
+const linkedMap = structures.linkedMap as Record<string, any>;
 const set = structures.set as Record<string, unknown>;
 const sortedSet = structures.sortedSet as Record<string, unknown>;
+const insertionOrderedSet = structures.insertionOrderedSet as Record<string, unknown>;
 const stack = structures.stack as Record<string, unknown>;
 const queue = structures.queue as Record<string, unknown>;
 const priorityQueue = structures.priorityQueue as Record<string, unknown>;
@@ -179,9 +189,12 @@ const list = structures.list as Record<string, unknown>;
 
 assert(JSON.stringify(nums.values) === "[99,7,11]", "array values incorrect");
 assert(Array.isArray(map.entries) && (map.entries as unknown[]).length === 2, "map entries incorrect");
+assert(JSON.stringify(linkedMap.entries.map((entry: any) => entry.key)) === "[5,1,3]", "LinkedHashMap insertion order was not preserved");
 assert(JSON.stringify(set.values) === "[10,11]", "set values incorrect");
 assert(sortedSet.$kind === "sortedSet", "TreeSet ordering kind is incorrect");
 assert(JSON.stringify(sortedSet.values) === "[3,7,11]", "TreeSet comparator order was not preserved");
+assert(insertionOrderedSet.$kind === "insertionOrderedSet", "LinkedHashSet ordering kind is incorrect");
+assert(JSON.stringify(insertionOrderedSet.values) === "[9,2,7]", "LinkedHashSet insertion order was not preserved");
 assert(JSON.stringify(stack.values) === "[5,6]", "stack values incorrect");
 assert(JSON.stringify(queue.values) === "[8,12]", "queue values incorrect");
 assert(priorityQueue.$kind === "priorityQueue", "priority queue kind is incorrect");
