@@ -2439,7 +2439,7 @@ export function LinkedListView({
                     {nextInComponent && <div className="yv-edge" data-edge-kind="next" data-edge-from={node.id} data-edge-to={node.nextId} aria-label={`next points to ${idLabel(node.nextId)}`}>→</div>}
                     {nextIsCycle && <div className="yv-edge yv-edge-cycle" data-edge-kind="cycle" data-edge-from={node.id} data-edge-to={component.cycleTo ?? 'unknown'} aria-label={`cycle back to ${idLabel(component.cycleTo)}`}>↶ {idLabel(component.cycleTo)}</div>}
                     {isLast && !nextIsCycle && nextField == null && <div className="yv-edge yv-edge-null" data-edge-kind="null" data-edge-from={node.id}>→ <span>null</span></div>}
-                    {isLast && !nextIsCycle && nextField != null && (nextIsKnownElsewhere || !node.nextId) && <div className="yv-edge yv-edge-external" data-edge-kind="external" data-edge-from={node.id} data-edge-to={node.nextId ?? 'external'}>→ <span>{idLabel(node.nextId)}</span></div>}
+                    {isLast && !nextIsCycle && nextField != null && !nextInComponent && <div className="yv-edge yv-edge-external" data-edge-kind="external" data-edge-from={node.id} data-edge-to={node.nextId ?? 'external'}>→ <span>{idLabel(node.nextId)}</span></div>}
                   </div>
                 );
               })}
@@ -2903,7 +2903,30 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
     }
   }
 
-  for (const [id, value] of Object.entries(state?.objects ?? {})) {
+  const objectEntries = Object.entries(state?.objects ?? {});
+  const listNodeEntries = objectEntries.filter(([, value]) => isPlainObject(value) && looksListNode(value));
+  if (listNodeEntries.length > 0) {
+    const listNodeIds = new Set(listNodeEntries.map(([id, value]) =>
+      isPlainObject(value) && typeof value.$objectId === 'string' ? value.$objectId : id
+    ));
+    const listVariableEntries = Object.entries(state?.variables ?? {}).filter(([, value]) =>
+      isPlainObject(value) && typeof value.$objectId === 'string' && listNodeIds.has(value.$objectId)
+    );
+    const preferredRoot = listVariableEntries.find(([name]) => /^(head|root|first)$/i.test(name));
+    const rootVariable = preferredRoot ?? listVariableEntries[0];
+    const rootValue = rootVariable
+      ? rootVariable[1]
+      : listNodeEntries[0]?.[1];
+    if (rootValue !== undefined) {
+      grouped.set('linked-list:runtime', {
+        names: listVariableEntries.map(([name]) => name).filter((name, index, all) => all.indexOf(name) === index),
+        value: rootValue,
+      });
+    }
+  }
+
+  for (const [id, value] of objectEntries) {
+    if (isPlainObject(value) && looksListNode(value)) continue;
     const names = namedObjectIds.get(id);
     if (!names?.length) continue;
     grouped.set(`object:${id}`, { names, value });
@@ -2929,6 +2952,7 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
           : isArray ? (isCharArray ? 'charArray' : 'Array')
           : isPlainObject(value) && typeof value.$mapId === 'string' ? 'Map'
           : isPlainObject(value) && typeof value.$collectionId === 'string' ? 'Collection'
+          : isPlainObject(value) && looksListNode(value) ? 'Linked List'
           : isPlainObject(value) && typeof value.$objectId === 'string' ? 'Object'
           : 'Data Structure';
         const title = kind + ' → ' + uniqueNames.join(' / ');
