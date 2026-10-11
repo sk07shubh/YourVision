@@ -906,6 +906,14 @@ describe('execution visualization feature matrix', () => {
     });
   });
 
+  it('compares collection deltas by captured identity when an item mutates', () => {
+    const beforeItem = { $objectId: 'mutable-collection-item', fields: { value: 1 } };
+    const afterItem = { $objectId: 'mutable-collection-item', fields: { value: 2 } };
+    expect(collectionDelta([beforeItem, 7], [afterItem, 7])).toBeUndefined();
+    expect(unorderedCollectionDelta([beforeItem, 7], [afterItem, 7])).toBeUndefined();
+    expect(collectionDelta([beforeItem], [afterItem, 7])).toEqual({ added: 7, index: 1 });
+  });
+
   it('matches map entries by captured object identity when a key object mutates', () => {
     const beforeKey = { $objectId: 'mutable-key', $type: 'Key', fields: { code: 'A' } };
     const afterKey = { $objectId: 'mutable-key', $type: 'Key', fields: { code: 'B' } };
