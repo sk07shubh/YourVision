@@ -1195,6 +1195,33 @@ describe('execution visualization feature matrix', () => {
 });
 
 
+  it('keeps a deleted map entry visible as a trace-backed removal cue', () => {
+    const previousSession = sessionStore.get();
+    const previous = state({
+      sequence: 80,
+      dataStructures: {
+        mp: { $mapId: 'map-delete', $type: 'java.util.HashMap', entries: [{ key: 'gone', value: 17 }, { key: 'stay', value: 21 }] },
+      },
+    });
+    const current = state({
+      sequence: 81,
+      dataStructures: {
+        mp: { $mapId: 'map-delete', $type: 'java.util.HashMap', entries: [{ key: 'stay', value: 21 }] },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'mp.remove("gone");', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source='mp.remove("gone");' />);
+      expect(html).toContain('yv-map-delete');
+      expect(html).toContain('gone');
+      expect(html).toContain('17');
+      expect(html).toContain('REMOVED');
+      expect(html).toContain('stay');
+    } finally {
+      sessionStore.set(previousSession);
+    }
+  });
+
 describe('deterministic semantic pointer roles', () => {
   it('exposes boundary roles even when variables are not array indices', () => {
     const current = state({ variables: { left: 1, right: 4 }, lastEvent: { type: 'STEP', line: 6, data: { semanticRoles: [
