@@ -1150,13 +1150,14 @@ function deriveStringEvents(
         });
     }
 
-    const concatenationPattern = /\b([A-Za-z_$][\w$]*)\s*(?:\+=|=(?!=))\s*([^;\n]+);?/g;
+    const concatenationPattern = /\b([A-Za-z_$][\w$]*)\s*(\+=|=(?!=))\s*([^;\n]+);?/g;
     for (const match of statement.matchAll(concatenationPattern)) {
         const resultName = match[1];
-        const expression = match[2] ?? "";
+        const operator = match[2];
+        const expression = match[3] ?? "";
         const after = resultName ? postVariables[resultName] : undefined;
         const before = resultName ? variables[resultName] : undefined;
-        if (!resultName || !expression.includes("+") || typeof after !== "string" || before === after) continue;
+        if (!resultName || !operator || (operator !== "+=" && !expression.includes("+")) || typeof after !== "string" || before === after) continue;
         const sourceNames = [...expression.matchAll(/\b([A-Za-z_$][\w$]*)\b/g)]
             .map(item => item[1])
             .filter((candidate): candidate is string => typeof candidate === "string" && candidate !== resultName && typeof variables[candidate] === "string");
