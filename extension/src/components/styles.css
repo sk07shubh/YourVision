@@ -641,3 +641,86 @@
 .yv-linked-connection-cycle{stroke:var(--yv-warning,var(--yv-accent));stroke-dasharray:5 3;opacity:.95}
 .yv-linked-connection-prev{marker-end:url(#yv-linked-arrow);stroke:var(--yv-muted)}
 .yv-linked-connection-cross-next{stroke:var(--yv-accent)}
+
+
+/* Classic linked-list node: a data compartment joined to a dedicated next
+   pointer compartment. The connector starts after the pointer slot. */
+.yv-linked-piece .yv-node.yv-linked-node {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: stretch;
+  gap: 0;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0;
+  border-radius: 5px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.yv-linked-node-data {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-width: 38px;
+  max-width: 150px;
+  padding: 7px 10px;
+  box-sizing: border-box;
+}
+.yv-linked-node-data .yv-node-value {
+  display: block;
+  max-width: 130px;
+  overflow-wrap: anywhere;
+  text-align: center;
+  line-height: 1.25;
+}
+.yv-linked-node-next {
+  position: relative;
+  display: flex;
+  flex: 0 0 25px;
+  align-items: center;
+  justify-content: center;
+  min-width: 25px;
+  border-left: 1px solid var(--yv-border);
+  background: color-mix(in srgb, var(--yv-border), var(--yv-elevated) 88%);
+}
+.yv-linked-next-port {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border: 1.5px solid var(--yv-accent);
+  border-radius: 50%;
+  background: var(--yv-elevated);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--yv-accent), transparent 90%);
+}
+.yv-linked-node[data-next-target="null"] .yv-linked-next-port {
+  border-color: var(--yv-muted);
+  box-shadow: none;
+}
+.yv-linked-node .yv-linked-node-data,
+.yv-linked-node .yv-linked-node-next {
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+.yv-linked-piece .yv-node.yv-node-link-changed .yv-linked-node-next {
+  background: color-mix(in srgb, var(--yv-success), var(--yv-elevated) 86%);
+}
+.yv-linked-piece .yv-node.yv-node-link-changed .yv-linked-next-port {
+  border-color: var(--yv-success);
+  animation: yv-linked-port-rewire 420ms ease-out;
+}
+.yv-linked-node + .yv-node-identity {
+  margin-top: 1px;
+}
+@keyframes yv-linked-port-rewire {
+  0% { transform: scale(.65); box-shadow: 0 0 0 4px color-mix(in srgb, var(--yv-success), transparent 72%); }
+  100% { transform: scale(1); box-shadow: 0 0 0 2px color-mix(in srgb, var(--yv-success), transparent 90%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-linked-node .yv-linked-node-data,
+  .yv-linked-node .yv-linked-node-next,
+  .yv-linked-next-port {
+    transition: none;
+    animation: none;
+  }
+}
