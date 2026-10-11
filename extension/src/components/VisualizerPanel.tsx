@@ -2511,9 +2511,16 @@ export function StringView({ value, state, name, source = '' }: { value: string;
         {characters.map((character, index) => {
           const inRange = ranges.some(range => index >= range.start && index < range.end);
           const previousCharacter = transition?.before[index];
-          const changed = Boolean(transition && transition.before !== transition.after && previousCharacter !== character);
+          const simpleAppend = Boolean(transition?.kind === 'result' &&
+            (transition.operation === 'concat' || transition.operation === 'concatenate') &&
+            transition.after.startsWith(transition.before));
+          const wholeValueChange = Boolean(transition?.kind === 'result' &&
+            transition.before.length !== transition.after.length && !simpleAppend);
+          const changed = Boolean(transition && transition.before !== transition.after &&
+            (wholeValueChange || previousCharacter !== character));
           const inserted = Boolean(transition?.kind === 'mutation' && transition.inserted && transition.index !== undefined && index >= transition.index && index < transition.index + transition.inserted.length);
-          const added = Boolean((transition && index >= transition.before.length && index < transition.after.length) || inserted);
+          const added = Boolean((transition?.kind === 'result' && transition.before.length === 0 && index < transition.after.length) ||
+            (simpleAppend && transition && index >= transition.before.length && index < transition.after.length) || inserted);
           const shiftsRight = Boolean(transition?.kind === 'mutation' && transition.index !== undefined &&
             (transition.operation === 'insert' || (transition.operation === 'replace' && transition.after.length > transition.before.length)) &&
             index >= transition.index + (transition.inserted?.length ?? 1));
