@@ -906,6 +906,20 @@ describe('execution visualization feature matrix', () => {
     });
   });
 
+  it('matches map entries by captured object identity when a key object mutates', () => {
+    const beforeKey = { $objectId: 'mutable-key', $type: 'Key', fields: { code: 'A' } };
+    const afterKey = { $objectId: 'mutable-key', $type: 'Key', fields: { code: 'B' } };
+    expect(compareMapEntries(
+      [{ key: beforeKey, value: 'before' }],
+      [{ key: afterKey, value: 'after' }],
+    )).toEqual([{
+      kind: 'update',
+      key: afterKey,
+      before: 'before',
+      after: 'after',
+    }]);
+  });
+
   it('handles unordered collection deltas without assuming Set order', () => {
     expect(unorderedCollectionDelta([1, 2], [1, 2, 3])).toEqual({
       added: 3,
