@@ -24,6 +24,68 @@ function snapshotField(value: unknown, field: string): unknown {
     return (value as Record<string, unknown>)[field];
 }
 
+function linkedListSnapshotValues(
+    root: unknown,
+    objects: Record<string, unknown>
+): unknown[] {
+    const values: unknown[] = [];
+    const visited = new Set<string>();
+    let current = root;
+
+    while (
+        current !== null &&
+        typeof current === "object" &&
+        !Array.isArray(current)
+    ) {
+        let node = current as Record<string, unknown>;
+        const id =
+            typeof node.$objectId === "string"
+                ? node.$objectId
+                : typeof node.$ref === "string"
+                    ? node.$ref
+                    : undefined;
+
+        if (id) {
+            if (visited.has(id)) {
+                break;
+            }
+            visited.add(id);
+
+            const canonical = objects[id];
+            if (
+                canonical !== null &&
+                typeof canonical === "object" &&
+                !Array.isArray(canonical) &&
+                (
+                    typeof node.$ref === "string" ||
+                    !("fields" in node)
+                )
+            ) {
+                node = canonical as Record<string, unknown>;
+            }
+        }
+
+        const fields = snapshotField(node, "fields");
+        if (
+            fields === null ||
+            typeof fields !== "object" ||
+            Array.isArray(fields)
+        ) {
+            break;
+        }
+
+        const payload =
+            snapshotField(fields, "val") ??
+            snapshotField(fields, "value") ??
+            snapshotField(fields, "data") ??
+            "?";
+        values.push(payload);
+        current = snapshotField(fields, "next");
+    }
+
+    return values;
+}
+
 const source = `
 import java.util.ArrayList;
 import java.util.List;
@@ -836,9 +898,15 @@ assert(
 );
 
 console.log("PASS: Java state integration");
+const linkedListInputValues = [1, 2, 3, 4, 5, 8, 9, 0, 0, 66];
+let linkedListArgument: unknown = null;
+for (const value of [...linkedListInputValues].reverse()) {
+    linkedListArgument = { val: value, next: linkedListArgument };
+}
+
 const reversedList = await runJava(source, {
     method: "reverseList",
-    arguments: ["{\"val\":1,\"next\":{\"val\":2,\"next\":{\"val\":3}}}"]
+    arguments: [JSON.stringify(linkedListArgument)]
 });
 
 assert(
@@ -854,14 +922,29 @@ assert(
     "linked-list reverse did not emit object field writes"
 );
 
-const reversedHead = reversedList.states?.at(-1)?.variables.previous;
-const reversedNext = snapshotField(snapshotField(reversedHead, "fields"), "next");
-const reversedTail = snapshotField(snapshotField(reversedNext, "fields"), "next");
+// The method argument is the only root variable for this chain. Every node
+// must remain reachable in the initial method snapshot even beyond the
+// generic object-depth limit, including duplicate zeros and the final 66.
+const initialReverseState = reversedList.states?.find(
+    (state) =>
+        state.callStack.includes("reverseList") &&
+        state.variables.head !== undefined
+);
 assert(
-    snapshotField(snapshotField(reversedHead, "fields"), "val") === 3 &&
-    snapshotField(snapshotField(reversedNext, "fields"), "val") === 2 &&
-    snapshotField(snapshotField(reversedTail, "fields"), "val") === 1,
-    "linked-list reverse state did not preserve the reversed structure"
+    JSON.stringify(linkedListSnapshotValues(
+        initialReverseState?.variables.head,
+        initialReverseState?.objects ?? {}
+    )) === JSON.stringify(linkedListInputValues),
+    "linked-list head snapshot omitted one or more reachable input nodes"
+);
+
+const reversedHead = reversedList.states?.at(-1)?.variables.previous;
+assert(
+    JSON.stringify(linkedListSnapshotValues(
+        reversedHead,
+        reversedList.states?.at(-1)?.objects ?? {}
+    )) === JSON.stringify([...linkedListInputValues].reverse()),
+    "linked-list reverse state did not preserve every node through the final tail"
 );
 
 const treeDepth = await runJava(source, {
