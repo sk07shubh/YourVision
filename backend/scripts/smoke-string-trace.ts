@@ -19,6 +19,8 @@ const source = [
     "  int foundAt = s.indexOf(\"na\");",
     "  StringBuilder builder = new StringBuilder(\"abc\");",
     "  builder.reverse();",
+    "  builder.deleteCharAt(1);",
+    "  builder.insert(1, 'b');",
     "  return part + c + upper;",
     " }",
     "}"
@@ -45,5 +47,9 @@ assert(search?.data?.matched === true && search.data.query === "ana", "contains 
 const mutation = effects.find(event => event.type === "STRING_MUTATION" && event.data?.name === "builder");
 assert(mutation?.data?.operation === "reverse" && mutation.data.before === "abc" && mutation.data.after === "cba",
     "StringBuilder reverse must expose its real before/after snapshot: " + JSON.stringify(mutation?.data));
+const deletion = effects.find(event => event.type === "STRING_MUTATION" && event.data?.operation === "deleteCharAt");
+assert(deletion?.data?.index === 1 && deletion.data.removed === "b" && deletion.data.after === "ca", "deleteCharAt must expose the removed character and index");
+const insertion = effects.find(event => event.type === "STRING_MUTATION" && event.data?.operation === "insert");
+assert(insertion?.data?.index === 1 && insertion.data.inserted === "b" && insertion.data.after === "cba", "insert must expose the inserted range and index");
 
 console.log("PASS: real Java string access, ranges, and derived results");
