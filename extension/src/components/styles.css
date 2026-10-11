@@ -724,3 +724,35 @@
     animation: none;
   }
 }
+
+
+/* Next links begin at the small pointer dot and disappear underneath the
+   next node's border, so there is no arrowhead or gap at the destination. */
+.yv-linked-connection-cross-next {
+  stroke: var(--yv-accent);
+  stroke-width: 1.8;
+  stroke-dasharray: none;
+  stroke-linecap: round;
+  opacity: 1;
+}
+.yv-linked-edge-accessible-label {
+  display: inline-block;
+  flex: 0 0 0;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+.yv-edge-null {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.yv-linked-null-line {
+  display: inline-block;
+  width: 20px;
+  border-top: 1.5px dashed var(--yv-muted);
+}
+.yv-linked-connections {
+  overflow: visible;
+}
