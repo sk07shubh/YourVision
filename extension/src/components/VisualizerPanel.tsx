@@ -1310,7 +1310,7 @@ function enhancedForBinding(source: string, state: TraceState | undefined, colle
     // Determine the loop's source span so the card remains visible through
     // the body, even on trace steps that omit the loop variable from snapshots.
     const headerOffset = match.index ?? 0;
-    const headerLine = source.slice(0, headerOffset).split(/\\r?\\n/).length;
+    const headerLine = source.slice(0, headerOffset).split(/\r?\n/).length;
     const openBrace = source.indexOf('{', headerOffset + match[0].length);
     let loopEndLine = headerLine;
     if (openBrace >= 0) {
@@ -1320,7 +1320,7 @@ function enhancedForBinding(source: string, state: TraceState | undefined, colle
         if (source[i] === '{') depth++;
         else if (source[i] === '}' && --depth === 0) { closeBrace = i; break; }
       }
-      if (closeBrace >= 0) loopEndLine = source.slice(0, closeBrace).split(/\\r?\\n/).length;
+      if (closeBrace >= 0) loopEndLine = source.slice(0, closeBrace).split(/\r?\n/).length;
     }
     const currentLine = state.line ?? headerLine;
     if (currentLine < headerLine || currentLine > loopEndLine) continue;
