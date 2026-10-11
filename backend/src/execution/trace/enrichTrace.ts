@@ -1067,7 +1067,7 @@ function deriveStringEvents(
             line: sourceEvent.line,
             method: sourceEvent.method,
             depth: sourceEvent.depth,
-            data: { name, index, value: value.charAt(index), kind: "read", operation: "charAt" }
+            data: { name, index, value: value.charAt(index), kind: "read", operation: "charAt", indexExpression: (match[2] ?? "").trim(), indexVariable: /^[A-Za-z_$][\\w$]*$/.test((match[2] ?? "").trim()) ? (match[2] ?? "").trim() : undefined }
         });
     }
 
@@ -1087,7 +1087,7 @@ function deriveStringEvents(
             line: sourceEvent.line,
             method: sourceEvent.method,
             depth: sourceEvent.depth,
-            data: { name, start, end, operation: match[2], kind: "read" }
+            data: { name, start, end, operation: match[2], kind: "read", startExpression: args[0], endExpression: args[1] ?? String(value.length), startVariable: /^[A-Za-z_$][\\w$]*$/.test(args[0] ?? "") ? args[0] : undefined, endVariable: /^[A-Za-z_$][\\w$]*$/.test(args[1] ?? "") ? args[1] : undefined }
         });
     }
 
