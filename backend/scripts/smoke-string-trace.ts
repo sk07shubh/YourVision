@@ -12,7 +12,11 @@ const source = [
     "  char c = s.charAt(i);",
     "  String part = s.substring(1, 4);",
     "  String upper = s.toUpperCase();",
-    "  return part + c + upper;",
+    "  boolean found = s.contains(\"ana\");",
+    "  int foundAt = s.indexOf(\"na\");",
+    "  StringBuilder builder = new StringBuilder(\"abc\");",
+    "  builder.reverse();",
+    "  return part + c + upper;"
     " }",
     "}"
 ].join("\n");
@@ -31,4 +35,10 @@ assert(range?.data?.start === 1 && range.data.end === 4, "substring range must b
 const results = effects.filter(event => event.type === "STRING_RESULT");
 assert(results.some(event => event.data?.resultName === "part" && event.data.after === "ana"), "substring result missing");
 assert(results.some(event => event.data?.resultName === "upper" && event.data.after === "BANANA"), "case-conversion result missing");
+const search = effects.find(event => event.type === "STRING_SEARCH_RESULT" && event.data?.operation === "contains");
+assert(search?.data?.matched === true && search.data.query === "ana", "contains must expose the confirmed match");
+const mutation = effects.find(event => event.type === "STRING_MUTATION" && event.data?.name === "builder");
+assert(mutation?.data?.operation === "reverse" && mutation.data.before === "abc" && mutation.data.after === "cba",
+    "StringBuilder reverse must expose its real before/after snapshot: " + JSON.stringify(mutation?.data));
+
 console.log("PASS: real Java string access, ranges, and derived results");
