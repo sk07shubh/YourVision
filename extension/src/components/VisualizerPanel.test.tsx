@@ -1222,6 +1222,33 @@ describe('execution visualization feature matrix', () => {
     }
   });
 
+  it('derives a map value update from adjacent snapshots when no MAP_WRITE payload exists', () => {
+    const previousSession = sessionStore.get();
+    const previous = state({
+      sequence: 82,
+      dataStructures: {
+        mp: { $mapId: 'map-update-fallback', $type: 'java.util.HashMap', entries: [{ key: 'count', value: 1 }] },
+      },
+    });
+    const current = state({
+      sequence: 83,
+      dataStructures: {
+        mp: { $mapId: 'map-update-fallback', $type: 'java.util.HashMap', entries: [{ key: 'count', value: 2 }] },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'mp.put("count", 2);', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source='mp.put("count", 2);' />);
+      expect(html).toContain('yv-map-update');
+      expect(html).toContain('count');
+      expect(html).toContain('1');
+      expect(html).toContain('→');
+      expect(html).toContain('2');
+    } finally {
+      sessionStore.set(previousSession);
+    }
+  });
+
 describe('deterministic semantic pointer roles', () => {
   it('exposes boundary roles even when variables are not array indices', () => {
     const current = state({ variables: { left: 1, right: 4 }, lastEvent: { type: 'STEP', line: 6, data: { semanticRoles: [
