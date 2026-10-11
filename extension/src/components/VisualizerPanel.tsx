@@ -696,7 +696,7 @@ export function collectionOperation(kind: string, method: string | undefined, de
     if (['remove','removelast','poll'].includes(m)) return {operation:'Remove',value:delta.removed,position:typeof delta.index === 'number' ? 'Index: ' + delta.index : 'End'};
     if (m === 'set') return {operation:'Set',value:delta.added,oldValue:delta.removed,position:'Index: ' + (delta.index ?? '?'),showOld:true};
   }
-  if (kind === 'set') {
+  if (kind === 'set' || kind === 'sortedSet') {
     if (m === 'add') return {operation:'Add',value:delta.added,position:'Element'};
     if (m === 'remove') return {operation:'Remove',value:delta.removed,position:'Element'};
   }
@@ -860,7 +860,7 @@ export function dataStructureResults(current?: TraceState, previous?: TraceState
       const method=sourceCall(statement,name);
       const args=sourceCallArgs(statement,name);
       let delta=collectionDelta(bc.values,ac.values);
-      if (!delta && ac.$kind === 'priorityQueue') delta=unorderedCollectionDelta(bc.values,ac.values);
+      if (!delta && (ac.$kind === 'priorityQueue' || ac.$kind === 'set')) delta=unorderedCollectionDelta(bc.values,ac.values);
       const op=delta ? collectionOperation(ac.$kind ?? '',method,delta,args.length) : undefined;
       if(delta && op) add('col-'+name+'-'+stableStringify([delta.added,delta.removed,delta.index]),name,op.operation,op.value,op.position,op.oldValue,op.showOld);
       continue;
@@ -1219,12 +1219,12 @@ function CollectionView({
     );
   }
 
-  if (kind === 'set') {
+  if (kind === 'set' || kind === 'sortedSet') {
     return (
       <div className="yv-collection">
         <div className="yv-collection-meta">
           <span>{type}</span>
-          <span>UNORDERED · {itemCount} elements</span>
+          <span>{kind === 'sortedSet' ? 'SORTED · ' : 'UNORDERED · '}{itemCount} elements</span>
         </div>
         <div className="yv-set-view">
           {value.values.map((item, index) => (
