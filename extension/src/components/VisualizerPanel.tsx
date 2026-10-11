@@ -2498,11 +2498,17 @@ export function StringView({ value, state, name, source = '' }: { value: string;
           const changed = Boolean(transition && transition.before !== transition.after && previousCharacter !== character);
           const inserted = Boolean(transition?.kind === 'mutation' && transition.inserted && transition.index !== undefined && index >= transition.index && index < transition.index + transition.inserted.length);
           const added = Boolean((transition && index >= transition.before.length && index < transition.after.length) || inserted);
+          const shiftsRight = Boolean(transition?.kind === 'mutation' && transition.index !== undefined &&
+            (transition.operation === 'insert' || (transition.operation === 'replace' && transition.after.length > transition.before.length)) &&
+            index >= transition.index + (transition.inserted?.length ?? 1));
+          const shiftsLeft = Boolean(transition?.kind === 'mutation' && transition.index !== undefined &&
+            (transition.operation === 'delete' || transition.operation === 'deleteCharAt' || (transition.operation === 'replace' && transition.after.length < transition.before.length)) &&
+            index >= transition.index);
           const removedHere = transition?.kind === 'mutation' && transition.removed && transition.index === index ? transition.removed : undefined;
           return (
             <div className="yv-string-cell-wrap" key={index} data-string-cell-index={index}>
               {removedHere && <div className="yv-string-removed-overlay" aria-hidden="true">{removedHere}</div>}
-              <div className={`yv-string-cell ${accessed.has(index) ? 'yv-cell-read ' : ''}${inRange ? 'yv-cell-range ' : ''}${changed ? 'yv-string-cell-changed ' : ''}${added ? 'yv-string-cell-added' : ''}`} data-string-index={index}>
+              <div className={`yv-string-cell ${accessed.has(index) ? 'yv-cell-read ' : ''}${inRange ? 'yv-cell-range ' : ''}${changed ? 'yv-string-cell-changed ' : ''}${added ? 'yv-string-cell-added ' : ''}${shiftsRight ? 'yv-string-cell-shift-right ' : ''}${shiftsLeft ? 'yv-string-cell-shift-left' : ''}`} data-string-index={index}>
                 <div className="yv-string-character">{character === ' ' ? '\u00a0' : character}</div>
               </div>
               <div className="yv-string-index">{index}</div>
