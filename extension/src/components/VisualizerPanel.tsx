@@ -2712,6 +2712,33 @@ function TreeNodeView({ value, objects, depth=0 }: { value: unknown; objects: Re
   const resolved=resolveRef(value,objects); if(!isPlainObject(resolved) || depth>6)return null;
   const f=objectFields(resolved); return <div className="yv-tree-node"><div className="yv-node">{displayValue(nodeValue(resolved))}</div>{(f.left!=null||f.right!=null)&&<div className="yv-tree-children"><div>{f.left!=null?<TreeNodeView value={f.left} objects={objects} depth={depth+1}/>:<span className="yv-null">null</span>}</div><div>{f.right!=null?<TreeNodeView value={f.right} objects={objects} depth={depth+1}/>:<span className="yv-null">null</span>}</div></div>}</div>;
 }
+function linkedListReturnText(root: unknown, objects: Record<string, unknown>): string | undefined {
+  if (!isPlainObject(root) || !looksListNode(root)) return undefined;
+
+  const values: unknown[] = [];
+  const visited = new Set<string>();
+  let current: unknown = root;
+
+  // Follow the returned head through the captured object graph. Use object
+  // identities to stop safely if the list contains a cycle.
+  while (isPlainObject(current) && looksListNode(current) && values.length < 500) {
+    const resolved = resolveRef(current, objects);
+    if (!isPlainObject(resolved) || !looksListNode(resolved)) break;
+    const id = typeof resolved.$objectId === 'string'
+      ? resolved.$objectId
+      : typeof resolved.$ref === 'string' ? resolved.$ref : undefined;
+    if (id && visited.has(id)) break;
+    if (id) visited.add(id);
+
+    values.push(nodeValue(resolved));
+    const next = objectFields(resolved).next;
+    if (next == null) break;
+    current = resolveRef(next, objects);
+  }
+
+  return '[' + values.map(item => displayValue(item)).join(',') + ']';
+}
+
 function ReturnValueView({
   text,
   value,
@@ -2722,13 +2749,8 @@ function ReturnValueView({
   state?: TraceState;
 }) {
   if (isPlainObject(value) && looksListNode(value)) {
-    return (
-      <div className="yv-return-object">
-        <div className="yv-return-reference yv-code">{text}</div>
-        <div className="yv-return-caption">Returned node and reachable chain</div>
-        <LinkedListView root={value} objects={state?.objects ?? {}} variables={state?.variables ?? {}} />
-      </div>
-    );
+    const listText = linkedListReturnText(value, state?.objects ?? {});
+    return <div className="yv-code">{listText ?? text}</div>;
   }
 
   if (isPlainObject(value) && looksTreeNode(value)) {
