@@ -2356,7 +2356,7 @@ export function LinkedListView({
       const resolvedNext = next == null ? null : resolveRef(next, objects);
       records.set(id, {
         id, value: nodeValue(resolvedRoot), fields,
-        nextId: isPlainObject(resolvedNext) ? String(resolvedNext.$objectId ?? '') || null : null,
+        nextId: isPlainObject(resolvedNext) ? String(resolvedNext.$objectId ?? resolvedNext.$ref ?? '') || null : null,
         cycleTo: null
       });
     }
@@ -2469,7 +2469,6 @@ export function LinkedListView({
                 const isLast = index === component.nodes.length - 1;
                 const nextInComponent = component.nodes[index + 1]?.id === node.nextId;
                 const nextIsCycle = isLast && component.cycleTo != null;
-                const nextIsKnownElsewhere = node.nextId != null && !nextInComponent && !nextIsCycle && allNodes.some(candidate => candidate.id === node.nextId);
                 return (
                   <div className="yv-linked-piece" key={node.id} data-node-id={node.id} data-node-index={allNodes.findIndex(candidate => candidate.id === node.id)} data-next-target={node.nextId ?? 'null'}>
                     <div className="yv-linked-node-column">
@@ -2483,7 +2482,7 @@ export function LinkedListView({
                     {nextInComponent && <div className={`yv-edge ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="next" data-edge-from={node.id} data-edge-to={node.nextId} aria-label={`next points to ${idLabel(node.nextId)}`}>→</div>}
                     {nextIsCycle && <div className={`yv-edge yv-edge-cycle ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="cycle" data-edge-from={node.id} data-edge-to={component.cycleTo ?? 'unknown'} aria-label={`cycle back to ${idLabel(component.cycleTo)}`}>↶ {idLabel(component.cycleTo)}</div>}
                     {isLast && !nextIsCycle && nextField == null && <div className={`yv-edge yv-edge-null ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="null" data-edge-from={node.id}>→ <span>null</span></div>}
-                    {isLast && !nextIsCycle && nextField != null && !nextInComponent && <div className="yv-edge yv-edge-external" data-edge-kind="external" data-edge-from={node.id} data-edge-to={node.nextId ?? 'external'}>→ <span>{idLabel(node.nextId)}</span></div>}
+                    {isLast && !nextIsCycle && nextField != null && !nextInComponent && <div className={`yv-edge yv-edge-external ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="external" data-edge-from={node.id} data-edge-to={node.nextId ?? 'external'}>→ <span>{idLabel(node.nextId)}</span></div>}
                   </div>
                 );
               })}
