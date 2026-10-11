@@ -65,6 +65,17 @@ describe('string data structure visualization', () => {
     expect(html).toContain('class="yv-string-cell yv-cell-read " data-string-index="2"');
     expect(html).not.toContain('class="yv-string-cell yv-cell-read " data-string-index="1"');
   });
+  it('preserves Java UTF-16 indexing for supplementary Unicode characters', () => {
+    const html = renderToStaticMarkup(<StringView value="😀" state={state()} name="s" />);
+    expect(html).toContain('data-string-length="2"');
+    expect(html).toContain('data-string-index="0"');
+    expect(html).toContain('data-string-index="1"');
+    expect(html).toContain('\\uD83D');
+    expect(html).toContain('\\uDE00');
+    expect(html).toContain('UTF-16 code unit U+D83D');
+    expect(html).toContain('UTF-16 code unit U+DE00');
+  });
+
   it('renders spaces as blank fixed-width cells and keeps every index in its own aligned wrapper', () => {
     const html = renderToStaticMarkup(<StringView value="a b  c" state={state()} name="s" />);
     expect(html).toContain('data-string-length="6"');
