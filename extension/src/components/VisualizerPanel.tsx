@@ -1145,6 +1145,34 @@ function CollectionBackingArray({
   );
 }
 
+function collectionItemMotionClass(
+  value: { $collectionId: string; values: unknown[] },
+  item: unknown,
+  occurrenceIndex: number,
+  state: TraceState | undefined,
+  name: string | undefined
+): string {
+  if (!name) return '';
+  const session = sessionStore.get();
+  const selectedIndex = Math.max(0, Math.min(session.index, session.states.length - 1));
+  const current = session.states[selectedIndex];
+  const previous = selectedIndex > 0 ? session.states[selectedIndex - 1] : undefined;
+  if (!current || !previous || current.sequence !== state?.sequence) return '';
+  const previousVariables = previous.variables;
+  const prior = previousVariables[name];
+  if (!isCollectionSnapshot(prior) || prior.$collectionId !== value.$collectionId) return '';
+
+  // Count equal values rather than using a Set: collections may legally hold
+  // duplicate values (queues, deques and priority queues), and each occurrence
+  // must be treated independently.
+  const signature = stableStringify(item);
+  const occurrenceBefore = value.values.slice(0, occurrenceIndex + 1)
+    .filter(candidate => stableStringify(candidate) === signature).length;
+  const occurrencePreviously = prior.values
+    .filter(candidate => stableStringify(candidate) === signature).length;
+  return occurrenceBefore > occurrencePreviously ? 'yv-collection-item-enter' : '';
+}
+
 function CollectionView({
   value,
   state,
@@ -1187,7 +1215,7 @@ function CollectionView({
         </div>
         <div className="yv-stack-view">
           {[...value.values].reverse().map((item, index) => (
-            <div className="yv-stack-cell" key={index}>
+            <div className={"yv-stack-cell " + collectionItemMotionClass(value, item, value.values.length - 1 - index, state, name)} key={index}>
               <span className="yv-stack-position">{index === 0 ? 'TOP' : ''}</span>
               <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
             </div>
@@ -1209,7 +1237,7 @@ function CollectionView({
         <div className="yv-queue-view">
           <div className="yv-queue-end">FRONT</div>
           {value.values.map((item, index) => (
-            <div className="yv-queue-cell" key={index}>
+            <div className={"yv-queue-cell " + collectionItemMotionClass(value, item, index, state, name)} key={index}>
               <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
             </div>
           ))}
@@ -1230,7 +1258,7 @@ function CollectionView({
         </div>
         <div className="yv-set-view">
           {value.values.map((item, index) => (
-            <div className="yv-set-element" key={index}>
+            <div className={"yv-set-element " + collectionItemMotionClass(value, item, index, state, name)} key={index}>
               <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
             </div>
           ))}
@@ -1259,7 +1287,7 @@ function CollectionView({
               <div className="yv-heap-level" key={level}>
                 {items.map((item, index) => (
                   <div className="yv-heap-node-wrap" key={`${level}-${index}`}>
-                    <div className="yv-heap-node"><DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/></div>
+                    <div className={"yv-heap-node " + collectionItemMotionClass(value, item, (2 ** level) - 1 + index, state, name)}><DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/></div>
                     <div className="yv-cell-index">[{(2 ** level) - 1 + index}]</div>
                   </div>
                 ))}
