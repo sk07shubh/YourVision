@@ -2422,6 +2422,26 @@ export function LinkedListView({
   }
 
   const allNodes = components.flatMap(component => component.nodes);
+  const edgeSnapshot = new Map(allNodes.map(node => [node.id, node.nextId] as const));
+  const pointerSnapshot = new Map<string, string>();
+  for (const [nodeId, names] of pointerNames) for (const name of names) pointerSnapshot.set(name, nodeId);
+  const edgeSignature = [...edgeSnapshot.entries()].map(([id, target]) => `${id}:${target ?? 'null'}`).join('|');
+  const pointerSignature = [...pointerSnapshot.entries()].map(([name, id]) => `${name}:${id}`).join('|');
+  const previousEdges = useRef<Map<string, string | null>>(new Map());
+  const previousPointers = useRef<Map<string, string>>(new Map());
+  const changedEdgeIds = new Set<string>();
+  for (const [id, target] of edgeSnapshot) {
+    if (previousEdges.current.has(id) && previousEdges.current.get(id) !== target) changedEdgeIds.add(id);
+  }
+  const movedPointerNames = new Set<string>();
+  for (const [name, nodeId] of pointerSnapshot) {
+    const previousNode = previousPointers.current.get(name);
+    if (previousNode && previousNode !== nodeId) movedPointerNames.add(name);
+  }
+  useEffect(() => {
+    previousEdges.current = new Map(edgeSnapshot);
+    previousPointers.current = new Map(pointerSnapshot);
+  }, [edgeSignature, pointerSignature]);
   const idLabel = (id: string | null) => {
     if (id == null) return 'null';
     const index = allNodes.findIndex(node => node.id === id);
@@ -2453,16 +2473,16 @@ export function LinkedListView({
                 return (
                   <div className="yv-linked-piece" key={node.id} data-node-id={node.id} data-node-index={allNodes.findIndex(candidate => candidate.id === node.id)} data-next-target={node.nextId ?? 'null'}>
                     <div className="yv-linked-node-column">
-                      {pointerNames.get(node.id)?.map(name => <div className="yv-node-pointer" data-pointer-name={name} key={name}>{name}</div>)}
-                      <div className="yv-node" data-linked-node-value={node.id}>
+                      {pointerNames.get(node.id)?.map(name => <div className={`yv-node-pointer ${movedPointerNames.has(name) ? 'yv-node-pointer-moved' : ''}`} data-pointer-name={name} key={name}>{name}</div>)}
+                      <div className={`yv-node ${changedEdgeIds.has(node.id) ? 'yv-node-link-changed' : ''}`} data-linked-node-value={node.id}>
                         <span className="yv-node-value">{displayValue(node.value)}</span>
                         <span className="yv-node-identity">N{allNodes.findIndex(candidate => candidate.id === node.id) + 1}</span>
                         {hasPrev && <span className="yv-node-link-meta" title={`prev references ${prevId ?? 'null'}`}>prev: {idLabel(prevId)}</span>}
                       </div>
                     </div>
-                    {nextInComponent && <div className="yv-edge" data-edge-kind="next" data-edge-from={node.id} data-edge-to={node.nextId} aria-label={`next points to ${idLabel(node.nextId)}`}>→</div>}
-                    {nextIsCycle && <div className="yv-edge yv-edge-cycle" data-edge-kind="cycle" data-edge-from={node.id} data-edge-to={component.cycleTo ?? 'unknown'} aria-label={`cycle back to ${idLabel(component.cycleTo)}`}>↶ {idLabel(component.cycleTo)}</div>}
-                    {isLast && !nextIsCycle && nextField == null && <div className="yv-edge yv-edge-null" data-edge-kind="null" data-edge-from={node.id}>→ <span>null</span></div>}
+                    {nextInComponent && <div className={`yv-edge ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="next" data-edge-from={node.id} data-edge-to={node.nextId} aria-label={`next points to ${idLabel(node.nextId)}`}>→</div>}
+                    {nextIsCycle && <div className={`yv-edge yv-edge-cycle ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="cycle" data-edge-from={node.id} data-edge-to={component.cycleTo ?? 'unknown'} aria-label={`cycle back to ${idLabel(component.cycleTo)}`}>↶ {idLabel(component.cycleTo)}</div>}
+                    {isLast && !nextIsCycle && nextField == null && <div className={`yv-edge yv-edge-null ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="null" data-edge-from={node.id}>→ <span>null</span></div>}
                     {isLast && !nextIsCycle && nextField != null && !nextInComponent && <div className="yv-edge yv-edge-external" data-edge-kind="external" data-edge-from={node.id} data-edge-to={node.nextId ?? 'external'}>→ <span>{idLabel(node.nextId)}</span></div>}
                   </div>
                 );
