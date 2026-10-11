@@ -811,6 +811,30 @@ describe('execution visualization feature matrix', () => {
     expect(unorderedCollectionDelta([1, 2], [2, 1])).toBeUndefined();
   });
 
+  it('marks a newly inserted map entry from the captured MAP_WRITE delta', () => {
+    const current = state({
+      dataStructures: {
+        lookup: {
+          $mapId: 'map-motion',
+          $type: 'java.util.HashMap',
+          entries: [{ key: 'answer', value: 42 }],
+          size: 1,
+        },
+      },
+      lastEvent: {
+        type: 'MAP_WRITE',
+        data: {
+          changes: [{ kind: 'insert', key: 'answer', after: 42 }],
+        },
+      },
+    });
+    const html = renderToStaticMarkup(<DataStructures state={current} source="lookup.put('answer', 42);" />);
+    expect(html).toContain('class="yv-map-row yv-map-insert"');
+    expect(html).toContain('NEW');
+    expect(html).toContain('answer');
+    expect(html).toContain('42');
+  });
+
   it('classifies HashSet mutations by membership rather than snapshot iteration order', () => {
     const previous = state({
       dataStructures: {
