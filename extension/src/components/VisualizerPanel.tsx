@@ -1279,6 +1279,57 @@ export function Variables({ state, previous }: { state?: TraceState; previous?: 
   );
 }
 
+
+type EnhancedForBinding = { variable: string; iterable: string; index: number; value: unknown };
+
+/**
+ * Resolve the element currently assigned by a Java enhanced-for loop.
+ * The iteration ordinal comes from recorded VARIABLE_UPDATE events, not from
+ * searching by value, so repeated values still point at the correct cell.
+ */
+function enhancedForBinding(source: string, state: TraceState | undefined, collectionName: string | undefined, values: unknown[]): EnhancedForBinding | undefined {
+  if (!state || !collectionName || !values.length) return undefined;
+  const pattern = /for\\s*\\(\\s*(?:final\\s+)?(?:[\\w.$<>?,\\[\\]\\s]+?)\\s+([A-Za-z_$][\\w$]*)\\s*:\\s*([A-Za-z_$][\\w$]*)(?:\\s*\\.\\s*toCharArray\\s*\\(\\s*\\))?\\s*\\)/g;
+  for (const match of source.matchAll(pattern)) {
+    const variable = match[1];
+    const iterable = match[2];
+    if (!variable || !iterable || !collectionName.split(' / ').includes(iterable)) continue;
+    const session = sessionStore.get();
+    const endIndex = Math.max(0, session.states.findIndex(candidate => candidate === state));
+    const currentIndex = session.states.indexOf(state);
+    const upto = currentIndex >= 0 ? currentIndex : endIndex;
+    let assignments = 0;
+    for (let i = 0; i <= upto; i++) {
+      const data = session.states[i]?.lastEvent?.data;
+      if (!isPlainObject(data) || !Array.isArray(data.executionEvents)) continue;
+      for (const event of data.executionEvents) {
+        if (!isPlainObject(event) || event.type !== 'VARIABLE_UPDATE' || !isPlainObject(event.data)) continue;
+        if (event.data.name === variable) assignments++;
+      }
+    }
+    // Trace formats may omit assignment events on synthetic/legacy snapshots.
+    let index = assignments > 0 ? assignments - 1 : -1;
+    if (index < 0 || index >= values.length) {
+      const variableValue = state.variables?.[variable];
+      index = values.findIndex(item => !valueChanged(item, variableValue));
+    }
+    if (index < 0 || index >= values.length) continue;
+    return { variable, iterable, index, value: state.variables?.[variable] };
+  }
+  return undefined;
+}
+
+function EnhancedForValueCard({ binding }: { binding: EnhancedForBinding }) {
+  return (
+    <div className="yv-enhanced-for-card" data-enhanced-for-variable={binding.variable}>
+      <span className="yv-enhanced-for-name">{binding.variable}</span>
+      <span className="yv-enhanced-for-equals">=</span>
+      <span className="yv-enhanced-for-value">{compactValue(binding.value)}</span>
+      <span className="yv-enhanced-for-connector" aria-hidden="true" />
+    </div>
+  );
+}
+
 function arrayIndexVariableNames(source: string, arrayName?: string): Set<string> {
   const names = new Set<string>();
   if (!arrayName) return names;
@@ -2016,6 +2067,7 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
     return () => observer.disconnect();
   }, [targetSignature, state?.sequence, value.length]);
 
+  const enhancedBinding = enhancedForBinding(source, state, arrayName, value);
   const changed = changedArrayIndices(state, arrayName);
   const accessed = accessedArrayIndices(state, arrayName);
   const compared = isComparisonStatement(source, state) && accessed.size >= 2 ? accessed : new Set<number>();
@@ -2041,6 +2093,7 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
       </div>
       {value.map((item, index) => (
         <div className="yv-cell" key={index} ref={element => { cellRefs.current[index] = element; }}>
+          {enhancedBinding?.index === index && <EnhancedForValueCard binding={enhancedBinding} />}
           <div
             key={`${index}-${state?.sequence ?? state?.line ?? 'initial'}`}
             className={`yv-cell-value ${rangeStart >= 0 && index >= rangeStart && index <= rangeEnd ? 'yv-cell-range ' : ''}${rangeStart >= 0 && index === rangeStart ? 'yv-cell-range-start ' : ''}${rangeEnd >= 0 && index === rangeEnd && rangeEnd !== rangeStart ? 'yv-cell-range-end ' : ''}${changed.has(index) ? 'yv-cell-written ' : ''}${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-cell-compared ' : ''}${accumulated.has(index) && !copied.has(index) ? 'yv-cell-accumulated ' : ''}${copied.has(index) ? 'yv-cell-copied ' : ''}${rotated.has(index) ? 'yv-cell-rotated-' + rotated.get(index) + ' ' : ''}${swapped.has(index) ? 'yv-cell-swapped' : ''}`}
@@ -2561,6 +2614,7 @@ export function StringView({ value, state, name, source = '' }: { value: string;
 
   // Java String indices count UTF-16 code units. split('') preserves that
   // mapping. Render a space as a blank cell, never as a visible abbreviation.
+  const enhancedBinding = enhancedForBinding(source, state, name, value.split(''));
   const characters = value.split('');
   const hasPointers = [...pointers.values()].some(index => index >= 0 && index <= value.length);
   return (
@@ -2612,6 +2666,7 @@ export function StringView({ value, state, name, source = '' }: { value: string;
           const removedHere = transition?.kind === 'mutation' && transition.removed && transition.index === index ? transition.removed : undefined;
           return (
             <div className="yv-string-cell-wrap" key={index} data-string-cell-index={index}>
+              {enhancedBinding?.index === index && <EnhancedForValueCard binding={enhancedBinding} />}
               {removedHere && <div className="yv-string-removed-overlay" aria-hidden="true">{removedHere}</div>}
               <div className={`yv-string-cell ${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-string-cell-compared ' : ''}${inRange ? 'yv-cell-range ' : ''}${changed ? 'yv-string-cell-changed ' : ''}${added ? 'yv-string-cell-added ' : ''}${swapFromRight ? 'yv-string-cell-swap-right ' : ''}${swapFromLeft ? 'yv-string-cell-swap-left ' : ''}${shiftsRight ? 'yv-string-cell-shift-right ' : ''}${shiftsLeft ? 'yv-string-cell-shift-left' : ''}`} data-string-index={index}>
                 <div className={`yv-string-character ${isSurrogateUnit ? 'yv-string-code-unit' : ''}`} title={isSurrogateUnit ? `UTF-16 code unit U+${codeUnit.toString(16).toUpperCase().padStart(4, '0')}` : undefined}>{characterLabel}</div>
@@ -2663,6 +2718,8 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
   // read-only character sequences in the Data Structures section.
   for (const [name, value] of Object.entries(state?.variables ?? {})) {
     if (name === 'this' || typeof value !== 'string') continue;
+    // Enhanced-for element variables are scalar loop bindings, not independent strings.
+    if (enhancedForBinding(source, state, name, value.split(''))) continue;
     grouped.set(`string:${name}`, { names: [name], value: { $stringValue: value } });
   }
 
