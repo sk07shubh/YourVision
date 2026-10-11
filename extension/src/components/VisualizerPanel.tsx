@@ -1289,7 +1289,7 @@ type EnhancedForBinding = { variable: string; iterable: string; index: number; v
  */
 function enhancedForBinding(source: string, state: TraceState | undefined, collectionName: string | undefined, values: unknown[]): EnhancedForBinding | undefined {
   if (!state || !collectionName || !values.length) return undefined;
-  const pattern = /for\\s*\\(\\s*(?:final\\s+)?(?:[\\w.$<>?,\\[\\]\\s]+?)\\s+([A-Za-z_$][\\w$]*)\\s*:\\s*([A-Za-z_$][\\w$]*)(?:\\s*\\.\\s*toCharArray\\s*\\(\\s*\\))?\\s*\\)/g;
+  const pattern = /for\s*\(\s*(?:final\s+)?(?:[\w.$<>?,\[\]\s]+?)\s+([A-Za-z_$][\w$]*)\s*:\s*([A-Za-z_$][\w$]*)(?:\s*\.\s*toCharArray\s*\(\s*\))?\s*\)/g;
   for (const match of source.matchAll(pattern)) {
     const variable = match[1];
     const iterable = match[2];
@@ -1320,7 +1320,7 @@ function enhancedForBinding(source: string, state: TraceState | undefined, colle
 }
 
 function isEnhancedForVariable(source: string, name: string): boolean {
-  const pattern = /for\\s*\\(\\s*(?:final\\s+)?(?:[\\w.$<>?,\\[\\]\\s]+?)\\s+([A-Za-z_$][\\w$]*)\\s*:/g;
+  const pattern = /for\s*\(\s*(?:final\s+)?(?:[\w.$<>?,\[\]\s]+?)\s+([A-Za-z_$][\w$]*)\s*:/g;
   return [...source.matchAll(pattern)].some(match => match[1] === name);
 }
 
