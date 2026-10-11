@@ -82,15 +82,19 @@ assert(results.some(event => event.data?.resultName === "fromChar" && event.data
 assert(results.some(event => event.data?.resultName === "joinedParts" && event.data.after === "a-b" && event.data.operation === "String.join"), "String.join result missing");
 assert(results.some(event => event.data?.resultName === "copied" && event.data.after === "banana" && event.data.operation === "new String"), "String constructor result missing");
 const split = effects.find(event => event.type === "STRING_SPLIT_RESULT" && event.data?.name === "s");
-assert(split?.data?.resultName === "pieces" && split.data.delimiter === "a" && split.data.partCount === 3,
-    "split must link the source string to its actual String[] result: " + JSON.stringify(split?.data));
-assert(Array.isArray(split?.data?.delimiterRanges) && split.data.delimiterRanges.length === 3,
+const splitData = split?.data;
+assert(splitData?.resultName === "pieces" && splitData.delimiter === "a" && splitData.partCount === 3,
+    "split must link the source string to its actual String[] result: " + JSON.stringify(splitData));
+const delimiterRanges = splitData?.delimiterRanges;
+assert(Array.isArray(delimiterRanges) && delimiterRanges.length === 3,
     "split must highlight every provable literal delimiter");
 const commaSplit = effects.find(event => event.type === "STRING_SPLIT_RESULT" && event.data?.name === "commas");
-assert(commaSplit?.data?.delimiter === "," && commaSplit.data.partCount === 3,
+const commaSplitData = commaSplit?.data;
+assert(commaSplitData?.delimiter === "," && commaSplitData.partCount === 3,
     "split argument parsing must preserve commas inside quoted delimiters");
 const charArrayConversion = effects.find(event => event.type === "STRING_CONVERSION_RESULT" && event.data?.name === "s");
-assert(charArrayConversion?.data?.resultName === "chars" && charArrayConversion.data.resultLength === 6,
+const conversionData = charArrayConversion?.data;
+assert(conversionData?.resultName === "chars" && conversionData.resultLength === 6,
     "toCharArray must link the source string to its actual char[] conversion");
 assert(results.some(event => event.data?.resultName === "combined" && event.data.after === "bananan" && event.data.operation === "concatenate"), "string plus result missing");
 assert(results.some(event => event.data?.resultName === "appended" && event.data.after === "ab" && event.data.operation === "concatenate"), "compound string concatenation result missing");
