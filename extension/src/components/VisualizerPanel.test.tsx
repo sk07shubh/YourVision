@@ -120,6 +120,49 @@ describe('string data structure visualization', () => {
     expect(resultHtml).toContain('yv-string-cell-added');
   });
 
+  it('links split results to the source and highlights only literal delimiter ranges', () => {
+    const current = state({ lastEvent: { type: 'STEP', line: 5, data: { executionEvents: [
+      { type: 'STRING_SPLIT_RESULT', data: {
+        name: 's', resultName: 'parts', operation: 'split', delimiter: 'a', partCount: 3,
+        delimiterRanges: [{ start: 1, end: 2 }, { start: 3, end: 4 }, { start: 5, end: 6 }],
+      } },
+    ] } } });
+    const html = renderToStaticMarkup(<StringView value="banana" state={current} name="s" />);
+    expect(html).toContain('split → 3 parts');
+    expect(html).toContain('class="yv-string-cell yv-cell-range " data-string-index="1"');
+    expect(html).toContain('class="yv-string-cell yv-cell-range " data-string-index="5"');
+  });
+
+  it('shows toCharArray conversion metadata while leaving the result array to the array visualizer', () => {
+    const current = state({ lastEvent: { type: 'STEP', line: 5, data: { executionEvents: [
+      { type: 'STRING_CONVERSION_RESULT', data: { name: 's', resultName: 'chars', operation: 'toCharArray', resultLength: 6 } },
+    ] } } });
+    const html = renderToStaticMarkup(<StringView value="banana" state={current} name="s" />);
+    expect(html).toContain('toCharArray → 6 chars');
+  });
+
+  it('highlights the first differing character for failed equality comparisons', () => {
+    const current = state({ lastEvent: { type: 'STEP', line: 5, data: { executionEvents: [
+      { type: 'STRING_SEARCH_RESULT', data: {
+        name: 's', operation: 'equals', query: 'baxana', index: 2, end: 3, matched: false, result: false,
+      } },
+    ] } } });
+    const html = renderToStaticMarkup(<StringView value="banana" state={current} name="s" />);
+    expect(html).toContain('class="yv-string-cell yv-string-cell-compared " data-string-index="2"');
+    expect(html).not.toContain('yv-string-cell-compared " data-string-index="1"');
+  });
+
+  it('animates reverse as mirrored character swaps while preserving fixed cell positions', () => {
+    const current = state({ lastEvent: { type: 'STEP', line: 5, data: { executionEvents: [
+      { type: 'STRING_MUTATION', data: { name: 'builder', operation: 'reverse', before: 'abc', after: 'cba', kind: 'mutation' } },
+    ] } } });
+    const html = renderToStaticMarkup(<StringView value="cba" state={current} name="builder" />);
+    expect(html).toContain('yv-string-cell-swap-right');
+    expect(html).toContain('yv-string-cell-swap-left');
+    expect(html).toContain('data-string-index="0"');
+    expect(html).toContain('data-string-index="2"');
+  });
+
   it('animates mutable string-sequence snapshots only when before and after differ', () => {
     const current = state({ lastEvent: { type: 'STEP', line: 6, data: { executionEvents: [
       { type: 'STRING_MUTATION', data: { name: 'builder', operation: 'reverse', before: 'abc', after: 'cba', kind: 'mutation' } },
