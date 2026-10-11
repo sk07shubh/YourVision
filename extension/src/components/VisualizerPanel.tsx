@@ -2322,6 +2322,7 @@ export function LinkedListView({
   variables?: Record<string, unknown>;
 }) {
   type ListNodeRecord = { id: string; value: unknown; fields: Obj; nextId: string | null; cycleTo: string | null };
+  type ListComponent = { nodes: ListNodeRecord[]; cycleTo: string | null };
   const pointerNames = new Map<string, string[]>();
   const nullPointers: string[] = [];
   for (const [name, value] of Object.entries(variables)) {
@@ -2335,74 +2336,115 @@ export function LinkedListView({
     }
   }
 
-  const nodes: ListNodeRecord[] = [];
-  const seen = new Map<string, number>();
-  let cur: unknown = root;
-  for (let guard = 0; guard < 100; guard++) {
-    cur = resolveRef(cur, objects);
-    if (!isPlainObject(cur)) break;
-    const id = String(cur.$objectId ?? `node-${guard}`);
-    const existingIndex = seen.get(id);
-    if (existingIndex !== undefined) {
-      const previous = nodes[nodes.length - 1];
-      if (previous) previous.cycleTo = id;
-      break;
-    }
-    const fields = objectFields(cur);
+  const records = new Map<string, ListNodeRecord>();
+  for (const [key, raw] of Object.entries(objects)) {
+    const value = resolveRef(raw, objects);
+    if (!isPlainObject(value) || !looksListNode(value)) continue;
+    const id = String(value.$objectId ?? key);
+    const fields = objectFields(value);
     const next = fields.next;
     const resolvedNext = next == null ? null : resolveRef(next, objects);
     const nextId = isPlainObject(resolvedNext) ? String(resolvedNext.$objectId ?? '') || null : null;
-    seen.set(id, nodes.length);
-    nodes.push({ id, value: nodeValue(cur), fields, nextId, cycleTo: null });
-    if (next == null) break;
-    cur = next;
-    if (guard === 99) {
-      const last = nodes[nodes.length - 1];
-      if (last) last.cycleTo = last.nextId;
+    records.set(id, { id, value: nodeValue(value), fields, nextId, cycleTo: null });
+  }
+  const resolvedRoot = resolveRef(root, objects);
+  if (isPlainObject(resolvedRoot) && looksListNode(resolvedRoot)) {
+    const id = String(resolvedRoot.$objectId ?? 'root');
+    if (!records.has(id)) {
+      const fields = objectFields(resolvedRoot);
+      const next = fields.next;
+      const resolvedNext = next == null ? null : resolveRef(next, objects);
+      records.set(id, {
+        id, value: nodeValue(resolvedRoot), fields,
+        nextId: isPlainObject(resolvedNext) ? String(resolvedNext.$objectId ?? '') || null : null,
+        cycleTo: null
+      });
     }
   }
 
+  const startIds: string[] = [];
+  if (isPlainObject(resolvedRoot) && looksListNode(resolvedRoot)) startIds.push(String(resolvedRoot.$objectId ?? 'root'));
+  for (const value of Object.values(variables)) {
+    if (!isPlainObject(value) || typeof value.$objectId !== 'string') continue;
+    if (records.has(value.$objectId) && !startIds.includes(value.$objectId)) startIds.push(value.$objectId);
+  }
+  for (const id of records.keys()) if (!startIds.includes(id)) startIds.push(id);
+
+  const visited = new Set<string>();
+  const components: ListComponent[] = [];
+  for (const startId of startIds) {
+    if (visited.has(startId)) continue;
+    const componentNodes: ListNodeRecord[] = [];
+    const local = new Map<string, number>();
+    let currentId: string | null = startId;
+    let cycleTo: string | null = null;
+    for (let guard = 0; currentId && guard < 100; guard++) {
+      if (local.has(currentId)) {
+        cycleTo = currentId;
+        break;
+      }
+      if (visited.has(currentId)) break;
+      const node = records.get(currentId);
+      if (!node) break;
+      local.set(currentId, componentNodes.length);
+      visited.add(currentId);
+      componentNodes.push(node);
+      currentId = node.nextId;
+    }
+    if (componentNodes.length) {
+      if (cycleTo) componentNodes[componentNodes.length - 1].cycleTo = cycleTo;
+      components.push({ nodes: componentNodes, cycleTo });
+    }
+  }
+
+  const allNodes = components.flatMap(component => component.nodes);
   const idLabel = (id: string | null) => {
     if (id == null) return 'null';
-    const index = nodes.findIndex(node => node.id === id);
+    const index = allNodes.findIndex(node => node.id === id);
     return index >= 0 ? `N${index + 1}` : 'external node';
   };
 
   return (
-    <div className="yv-linked-graph" data-linked-list-root={isPlainObject(resolveRef(root, objects)) ? String((resolveRef(root, objects) as Obj).$objectId ?? 'root') : 'null'}>
+    <div className="yv-linked-graph" data-linked-list-root={isPlainObject(resolvedRoot) ? String(resolvedRoot.$objectId ?? 'root') : 'null'}>
       {nullPointers.length > 0 && (
         <div className="yv-linked-null-pointers" aria-label="Null references">
           {nullPointers.map(name => <span className="yv-node-pointer yv-node-pointer-null" key={name}>{name} = null</span>)}
         </div>
       )}
-      {nodes.length === 0 ? (
+      {allNodes.length === 0 ? (
         <div className="yv-linked-empty"><span className="yv-linked-empty-label">empty list</span><span className="yv-null">null</span></div>
       ) : (
-        <div className="yv-linked" role="group" aria-label="Linked list nodes">
-          {nodes.map((node, index) => {
-            const nextField = node.fields.next;
-            const hasPrev = 'prev' in node.fields;
-            const prevValue = hasPrev ? resolveRef(node.fields.prev, objects) : null;
-            const prevId = isPlainObject(prevValue) ? String(prevValue.$objectId ?? '') || null : null;
-            const isCycleEdge = node.cycleTo != null;
-            const isLast = index === nodes.length - 1;
-            return (
-              <div className="yv-linked-piece" key={node.id} data-node-id={node.id} data-node-index={index} data-next-target={node.nextId ?? 'null'}>
-                <div className="yv-linked-node-column">
-                  {pointerNames.get(node.id)?.map(name => <div className="yv-node-pointer" data-pointer-name={name} key={name}>{name}</div>)}
-                  <div className="yv-node" data-linked-node-value={node.id}>
-                    <span className="yv-node-value">{displayValue(node.value)}</span>
-                    <span className="yv-node-identity">N{index + 1}</span>
-                    {hasPrev && <span className="yv-node-link-meta" title={`prev references ${prevId ?? 'null'}`}>prev: {idLabel(prevId)}</span>}
+        <div className="yv-linked-components" role="group" aria-label="Linked list reference graph">
+          {components.map((component, componentIndex) => (
+            <div className="yv-linked" data-linked-component={componentIndex} key={component.nodes[0]?.id ?? componentIndex} role="group" aria-label={`Linked-list component ${componentIndex + 1}`}>
+              {component.nodes.map((node, index) => {
+                const nextField = node.fields.next;
+                const hasPrev = 'prev' in node.fields;
+                const prevValue = hasPrev ? resolveRef(node.fields.prev, objects) : null;
+                const prevId = isPlainObject(prevValue) ? String(prevValue.$objectId ?? '') || null : null;
+                const isLast = index === component.nodes.length - 1;
+                const nextInComponent = component.nodes[index + 1]?.id === node.nextId;
+                const nextIsCycle = isLast && component.cycleTo != null;
+                const nextIsKnownElsewhere = node.nextId != null && !nextInComponent && !nextIsCycle && allNodes.some(candidate => candidate.id === node.nextId);
+                return (
+                  <div className="yv-linked-piece" key={node.id} data-node-id={node.id} data-node-index={allNodes.findIndex(candidate => candidate.id === node.id)} data-next-target={node.nextId ?? 'null'}>
+                    <div className="yv-linked-node-column">
+                      {pointerNames.get(node.id)?.map(name => <div className="yv-node-pointer" data-pointer-name={name} key={name}>{name}</div>)}
+                      <div className="yv-node" data-linked-node-value={node.id}>
+                        <span className="yv-node-value">{displayValue(node.value)}</span>
+                        <span className="yv-node-identity">N{allNodes.findIndex(candidate => candidate.id === node.id) + 1}</span>
+                        {hasPrev && <span className="yv-node-link-meta" title={`prev references ${prevId ?? 'null'}`}>prev: {idLabel(prevId)}</span>}
+                      </div>
+                    </div>
+                    {nextInComponent && <div className="yv-edge" data-edge-kind="next" data-edge-from={node.id} data-edge-to={node.nextId} aria-label={`next points to ${idLabel(node.nextId)}`}>→</div>}
+                    {nextIsCycle && <div className="yv-edge yv-edge-cycle" data-edge-kind="cycle" data-edge-from={node.id} data-edge-to={component.cycleTo ?? 'unknown'} aria-label={`cycle back to ${idLabel(component.cycleTo)}`}>↶ {idLabel(component.cycleTo)}</div>}
+                    {isLast && !nextIsCycle && nextField == null && <div className="yv-edge yv-edge-null" data-edge-kind="null" data-edge-from={node.id}>→ <span>null</span></div>}
+                    {isLast && !nextIsCycle && nextField != null && (nextIsKnownElsewhere || !node.nextId) && <div className="yv-edge yv-edge-external" data-edge-kind="external" data-edge-from={node.id} data-edge-to={node.nextId ?? 'external'}>→ <span>{idLabel(node.nextId)}</span></div>}
                   </div>
-                </div>
-                {!isLast && <div className="yv-edge" data-edge-kind="next" data-edge-from={node.id} data-edge-to={node.nextId ?? 'null'} aria-label={`next points to ${idLabel(node.nextId)}`}>→</div>}
-                {isLast && isCycleEdge && <div className="yv-edge yv-edge-cycle" data-edge-kind="cycle" data-edge-from={node.id} data-edge-to={node.cycleTo ?? 'unknown'} aria-label={`cycle back to ${idLabel(node.cycleTo)}`}>↶ {idLabel(node.cycleTo)}</div>}
-                {isLast && !isCycleEdge && nextField == null && <div className="yv-edge yv-edge-null" data-edge-kind="null" data-edge-from={node.id}>→ <span>null</span></div>}
-                {isLast && !isCycleEdge && nextField != null && <div className="yv-edge yv-edge-external" data-edge-kind="external" data-edge-from={node.id} data-edge-to={node.nextId ?? 'external'}>→ <span>{idLabel(node.nextId)}</span></div>}
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          ))}
         </div>
       )}
     </div>
