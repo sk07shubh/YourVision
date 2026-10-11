@@ -1170,6 +1170,21 @@ function previousCollectionSnapshot(
   ) as { $collectionId: string; values: unknown[] } | undefined;
 }
 
+function collectionItemIdentity(item: unknown): string {
+  if (isPlainObject(item)) {
+    for (const key of ['$objectId', '$ref', '$arrayId', '$mapId', '$collectionId']) {
+      if (typeof item[key] === 'string') return key + ':' + item[key];
+    }
+  }
+  return stableStringify(item);
+}
+
+function collectionItemReactKey(item: unknown, index: number, values: unknown[]): string {
+  const identity = collectionItemIdentity(item);
+  const occurrence = values.slice(0, index).filter(candidate => collectionItemIdentity(candidate) === identity).length;
+  return identity + '#' + occurrence;
+}
+
 function collectionItemMotionClass(
   value: { $collectionId: string; values: unknown[] },
   item: unknown,
@@ -1277,7 +1292,7 @@ function CollectionView({
         </div>
         <div className="yv-stack-view">
           {[...value.values].reverse().map((item, index) => (
-            <div className={"yv-stack-cell " + collectionItemMotionClass(value, item, value.values.length - 1 - index, state, name)} key={index}>
+            <div className={"yv-stack-cell " + collectionItemMotionClass(value, item, value.values.length - 1 - index, state, name)} key={collectionItemReactKey(item, value.values.length - 1 - index, value.values)} data-collection-item-key={collectionItemReactKey(item, value.values.length - 1 - index, value.values)}>
               <span className="yv-stack-position">{index === 0 ? 'TOP' : ''}</span>
               <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
             </div>
