@@ -828,6 +828,30 @@ describe('execution visualization feature matrix', () => {
     expect(html).not.toContain('[Set]');
   });
 
+  it('animates a newly pushed stack item only when the prior snapshot proves an insertion', () => {
+    const previousSession = sessionStore.get();
+    const previous = state({
+      sequence: 40,
+      dataStructures: {
+        stack: { $collectionId: 'stack-motion', $type: 'java.util.Stack', $kind: 'stack', values: [1, 2], size: 2 },
+      },
+    });
+    const current = state({
+      sequence: 41,
+      dataStructures: {
+        stack: { $collectionId: 'stack-motion', $type: 'java.util.Stack', $kind: 'stack', values: [1, 2, 3], size: 3 },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'stack.push(3);', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source="stack.push(3);" />);
+      expect(html).toContain('class="yv-stack-cell yv-collection-item-enter"');
+      expect((html.match(/yv-collection-item-enter/g) ?? []).length).toBe(1);
+    } finally {
+      sessionStore.set(previousSession);
+    }
+  });
+
   it('maps stack, queue, deque, priority queue, list, and set operations', () => {
     expect(collectionOperation('stack', 'push', { added: 5 })).toEqual({
       operation: 'Push', value: 5, position: 'Top',
