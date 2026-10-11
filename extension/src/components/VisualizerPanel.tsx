@@ -2519,8 +2519,13 @@ export function LinkedListView({
     <div ref={graphRef} className="yv-linked-graph" data-linked-list-root={isPlainObject(resolvedRoot) ? String(resolvedRoot.$objectId ?? 'root') : 'null'}>
       {connectionPaths.length > 0 && (
         <svg className="yv-linked-connections" aria-hidden="true" width={Math.max(graphRef.current?.scrollWidth ?? 0, graphRef.current?.clientWidth ?? 0)} height={Math.max(graphRef.current?.scrollHeight ?? 0, graphRef.current?.clientHeight ?? 0)}>
+          <defs>
+            <marker id="yv-linked-arrow" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L7,3.5 L0,7 z" />
+            </marker>
+          </defs>
           {connectionPaths.map(path => (
-            <path key={path.key} className={`yv-linked-connection yv-linked-connection-${path.kind}`} d={path.d} data-connection-from={path.from} data-connection-to={path.to} />
+            <path key={path.key} className={`yv-linked-connection yv-linked-connection-${path.kind}`} d={path.d} markerEnd="url(#yv-linked-arrow)" data-connection-from={path.from} data-connection-to={path.to} />
           ))}
         </svg>
       )}
