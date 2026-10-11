@@ -357,6 +357,39 @@ function debugValue(value: unknown): string {
   try { return JSON.stringify(value, null, 2); } catch { return String(value); }
 }
 
+function buildExecutionPanelTrace(states: TraceState[], source: string): string {
+  const lines = source.split(/\r?\n/);
+  return states.map((state, index) => {
+    const previous = index > 0 ? states[index - 1] : undefined;
+    const lineNumber = state.line ?? 0;
+    const statement = lineNumber > 0 ? (lines[lineNumber - 1] ?? '').trim() : '';
+    const data = isPlainObject(state.lastEvent?.data) ? state.lastEvent.data : {};
+    const condition = typeof data.conditionResult === 'boolean'
+      ? (data.conditionResult ? 'TRUE' : 'FALSE')
+      : '—';
+    const before = previous?.variables ?? {};
+    const after = state.variables ?? {};
+    const changedVariables = Object.entries(after)
+      .filter(([name, value]) => name !== 'this' && (!Object.prototype.hasOwnProperty.call(before, name) || stableStringify(before[name]) !== stableStringify(value)))
+      .map(([name, value]) => name + ': ' + (Object.prototype.hasOwnProperty.call(before, name) ? debugValue(before[name]) + ' → ' : '') + debugValue(value));
+    const events = Array.isArray(data.executionEvents) ? data.executionEvents : [];
+    const eventEffects = events.map((event: any) => {
+      const eventData = isPlainObject(event?.data) ? event.data : {};
+      return (event?.type ?? 'EVENT') + (Object.keys(eventData).length ? ': ' + debugValue(eventData) : '');
+    });
+    return [
+      'STEP ' + (index + 1) + ' / ' + states.length,
+      'EXECUTED LINE ' + lineNumber + ': ' + statement,
+      'CONDITION RESULT: ' + condition,
+      'VARIABLE / STATE CHANGES:',
+      ...(changedVariables.length ? changedVariables : ['—']),
+      'TRACE EVENTS:',
+      ...(eventEffects.length ? eventEffects : ['—']),
+      ''
+    ].join('\n');
+  }).join('\n' + '-'.repeat(72) + '\n');
+}
+
 function buildDebugTrace(states: TraceState[], source: string): string {
   const lines = source.split(/\r?\n/);
   return states.map((state, index) => {
@@ -956,6 +989,30 @@ function ExecutionInspector({ state, previous, statement, index, total }: { stat
           }}
         >
           Copy DS Debug Trace
+        </button>
+        <button
+          className="yv-btn"
+          type="button"
+          tabIndex={-1}
+          onMouseDown={e => e.preventDefault()}
+          onClick={async () => {
+            const current = sessionStore.get();
+            const trace = buildExecutionPanelTrace(current.states, current.source);
+            try {
+              await navigator.clipboard.writeText(trace);
+            } catch {
+              const textarea = document.createElement('textarea');
+              textarea.value = trace;
+              textarea.style.position = 'fixed';
+              textarea.style.opacity = '0';
+              document.body.appendChild(textarea);
+              textarea.select();
+              document.execCommand('copy');
+              textarea.remove();
+            }
+          }}
+        >
+          Copy Execution Trace
         </button>
       </div>
 
