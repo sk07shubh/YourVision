@@ -1279,6 +1279,114 @@ export function Variables({ state, previous }: { state?: TraceState; previous?: 
   );
 }
 
+
+type EnhancedForBinding = { variable: string; iterable: string; index: number; value: unknown };
+
+/**
+ * Resolve the element currently assigned by a Java enhanced-for loop.
+ * The iteration ordinal comes from recorded VARIABLE_UPDATE events, not from
+ * searching by value, so repeated values still point at the correct cell.
+ */
+function enhancedForBinding(source: string, state: TraceState | undefined, collectionName: string | undefined, values: unknown[]): EnhancedForBinding | undefined {
+  if (!state || !collectionName || !values.length) return undefined;
+  const collectionNames = new Set(collectionName.split(' / ').map(name => name.trim()));
+  const pattern = /for\s*\(\s*(?:final\s+)?(?:[\w.$<>?,\[\]\s]+?)\s+([A-Za-z_$][\w$]*)\s*:\s*([A-Za-z_$][\w$]*)(?:\s*\.\s*toCharArray\s*\(\s*\))?\s*\)/g;
+  const session = sessionStore.get();
+  const stateIndex = session.states.indexOf(state);
+  const currentIndex = stateIndex >= 0
+    ? stateIndex
+    : session.states.findIndex(candidate => candidate.sequence === state.sequence);
+  const upto = currentIndex >= 0 ? currentIndex : session.index;
+
+  for (const match of source.matchAll(pattern)) {
+    const variable = match[1];
+    const iterable = match[2];
+    if (!variable || !iterable || !collectionNames.has(iterable)) continue;
+
+    const headerOffset = match.index ?? 0;
+    const headerLine = source.slice(0, headerOffset).split(/\r?\n/).length;
+    const openBrace = source.indexOf('{', headerOffset + match[0].length);
+    let loopEndLine = headerLine;
+    if (openBrace >= 0) {
+      let depth = 0;
+      let closeBrace = -1;
+      for (let i = openBrace; i < source.length; i++) {
+        if (source[i] === '{') depth++;
+        else if (source[i] === '}' && --depth === 0) { closeBrace = i; break; }
+      }
+      if (closeBrace >= 0) loopEndLine = source.slice(0, closeBrace).split(/\r?\n/).length;
+    }
+
+    const currentLine = state.line ?? headerLine;
+    if (currentLine < headerLine || currentLine > loopEndLine) continue;
+
+    // Count one binding per trace checkpoint, and only when the binding update
+    // belongs to this loop header. Counting raw events overcounts duplicate
+    // updates in a checkpoint and can accidentally count assignments in the
+    // loop body or another loop that reuses the same variable name.
+    let assignments = 0;
+    let lastAssignedValue: unknown;
+    let hasLastAssignedValue = false;
+    const historyEnd = Math.min(upto, session.states.length - 1);
+    for (let i = 0; i <= historyEnd; i++) {
+      const historicalState = session.states[i];
+      if (!historicalState) continue;
+      const historicalLine = historicalState.line;
+      if (historicalLine !== undefined && (historicalLine < headerLine || historicalLine > loopEndLine)) continue;
+      const data = historicalState.lastEvent?.data;
+      if (!isPlainObject(data) || !Array.isArray(data.executionEvents)) continue;
+      const matchingUpdates = data.executionEvents.filter(event => {
+        if (!isPlainObject(event) || event.type !== 'VARIABLE_UPDATE' || !isPlainObject(event.data)) return false;
+        if (event.data.name !== variable) return false;
+        const eventLine = typeof event.line === 'number' ? event.line : historicalLine;
+        return eventLine === headerLine;
+      });
+      if (matchingUpdates.length === 0) continue;
+      assignments++;
+      const latest = matchingUpdates[matchingUpdates.length - 1];
+      if (isPlainObject(latest) && isPlainObject(latest.data) && 'value' in latest.data) {
+        lastAssignedValue = latest.data.value;
+        hasLastAssignedValue = true;
+      }
+    }
+
+    // Without a recorded binding checkpoint there is no reliable way to map
+    // a duplicate value back to its cell. Never guess by searching the value.
+    if (assignments === 0) continue;
+    const index = Math.min(assignments - 1, values.length - 1);
+    const variableValue = state.variables?.[variable];
+    const value = variableValue !== undefined
+      ? variableValue
+      : hasLastAssignedValue ? lastAssignedValue : values[index];
+    return { variable, iterable, index, value };
+  }
+  return undefined;
+}
+
+function isEnhancedForVariable(source: string, name: string): boolean {
+  const pattern = /for\s*\(\s*(?:final\s+)?(?:[\w.$<>?,\[\]\s]+?)\s+([A-Za-z_$][\w$]*)\s*:/g;
+  return [...source.matchAll(pattern)].some(match => match[1] === name);
+}
+
+function EnhancedForValueCard({ binding }: { binding: EnhancedForBinding }) {
+  return (
+    <div className="yv-enhanced-for-card" data-enhanced-for-variable={binding.variable}
+      style={{ position: 'absolute', zIndex: 5, left: '50%', bottom: 'calc(100% + 9px)', transform: 'translateX(-50%)',
+        display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', padding: '4px 8px',
+        border: '1px solid var(--yv-accent, #65a9ff)', borderRadius: 7, background: 'var(--yv-panel, #101b2d)',
+        color: 'var(--yv-text, #f3f6ff)', boxShadow: '0 3px 12px rgba(0,0,0,.28)', fontSize: 12,
+        lineHeight: '16px', pointerEvents: 'none', transition: 'opacity 120ms ease' }}>
+      <span className="yv-enhanced-for-name" style={{ color: 'var(--yv-accent, #65a9ff)', fontWeight: 700 }}>{binding.variable}</span>
+      <span className="yv-enhanced-for-equals">=</span>
+      <span className="yv-enhanced-for-value">{compactValue(binding.value)}</span>
+      <span className="yv-enhanced-for-connector" aria-hidden="true"
+        style={{ position: 'absolute', left: '50%', top: '100%', height: 9, borderLeft: '1px solid var(--yv-accent, #65a9ff)' }} />
+      <span aria-hidden="true" style={{ position: 'absolute', left: 'calc(50% - 3px)', top: 'calc(100% + 6px)',
+        width: 6, height: 6, borderRadius: '50%', background: 'var(--yv-accent, #65a9ff)' }} />
+    </div>
+  );
+}
+
 function arrayIndexVariableNames(source: string, arrayName?: string): Set<string> {
   const names = new Set<string>();
   if (!arrayName) return names;
@@ -2016,6 +2124,7 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
     return () => observer.disconnect();
   }, [targetSignature, state?.sequence, value.length]);
 
+  const enhancedBinding = enhancedForBinding(source, state, arrayName, value);
   const changed = changedArrayIndices(state, arrayName);
   const accessed = accessedArrayIndices(state, arrayName);
   const compared = isComparisonStatement(source, state) && accessed.size >= 2 ? accessed : new Set<number>();
@@ -2040,7 +2149,8 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
         ))}
       </div>
       {value.map((item, index) => (
-        <div className="yv-cell" key={index} ref={element => { cellRefs.current[index] = element; }}>
+        <div className="yv-cell" key={index} ref={element => { cellRefs.current[index] = element; }} style={enhancedBinding?.index === index ? { position: "relative" } : undefined}>
+          {enhancedBinding?.index === index && <EnhancedForValueCard binding={enhancedBinding} />}
           <div
             key={`${index}-${state?.sequence ?? state?.line ?? 'initial'}`}
             className={`yv-cell-value ${rangeStart >= 0 && index >= rangeStart && index <= rangeEnd ? 'yv-cell-range ' : ''}${rangeStart >= 0 && index === rangeStart ? 'yv-cell-range-start ' : ''}${rangeEnd >= 0 && index === rangeEnd && rangeEnd !== rangeStart ? 'yv-cell-range-end ' : ''}${changed.has(index) ? 'yv-cell-written ' : ''}${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-cell-compared ' : ''}${accumulated.has(index) && !copied.has(index) ? 'yv-cell-accumulated ' : ''}${copied.has(index) ? 'yv-cell-copied ' : ''}${rotated.has(index) ? 'yv-cell-rotated-' + rotated.get(index) + ' ' : ''}${swapped.has(index) ? 'yv-cell-swapped' : ''}`}
@@ -2561,11 +2671,11 @@ export function StringView({ value, state, name, source = '' }: { value: string;
 
   // Java String indices count UTF-16 code units. split('') preserves that
   // mapping. Render a space as a blank cell, never as a visible abbreviation.
+  const enhancedBinding = enhancedForBinding(source, state, name, value.split(''));
   const characters = value.split('');
   const hasPointers = [...pointers.values()].some(index => index >= 0 && index <= value.length);
   return (
     <div className={`yv-string-view ${hasPointers ? 'has-pointers' : ''}`} data-string-structure={name} data-string-length={value.length}>
-      <div className="yv-string-meta"><span>length</span><strong>{value.length}</strong><span>UTF-16 units</span></div>
       {(transition || operationResult) && <div className="yv-string-operation">
         {transition && <span>{transition.operation} · {transition.kind === 'mutation' ? 'mutated' : 'result'}</span>}
         {operationResult && <span>{operationResult.operation} → {String(operationResult.result)}</span>}
@@ -2611,7 +2721,8 @@ export function StringView({ value, state, name, source = '' }: { value: string;
             index >= transition.index);
           const removedHere = transition?.kind === 'mutation' && transition.removed && transition.index === index ? transition.removed : undefined;
           return (
-            <div className="yv-string-cell-wrap" key={index} data-string-cell-index={index}>
+            <div className="yv-string-cell-wrap" key={index} data-string-cell-index={index} style={enhancedBinding?.index === index ? { position: "relative" } : undefined}>
+              {enhancedBinding?.index === index && <EnhancedForValueCard binding={enhancedBinding} />}
               {removedHere && <div className="yv-string-removed-overlay" aria-hidden="true">{removedHere}</div>}
               <div className={`yv-string-cell ${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-string-cell-compared ' : ''}${inRange ? 'yv-cell-range ' : ''}${changed ? 'yv-string-cell-changed ' : ''}${added ? 'yv-string-cell-added ' : ''}${swapFromRight ? 'yv-string-cell-swap-right ' : ''}${swapFromLeft ? 'yv-string-cell-swap-left ' : ''}${shiftsRight ? 'yv-string-cell-shift-right ' : ''}${shiftsLeft ? 'yv-string-cell-shift-left' : ''}`} data-string-index={index}>
                 <div className={`yv-string-character ${isSurrogateUnit ? 'yv-string-code-unit' : ''}`} title={isSurrogateUnit ? `UTF-16 code unit U+${codeUnit.toString(16).toUpperCase().padStart(4, '0')}` : undefined}>{characterLabel}</div>
@@ -2663,6 +2774,8 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
   // read-only character sequences in the Data Structures section.
   for (const [name, value] of Object.entries(state?.variables ?? {})) {
     if (name === 'this' || typeof value !== 'string') continue;
+    // Enhanced-for element variables are scalar loop bindings, not independent strings.
+    if (isEnhancedForVariable(source, name)) continue;
     grouped.set(`string:${name}`, { names: [name], value: { $stringValue: value } });
   }
 
@@ -2697,7 +2810,20 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
   return (
     <div className="yv-ds-list">
       {items.map(({ names, value }) => {
-        const title = [...new Set(names)].join(' / ');
+        const uniqueNames = [...new Set(names)];
+        const primaryName = uniqueNames[0] ?? 'value';
+        const isString = isPlainObject(value) && typeof value.$stringValue === 'string';
+        const isArray = Array.isArray(value) || isArraySnapshot(value);
+        const isCharArray = isArray && uniqueNames.some(variable =>
+          /char\s*\[\s*\]\s+/.test(source) && source.includes(variable) && source.includes('.toCharArray')
+        );
+        const kind = isString ? 'String'
+          : isArray ? (isCharArray ? 'charArray' : 'Array')
+          : isPlainObject(value) && typeof value.$mapId === 'string' ? 'Map'
+          : isPlainObject(value) && typeof value.$collectionId === 'string' ? 'Collection'
+          : isPlainObject(value) && typeof value.$objectId === 'string' ? 'Object'
+          : 'Data Structure';
+        const title = kind + ' → ' + uniqueNames.join(' / ');
         return (
           <div className="yv-ds" key={title}>
             <div className="yv-ds-title">{title}</div>
