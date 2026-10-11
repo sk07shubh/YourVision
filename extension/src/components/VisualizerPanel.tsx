@@ -2446,8 +2446,8 @@ export function LinkedListView({
   }, [edgeSignature, pointerSignature]);
   const idLabel = (id: string | null) => {
     if (id == null) return 'null';
-    const index = allNodes.findIndex(node => node.id === id);
-    return index >= 0 ? `N${index + 1}` : 'external node';
+    const node = allNodes.find(candidate => candidate.id === id);
+    return node ? `#${node.id.length > 8 ? node.id.slice(-6) : node.id}` : 'external node';
   };
 
   return (
@@ -2477,7 +2477,7 @@ export function LinkedListView({
                       {pointerNames.get(node.id)?.map(name => <div className={`yv-node-pointer ${movedPointerNames.has(name) ? 'yv-node-pointer-moved' : ''}`} data-pointer-name={name} key={name}>{name}</div>)}
                       <div className={`yv-node ${changedEdgeIds.has(node.id) ? 'yv-node-link-changed' : ''}`} data-linked-node-value={node.id}>
                         <span className="yv-node-value">{displayValue(node.value)}</span>
-                        <span className="yv-node-identity">N{allNodes.findIndex(candidate => candidate.id === node.id) + 1}</span>
+                        <span className="yv-node-identity" title={`Stable object identity: ${node.id}`}>#{node.id.length > 8 ? node.id.slice(-6) : node.id}</span>
                         {hasPrev && <span className="yv-node-link-meta" title={`prev references ${prevId ?? 'null'}`}>prev: {idLabel(prevId)}</span>}
                       </div>
                     </div>
