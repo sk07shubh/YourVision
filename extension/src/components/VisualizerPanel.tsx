@@ -2575,9 +2575,9 @@ export function LinkedListView({
           const top = Math.max(4, Math.min(ay, by) - lift);
           d = `M ${ax} ${ay} C ${ax + 22} ${top}, ${bx + 22} ${top}, ${bx} ${by}`;
         } else if (kind === 'null-next') {
-          // A terminal null belongs directly beside its node: keep this
-          // connector horizontal rather than routing it through an S-curve.
-          d = `M ${ax} ${ay} L ${bx} ${ay}`;
+          // Connect the source port to the exact vertical center of the null box,
+          // matching how links meet the centerline of other node targets.
+          d = `M ${ax} ${ay} L ${bx} ${by}`;
         } else if (kind === 'cross-next' && bx > ax && Math.abs(by - ay) <= 10) {
           // Side-by-side nodes on the same row get a genuinely straight link.
           d = `M ${ax} ${ay} L ${bx} ${by}`;
