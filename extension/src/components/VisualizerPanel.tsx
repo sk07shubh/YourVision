@@ -2414,6 +2414,7 @@ export function StringView({ value, state, name, source = '' }: { value: string;
   const ranges: Array<{ start: number; end: number }> = [];
   const pointers = new Map<string, number>();
   let transition: { operation: string; before: string; after: string; kind: 'result' | 'mutation'; index?: number; removed?: string; inserted?: string } | undefined;
+  let operationResult: { operation: string; result: unknown } | undefined;
 
   for (const event of executionEvents) {
     if (!isPlainObject(event) || !isPlainObject(event.data)) continue;
@@ -2425,6 +2426,9 @@ export function StringView({ value, state, name, source = '' }: { value: string;
       if (event.type === 'STRING_ACCESS' && typeof effect.indexVariable === 'string' && typeof effect.index === 'number') {
         pointers.set(effect.indexVariable, effect.index);
       }
+    }
+    if (event.type === 'STRING_SEARCH_RESULT' && effect.name === name && typeof effect.operation === 'string' && 'result' in effect) {
+      operationResult = { operation: effect.operation, result: effect.result };
     }
     if (event.type === 'STRING_SEARCH_RESULT' && effect.name === name && effect.matched === true &&
         typeof effect.index === 'number' && typeof effect.end === 'number' &&
@@ -2476,7 +2480,11 @@ export function StringView({ value, state, name, source = '' }: { value: string;
   const hasPointers = [...pointers.values()].some(index => index >= 0 && index <= value.length);
   return (
     <div className={`yv-string-view ${hasPointers ? 'has-pointers' : ''}`} data-string-structure={name} data-string-length={value.length}>
-      {transition && <div className="yv-string-operation">{transition.operation} · {transition.kind === 'mutation' ? 'mutated' : 'result'}</div>}
+      <div className="yv-string-meta"><span>length</span><strong>{value.length}</strong><span>UTF-16 units</span></div>
+      {(transition || operationResult) && <div className="yv-string-operation">
+        {transition && <span>{transition.operation} · {transition.kind === 'mutation' ? 'mutated' : 'result'}</span>}
+        {operationResult && <span>{operationResult.operation} → {String(operationResult.result)}</span>}
+      </div>}
       <div className="yv-string-cells">
         {characters.map((character, index) => {
           const inRange = ranges.some(range => index >= range.start && index < range.end);
