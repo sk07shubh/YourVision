@@ -819,3 +819,11 @@
 .yv-collection-item-exit{display:inline-flex;align-items:center;padding:4px 8px;border:1px solid color-mix(in srgb,var(--yv-danger,var(--yv-warning,#f59e0b)),var(--yv-border) 35%);border-radius:5px;color:var(--yv-muted);text-decoration:line-through;animation:yv-collection-item-exit 360ms ease-out both}
 @keyframes yv-collection-item-exit{0%{opacity:1;transform:translateY(0);background:color-mix(in srgb,var(--yv-danger,var(--yv-warning,#f59e0b)),transparent 84%)}100%{opacity:.8;transform:translateY(-2px);background:transparent}}
 @media(prefers-reduced-motion:reduce){.yv-collection-item-exit{animation:none}}
+
+/* Trace-backed graph state: the node reached by a moved pointer gets a brief
+   accent ring; mutated node snapshots receive a separate, quieter pulse. */
+.yv-graph-node-entered{animation:yv-graph-node-entered 420ms ease-out both}
+.yv-graph-node-changed{animation:yv-graph-node-changed 420ms ease-out both}
+@keyframes yv-graph-node-entered{0%{transform:scale(.94);filter:brightness(1.3)}65%{transform:scale(1.035)}100%{transform:scale(1);filter:brightness(1)}}
+@keyframes yv-graph-node-changed{0%{filter:brightness(1.25)}100%{filter:brightness(1)}}
+@media(prefers-reduced-motion:reduce){.yv-graph-node-entered,.yv-graph-node-changed{animation:none}}
