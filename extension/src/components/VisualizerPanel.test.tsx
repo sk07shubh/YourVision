@@ -1287,6 +1287,41 @@ describe('execution visualization feature matrix', () => {
     }
   });
 
+  it('applies an explicit MAP_WRITE only to the matching map identity', () => {
+    const previousSession = sessionStore.get();
+    const current = state({
+      sequence: 86,
+      dataStructures: {
+        first: { $mapId: 'map-a', $type: 'java.util.HashMap', entries: [{ key: 'shared', value: 1 }], size: 1 },
+        second: { $mapId: 'map-b', $type: 'java.util.HashMap', entries: [{ key: 'shared', value: 1 }], size: 1 },
+      },
+      lastEvent: {
+        type: 'STEP',
+        line: 12,
+        data: {
+          executionEvents: [{
+            type: 'MAP_WRITE',
+            data: {
+              mapId: 'map-a',
+              changes: [{ kind: 'update', key: 'shared', before: 0, after: 1 }],
+            },
+          }],
+        },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'first.put("shared", 1);', states: [current], index: 0 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source='first.put("shared", 1);' />);
+      const mapA = html.split('data-map-id="map-a"')[1]?.split('data-map-id="map-b"')[0] ?? '';
+      const mapB = html.split('data-map-id="map-b"')[1] ?? '';
+      expect(mapA).toContain('yv-map-update');
+      expect(mapB).not.toContain('yv-map-update');
+      expect(mapB).not.toContain('yv-old-value');
+    } finally {
+      sessionStore.set(previousSession);
+    }
+  });
+
   it('derives a map value update from adjacent snapshots when no MAP_WRITE payload exists', () => {
     const previousSession = sessionStore.get();
     const previous = state({
