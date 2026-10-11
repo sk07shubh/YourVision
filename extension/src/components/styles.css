@@ -600,16 +600,17 @@
 .yv-linked-piece .yv-node{position:relative;flex-direction:column;gap:3px;min-width:54px;min-height:48px;padding:7px 9px;overflow:visible}
 .yv-node-value{font-weight:600;max-width:140px;overflow-wrap:anywhere}
 .yv-node-identity{font-size:9px;line-height:12px;color:var(--yv-muted)}
-.yv-node-link-meta{display:inline-block;box-sizing:border-box;font-size:11px;line-height:15px;color:#f0abfc;white-space:nowrap;padding:3px 7px;border:1.5px solid #d946ef;border-radius:5px;background:color-mix(in srgb,#d946ef,var(--yv-elevated) 94%);font-weight:600;box-shadow:0 0 0 1px color-mix(in srgb,#d946ef,transparent 82%)}
+.yv-node-link-meta{display:inline-block;box-sizing:border-box;font-size:11px;line-height:15px;color:#fff;white-space:nowrap;padding:3px 7px;border:1.5px solid #fff;border-radius:5px;background:color-mix(in srgb,#fff,var(--yv-elevated) 94%);font-weight:600;box-shadow:0 0 0 1px rgb(255 255 255 / 22%)}
 .yv-linked-piece .yv-edge{align-self:center;display:flex;align-items:center;gap:3px;min-height:24px;padding:0 2px;font-size:18px;white-space:nowrap}
 .yv-linked-piece .yv-edge-null,.yv-linked-piece .yv-edge-external,.yv-linked-piece .yv-edge-cycle{font-size:12px}
 .yv-linked-piece .yv-edge-null span,.yv-linked-piece .yv-edge-external span{font-size:10px;color:var(--yv-muted)}
+.yv-linked-piece .yv-edge-null .yv-null-value-box,.yv-null-value-box{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:24px;padding:3px 9px;border:1.5px solid #fff;border-radius:5px;color:#fff!important;font-size:12px;font-weight:650;line-height:16px;background:color-mix(in srgb,#fff,var(--yv-elevated) 94%);box-shadow:0 0 0 1px rgb(255 255 255 / 22%)}
 .yv-linked-piece .yv-edge-cycle{color:var(--yv-warning,var(--yv-accent))}
 .yv-linked-null-pointers{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 6px}
-.yv-node-pointer-null{color:#f0abfc;border:1.5px solid #d946ef;border-style:solid;background:color-mix(in srgb,#d946ef,var(--yv-elevated) 94%);font-size:11px;font-weight:600;min-height:23px;padding:3px 8px;box-shadow:0 0 0 1px color-mix(in srgb,#d946ef,transparent 78%)}
+.yv-node-pointer-null{color:#fff!important;border:1.5px solid #fff!important;border-style:solid;background:color-mix(in srgb,#fff,var(--yv-elevated) 94%);font-size:11px;font-weight:650;min-height:23px;padding:3px 8px;box-shadow:0 0 0 1px rgb(255 255 255 / 22%)}
 .yv-linked-empty{display:flex;align-items:center;gap:8px;padding:8px 2px;color:var(--yv-muted)}
 .yv-linked-empty-label{font-size:11px}
-.yv-linked-piece[data-next-target="null"] .yv-node{border-color:color-mix(in srgb,var(--yv-border),var(--yv-accent) 25%)}
+.yv-linked-piece[data-next-target="null"] .yv-node{border-color:color-mix(in srgb,var(--yv-border),#fff 48%)}
 @media(prefers-reduced-motion:reduce){.yv-linked-piece,.yv-linked-piece .yv-node,.yv-linked-piece .yv-edge{animation:none;transition:none}}
 
 .yv-linked-components{display:flex;flex-direction:column;align-items:flex-start;gap:14px;min-width:0}
@@ -695,9 +696,9 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--yv-accent), transparent 90%);
 }
 .yv-linked-piece[data-next-target="null"] .yv-linked-next-port {
-  border-color: #d946ef !important;
-  background: color-mix(in srgb,#d946ef,var(--yv-elevated) 72%);
-  box-shadow: 0 0 0 2px color-mix(in srgb,#d946ef,transparent 82%);
+  border-color: #fff !important;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 28%);
 }
 .yv-linked-node .yv-linked-node-data,
 .yv-linked-node .yv-linked-node-next {
