@@ -2486,22 +2486,24 @@ export function StringView({ value, state, name, source = '' }: { value: string;
         {operationResult && <span>{operationResult.operation} → {String(operationResult.result)}</span>}
       </div>}
       <div className="yv-string-cells">
+        {hasPointers && <div className="yv-string-pointer-layer" aria-hidden="true">
+          {[...pointers.entries()].map(([pointer, pointerIndex]) => (
+            <span className="yv-string-pointer" key={pointer} data-string-pointer={pointer}
+              style={{ left: pointerIndex * 40 + 18 }}>{pointer}</span>
+          ))}
+        </div>}
         {characters.map((character, index) => {
           const inRange = ranges.some(range => index >= range.start && index < range.end);
           const previousCharacter = transition?.before[index];
           const changed = Boolean(transition && transition.before !== transition.after && previousCharacter !== character);
           const inserted = Boolean(transition?.kind === 'mutation' && transition.inserted && transition.index !== undefined && index >= transition.index && index < transition.index + transition.inserted.length);
           const added = Boolean((transition && index >= transition.before.length && index < transition.after.length) || inserted);
-          const cellPointers = [...pointers.entries()].filter(([, pointerIndex]) => pointerIndex === index);
           const removedHere = transition?.kind === 'mutation' && transition.removed && transition.index === index ? transition.removed : undefined;
           return (
             <div className="yv-string-cell-wrap" key={index} data-string-cell-index={index}>
-              {cellPointers.length > 0 && <div className="yv-string-pointers" aria-hidden="true">
-                {cellPointers.map(([pointer]) => <span className="yv-string-pointer" key={pointer} data-string-pointer={pointer}>{pointer}</span>)}
-              </div>}
               {removedHere && <div className="yv-string-removed-overlay" aria-hidden="true">{removedHere}</div>}
-              <div className={`yv-string-cell ${accessed.has(index) ? 'yv-cell-read ' : ''}${inRange ? 'yv-cell-range ' : ''}${changed ? 'yv-string-cell-changed ' : ''}${added ? 'yv-string-cell-added' : ''}`} data-string-index={index}>
-                <div className="yv-string-character">{character === ' ' ? '\u00a0' : character}</div>
+              <div className={\`yv-string-cell \${accessed.has(index) ? 'yv-cell-read ' : ''}\${inRange ? 'yv-cell-range ' : ''}\${changed ? 'yv-string-cell-changed ' : ''}\${added ? 'yv-string-cell-added' : ''}\`} data-string-index={index}>
+                <div className="yv-string-character">{character === ' ' ? '\\u00a0' : character}</div>
               </div>
               <div className="yv-string-index">{index}</div>
             </div>
@@ -2512,10 +2514,10 @@ export function StringView({ value, state, name, source = '' }: { value: string;
         {!characters.length && <div className="yv-empty">Empty string</div>}
         {[...pointers.entries()].some(([, index]) => index === value.length) &&
           <div className="yv-string-cell-wrap yv-string-end-pointer">
-            <div className="yv-string-pointers">{[...pointers.entries()].filter(([, index]) => index === value.length).map(([pointer]) => <span className="yv-string-pointer" key={pointer}>{pointer}</span>)}</div>
             <div className="yv-string-end-marker" aria-label="String end">∅</div>
             <div className="yv-string-index">{value.length}</div>
           </div>}
+      </div>
       </div>
     </div>
   );
