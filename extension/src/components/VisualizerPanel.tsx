@@ -1368,10 +1368,10 @@ function isEnhancedForVariable(source: string, name: string): boolean {
   return [...source.matchAll(pattern)].some(match => match[1] === name);
 }
 
-function EnhancedForValueCard({ binding }: { binding: EnhancedForBinding }) {
+function EnhancedForValueCard({ binding, alignStart = false }: { binding: EnhancedForBinding; alignStart?: boolean }) {
   return (
     <div className="yv-enhanced-for-card" data-enhanced-for-variable={binding.variable} data-enhanced-for-index={binding.index}
-      style={{ position: 'absolute', zIndex: 5, left: '50%', bottom: 'calc(100% + 10px)', transform: 'translateX(-50%)',
+      style={{ position: 'absolute', zIndex: 5, left: alignStart ? 0 : '50%', bottom: 'calc(100% + 10px)', transform: alignStart ? 'none' : 'translateX(-50%)',
         display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', padding: '4px 8px',
         border: '1px solid var(--yv-accent, #65a9ff)', borderRadius: 7, background: 'var(--yv-panel, #101b2d)',
         color: 'var(--yv-text, #f3f6ff)', boxShadow: '0 3px 12px rgba(0,0,0,.28)', fontSize: 12,
@@ -1380,8 +1380,8 @@ function EnhancedForValueCard({ binding }: { binding: EnhancedForBinding }) {
       <span className="yv-enhanced-for-equals">=</span>
       <span className="yv-enhanced-for-value">{compactValue(binding.value)}</span>
       <span className="yv-enhanced-for-connector" aria-hidden="true"
-        style={{ position: 'absolute', left: '50%', top: '100%', height: 10, borderLeft: '1px solid var(--yv-accent, #65a9ff)' }} />
-      <span aria-hidden="true" style={{ position: 'absolute', left: 'calc(50% - 3px)', top: 'calc(100% + 7px)',
+        style={{ position: 'absolute', left: alignStart ? 18 : '50%', top: '100%', height: 10, borderLeft: '1px solid var(--yv-accent, #65a9ff)' }} />
+      <span aria-hidden="true" style={{ position: 'absolute', left: alignStart ? 15 : 'calc(50% - 3px)', top: 'calc(100% + 7px)',
         width: 6, height: 6, borderRadius: '50%', background: 'var(--yv-accent, #65a9ff)' }} />
     </div>
   );
@@ -2150,7 +2150,7 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
       </div>
       {value.map((item, index) => (
         <div className="yv-cell" key={index} ref={element => { cellRefs.current[index] = element; }} style={enhancedBinding?.index === index ? { position: "relative" } : undefined}>
-          {enhancedBinding?.index === index && <EnhancedForValueCard binding={enhancedBinding} />}
+          {enhancedBinding?.index === index && <EnhancedForValueCard binding={enhancedBinding} alignStart={index === 0} />}
           <div
             key={`${index}-${state?.sequence ?? state?.line ?? 'initial'}`}
             className={`yv-cell-value ${rangeStart >= 0 && index >= rangeStart && index <= rangeEnd ? 'yv-cell-range ' : ''}${rangeStart >= 0 && index === rangeStart ? 'yv-cell-range-start ' : ''}${rangeEnd >= 0 && index === rangeEnd && rangeEnd !== rangeStart ? 'yv-cell-range-end ' : ''}${changed.has(index) ? 'yv-cell-written ' : ''}${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-cell-compared ' : ''}${accumulated.has(index) && !copied.has(index) ? 'yv-cell-accumulated ' : ''}${copied.has(index) ? 'yv-cell-copied ' : ''}${rotated.has(index) ? 'yv-cell-rotated-' + rotated.get(index) + ' ' : ''}${swapped.has(index) ? 'yv-cell-swapped' : ''}`}
