@@ -2441,7 +2441,8 @@ export function StringView({ value, state, name, source = '' }: { value: string;
         typeof effect.start === 'number' && typeof effect.end === 'number') {
       ranges.push({ start: effect.start, end: effect.end });
       if (typeof effect.startVariable === 'string') pointers.set(effect.startVariable, effect.start);
-      if (typeof effect.endVariable === 'string' && effect.end < value.length) pointers.set(effect.endVariable, effect.end);
+      if (typeof effect.endVariable === 'string' && effect.end <= value.length) pointers.set(effect.endVariable, effect.end);
+      if (typeof effect.endExpression === 'string' && /\.length\s*\(\s*\)\s*$/.test(effect.endExpression) && effect.end === value.length) pointers.set('end', value.length);
     }
     if (event.type === 'STRING_RESULT' && (matchesName(effect.resultName) || matchesName(effect.name)) &&
         typeof effect.after === 'string' && effect.after === value && typeof effect.operation === 'string') {
