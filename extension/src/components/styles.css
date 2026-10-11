@@ -589,3 +589,5 @@
     animation: none;
   }
 }
+
+.yv-string-character.yv-string-code-unit{font-size:9px;letter-spacing:-.035em;white-space:nowrap}
