@@ -1307,14 +1307,33 @@ function enhancedForBinding(source: string, state: TraceState | undefined, colle
         if (event.data.name === variable) assignments++;
       }
     }
-    // Trace formats may omit assignment events on synthetic/legacy snapshots.
-    let index = assignments > 0 ? assignments - 1 : -1;
-    if (index < 0 || index >= values.length) {
-      const variableValue = state.variables?.[variable];
+    // Determine the loop's source span so the card remains visible through
+    // the body, even on trace steps that omit the loop variable from snapshots.
+    const headerOffset = match.index ?? 0;
+    const headerLine = source.slice(0, headerOffset).split(/\\r?\\n/).length;
+    const openBrace = source.indexOf('{', headerOffset + match[0].length);
+    let loopEndLine = headerLine;
+    if (openBrace >= 0) {
+      let depth = 0;
+      let closeBrace = -1;
+      for (let i = openBrace; i < source.length; i++) {
+        if (source[i] === '{') depth++;
+        else if (source[i] === '}' && --depth === 0) { closeBrace = i; break; }
+      }
+      if (closeBrace >= 0) loopEndLine = source.slice(0, closeBrace).split(/\\r?\\n/).length;
+    }
+    const currentLine = state.line ?? headerLine;
+    if (currentLine < headerLine || currentLine > loopEndLine) continue;
+
+    // Count element assignments through this trace step. Clamp to the final
+    // cell while a trace event is missing; never lose the card mid-loop.
+    let index = assignments > 0 ? Math.min(assignments - 1, values.length - 1) : -1;
+    const variableValue = state.variables?.[variable];
+    if (index < 0) {
       index = values.findIndex(item => !valueChanged(item, variableValue));
     }
     if (index < 0 || index >= values.length) continue;
-    return { variable, iterable, index, value: state.variables?.[variable] };
+    return { variable, iterable, index, value: variableValue ?? values[index] };
   }
   return undefined;
 }
@@ -2632,7 +2651,7 @@ export function StringView({ value, state, name, source = '' }: { value: string;
   const hasPointers = [...pointers.values()].some(index => index >= 0 && index <= value.length);
   return (
     <div className={`yv-string-view ${hasPointers ? 'has-pointers' : ''}`} data-string-structure={name} data-string-length={value.length}>
-      <div className="yv-string-meta"><span>length</span><strong>{value.length}</strong><span>UTF-16 units</span></div>
+      <div className="yv-string-meta"><span>length</span><strong>{value.length}</strong></div>
       {(transition || operationResult) && <div className="yv-string-operation">
         {transition && <span>{transition.operation} · {transition.kind === 'mutation' ? 'mutated' : 'result'}</span>}
         {operationResult && <span>{operationResult.operation} → {String(operationResult.result)}</span>}
@@ -2767,7 +2786,20 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
   return (
     <div className="yv-ds-list">
       {items.map(({ names, value }) => {
-        const title = [...new Set(names)].join(' / ');
+        const uniqueNames = [...new Set(names)];
+        const primaryName = uniqueNames[0] ?? 'value';
+        const kind = isPlainObject(value) && typeof value.$stringValue === 'string'
+          ? 'String'
+          : Array.isArray(value) || isArraySnapshot(value)
+            ? 'Array'
+            : isPlainObject(value) && typeof value.$mapId === 'string'
+              ? 'Map'
+              : isPlainObject(value) && typeof value.$collectionId === 'string'
+                ? 'Collection'
+                : isPlainObject(value) && typeof value.$objectId === 'string'
+                  ? 'Object'
+                  : 'Data Structure';
+        const title = kind + ' → ' + uniqueNames.join(' / ');
         return (
           <div className="yv-ds" key={title}>
             <div className="yv-ds-title">{title}</div>
