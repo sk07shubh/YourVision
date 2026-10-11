@@ -2321,26 +2321,90 @@ function LinkedListView({
   objects: Record<string, unknown>;
   variables?: Record<string, unknown>;
 }) {
+  type ListNodeRecord = { id: string; value: unknown; fields: Obj; nextId: string | null; cycleTo: string | null };
   const pointerNames = new Map<string, string[]>();
+  const nullPointers: string[] = [];
   for (const [name, value] of Object.entries(variables)) {
     if (name === 'this') continue;
     if (isPlainObject(value) && typeof value.$objectId === 'string') {
       const names = pointerNames.get(value.$objectId) ?? [];
       names.push(name);
       pointerNames.set(value.$objectId, names);
+    } else if (value == null) {
+      nullPointers.push(name);
     }
   }
 
-  const nodes: Array<{id:string;value:unknown}> = []; const seen=new Set<string>(); let cur: unknown=root;
-  for(let guard=0;guard<40;guard++){
-    cur=resolveRef(cur,objects); if(!isPlainObject(cur))break;
-    const id=String(cur.$objectId ?? `node-${guard}`); if(seen.has(id)){nodes.push({id:'cycle',value:'↻'});break;} seen.add(id);
-    nodes.push({id,value:nodeValue(cur)}); const f=objectFields(cur); if(f.next==null)break; cur=f.next;
+  const nodes: ListNodeRecord[] = [];
+  const seen = new Map<string, number>();
+  let cur: unknown = root;
+  for (let guard = 0; guard < 100; guard++) {
+    cur = resolveRef(cur, objects);
+    if (!isPlainObject(cur)) break;
+    const id = String(cur.$objectId ?? `node-${guard}`);
+    const existingIndex = seen.get(id);
+    if (existingIndex !== undefined) {
+      const previous = nodes[nodes.length - 1];
+      if (previous) previous.cycleTo = id;
+      break;
+    }
+    const fields = objectFields(cur);
+    const next = fields.next;
+    const resolvedNext = next == null ? null : resolveRef(next, objects);
+    const nextId = isPlainObject(resolvedNext) ? String(resolvedNext.$objectId ?? '') || null : null;
+    seen.set(id, nodes.length);
+    nodes.push({ id, value: nodeValue(cur), fields, nextId, cycleTo: null });
+    if (next == null) break;
+    cur = next;
+    if (guard === 99) {
+      const last = nodes[nodes.length - 1];
+      if (last) last.cycleTo = last.nextId;
+    }
   }
-  return <div className="yv-linked">{nodes.map((n,i)=><div className="yv-linked-piece" key={`${n.id}-${i}`}>
-    {pointerNames.get(n.id)?.map(name => <div className="yv-node-pointer" key={name}>{name}</div>)}
-    <div className="yv-node">{displayValue(n.value)}</div>{i<nodes.length-1&&<div className="yv-edge">→</div>}
-  </div>)}</div>;
+
+  const idLabel = (id: string | null) => {
+    if (id == null) return 'null';
+    const index = nodes.findIndex(node => node.id === id);
+    return index >= 0 ? `N${index + 1}` : 'external node';
+  };
+
+  return (
+    <div className="yv-linked-graph" data-linked-list-root={isPlainObject(resolveRef(root, objects)) ? String((resolveRef(root, objects) as Obj).$objectId ?? 'root') : 'null'}>
+      {nullPointers.length > 0 && (
+        <div className="yv-linked-null-pointers" aria-label="Null references">
+          {nullPointers.map(name => <span className="yv-node-pointer yv-node-pointer-null" key={name}>{name} = null</span>)}
+        </div>
+      )}
+      {nodes.length === 0 ? (
+        <div className="yv-linked-empty"><span className="yv-linked-empty-label">empty list</span><span className="yv-null">null</span></div>
+      ) : (
+        <div className="yv-linked" role="group" aria-label="Linked list nodes">
+          {nodes.map((node, index) => {
+            const nextField = node.fields.next;
+            const hasPrev = 'prev' in node.fields;
+            const prevValue = hasPrev ? resolveRef(node.fields.prev, objects) : null;
+            const prevId = isPlainObject(prevValue) ? String(prevValue.$objectId ?? '') || null : null;
+            const isCycleEdge = node.cycleTo != null;
+            const isLast = index === nodes.length - 1;
+            return (
+              <div className="yv-linked-piece" key={node.id} data-node-id={node.id} data-node-index={index} data-next-target={node.nextId ?? 'null'}>
+                {pointerNames.get(node.id)?.map(name => <div className="yv-node-pointer" data-pointer-name={name} key={name}>{name}</div>)}
+                <div className="yv-node" data-linked-node-value={node.id}>
+                  <span className="yv-node-value">{displayValue(node.value)}</span>
+                  <span className="yv-node-identity">N{index + 1}</span>
+                  {hasPrev && <span className="yv-node-link-meta" title={`prev references ${prevId ?? 'null'}`}>prev: {idLabel(prevId)}</span>}
+                </div>
+                {!isLast && <div className="yv-edge" data-edge-kind="next" data-edge-from={node.id} data-edge-to={node.nextId ?? 'null'} aria-label={`next points to ${idLabel(node.nextId)}`}>→</div>}
+                {isLast && isCycleEdge && <div className="yv-edge yv-edge-cycle" data-edge-kind="cycle" data-edge-from={node.id} data-edge-to={node.cycleTo ?? 'unknown'} aria-label={`cycle back to ${idLabel(node.cycleTo)}`}>↶ {idLabel(node.cycleTo)}</div>}
+                {isLast && !isCycleEdge && nextField == null && <div className="yv-edge yv-edge-null" data-edge-kind="null" data-edge-from={node.id}>→ <span>null</span></div>}
+                {isLast && !isCycleEdge && nextField != null && <div className="yv-edge yv-edge-external" data-edge-kind="external" data-edge-from={node.id} data-edge-to={node.nextId ?? 'external'}>→ <span>{idLabel(node.nextId)}</span></div>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function TreeNodeView({ value, objects, depth=0 }: { value: unknown; objects: Record<string,unknown>; depth?: number }) {
