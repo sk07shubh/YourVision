@@ -2524,7 +2524,6 @@ export function StringView({ value, state, name, source = '' }: { value: string;
             <div className="yv-string-index">{value.length}</div>
           </div>}
       </div>
-      </div>
     </div>
   );
 }
