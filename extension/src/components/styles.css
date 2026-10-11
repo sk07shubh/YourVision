@@ -695,8 +695,9 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--yv-accent), transparent 90%);
 }
 .yv-linked-piece[data-next-target="null"] .yv-linked-next-port {
-  border-color: var(--yv-muted);
-  box-shadow: none;
+  border-color: #d946ef !important;
+  background: color-mix(in srgb,#d946ef,var(--yv-elevated) 72%);
+  box-shadow: 0 0 0 2px color-mix(in srgb,#d946ef,transparent 82%);
 }
 .yv-linked-node .yv-linked-node-data,
 .yv-linked-node .yv-linked-node-next {
