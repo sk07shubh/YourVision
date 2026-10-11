@@ -1397,6 +1397,7 @@ function CollectionView({
         <span>{type}</span>
         <span>{kind} · {itemCount} items</span>
       </div>
+      <CollectionRemovalCue value={value} state={state} name={name} source={source} depth={depth} seen={seen}/>
       <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
     </div>
   );
