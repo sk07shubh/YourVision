@@ -2430,7 +2430,7 @@ export function LinkedListView({
   const edgeSignature = [...edgeSnapshot.entries()].map(([id, target]) => `${id}:${target ?? 'null'}`).join('|');
   const pointerSignature = [...pointerSnapshot.entries()].map(([name, id]) => `${name}:${id}`).join('|');
   const graphRef = useRef<HTMLDivElement | null>(null);
-  const [connectionPaths, setConnectionPaths] = useState<Array<{ key: string; d: string; kind: 'prev' | 'cross-next'; from: string; to: string }>>([]);
+  const [connectionPaths, setConnectionPaths] = useState<Array<{ key: string; d: string; kind: 'prev' | 'cross-next' | 'cycle'; from: string; to: string }>>([]);
   const previousEdges = useRef<Map<string, string | null>>(new Map());
   const previousPointers = useRef<Map<string, string>>(new Map());
   const changedEdgeIds = new Set<string>();
@@ -2456,20 +2456,29 @@ export function LinkedListView({
         const id = element.dataset.linkedNodeValue;
         if (id) nodes.set(id, element.getBoundingClientRect());
       });
-      const nextPaths: Array<{ key: string; d: string; kind: 'prev' | 'cross-next'; from: string; to: string }> = [];
+      const nextPaths: Array<{ key: string; d: string; kind: 'prev' | 'cross-next' | 'cycle'; from: string; to: string }> = [];
       const componentForNode = new Map<string, number>();
       components.forEach((component, index) => component.nodes.forEach(node => componentForNode.set(node.id, index)));
-      const addPath = (from: string, to: string, kind: 'prev' | 'cross-next') => {
+      const addPath = (from: string, to: string, kind: 'prev' | 'cross-next' | 'cycle') => {
         const a = nodes.get(from), b = nodes.get(to);
         if (!a || !b) return;
-        const ax = a.right - graphRect.left + graph.scrollLeft;
+        const ax = (kind === 'cycle' ? a.right : a.right) - graphRect.left + graph.scrollLeft;
         const ay = a.top + a.height / 2 - graphRect.top + graph.scrollTop;
-        const bx = b.left - graphRect.left + graph.scrollLeft;
+        const bx = (kind === 'cycle' ? b.right : b.left) - graphRect.left + graph.scrollLeft;
         const by = b.top + b.height / 2 - graphRect.top + graph.scrollTop;
-        const lift = Math.max(28, Math.min(72, Math.abs(bx - ax) * 0.22));
-        const direction = kind === 'prev' ? -1 : 1;
-        const controlY = Math.min(ay, by) - lift * (kind === 'prev' ? 1 : 1);
-        const d = `M ${ax} ${ay} C ${ax + direction * lift} ${controlY}, ${bx - direction * lift} ${controlY}, ${bx} ${by}`;
+        let d: string;
+        if (kind === 'cycle') {
+          // A cycle is a real back-edge: route it above the nodes and return
+          // to the referenced node, instead of representing it as another node.
+          const lift = Math.max(34, Math.min(90, Math.abs(ax - bx) * 0.28 + 24));
+          const top = Math.max(4, Math.min(ay, by) - lift);
+          d = `M ${ax} ${ay} C ${ax + 22} ${top}, ${bx + 22} ${top}, ${bx} ${by}`;
+        } else {
+          const lift = Math.max(28, Math.min(72, Math.abs(bx - ax) * 0.22));
+          const direction = kind === 'prev' ? -1 : 1;
+          const controlY = Math.min(ay, by) - lift;
+          d = `M ${ax} ${ay} C ${ax + direction * lift} ${controlY}, ${bx - direction * lift} ${controlY}, ${bx} ${by}`;
+        }
         nextPaths.push({ key: `${kind}:${from}:${to}`, d, kind, from, to });
       };
       for (const node of allNodes) {
@@ -2479,6 +2488,11 @@ export function LinkedListView({
         const prev = resolveRef(node.fields.prev, objects);
         const prevId = isPlainObject(prev) ? String(prev.$objectId ?? prev.$ref ?? '') : '';
         if (prevId && nodes.has(prevId)) addPath(node.id, prevId, 'prev');
+      }
+      for (const component of components) {
+        if (component.cycleTo && component.nodes.length) {
+          addPath(component.nodes[component.nodes.length - 1]!.id, component.cycleTo, 'cycle');
+        }
       }
       setConnectionPaths(previous => {
         if (previous.length === nextPaths.length && previous.every((path, i) => path.key === nextPaths[i]?.key && path.d === nextPaths[i]?.d)) return previous;
