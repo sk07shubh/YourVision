@@ -616,3 +616,11 @@
 .yv-linked-components .yv-linked{margin:0}
 .yv-linked-components .yv-linked[data-linked-component]:not(:first-child){padding-top:8px;border-top:1px dashed var(--yv-border)}
 .yv-linked-piece .yv-edge-external{color:var(--yv-warning,var(--yv-accent))}
+
+.yv-node-link-changed{animation:yv-linked-node-rewire 420ms ease-out}
+.yv-edge-rewired{animation:yv-linked-edge-rewire 520ms ease-out;transform-origin:center}
+.yv-node-pointer-moved{animation:yv-linked-pointer-move 260ms ease-out}
+@keyframes yv-linked-node-rewire{0%{box-shadow:0 0 0 2px color-mix(in srgb,var(--yv-accent),transparent 10%)}100%{box-shadow:0 0 0 0 transparent}}
+@keyframes yv-linked-edge-rewire{0%{color:var(--yv-success,var(--yv-accent));transform:scale(1.2)}100%{color:var(--yv-accent);transform:scale(1)}}
+@keyframes yv-linked-pointer-move{0%{opacity:.25;transform:translateY(7px) scale(.94)}100%{opacity:1;transform:translateY(0) scale(1)}}
+@media(prefers-reduced-motion:reduce){.yv-node-link-changed,.yv-edge-rewired,.yv-node-pointer-moved{animation:none}}
