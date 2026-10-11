@@ -876,6 +876,32 @@ describe('execution visualization feature matrix', () => {
     }
   });
 
+  it('keeps a removed stack value visible as a trace-backed removal cue for the current step', () => {
+    const previousSession = sessionStore.get();
+    const previous = state({
+      sequence: 70,
+      dataStructures: {
+        stack: { $collectionId: 'stack-remove', $type: 'java.util.Stack', $kind: 'stack', values: [1, 2, 3], size: 3 },
+      },
+    });
+    const current = state({
+      sequence: 71,
+      dataStructures: {
+        stack: { $collectionId: 'stack-remove', $type: 'java.util.Stack', $kind: 'stack', values: [1, 2], size: 2 },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'stack.pop();', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source="stack.pop();" />);
+      expect(html).toContain('yv-collection-removals');
+      expect(html).toContain('REMOVED');
+      expect(html).toContain('>3</');
+      expect(html).not.toContain('>3</div></div>');
+    } finally {
+      sessionStore.set(previousSession);
+    }
+  });
+
   it('maps stack, queue, deque, priority queue, list, and set operations', () => {
     expect(collectionOperation('stack', 'push', { added: 5 })).toEqual({
       operation: 'Push', value: 5, position: 'Top',
