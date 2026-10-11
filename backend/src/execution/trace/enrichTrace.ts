@@ -1091,6 +1091,32 @@ function deriveStringEvents(
         });
     }
 
+    const searchPattern = /\b([A-Za-z_$][\w$]*)\s*\.\s*(indexOf|lastIndexOf|contains|startsWith|endsWith|equals|equalsIgnoreCase)\s*\(([^()]*)\)/g;
+    for (const match of statement.matchAll(searchPattern)) {
+        const name = match[1];
+        const operation = match[2];
+        const query = evaluateExpression(match[3] ?? "", variables);
+        if (!name || !operation || typeof variables[name] !== "string" || typeof query !== "string") continue;
+        const value = variables[name] as string;
+        let index = -1;
+        let result: string | number | boolean;
+        if (operation === "indexOf") { index = value.indexOf(query); result = index; }
+        else if (operation === "lastIndexOf") { index = value.lastIndexOf(query); result = index; }
+        else if (operation === "contains") { index = value.indexOf(query); result = index >= 0; }
+        else if (operation === "startsWith") { index = value.startsWith(query) ? 0 : -1; result = index >= 0; }
+        else if (operation === "endsWith") { index = value.endsWith(query) ? value.length - query.length : -1; result = index >= 0; }
+        else if (operation === "equalsIgnoreCase") { result = value.toLowerCase() === query.toLowerCase(); index = result ? 0 : -1; }
+        else { result = value === query; index = result ? 0 : -1; }
+        events.push({
+            sequence: 0,
+            type: "STRING_SEARCH_RESULT",
+            line: sourceEvent.line,
+            method: sourceEvent.method,
+            depth: sourceEvent.depth,
+            data: { name, operation, query, index, end: index < 0 ? -1 : index + query.length, matched: index >= 0, result, kind: "search" }
+        });
+    }
+
     const assignmentPattern = /\b([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*\.\s*(substring|subSequence|concat|replace|replaceAll|toLowerCase|toUpperCase|trim|strip)\s*\(/g;
     for (const match of statement.matchAll(assignmentPattern)) {
         const resultName = match[1];
@@ -1118,6 +1144,27 @@ function deriveStringEvents(
                 sourceBefore: sourceValue,
                 kind: "derived"
             }
+        });
+    }
+
+    const concatenationPattern = /\b([A-Za-z_$][\w$]*)\s*=\s*([^;\n]+);?/g;
+    for (const match of statement.matchAll(concatenationPattern)) {
+        const resultName = match[1];
+        const expression = match[2] ?? "";
+        const after = resultName ? postVariables[resultName] : undefined;
+        const before = resultName ? variables[resultName] : undefined;
+        if (!resultName || !expression.includes("+") || typeof after !== "string" || before === after) continue;
+        const sourceNames = [...expression.matchAll(/\b([A-Za-z_$][\w$]*)\b/g)]
+            .map(item => item[1])
+            .filter((candidate): candidate is string => Boolean(candidate) && candidate !== resultName && typeof variables[candidate] === "string");
+        if (sourceNames.length === 0) continue;
+        events.push({
+            sequence: 0,
+            type: "STRING_RESULT",
+            line: sourceEvent.line,
+            method: sourceEvent.method,
+            depth: sourceEvent.depth,
+            data: { name: resultName, resultName, sourceName: sourceNames[0], operation: "concatenate", before: typeof before === "string" ? before : "", after, sourceBefore: variables[sourceNames[0]], kind: "derived" }
         });
     }
 
@@ -1149,17 +1196,33 @@ function stringBuilderContents(value: unknown): string | undefined {
     const record = value as Record<string, unknown>;
     const type = typeof record.$type === "string" ? record.$type : "";
     if (!/StringBuilder|StringBuffer/.test(type)) return undefined;
-    for (const candidate of [record.value, record.stringValue, record.text]) {
+    const fields = record.fields && typeof record.fields === "object" && !Array.isArray(record.fields)
+        ? record.fields as Record<string, unknown>
+        : {};
+    for (const candidate of [record.value, record.stringValue, record.text, fields.stringValue, fields.text]) {
         if (typeof candidate === "string") return candidate;
     }
-    for (const fieldSet of [record.fields, record.snapshot]) {
-        if (!fieldSet || typeof fieldSet !== "object" || Array.isArray(fieldSet)) continue;
-        const fields = fieldSet as Record<string, unknown>;
-        for (const candidate of [fields.value, fields.stringValue, fields.text]) {
-            if (typeof candidate === "string") return candidate;
+    const fieldValue = fields.value;
+    const values = fieldValue && typeof fieldValue === "object" && !Array.isArray(fieldValue) &&
+        Array.isArray((fieldValue as Record<string, unknown>).values)
+        ? (fieldValue as { values: unknown[] }).values
+        : Array.isArray(fieldValue) ? fieldValue : undefined;
+    if (!values || !values.every(item => typeof item === "string" || typeof item === "number")) return undefined;
+    const count = typeof fields.count === "number" ? fields.count : values.length;
+    const coder = typeof fields.coder === "number" ? fields.coder : 0;
+    let text: string;
+    if (values.every(item => typeof item === "string" && item.length <= 1)) {
+        text = (values as string[]).join("");
+    } else if (coder === 1) {
+        let decoded = "";
+        for (let i = 0; i + 1 < values.length; i += 2) {
+            decoded += String.fromCharCode(((Number(values[i]) & 255) << 8) | (Number(values[i + 1]) & 255));
         }
+        text = decoded;
+    } else {
+        text = values.map(item => String.fromCharCode(Number(item) & 255)).join("");
     }
-    return undefined;
+    return text.slice(0, count);
 }
 
 function evaluateExpression(
