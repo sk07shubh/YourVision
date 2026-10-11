@@ -2469,19 +2469,27 @@ export function LinkedListView({
         if (!a || !b) return;
         const sourcePort = graph.querySelector<HTMLElement>(`[data-linked-node-value="${CSS.escape(from)}"] .yv-linked-next-port`);
         const sourceRect = sourcePort?.getBoundingClientRect() ?? a;
-        // Start at the exact center of the pointer dot. The dot's border is
-        // colored with the same edge color, so the line visually emerges from it.
-        const ax = (kind === 'prev' ? a.left : sourceRect.left + sourceRect.width / 2) - graphRect.left + graph.scrollLeft;
+        // Next links begin at the outer edge of the source dot, so the stroke
+        // visibly touches the dot instead of passing underneath its fill.
+        const ax = (kind === 'prev' ? a.left : sourceRect.right) - graphRect.left + graph.scrollLeft;
         const ay = (kind === 'prev' ? a.top + a.height / 2 : sourceRect.top + sourceRect.height / 2) - graphRect.top + graph.scrollTop;
         const bx = (kind === 'cycle' ? b.right : b.left) - graphRect.left + graph.scrollLeft;
         const by = b.top + b.height / 2 - graphRect.top + graph.scrollTop;
         let d: string;
         if (kind === 'cycle') {
-          // A cycle is a real back-edge: route it above the nodes and return
-          // to the referenced node, instead of representing it as another node.
+          // Keep cycle back-edges distinct by routing them above the chain.
           const lift = Math.max(34, Math.min(90, Math.abs(ax - bx) * 0.28 + 24));
           const top = Math.max(4, Math.min(ay, by) - lift);
           d = `M ${ax} ${ay} C ${ax + 22} ${top}, ${bx + 22} ${top}, ${bx} ${by}`;
+        } else if (kind === 'cross-next' && bx > ax && Math.abs(by - ay) <= 10) {
+          // Side-by-side nodes on the same row get a genuinely straight link.
+          d = `M ${ax} ${ay} L ${bx} ${by}`;
+        } else if (kind === 'cross-next' && by < ay) {
+          // Upward links use a clean S: leave horizontally, then curve back
+          // into the target's left outline (never spiral around it).
+          const span = Math.max(18, bx - ax);
+          const handle = Math.min(64, Math.max(16, span * 0.48));
+          d = `M ${ax} ${ay} C ${ax + handle} ${ay}, ${bx - handle} ${by}, ${bx} ${by}`;
         } else {
           const lift = Math.max(28, Math.min(72, Math.abs(bx - ax) * 0.22));
           const direction = kind === 'prev' ? -1 : 1;
@@ -2564,7 +2572,9 @@ export function LinkedListView({
                 return (
                   <div className="yv-linked-piece" key={node.id} data-node-id={node.id} data-node-index={allNodes.findIndex(candidate => candidate.id === node.id)} data-next-target={node.nextId ?? 'null'} data-prev-target={prevId ?? 'null'}>
                     <div className="yv-linked-node-column">
-                      {pointerNames.get(node.id)?.map(name => <div className={`yv-node-pointer ${movedPointerNames.has(name) ? 'yv-node-pointer-moved' : ''}`} data-pointer-name={name} key={name}>{name}</div>)}
+                      <div className="yv-linked-pointer-labels">
+                        {pointerNames.get(node.id)?.map(name => <div className={`yv-node-pointer ${movedPointerNames.has(name) ? 'yv-node-pointer-moved' : ''}`} data-pointer-name={name} key={name}>{name}</div>)}
+                      </div>
                       <div
                         className={`yv-node yv-linked-node ${changedEdgeIds.has(node.id) ? 'yv-node-link-changed' : ''}`}
                         data-linked-node-value={node.id}
