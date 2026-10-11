@@ -2624,10 +2624,30 @@ export function TrieView({ objects, variables = {}, source = '' }: {
   );
 }
 
-export function GraphView({ objects, variables = {} }: {
+export function GraphView({ objects, variables = {}, state }: {
   objects: Record<string, unknown>;
   variables?: Record<string, unknown>;
+  state?: TraceState;
 }) {
+  const session = sessionStore.get();
+  const selectedIndex = state ? session.states.indexOf(state) : -1;
+  const previous = selectedIndex > 0 ? session.states[selectedIndex - 1] : undefined;
+  const previousObjects = previous?.objects ?? {};
+  const changedNodeIds = new Set<string>();
+  const enteredNodeIds = new Set<string>();
+  if (state && previous && session.states.includes(state)) {
+    for (const [key, value] of Object.entries(objects)) {
+      if (!isPlainObject(value) || !looksGraphNode(value)) continue;
+      const id = typeof value.$objectId === 'string' ? value.$objectId : key;
+      const before = previousObjects[id];
+      if (before !== undefined && stableStringify(before) !== stableStringify(value)) changedNodeIds.add(id);
+    }
+    for (const [name, value] of Object.entries(variables)) {
+      const currentId = graphReferenceId(value, objects);
+      const previousId = graphReferenceId(previous.variables[name], previousObjects);
+      if (currentId && currentId !== previousId) enteredNodeIds.add(currentId);
+    }
+  }
   const nodes = Object.entries(objects).flatMap(([key, value]) => {
     if (!isPlainObject(value) || !looksGraphNode(value)) return [];
     const id = typeof value.$objectId === 'string' ? value.$objectId : key;
@@ -2689,12 +2709,15 @@ export function GraphView({ objects, variables = {} }: {
           {nodes.map(node => {
             const point = positions.get(node.id)!;
             const pointers = pointerNames.get(node.id) ?? [];
-            return <div key={node.id} className="yv-graph-node" data-graph-node-id={node.id}
+            const changed = changedNodeIds.has(node.id);
+            const entered = enteredNodeIds.has(node.id);
+            return <div key={node.id} className={'yv-graph-node' + (changed ? ' yv-graph-node-changed' : '') + (entered ? ' yv-graph-node-entered' : '')}
+              data-graph-node-id={node.id} data-graph-changed={changed ? 'true' : undefined} data-graph-entered={entered ? 'true' : undefined}
               style={{ position: 'absolute', left: point.x - 47, top: point.y - 23, width: 94, minHeight: 46,
                 boxSizing: 'border-box', display: 'flex', flexDirection: 'column', alignItems: 'center',
                 justifyContent: 'center', gap: 2, padding: '5px 6px', border: '1px solid var(--yv-accent, #65a9ff)',
-                borderRadius: 10, background: 'var(--yv-panel, #101b2d)', color: 'var(--yv-text, #f3f6ff)',
-                boxShadow: '0 2px 8px rgba(0,0,0,.2)', textAlign: 'center', fontSize: 12, zIndex: 1 }}>
+                borderRadius: 10, background: changed ? 'var(--yv-highlight, #203b5b)' : 'var(--yv-panel, #101b2d)', color: 'var(--yv-text, #f3f6ff)',
+                boxShadow: entered ? '0 0 0 3px color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 55%)' : changed ? '0 0 0 2px color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 55%)' : '0 2px 8px rgba(0,0,0,.2)', textAlign: 'center', fontSize: 12, zIndex: 1 }}>
               <span>{compactValue(node.label)}</span>
               <span style={{ color: 'var(--yv-accent, #65a9ff)', fontSize: 10 }}>{node.id}</span>
               {pointers.length > 0 && <span style={{ color: 'var(--yv-muted, #8b9bb4)', fontSize: 10 }}>{pointers.join(' · ')}</span>}
@@ -3714,7 +3737,7 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
             const id = graphReferenceId(value, state?.objects ?? {});
             return id && graphNodeEntries.some(([key, node]) => id === key || (isPlainObject(node) && node.$objectId === id)) ? [name] : [];
           }))].join(' / ') || 'runtime nodes'}</div>
-          <GraphView objects={state?.objects ?? {}} variables={state?.variables ?? {}} />
+          <GraphView objects={state?.objects ?? {}} variables={state?.variables ?? {}} state={state} />
         </div>
       )}
     </div>
