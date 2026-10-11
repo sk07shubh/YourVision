@@ -1179,7 +1179,7 @@ function collectionRemovedItems(value: Obj & { $collectionId: string; values: un
   const selectedIndex = session.states.indexOf(state);
   const currentIndex = selectedIndex >= 0 ? selectedIndex : session.index;
   const previous = currentIndex > 0 ? session.states[currentIndex - 1] : undefined;
-  if (!previous || previous.sequence !== state.sequence) return [];
+  if (!previous || !session.states.includes(state)) return [];
   const priorCandidate = previous.variables[name] ?? previous.dataStructures[name];
   if (!isPlainObject(priorCandidate) || priorCandidate.$collectionId !== value.$collectionId || !Array.isArray(priorCandidate.values)) return [];
 
