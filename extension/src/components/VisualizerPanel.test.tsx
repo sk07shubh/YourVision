@@ -1300,6 +1300,42 @@ describe('execution visualization feature matrix', () => {
     }
   });
 
+  it('finds previous map snapshots in variables when a map alias moves into data structures', () => {
+    const previousSession = sessionStore.get();
+    const previous = state({
+      sequence: 84,
+      variables: {
+        oldLookup: {
+          $mapId: 'renamed-map',
+          $type: 'java.util.HashMap',
+          entries: [{ key: 'gone', value: 17 }, { key: 'stay', value: 21 }],
+          size: 2,
+        },
+      },
+    });
+    const current = state({
+      sequence: 85,
+      dataStructures: {
+        newLookup: {
+          $mapId: 'renamed-map',
+          $type: 'java.util.HashMap',
+          entries: [{ key: 'stay', value: 21 }],
+          size: 1,
+        },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'newLookup.remove("gone");', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source='newLookup.remove("gone");' />);
+      expect(html).toContain('yv-map-delete');
+      expect(html).toContain('gone');
+      expect(html).toContain('17');
+      expect(html).toContain('stay');
+    } finally {
+      sessionStore.set(previousSession);
+    }
+  });
+
 describe('deterministic semantic pointer roles', () => {
   it('exposes boundary roles even when variables are not array indices', () => {
     const current = state({ variables: { left: 1, right: 4 }, lastEvent: { type: 'STEP', line: 6, data: { semanticRoles: [
