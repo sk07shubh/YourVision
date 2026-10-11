@@ -2404,10 +2404,16 @@ function mapChanges(state?: TraceState, mapId?: string): Array<{
   );
   if (currentIndex <= 0) return [];
   const previousState = session.states[currentIndex - 1];
-  const previousMap = Object.values(previousState?.dataStructures ?? {}).find(candidate =>
+  const previousMap = [
+    ...Object.values(previousState?.variables ?? {}),
+    ...Object.values(previousState?.dataStructures ?? {}),
+  ].find(candidate =>
     isPlainObject(candidate) && candidate.$mapId === mapId && Array.isArray(candidate.entries)
   );
-  const currentMap = Object.values(state.dataStructures ?? {}).find(candidate =>
+  const currentMap = [
+    ...Object.values(state.variables ?? {}),
+    ...Object.values(state.dataStructures ?? {}),
+  ].find(candidate =>
     isPlainObject(candidate) && candidate.$mapId === mapId && Array.isArray(candidate.entries)
   );
   if (!isPlainObject(previousMap) || !isPlainObject(currentMap)) return [];
