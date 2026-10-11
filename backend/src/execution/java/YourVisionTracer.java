@@ -1375,10 +1375,13 @@ public class YourVisionTracer {
             kind = "priorityQueue";
         } else if (type.contains("LinkedList")) {
             kind = "list";
+        } else if (type.contains("TreeSet")) {
+            // TreeSet iteration follows comparator order; preserve that
+            // contract so the visualizer can distinguish it from HashSet.
+            kind = "sortedSet";
         } else if (
             type.contains("HashSet") ||
-            type.contains("LinkedHashSet") ||
-            type.contains("TreeSet")
+            type.contains("LinkedHashSet")
         ) {
             kind = "set";
         }
