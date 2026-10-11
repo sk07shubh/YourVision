@@ -504,7 +504,7 @@ This section records code that has been implemented after the design audit. It d
 ### Regression coverage added
 
 - extension/src/components/VisualizerPanel.test.tsx: sorted/insertion-ordered collection labels, comparator-agnostic heap label, graph cycles/self-loops, trie child edges and terminal nodes, and disjoint-set forest rendering.
-- backend/scripts/smoke-java-data-structures.ts: TreeSet comparator order, LinkedHashSet insertion order, LinkedHashMap insertion order, and TreeMap key order.
+- backend/scripts/smoke-java-data-structures.ts: TreeSet comparator order, LinkedHashSet insertion order, LinkedHashMap insertion order, TreeMap key order, and captured GraphNode/TrieNode snapshots.
 
 ### Remaining verification and scope
 
