@@ -7,6 +7,7 @@ export type ExecutionEventType =
     | "ARRAY_ACCESS"
     | "STRING_ACCESS"
     | "STRING_RANGE_ACCESS"
+    | "STRING_SEARCH_RESULT"
     | "STRING_RESULT"
     | "STRING_MUTATION"
     | "ARRAY_WRITE"
