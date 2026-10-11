@@ -2452,11 +2452,17 @@ export function StringView({ value, state, name, source = '' }: { value: string;
   const line = source.split(/\r?\n/)[Math.max(0, (state?.line ?? 1) - 1)] ?? '';
   const escapedName = name.replace(/\$/g, '\\$');
   const indexExpressions: string[] = [];
-  for (const match of line.matchAll(new RegExp('\\b' + escapedName + '\\s*\\.\\s*charAt\\s*\\(([^()]*)\\)', 'g'))) {
-    indexExpressions.push((match[1] ?? '').trim());
+  const isActiveIdentifier = (expression: string) => {
+    if (!/^[A-Za-z_$][\w$]*$/.test(expression)) return false;
+    const escaped = expression.replace(/\$/g, '\\$');
+    return new RegExp('\\b' + escaped + '\\b').test(line);
+  };
+  for (const match of source.matchAll(new RegExp('\\b' + escapedName + '\\s*\\.\\s*charAt\\s*\\(([^()]*)\\)', 'g'))) {
+    const expression = (match[1] ?? '').trim();
+    if (isActiveIdentifier(expression)) indexExpressions.push(expression);
   }
-  for (const match of line.matchAll(new RegExp('\\b' + escapedName + '\\s*\\.\\s*(?:substring|subSequence)\\s*\\(([^()]*)\\)', 'g'))) {
-    indexExpressions.push(...(match[1] ?? '').split(',').slice(0, 2).map(part => part.trim()));
+  for (const match of source.matchAll(new RegExp('\\b' + escapedName + '\\s*\\.\\s*(?:substring|subSequence)\\s*\\(([^()]*)\\)', 'g'))) {
+    indexExpressions.push(...(match[1] ?? '').split(',').slice(0, 2).map(part => part.trim()).filter(isActiveIdentifier));
   }
   for (const expression of indexExpressions) {
     if (!/^[A-Za-z_$][\w$]*$/.test(expression) || pointers.has(expression)) continue;
