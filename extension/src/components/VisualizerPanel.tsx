@@ -2827,7 +2827,7 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
         return (
           <div className="yv-ds" key={title}>
             <div className="yv-ds-title">{title}</div>
-            <DataValue value={value} state={state} source={source} name={title}/>
+            <DataValue value={value} state={state} source={source} name={uniqueNames.join(' / ')}/>
           </div>
         );
       })}
