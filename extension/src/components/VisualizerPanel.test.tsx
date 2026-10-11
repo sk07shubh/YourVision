@@ -127,6 +127,10 @@ describe('string data structure visualization', () => {
     const html = renderToStaticMarkup(<StringView value="cba" state={current} name="builder" />);
     expect(html).toContain('reverse · mutated');
     expect(html).toContain('yv-string-cell-changed');
+
+    const backwards = renderToStaticMarkup(<StringView value="abc" state={current} name="builder" />);
+    expect(backwards).toContain('reverse · mutated');
+    expect(backwards).toContain('yv-string-cell-changed');
   });
   it('highlights only a confirmed search match range', () => {
     const current = state({ lastEvent: { type: 'STEP', line: 4, data: { executionEvents: [
