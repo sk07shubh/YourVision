@@ -522,3 +522,13 @@ This section records code that has been implemented after the design audit. It d
 - Duplicate values are counted by occurrence, rather than collapsed into a set. The animation respects `prefers-reduced-motion`.
 - Added a regression test for a stack push where the previous snapshot contains `[1, 2]` and the current snapshot contains `[1, 2, 3]`.
 - **Verification status:** code and test are committed, but tests/typecheck/build have not yet been executed in this environment. This is one operation slice, not completion of collection animations or the full DS scope.
+
+
+## Implementation log — trace-backed mutation and pointer transitions
+
+- **Collection removals:** stack, queue/deque, set, and heap views compare adjacent snapshots of the same collection identity. Values absent from the current multiset are shown in a compact REMOVED cue; the live structure remains an exact rendering of the current snapshot. Duplicate occurrences are handled by counts, and the cue respects reduced-motion preferences.
+- **Graph traversal/mutation cues:** nodes reached by a variable pointer movement are accented; changed node snapshots receive a separate highlight. Newly added edges use the accent color. Removed edges remain briefly visible as dashed transition cues when both endpoint nodes still exist in the current snapshot.
+- **Trie traversal/mutation cues:** pointer arrivals and changed node snapshots are highlighted from adjacent trace states, without relying on method names.
+- **Binary-tree traversal/mutation cues:** pointer arrivals and changed node snapshots are highlighted while retaining existing left/right labels and cycle guards.
+- **Regression tests:** added stack removal, graph pointer movement, trie pointer movement, tree mutation/pointer movement, and graph edge-removal coverage.
+- **Verification status:** CI is running for the latest feature-branch commit. Do not treat this slice as verified until the extension test/typecheck/build and full backend regression jobs complete successfully. Real trace checks remain required in addition to component-level synthetic tests.
