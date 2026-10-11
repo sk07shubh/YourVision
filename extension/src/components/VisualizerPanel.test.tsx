@@ -1033,6 +1033,31 @@ describe('execution visualization feature matrix', () => {
     }
   });
 
+  it('keeps duplicate queue item identities stable when an item is inserted at the front', () => {
+    const previousSession = sessionStore.get();
+    const previous = state({
+      sequence: 90,
+      dataStructures: {
+        queue: { $collectionId: 'stable-queue', $type: 'java.util.ArrayDeque', $kind: 'queue', values: [1, 1], size: 2 },
+      },
+    });
+    const current = state({
+      sequence: 91,
+      dataStructures: {
+        queue: { $collectionId: 'stable-queue', $type: 'java.util.ArrayDeque', $kind: 'queue', values: [0, 1, 1], size: 3 },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'queue.addFirst(0);', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source="queue.addFirst(0);" />);
+      expect(html).toContain('data-collection-item-key="1#0"');
+      expect(html).toContain('data-collection-item-key="1#1"');
+      expect(html).toContain('data-collection-item-key="0#0"');
+    } finally {
+      sessionStore.set(previousSession);
+    }
+  });
+
   it('maps stack, queue, deque, priority queue, list, and set operations', () => {
     expect(collectionOperation('stack', 'push', { added: 5 })).toEqual({
       operation: 'Push', value: 5, position: 'Top',
