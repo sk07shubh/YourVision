@@ -833,3 +833,8 @@
 .yv-trie-node-entered .yv-trie-node{animation:yv-graph-node-entered 420ms ease-out both;box-shadow:0 0 0 2px color-mix(in srgb,var(--yv-accent,#65a9ff),transparent 45%)}
 .yv-trie-node-changed .yv-trie-node{animation:yv-graph-node-changed 420ms ease-out both}
 @media(prefers-reduced-motion:reduce){.yv-trie-node-entered .yv-trie-node,.yv-trie-node-changed .yv-trie-node{animation:none}}
+
+/* Binary-tree node changes and pointer arrivals are trace-derived. */
+.yv-tree-node-entered>.yv-node{animation:yv-graph-node-entered 420ms ease-out both;box-shadow:0 0 0 2px color-mix(in srgb,var(--yv-accent,#65a9ff),transparent 45%)}
+.yv-tree-node-changed>.yv-node{animation:yv-graph-node-changed 420ms ease-out both}
+@media(prefers-reduced-motion:reduce){.yv-tree-node-entered>.yv-node,.yv-tree-node-changed>.yv-node{animation:none}}
