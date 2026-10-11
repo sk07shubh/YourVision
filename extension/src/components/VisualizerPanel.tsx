@@ -2403,6 +2403,110 @@ function resolveRef(value: unknown, objects: Record<string,unknown>): unknown {
 }
 function nodeValue(value: Obj): unknown { const f=objectFields(value); return f.val ?? f.value ?? f.data ?? '?'; }
 
+function looksGraphNode(value: Obj): boolean {
+  return 'neighbors' in objectFields(value);
+}
+
+function graphNeighborValues(value: Obj): unknown[] | undefined {
+  const fields = objectFields(value);
+  if (!('neighbors' in fields)) return undefined;
+  const neighbors = fields.neighbors;
+  if (Array.isArray(neighbors)) return neighbors;
+  if (isPlainObject(neighbors) && Array.isArray(neighbors.values)) return neighbors.values;
+  return neighbors == null ? [] : undefined;
+}
+
+function graphReferenceId(value: unknown, objects: Record<string, unknown>): string | undefined {
+  if (!isPlainObject(value)) return undefined;
+  if (typeof value.$objectId === 'string') return value.$objectId;
+  if (typeof value.$ref === 'string') return value.$ref;
+  const resolved = resolveRef(value, objects);
+  if (isPlainObject(resolved) && typeof resolved.$objectId === 'string') return resolved.$objectId;
+  return undefined;
+}
+
+export function GraphView({ objects, variables = {} }: {
+  objects: Record<string, unknown>;
+  variables?: Record<string, unknown>;
+}) {
+  const nodes = Object.entries(objects).flatMap(([key, value]) => {
+    if (!isPlainObject(value) || !looksGraphNode(value)) return [];
+    const id = typeof value.$objectId === 'string' ? value.$objectId : key;
+    return [{ id, value, label: nodeValue(value), neighbors: graphNeighborValues(value) ?? [] }];
+  }).slice(0, 80);
+  const ids = new Set(nodes.map(node => node.id));
+  const positions = new Map<string, { x: number; y: number }>();
+  nodes.forEach((node, index) => {
+    const angle = -Math.PI / 2 + (2 * Math.PI * index) / Math.max(1, nodes.length);
+    positions.set(node.id, {
+      x: 300 + (nodes.length <= 1 ? 0 : 205 * Math.cos(angle)),
+      y: 160 + (nodes.length <= 1 ? 0 : 112 * Math.sin(angle)),
+    });
+  });
+  const edges = nodes.flatMap(node => node.neighbors.flatMap((neighbor, index) => {
+    const target = graphReferenceId(neighbor, objects);
+    return target && ids.has(target) ? [{ key: node.id + ':' + target + ':' + index, from: node.id, to: target }] : [];
+  }));
+  const pointerNames = new Map<string, string[]>();
+  for (const [name, value] of Object.entries(variables)) {
+    const id = graphReferenceId(value, objects);
+    if (!id || !ids.has(id)) continue;
+    pointerNames.set(id, [...(pointerNames.get(id) ?? []), name]);
+  }
+
+  if (!nodes.length) return <div className="yv-empty">No graph nodes captured.</div>;
+
+  return (
+    <div className="yv-graph" data-graph-node-count={nodes.length} data-graph-edge-count={edges.length}>
+      <div className="yv-collection-meta">
+        <span>Adjacency graph</span>
+        <span>{nodes.length} nodes · {edges.length} links{nodes.length === 80 ? ' · display limit reached' : ''}</span>
+      </div>
+      <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
+        <div style={{ position: 'relative', width: 600, height: 320, minWidth: 600, margin: '0 auto' }}>
+          <svg width="600" height="320" viewBox="0 0 600 320" aria-label="Graph links"
+            style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}>
+            <defs>
+              <marker id="yv-graph-arrow" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+                <path d="M0,0 L7,3.5 L0,7 z" fill="var(--yv-muted, #8b9bb4)" />
+              </marker>
+            </defs>
+            {edges.map(edge => {
+              const from = positions.get(edge.from)!;
+              const to = positions.get(edge.to)!;
+              if (edge.from === edge.to) {
+                return <path key={edge.key} data-graph-edge-from={edge.from} data-graph-edge-to={edge.to}
+                  d={`M ${from.x + 20} ${from.y - 12} C ${from.x + 70} ${from.y - 65}, ${from.x - 45} ${from.y - 65}, ${from.x - 20} ${from.y - 12}`}
+                  fill="none" stroke="var(--yv-muted, #8b9bb4)" strokeWidth="1.5" markerEnd="url(#yv-graph-arrow)" />;
+              }
+              const dx = to.x - from.x, dy = to.y - from.y;
+              const length = Math.max(1, Math.hypot(dx, dy));
+              return <line key={edge.key} data-graph-edge-from={edge.from} data-graph-edge-to={edge.to}
+                x1={from.x + dx / length * 43} y1={from.y + dy / length * 25}
+                x2={to.x - dx / length * 50} y2={to.y - dy / length * 30}
+                stroke="var(--yv-muted, #8b9bb4)" strokeWidth="1.5" markerEnd="url(#yv-graph-arrow)" />;
+            })}
+          </svg>
+          {nodes.map(node => {
+            const point = positions.get(node.id)!;
+            const pointers = pointerNames.get(node.id) ?? [];
+            return <div key={node.id} className="yv-graph-node" data-graph-node-id={node.id}
+              style={{ position: 'absolute', left: point.x - 47, top: point.y - 23, width: 94, minHeight: 46,
+                boxSizing: 'border-box', display: 'flex', flexDirection: 'column', alignItems: 'center',
+                justifyContent: 'center', gap: 2, padding: '5px 6px', border: '1px solid var(--yv-accent, #65a9ff)',
+                borderRadius: 10, background: 'var(--yv-panel, #101b2d)', color: 'var(--yv-text, #f3f6ff)',
+                boxShadow: '0 2px 8px rgba(0,0,0,.2)', textAlign: 'center', fontSize: 12, zIndex: 1 }}>
+              <span>{compactValue(node.label)}</span>
+              <span style={{ color: 'var(--yv-accent, #65a9ff)', fontSize: 10 }}>{node.id}</span>
+              {pointers.length > 0 && <span style={{ color: 'var(--yv-muted, #8b9bb4)', fontSize: 10 }}>{pointers.join(' · ')}</span>}
+            </div>;
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function LinkedListView({
   root,
   objects,
@@ -3212,8 +3316,12 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
     }
   }
 
+  const graphNodeEntries = objectEntries.filter(([, value]) =>
+    isPlainObject(value) && looksGraphNode(value)
+  );
+
   for (const [id, value] of objectEntries) {
-    if (isPlainObject(value) && looksListNode(value)) continue;
+    if (isPlainObject(value) && (looksListNode(value) || looksGraphNode(value))) continue;
     const names = namedObjectIds.get(id);
     if (!names?.length) continue;
     grouped.set(`object:${id}`, { names, value });
@@ -3250,6 +3358,15 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
           </div>
         );
       })}
+      {graphNodeEntries.length > 0 && (
+        <div className="yv-ds" key="Graph → runtime nodes">
+          <div className="yv-ds-title">Graph → {[...new Set(Object.entries(state?.variables ?? {}).flatMap(([name, value]) => {
+            const id = graphReferenceId(value, state?.objects ?? {});
+            return id && graphNodeEntries.some(([key, node]) => id === key || (isPlainObject(node) && node.$objectId === id)) ? [name] : [];
+          }))].join(' / ') || 'runtime nodes'}</div>
+          <GraphView objects={state?.objects ?? {}} variables={state?.variables ?? {}} />
+        </div>
+      )}
     </div>
   );
 }
