@@ -61,6 +61,11 @@ describe('linked-list graph visualization', () => {
     expect(html).toContain('data-pointer-name="curr"');
     expect(html).toContain('prev = null');
     expect(html).toContain('data-next-target="n2"');
+    expect(html).toContain('class="yv-node yv-linked-node');
+    expect(html).toContain('class="yv-linked-node-next"');
+    expect(html).toContain('class="yv-linked-next-port"');
+    expect(html).toContain('data-edge-kind="next"');
+    expect(html).not.toContain('>→</div>');
   });
 
   it('groups all runtime ListNode objects into one graph instead of duplicate per-node lists', () => {
