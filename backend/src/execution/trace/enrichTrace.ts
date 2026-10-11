@@ -1175,6 +1175,44 @@ function deriveStringEvents(
         });
     }
 
+    const staticStringPattern = /\b([A-Za-z_$][\w$]*)\s*=\s*String\s*\.\s*(valueOf|join|format|copyValueOf)\s*\(((?:[^()]|\([^()]*\))*)\)/g;
+    for (const match of statement.matchAll(staticStringPattern)) {
+        const resultName = match[1];
+        const operation = match[2];
+        const args = match[3] ?? "";
+        if (!resultName || !operation) continue;
+        const beforeResult = variables[resultName];
+        const afterResult = postVariables[resultName];
+        if (typeof afterResult !== "string" || beforeResult === afterResult) continue;
+        const firstArg = args.split(",")[0]?.trim();
+        const sourceName = firstArg && /^[A-Za-z_$][\w$]*$/.test(firstArg) ? firstArg : undefined;
+        events.push({
+            sequence: 0,
+            type: "STRING_RESULT",
+            line: sourceEvent.line,
+            method: sourceEvent.method,
+            depth: sourceEvent.depth,
+            data: { name: resultName, resultName, sourceName, operation: "String." + operation, before: typeof beforeResult === "string" ? beforeResult : "", after: afterResult, sourceBefore: sourceName ? variables[sourceName] : undefined, kind: "derived" }
+        });
+    }
+
+    const stringConstructorPattern = /\b([A-Za-z_$][\w$]*)\s*=\s*new\s+String\s*\(((?:[^()]|\([^()]*\))*)\)/g;
+    for (const match of statement.matchAll(stringConstructorPattern)) {
+        const resultName = match[1];
+        if (!resultName) continue;
+        const beforeResult = variables[resultName];
+        const afterResult = postVariables[resultName];
+        if (typeof afterResult !== "string" || beforeResult === afterResult) continue;
+        events.push({
+            sequence: 0,
+            type: "STRING_RESULT",
+            line: sourceEvent.line,
+            method: sourceEvent.method,
+            depth: sourceEvent.depth,
+            data: { name: resultName, resultName, operation: "new String", before: typeof beforeResult === "string" ? beforeResult : "", after: afterResult, kind: "derived" }
+        });
+    }
+
     const concatenationPattern = /\b([A-Za-z_$][\w$]*)\s*(\+=|=(?!=))\s*([^;\n]+);?/g;
     for (const match of statement.matchAll(concatenationPattern)) {
         const resultName = match[1];
