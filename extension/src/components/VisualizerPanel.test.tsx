@@ -65,6 +65,26 @@ describe('string data structure visualization', () => {
     expect(html).toContain('class="yv-string-cell yv-cell-read " data-string-index="2"');
     expect(html).not.toContain('class="yv-string-cell yv-cell-read " data-string-index="1"');
   });
+  it('surfaces string reads, ranges, search results, conversions, results, and mutations in execution effects', () => {
+    const current = state({ lastEvent: { type: 'STEP', line: 5, data: { executionEvents: [
+      { type: 'STRING_ACCESS', data: { name: 's', index: 2, value: 'n' } },
+      { type: 'STRING_RANGE_ACCESS', data: { name: 's', start: 1, end: 4 } },
+      { type: 'STRING_SEARCH_RESULT', data: { name: 's', operation: 'indexOf', result: 1 } },
+      { type: 'STRING_SPLIT_RESULT', data: { name: 's', resultName: 'parts', partCount: 3 } },
+      { type: 'STRING_CONVERSION_RESULT', data: { name: 's', operation: 'toCharArray', resultLength: 6 } },
+      { type: 'STRING_RESULT', data: { resultName: 'upper', before: 'banana', after: 'BANANA' } },
+      { type: 'STRING_MUTATION', data: { name: 'builder', operation: 'reverse', before: 'abc', after: 'cba' } },
+    ] } } });
+    const effects = eventEffects(current).map(effect => effect.text);
+    expect(effects.some(text => text.includes('s[2]'))).toBe(true);
+    expect(effects.some(text => text.includes('s[1:4)'))).toBe(true);
+    expect(effects.some(text => text.includes('s.indexOf'))).toBe(true);
+    expect(effects.some(text => text.includes('s.split → parts (3 parts)'))).toBe(true);
+    expect(effects.some(text => text.includes('s.toCharArray → char[6]'))).toBe(true);
+    expect(effects.some(text => text.includes('upper'))).toBe(true);
+    expect(effects.some(text => text.includes('builder.reverse'))).toBe(true);
+  });
+
   it('preserves Java UTF-16 indexing for supplementary Unicode characters', () => {
     const html = renderToStaticMarkup(<StringView value="😀" state={state()} name="s" />);
     expect(html).toContain('data-string-length="2"');
