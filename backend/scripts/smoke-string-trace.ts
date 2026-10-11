@@ -41,6 +41,9 @@ const source = [
     "  builder.setCharAt(0, 'x');",
     "  builder.delete(1, 2);",
     "  String builderText = builder.toString();",
+    "  String fromChar = String.valueOf(c);",
+    '  String joinedParts = String.join("-", "a", "b");',
+    "  String copied = new String(s);",
     "  return part + c + upper;",
     " }",
     "}"
@@ -67,6 +70,9 @@ assert(results.some(event => event.data?.resultName === "compact" && event.data.
 assert(results.some(event => event.data?.resultName === "trimmed" && event.data.after === "hi" && event.data.operation === "trim"), "trim result missing");
 assert(results.some(event => event.data?.resultName === "joined" && event.data.after === "bananax" && event.data.operation === "concat"), "concat result missing");
 assert(results.some(event => event.data?.resultName === "builderText" && event.data.after === "xad" && event.data.operation === "toString"), "StringBuilder.toString result missing");
+assert(results.some(event => event.data?.resultName === "fromChar" && event.data.after === "n" && event.data.operation === "String.valueOf"), "String.valueOf conversion missing");
+assert(results.some(event => event.data?.resultName === "joinedParts" && event.data.after === "a-b" && event.data.operation === "String.join"), "String.join result missing");
+assert(results.some(event => event.data?.resultName === "copied" && event.data.after === "banana" && event.data.operation === "new String"), "String constructor result missing");
 assert(results.some(event => event.data?.resultName === "combined" && event.data.after === "bananan" && event.data.operation === "concatenate"), "string plus result missing");
 assert(results.some(event => event.data?.resultName === "appended" && event.data.after === "ab" && event.data.operation === "concatenate"), "compound string concatenation result missing");
 const search = effects.find(event => event.type === "STRING_SEARCH_RESULT" && event.data?.operation === "contains");
