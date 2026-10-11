@@ -2457,7 +2457,7 @@ export function StringView({ value, state, name, source = '' }: { value: string;
   // pointer variables for the currently executed string expression.
   const line = source.split(/\r?\n/)[Math.max(0, (state?.line ?? 1) - 1)] ?? '';
   const sourceName = structureNames[0] ?? name;
-  const escapedName = sourceName.replace(/\$/g, '\\
+  const escapedName = sourceName.replace(/\$/g, '\\$');
   const indexExpressions: string[] = [];
   const isActiveIdentifier = (expression: string) => {
     if (!/^[A-Za-z_$][\w$]*$/.test(expression)) return false;
