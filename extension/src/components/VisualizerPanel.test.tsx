@@ -131,6 +131,21 @@ describe('string data structure visualization', () => {
     expect(resultHtml).toContain('yv-string-cell-added');
   });
 
+  it('groups multiple string pointers on the same character without hiding either label', () => {
+    const current = state({
+      line: 1,
+      variables: { s: 'radar', left: 2, right: 2 },
+      lastEvent: { type: 'STEP', line: 1, data: { executionEvents: [
+        { type: 'STRING_ACCESS', data: { name: 's', index: 2, value: 'd', kind: 'read', indexVariable: 'left' } },
+        { type: 'STRING_ACCESS', data: { name: 's', index: 2, value: 'd', kind: 'read', indexVariable: 'right' } },
+      ] } },
+    });
+    const html = renderToStaticMarkup(<StringView value="radar" state={current} name="s" source="if (s.charAt(left) == s.charAt(right)) return true;" />);
+    expect(html).toContain('data-string-pointer-index="2"');
+    expect(html).toContain('data-string-pointer="left"');
+    expect(html).toContain('data-string-pointer="right"');
+  });
+
   it('highlights all runtime-read characters participating in a character comparison', () => {
     const source = 'if (s.charAt(left) != s.charAt(right)) return false;';
     const current = state({
