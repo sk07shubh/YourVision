@@ -20,6 +20,7 @@ import {
   Variables,
   ArrayView,
   DataStructures,
+  GraphView,
   LinkedListView,
   StringView,
 } from './VisualizerPanel';
@@ -183,6 +184,48 @@ describe('linked-list graph visualization', () => {
     expect(html).toContain('empty list');
     expect(html).toContain('head = null');
     expect(html).not.toContain('data-node-id=');
+  });
+});
+
+describe('graph data structure visualization', () => {
+  it('renders actual adjacency links with stable node identities and pointer names', () => {
+    const current = state({
+      variables: { start: { $objectId: 'g1' } },
+      objects: {
+        g1: {
+          $objectId: 'g1',
+          $type: 'Node',
+          fields: { val: 1, neighbors: { $collectionId: 'neighbors-1', $kind: 'list', values: [{ $ref: 'g2' }] } },
+        },
+        g2: {
+          $objectId: 'g2',
+          $type: 'Node',
+          fields: { val: 2, neighbors: { $collectionId: 'neighbors-2', $kind: 'list', values: [{ $ref: 'g1' }] } },
+        },
+      },
+    });
+    const html = renderToStaticMarkup(<DataStructures state={current} source="" />);
+    expect(html).toContain('Graph → start');
+    expect(html).toContain('data-graph-node-count="2"');
+    expect(html).toContain('data-graph-edge-count="2"');
+    expect(html).toContain('data-graph-node-id="g1"');
+    expect(html).toContain('data-graph-node-id="g2"');
+    expect(html).toContain('data-graph-edge-from="g1" data-graph-edge-to="g2"');
+    expect(html).toContain('data-graph-edge-from="g2" data-graph-edge-to="g1"');
+    expect(html).toContain('start');
+  });
+
+  it('handles a self-loop without duplicating the graph node', () => {
+    const html = renderToStaticMarkup(<GraphView
+      objects={{
+        g1: { $objectId: 'g1', $type: 'Node', fields: { val: 4, neighbors: { values: [{ $ref: 'g1' }] } } },
+      }}
+      variables={{ node: { $objectId: 'g1' } }}
+    />);
+    expect(html).toContain('data-graph-node-count="1"');
+    expect(html).toContain('data-graph-edge-count="1"');
+    expect(html).toContain('data-graph-edge-from="g1" data-graph-edge-to="g1"');
+    expect((html.match(/data-graph-node-id="g1"/g) ?? []).length).toBe(1);
   });
 });
 
