@@ -1077,7 +1077,7 @@ function deriveStringEvents(
         if (!name) continue;
         const value = typeof variables[name] === "string" ? variables[name] as string : stringBuilderContents(variables[name]);
         if (value === undefined) continue;
-        const args = (match[3] ?? "").split(",").map(part => part.trim());
+        const args = splitTopLevel(match[3] ?? "", ",").map(part => part.trim());
         const start = evaluateExpression(args[0] ?? "", variables);
         const end = args.length > 1 ? evaluateExpression(args[1] ?? "", variables) : value.length;
         if (typeof start !== "number" || typeof end !== "number" ||
@@ -1117,8 +1117,22 @@ function deriveStringEvents(
             else if (operation === "contains") { index = value.indexOf(query); result = index >= 0; matched = index >= 0; }
             else if (operation === "startsWith") { index = value.startsWith(query) ? 0 : -1; result = index >= 0; matched = index >= 0; }
             else if (operation === "endsWith") { index = value.endsWith(query) ? value.length - query.length : -1; result = index >= 0; matched = index >= 0; }
-            else if (operation === "equalsIgnoreCase") { result = value.toLowerCase() === query.toLowerCase(); matched = result; index = matched ? 0 : -1; }
-            else if (operation === "equals") { result = value === query; matched = result; index = matched ? 0 : -1; }
+            else if (operation === "equalsIgnoreCase") {
+                result = value.toLowerCase() === query.toLowerCase();
+                matched = result;
+                let offset = 0;
+                while (offset < value.length && offset < query.length &&
+                    value.charAt(offset).toLowerCase() === query.charAt(offset).toLowerCase()) offset++;
+                index = matched ? 0 : offset;
+            }
+            else if (operation === "equals") {
+                result = value === query;
+                matched = result;
+                let offset = 0;
+                while (offset < value.length && offset < query.length &&
+                    value.charCodeAt(offset) === query.charCodeAt(offset)) offset++;
+                index = matched ? 0 : offset;
+            }
             else {
                 let offset = 0;
                 while (offset < value.length && offset < query.length && value.charCodeAt(offset) === query.charCodeAt(offset)) offset++;
@@ -1131,7 +1145,8 @@ function deriveStringEvents(
             if (matched && index >= 0) end = operation === "equals" || operation === "equalsIgnoreCase" || operation === "compareTo"
                 ? value.length
                 : index + query.length;
-            else if (operation === "compareTo" && index >= 0) end = index + 1;
+            else if ((operation === "compareTo" || operation === "equals" || operation === "equalsIgnoreCase") &&
+                index >= 0 && index < value.length) end = index + 1;
         }
         events.push({
             sequence: 0,
@@ -1140,6 +1155,82 @@ function deriveStringEvents(
             method: sourceEvent.method,
             depth: sourceEvent.depth,
             data: { name, operation, query: argument ? queryValue : undefined, index, end, matched, result, kind: "search" }
+        });
+    }
+
+    // split() creates a distinct String[]; its cells are rendered by the existing
+    // array visualizer. This event links the result to its source and highlights
+    // delimiters only when the regex is provably a literal delimiter.
+    const splitPattern = /\b([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*\.\s*split\s*\(((?:[^()]|\([^()]*\))*)\)/g;
+    for (const match of statement.matchAll(splitPattern)) {
+        const resultName = match[1];
+        const name = match[2];
+        if (!resultName || !name) continue;
+        const value = typeof variables[name] === "string"
+            ? variables[name] as string
+            : stringBuilderContents(variables[name]);
+        if (value === undefined) continue;
+        const args = splitTopLevel(match[3] ?? "", ",").map(part => part.trim());
+        const delimiter = evaluateExpression(args[0] ?? "", variables);
+        const resultArray = asArraySnapshot(postVariables[resultName]);
+        if (typeof delimiter !== "string" || !resultArray) continue;
+
+        const delimiterRanges: Array<{ start: number; end: number }> = [];
+        const regexMetaCodes = [92, 94, 36, 46, 42, 43, 63, 40, 41, 91, 93, 123, 125, 124];
+        const literalDelimiter = delimiter.length > 0 &&
+            ![...delimiter].some(character => regexMetaCodes.includes(character.charCodeAt(0)));
+        if (literalDelimiter) {
+            let cursor = 0;
+            while (cursor <= value.length - delimiter.length) {
+                const index = value.indexOf(delimiter, cursor);
+                if (index < 0) break;
+                delimiterRanges.push({ start: index, end: index + delimiter.length });
+                cursor = index + delimiter.length;
+            }
+        }
+
+        events.push({
+            sequence: 0,
+            type: "STRING_SPLIT_RESULT",
+            line: sourceEvent.line,
+            method: sourceEvent.method,
+            depth: sourceEvent.depth,
+            data: {
+                name,
+                resultName,
+                operation: "split",
+                delimiter,
+                partCount: resultArray.values.length,
+                delimiterRanges,
+                kind: "split"
+            }
+        });
+    }
+
+    // toCharArray() creates a distinct char[]; the array itself remains owned
+    // by the existing array visualizer. Also support enhanced-for expressions
+    // where the temporary array has no user-declared result variable.
+    const charArrayPattern = /(?:\b([A-Za-z_$][\w$]*)\s*=\s*)?\b([A-Za-z_$][\w$]*)\s*\.\s*toCharArray\s*\(\s*\)/g;
+    for (const match of statement.matchAll(charArrayPattern)) {
+        const resultName = match[1];
+        const name = match[2];
+        if (!name) continue;
+        const value = typeof variables[name] === "string" ? variables[name] as string : undefined;
+        if (value === undefined) continue;
+        if (resultName && !asArraySnapshot(postVariables[resultName])) continue;
+        events.push({
+            sequence: 0,
+            type: "STRING_CONVERSION_RESULT",
+            line: sourceEvent.line,
+            method: sourceEvent.method,
+            depth: sourceEvent.depth,
+            data: {
+                name,
+                resultName,
+                operation: "toCharArray",
+                resultLength: value.length,
+                kind: "conversion"
+            }
         });
     }
 
@@ -1245,7 +1336,7 @@ function deriveStringEvents(
         const before = stringBuilderContents(variables[name]);
         const after = stringBuilderContents(postVariables[name]);
         if (before === undefined || after === undefined || before === after) continue;
-        const args = (match[3] ?? "").split(",").map(part => part.trim());
+        const args = splitTopLevel(match[3] ?? "", ",").map(part => part.trim());
         const firstArg = evaluateExpression(args[0] ?? "", variables);
         const secondArg = evaluateExpression(args[1] ?? "", variables);
         const index = typeof firstArg === "number" && Number.isInteger(firstArg)
