@@ -32,7 +32,8 @@ export function enrichTrace(
                 const executionEvents = [
                     ...deriveChanges(previousStep, event),
                     ...deriveMapChanges(previousStep, event),
-                    ...deriveArrayAccessEvents(previousStep, sourceLines)
+                    ...deriveArrayAccessEvents(previousStep, sourceLines),
+                    ...deriveStringEvents(previousStep, event, sourceLines)
                 ];
 
                 // Runtime checkpoints are authoritative. Keep derived effects
@@ -106,7 +107,8 @@ export function enrichTrace(
                 const executionEvents = [
                     ...deriveChanges(previousStep, event),
                     ...deriveMapChanges(previousStep, event),
-                    ...deriveArrayAccessEvents(previousStep, sourceLines)
+                    ...deriveArrayAccessEvents(previousStep, sourceLines),
+                    ...deriveStringEvents(previousStep, event, sourceLines)
                 ];
 
                 // MethodExitEvent is emitted after the method body has
@@ -1034,6 +1036,130 @@ function deriveArrayAccessEvents(
     }
 
     return accesses;
+}
+
+
+/**
+ * Derive string effects from the executed statement and adjacent runtime
+ * checkpoints. We only emit an access when its index/range and receiver are
+ * available in the runtime snapshot; source text alone never creates a hit.
+ */
+function deriveStringEvents(
+    sourceEvent: ExecutionEvent,
+    postEvent: ExecutionEvent,
+    sourceLines: string[]
+): ExecutionEvent[] {
+    if (typeof sourceEvent.line !== "number" || sourceEvent.line < 1) return [];
+    const statement = sourceLines[sourceEvent.line - 1] ?? "";
+    const variables = getVariables(sourceEvent);
+    const postVariables = getVariables(postEvent);
+    const events: ExecutionEvent[] = [];
+
+    for (const match of statement.matchAll(/\b([A-Za-z_$][\w$]*)\s*\.\s*charAt\s*\(([^()]*)\)/g)) {
+        const name = match[1];
+        if (!name || typeof variables[name] !== "string") continue;
+        const index = evaluateExpression(match[2] ?? "", variables);
+        const value = variables[name] as string;
+        if (typeof index !== "number" || !Number.isInteger(index) || index < 0 || index >= value.length) continue;
+        events.push({
+            sequence: 0,
+            type: "STRING_ACCESS",
+            line: sourceEvent.line,
+            method: sourceEvent.method,
+            depth: sourceEvent.depth,
+            data: { name, index, value: value.charAt(index), kind: "read", operation: "charAt" }
+        });
+    }
+
+    for (const match of statement.matchAll(/\b([A-Za-z_$][\w$]*)\s*\.\s*(substring|subSequence)\s*\(([^()]*)\)/g)) {
+        const name = match[1];
+        if (!name || typeof variables[name] !== "string") continue;
+        const args = (match[3] ?? "").split(",").map(part => part.trim());
+        const start = evaluateExpression(args[0] ?? "", variables);
+        const end = args.length > 1 ? evaluateExpression(args[1] ?? "", variables) : (variables[name] as string).length;
+        const value = variables[name] as string;
+        if (typeof start !== "number" || typeof end !== "number" ||
+            !Number.isInteger(start) || !Number.isInteger(end) ||
+            start < 0 || end < start || end > value.length) continue;
+        events.push({
+            sequence: 0,
+            type: "STRING_RANGE_ACCESS",
+            line: sourceEvent.line,
+            method: sourceEvent.method,
+            depth: sourceEvent.depth,
+            data: { name, start, end, operation: match[2], kind: "read" }
+        });
+    }
+
+    const assignmentPattern = /\b([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*\.\s*(substring|subSequence|concat|replace|replaceAll|toLowerCase|toUpperCase|trim|strip)\s*\(/g;
+    for (const match of statement.matchAll(assignmentPattern)) {
+        const resultName = match[1];
+        const sourceName = match[2];
+        const operation = match[3];
+        if (!resultName || !sourceName || !operation) continue;
+        const beforeResult = variables[resultName];
+        const afterResult = postVariables[resultName];
+        const sourceValue = variables[sourceName];
+        if (typeof afterResult !== "string" || typeof sourceValue !== "string" ||
+            beforeResult === afterResult) continue;
+        events.push({
+            sequence: 0,
+            type: "STRING_RESULT",
+            line: sourceEvent.line,
+            method: sourceEvent.method,
+            depth: sourceEvent.depth,
+            data: {
+                name: resultName,
+                resultName,
+                sourceName,
+                operation,
+                before: typeof beforeResult === "string" ? beforeResult : undefined,
+                after: afterResult,
+                sourceBefore: sourceValue,
+                kind: "derived"
+            }
+        });
+    }
+
+    // StringBuilder is mutable; only emit a mutation event when the runtime
+    // exposes string snapshots for both sides and proves a changed value.
+    const mutablePattern = /\b([A-Za-z_$][\w$]*)\s*\.\s*(append|insert|delete|deleteCharAt|setCharAt|replace|reverse)\s*\(/g;
+    for (const match of statement.matchAll(mutablePattern)) {
+        const name = match[1];
+        const operation = match[2];
+        if (!name || !operation) continue;
+        const before = stringBuilderContents(variables[name]);
+        const after = stringBuilderContents(postVariables[name]);
+        if (before === undefined || after === undefined || before === after) continue;
+        events.push({
+            sequence: 0,
+            type: "STRING_MUTATION",
+            line: sourceEvent.line,
+            method: sourceEvent.method,
+            depth: sourceEvent.depth,
+            data: { name, operation, before, after, kind: "mutation" }
+        });
+    }
+
+    return events;
+}
+
+function stringBuilderContents(value: unknown): string | undefined {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+    const record = value as Record<string, unknown>;
+    const type = typeof record.$type === "string" ? record.$type : "";
+    if (!/StringBuilder|StringBuffer/.test(type)) return undefined;
+    for (const candidate of [record.value, record.stringValue, record.text]) {
+        if (typeof candidate === "string") return candidate;
+    }
+    for (const fieldSet of [record.fields, record.snapshot]) {
+        if (!fieldSet || typeof fieldSet !== "object" || Array.isArray(fieldSet)) continue;
+        const fields = fieldSet as Record<string, unknown>;
+        for (const candidate of [fields.value, fields.stringValue, fields.text]) {
+            if (typeof candidate === "string") return candidate;
+        }
+    }
+    return undefined;
 }
 
 function evaluateExpression(
