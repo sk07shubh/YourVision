@@ -31,6 +31,10 @@ const source = [
     "  builder.reverse();",
     "  builder.deleteCharAt(1);",
     "  builder.insert(1, 'b');",
+    '  builder.replace(0, 1, "z");',
+    "  builder.append('d');",
+    "  builder.setCharAt(0, 'x');",
+    "  builder.delete(1, 2);",
     "  return part + c + upper;",
     " }",
     "}"
@@ -70,5 +74,13 @@ const deletion = effects.find(event => event.type === "STRING_MUTATION" && event
 assert(deletion?.data?.index === 1 && deletion.data.removed === "b" && deletion.data.after === "ca", "deleteCharAt must expose the removed character and index");
 const insertion = effects.find(event => event.type === "STRING_MUTATION" && event.data?.operation === "insert");
 assert(insertion?.data?.index === 1 && insertion.data.inserted === "b" && insertion.data.after === "cba", "insert must expose the inserted range and index");
+const replacement = effects.find(event => event.type === "STRING_MUTATION" && event.data?.operation === "replace");
+assert(replacement?.data?.index === 0 && replacement.data.removed === "c" && replacement.data.inserted === "z", "replace must expose both changed ranges");
+const append = effects.find(event => event.type === "STRING_MUTATION" && event.data?.operation === "append");
+assert(append?.data?.index === 3 && append.data.inserted === "d", "append must expose newly appended characters");
+const setChar = effects.find(event => event.type === "STRING_MUTATION" && event.data?.operation === "setCharAt");
+assert(setChar?.data?.index === 0 && setChar.data.removed === "z" && setChar.data.inserted === "x", "setCharAt must expose the replaced character");
+const deleteRange = effects.find(event => event.type === "STRING_MUTATION" && event.data?.operation === "delete");
+assert(deleteRange?.data?.index === 1 && deleteRange.data.removed === "b", "delete must expose the removed range");
 
 console.log("PASS: real Java string access, ranges, and derived results");
