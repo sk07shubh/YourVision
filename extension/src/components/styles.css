@@ -596,7 +596,7 @@
 /* Linked-list graph: keep object identity, pointer aliases, and terminal topology explicit. */
 .yv-linked-graph{min-width:0;overflow-x:auto;padding:4px 0 7px}
 .yv-linked{align-items:flex-start;gap:8px;width:max-content;min-width:100%;padding:7px 2px 8px}
-.yv-linked-piece{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
+.yv-linked-piece{display:flex;flex-direction:row;align-items:center;gap:7px;min-width:0}.yv-linked-node-column{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
 .yv-linked-piece .yv-node{position:relative;flex-direction:column;gap:3px;min-width:54px;min-height:48px;padding:7px 9px;overflow:visible}
 .yv-node-value{font-weight:600;max-width:140px;overflow-wrap:anywhere}
 .yv-node-identity{font-size:9px;line-height:12px;color:var(--yv-muted)}
