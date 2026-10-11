@@ -399,6 +399,33 @@ describe('graph data structure visualization', () => {
     }
   });
 
+  it('keeps a removed graph edge visible as a dashed transition cue', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 111,
+      objects: {
+        g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'g2' }] } } },
+        g2: { $objectId: 'g2', $type: 'Node', fields: { val: 2, neighbors: { values: [] } } },
+      },
+    });
+    const current = state({
+      sequence: 112,
+      objects: {
+        g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [] } } },
+        g2: { $objectId: 'g2', $type: 'Node', fields: { val: 2, neighbors: { values: [] } } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'adj.remove(g2);', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<GraphView objects={current.objects} state={current} />);
+      expect(html).toContain('data-graph-edge-from="g1" data-graph-edge-to="g2"');
+      expect(html).toContain('data-graph-edge-status="removed"');
+      expect(html).toContain('stroke-dasharray="4 3"');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
   it('handles a self-loop without duplicating the graph node', () => {
     const html = renderToStaticMarkup(<GraphView
       objects={{
