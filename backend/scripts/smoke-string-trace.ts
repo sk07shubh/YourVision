@@ -17,6 +17,10 @@ const source = [
     '  appended += "b";',
     "  boolean found = s.contains(\"ana\");",
     "  int foundAt = s.indexOf(\"na\");",
+    "  int length = s.length();",
+    "  boolean empty = s.isEmpty();",
+    "  boolean blank = s.isBlank();",
+    "  int comparison = s.compareTo(\"banana\");",
     "  StringBuilder builder = new StringBuilder(\"abc\");",
     "  builder.reverse();",
     "  builder.deleteCharAt(1);",
@@ -44,6 +48,9 @@ assert(results.some(event => event.data?.resultName === "combined" && event.data
 assert(results.some(event => event.data?.resultName === "appended" && event.data.after === "ab" && event.data.operation === "concatenate"), "compound string concatenation result missing");
 const search = effects.find(event => event.type === "STRING_SEARCH_RESULT" && event.data?.operation === "contains");
 assert(search?.data?.matched === true && search.data.query === "ana", "contains must expose the confirmed match");
+assert(effects.some(event => event.type === "STRING_SEARCH_RESULT" && event.data?.operation === "length" && event.data.result === 6), "length must emit metadata without a character access");
+assert(effects.some(event => event.type === "STRING_SEARCH_RESULT" && event.data?.operation === "isBlank" && event.data.result === false), "isBlank must emit its boolean result");
+assert(effects.some(event => event.type === "STRING_SEARCH_RESULT" && event.data?.operation === "compareTo" && event.data.result === 0), "compareTo must emit its comparison result");
 const mutation = effects.find(event => event.type === "STRING_MUTATION" && event.data?.name === "builder");
 assert(mutation?.data?.operation === "reverse" && mutation.data.before === "abc" && mutation.data.after === "cba",
     "StringBuilder reverse must expose its real before/after snapshot: " + JSON.stringify(mutation?.data));
