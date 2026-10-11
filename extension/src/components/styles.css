@@ -634,3 +634,10 @@
 .yv-linked-connection-cross-next{stroke:var(--yv-accent)}
 .yv-linked-piece .yv-node{z-index:2}
 @media(prefers-reduced-motion:reduce){.yv-linked-connection{animation:none;transition:none}}
+
+
+/* Directional SVG edges make non-local references and cycle back-edges readable. */
+.yv-linked-connections marker path{fill:var(--yv-accent)}
+.yv-linked-connection-cycle{stroke:var(--yv-warning,var(--yv-accent));stroke-dasharray:5 3;opacity:.95}
+.yv-linked-connection-prev{marker-end:url(#yv-linked-arrow);stroke:var(--yv-muted)}
+.yv-linked-connection-cross-next{stroke:var(--yv-accent)}
