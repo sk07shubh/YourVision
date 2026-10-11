@@ -627,7 +627,7 @@
 
 
 .yv-linked-graph{position:relative;isolation:isolate}
-.yv-linked-connections{position:absolute;inset:0;z-index:0;overflow:visible;pointer-events:none}
+.yv-linked-connections{position:absolute;inset:0;z-index:3;overflow:visible;pointer-events:none}
 .yv-linked-components,.yv-linked-null-pointers,.yv-linked-empty{position:relative;z-index:1}
 .yv-linked-connection{fill:none;stroke-width:1.6;stroke-dasharray:4 3;opacity:.82;vector-effect:non-scaling-stroke}
 .yv-linked-connection-prev{stroke:var(--yv-muted);stroke-dasharray:3 4}
