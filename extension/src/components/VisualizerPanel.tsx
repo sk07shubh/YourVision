@@ -2413,7 +2413,7 @@ export function StringView({ value, state, name, source = '' }: { value: string;
   const accessed = new Set<number>();
   const ranges: Array<{ start: number; end: number }> = [];
   const pointers = new Map<string, number>();
-  let transition: { operation: string; before: string; after: string; kind: 'result' | 'mutation' } | undefined;
+  let transition: { operation: string; before: string; after: string; kind: 'result' | 'mutation'; index?: number; removed?: string; inserted?: string } | undefined;
 
   for (const event of executionEvents) {
     if (!isPlainObject(event) || !isPlainObject(event.data)) continue;
@@ -2443,7 +2443,7 @@ export function StringView({ value, state, name, source = '' }: { value: string;
     }
     if (event.type === 'STRING_MUTATION' && effect.name === name &&
         typeof effect.after === 'string' && effect.after === value && typeof effect.operation === 'string') {
-      transition = { operation: effect.operation, before: typeof effect.before === 'string' ? effect.before : '', after: effect.after, kind: 'mutation' };
+      transition = { operation: effect.operation, before: typeof effect.before === 'string' ? effect.before : '', after: effect.after, kind: 'mutation', index: typeof effect.index === 'number' ? effect.index : undefined, removed: typeof effect.removed === 'string' ? effect.removed : undefined, inserted: typeof effect.inserted === 'string' ? effect.inserted : undefined };
     }
   }
 
@@ -2482,13 +2482,16 @@ export function StringView({ value, state, name, source = '' }: { value: string;
           const inRange = ranges.some(range => index >= range.start && index < range.end);
           const previousCharacter = transition?.before[index];
           const changed = Boolean(transition && transition.before !== transition.after && previousCharacter !== character);
-          const added = Boolean(transition && index >= transition.before.length && index < transition.after.length);
+          const inserted = Boolean(transition?.kind === 'mutation' && transition.inserted && transition.index !== undefined && index >= transition.index && index < transition.index + transition.inserted.length);
+          const added = Boolean((transition && index >= transition.before.length && index < transition.after.length) || inserted);
           const cellPointers = [...pointers.entries()].filter(([, pointerIndex]) => pointerIndex === index);
+          const removedHere = transition?.kind === 'mutation' && transition.removed && transition.index === index ? transition.removed : undefined;
           return (
             <div className="yv-string-cell-wrap" key={index} data-string-cell-index={index}>
               {cellPointers.length > 0 && <div className="yv-string-pointers" aria-hidden="true">
                 {cellPointers.map(([pointer]) => <span className="yv-string-pointer" key={pointer} data-string-pointer={pointer}>{pointer}</span>)}
               </div>}
+              {removedHere && <div className="yv-string-removed-overlay" aria-hidden="true">{removedHere}</div>}
               <div className={`yv-string-cell ${accessed.has(index) ? 'yv-cell-read ' : ''}${inRange ? 'yv-cell-range ' : ''}${changed ? 'yv-string-cell-changed ' : ''}${added ? 'yv-string-cell-added' : ''}`} data-string-index={index}>
                 <div className="yv-string-character">{character === ' ' ? '\u00a0' : character}</div>
               </div>
@@ -2496,6 +2499,8 @@ export function StringView({ value, state, name, source = '' }: { value: string;
             </div>
           );
         })}
+        {transition?.kind === 'mutation' && transition.removed && transition.index !== undefined && transition.index >= value.length &&
+          <div className="yv-string-cell-wrap yv-string-removal-tail"><div className="yv-string-removed-overlay" aria-hidden="true">{transition.removed}</div></div>}
         {!characters.length && <div className="yv-empty">Empty string</div>}
         {[...pointers.entries()].some(([, index]) => index === value.length) &&
           <div className="yv-string-cell-wrap yv-string-end-pointer">
