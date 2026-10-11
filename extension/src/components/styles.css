@@ -752,10 +752,14 @@
   gap: 5px;
   white-space: nowrap;
 }
-.yv-linked-null-line {
-  display: inline-block;
-  width: 20px;
-  border-top: 1.5px dashed var(--yv-muted);
+.yv-linked-null-line { display: none; }
+.yv-linked-connection-null-next {
+  stroke: #fff;
+  stroke-width: 2.2;
+  stroke-dasharray: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 1;
 }
 .yv-linked-connections {
   overflow: visible;
