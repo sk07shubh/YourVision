@@ -2914,9 +2914,13 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
     );
     const preferredRoot = listVariableEntries.find(([name]) => /^(head|root|first)$/i.test(name));
     const rootVariable = preferredRoot ?? listVariableEntries[0];
-    const rootValue = rootVariable
-      ? rootVariable[1]
-      : listNodeEntries[0]?.[1];
+    const rootId = rootVariable && isPlainObject(rootVariable[1]) && typeof rootVariable[1].$objectId === 'string'
+      ? rootVariable[1].$objectId
+      : null;
+    const rootEntry = rootId
+      ? listNodeEntries.find(([id, value]) => id === rootId || (isPlainObject(value) && value.$objectId === rootId))
+      : listNodeEntries[0];
+    const rootValue = rootEntry?.[1];
     if (rootValue !== undefined) {
       grouped.set('linked-list:runtime', {
         names: listVariableEntries.map(([name]) => name).filter((name, index, all) => all.indexOf(name) === index),
