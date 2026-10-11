@@ -1145,6 +1145,31 @@ function CollectionBackingArray({
   );
 }
 
+function previousCollectionSnapshot(
+  state: TraceState | undefined,
+  collectionId: string
+): { $collectionId: string; values: unknown[] } | undefined {
+  if (!state) return undefined;
+  const session = sessionStore.get();
+  const stateIndex = session.states.indexOf(state);
+  const selectedIndex = stateIndex >= 0
+    ? stateIndex
+    : Math.max(0, Math.min(session.index, session.states.length - 1));
+  const current = session.states[selectedIndex];
+  const previous = selectedIndex > 0 ? session.states[selectedIndex - 1] : undefined;
+  if (!current || !previous || current.sequence !== state.sequence) return undefined;
+
+  // A variable can be renamed or an alias can become the visible collection
+  // name between steps. Resolve by runtime identity, not by the current label.
+  const candidates = [
+    ...Object.values(previous.variables),
+    ...Object.values(previous.dataStructures),
+  ];
+  return candidates.find(candidate =>
+    isCollectionSnapshot(candidate) && candidate.$collectionId === collectionId
+  ) as { $collectionId: string; values: unknown[] } | undefined;
+}
+
 function collectionItemMotionClass(
   value: { $collectionId: string; values: unknown[] },
   item: unknown,
@@ -1153,14 +1178,8 @@ function collectionItemMotionClass(
   name: string | undefined
 ): string {
   if (!name) return '';
-  const session = sessionStore.get();
-  const selectedIndex = Math.max(0, Math.min(session.index, session.states.length - 1));
-  const current = session.states[selectedIndex];
-  const previous = selectedIndex > 0 ? session.states[selectedIndex - 1] : undefined;
-  if (!current || !previous || current.sequence !== state?.sequence) return '';
-  const priorCandidate = previous.variables[name] ?? previous.dataStructures[name];
-  const prior = isCollectionSnapshot(priorCandidate) ? priorCandidate : undefined;
-  if (!prior || prior.$collectionId !== value.$collectionId) return '';
+  const prior = previousCollectionSnapshot(state, value.$collectionId);
+  if (!prior) return '';
 
   // Count equal values rather than using a Set: collections may legally hold
   // duplicate values (queues, deques and priority queues), and each occurrence
@@ -1175,13 +1194,8 @@ function collectionItemMotionClass(
 
 function collectionRemovedItems(value: Obj & { $collectionId: string; values: unknown[] }, state?: TraceState, name?: string): unknown[] {
   if (!state || !name) return [];
-  const session = sessionStore.get();
-  const selectedIndex = session.states.indexOf(state);
-  const currentIndex = selectedIndex >= 0 ? selectedIndex : session.index;
-  const previous = currentIndex > 0 ? session.states[currentIndex - 1] : undefined;
-  if (!previous || !session.states.includes(state)) return [];
-  const priorCandidate = previous.variables[name] ?? previous.dataStructures[name];
-  if (!isPlainObject(priorCandidate) || priorCandidate.$collectionId !== value.$collectionId || !Array.isArray(priorCandidate.values)) return [];
+  const priorCandidate = previousCollectionSnapshot(state, value.$collectionId);
+  if (!priorCandidate || !Array.isArray(priorCandidate.values)) return [];
 
   // Multiset subtraction preserves duplicate occurrences without assuming iteration order.
   const remainingCounts = new Map<string, number>();
