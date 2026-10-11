@@ -12,11 +12,14 @@ const source = [
     "  char c = s.charAt(i);",
     "  String part = s.substring(1, 4);",
     "  String suffix = s.substring(3, s.length());",
+    "  String tail = s.substring(2);",
+    "  CharSequence middle = s.subSequence(1, 3);",
     "  String upper = s.toUpperCase();",
     '  String replaced = s.replace("a", "o");',
     '  String compact = s.replaceAll("a", "");',
     '  String padded = "  hi  "; ',
     "  String trimmed = padded.trim();",
+    "  String stripped = padded.strip();",
     '  String joined = s.concat("x");',
     "  String combined = s + c;",
     '  String appended = "a";',
@@ -71,11 +74,16 @@ assert(range?.data?.start === 1 && range.data.end === 4, "substring range must b
 const results = effects.filter(event => event.type === "STRING_RESULT");
 assert(results.some(event => event.data?.resultName === "part" && event.data.after === "ana"), "substring result missing");
 assert(results.some(event => event.data?.resultName === "suffix" && event.data.after === "ana"), "substring with nested length() result missing");
+assert(results.some(event => event.data?.resultName === "tail" && event.data.after === "nana" && event.data.operation === "substring"), "one-argument substring result missing");
+assert(results.some(event => event.data?.resultName === "middle" && event.data.after === "an" && event.data.operation === "subSequence"), "subSequence result missing");
 assert(effects.some(event => event.type === "STRING_RANGE_ACCESS" && event.data?.start === 3 && event.data.end === 6), "substring with nested length() range missing");
+assert(effects.some(event => event.type === "STRING_RANGE_ACCESS" && event.data?.start === 2 && event.data.end === 6 && event.data.operation === "substring"), "one-argument substring range missing");
+assert(effects.some(event => event.type === "STRING_RANGE_ACCESS" && event.data?.start === 1 && event.data.end === 3 && event.data.operation === "subSequence"), "subSequence range missing");
 assert(results.some(event => event.data?.resultName === "upper" && event.data.after === "BANANA"), "case-conversion result missing");
 assert(results.some(event => event.data?.resultName === "replaced" && event.data.after === "bonono" && event.data.operation === "replace"), "replace result missing");
 assert(results.some(event => event.data?.resultName === "compact" && event.data.after === "bnn" && event.data.operation === "replaceAll"), "replaceAll result missing");
 assert(results.some(event => event.data?.resultName === "trimmed" && event.data.after === "hi" && event.data.operation === "trim"), "trim result missing");
+assert(results.some(event => event.data?.resultName === "stripped" && event.data.after === "hi" && event.data.operation === "strip"), "strip result missing");
 assert(results.some(event => event.data?.resultName === "joined" && event.data.after === "bananax" && event.data.operation === "concat"), "concat result missing");
 assert(results.some(event => event.data?.resultName === "builderText" && event.data.after === "xad" && event.data.operation === "toString"), "StringBuilder.toString result missing");
 assert(results.some(event => event.data?.resultName === "fromChar" && event.data.after === "n" && event.data.operation === "String.valueOf"), "String.valueOf conversion missing");
