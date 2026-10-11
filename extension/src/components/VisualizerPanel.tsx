@@ -2331,7 +2331,6 @@ export function LinkedListView({
   type ListNodeRecord = { id: string; value: unknown; fields: Obj; nextId: string | null; cycleTo: string | null };
   type ListComponent = { nodes: ListNodeRecord[]; cycleTo: string | null };
   const pointerNames = new Map<string, string[]>();
-  const maxPointerLabelCount = Math.max(0, ...Array.from(pointerNames.values(), names => names.length));
   const nullPointers: string[] = [];
   for (const [name, value] of Object.entries(variables)) {
     if (name === 'this') continue;
@@ -2344,6 +2343,7 @@ export function LinkedListView({
       nullPointers.push(name);
     }
   }
+  const maxPointerLabelCount = Math.max(0, ...Array.from(pointerNames.values(), names => names.length));
 
   const records = new Map<string, ListNodeRecord>();
   for (const [key, raw] of Object.entries(objects)) {
