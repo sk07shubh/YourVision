@@ -1208,11 +1208,11 @@ function collectionItemMotionClass(
   // Count equal values rather than using a Set: collections may legally hold
   // duplicate values (queues, deques and priority queues), and each occurrence
   // must be treated independently.
-  const signature = stableStringify(item);
+  const signature = collectionItemIdentity(item);
   const occurrenceBefore = value.values.slice(0, occurrenceIndex + 1)
-    .filter(candidate => stableStringify(candidate) === signature).length;
+    .filter(candidate => collectionItemIdentity(candidate) === signature).length;
   const occurrencePreviously = prior.values
-    .filter(candidate => stableStringify(candidate) === signature).length;
+    .filter(candidate => collectionItemIdentity(candidate) === signature).length;
   return occurrenceBefore > occurrencePreviously ? 'yv-collection-item-enter' : '';
 }
 
@@ -1224,12 +1224,12 @@ function collectionRemovedItems(value: Obj & { $collectionId: string; values: un
   // Multiset subtraction preserves duplicate occurrences without assuming iteration order.
   const remainingCounts = new Map<string, number>();
   for (const item of value.values) {
-    const signature = stableStringify(item);
+    const signature = collectionItemIdentity(item);
     remainingCounts.set(signature, (remainingCounts.get(signature) ?? 0) + 1);
   }
   const removed: unknown[] = [];
   for (const item of priorCandidate.values) {
-    const signature = stableStringify(item);
+    const signature = collectionItemIdentity(item);
     const count = remainingCounts.get(signature) ?? 0;
     if (count > 0) remainingCounts.set(signature, count - 1);
     else removed.push(item);
