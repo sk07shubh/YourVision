@@ -458,7 +458,19 @@ function variableResultChanges(current?: TraceState, previous?: TraceState): Rea
   const before = previous?.variables ?? {};
   const results = Object.entries(current.variables ?? {})
     .filter(([, value]) => !isStructuralValue(value))
-    .filter(([name, value]) => name !== 'this' && (!(name in before) || valueChanged(before[name], value)))
+    .filter(([name, value]) => {
+      if (name === 'this') return false;
+      const oldValue = before[name];
+      if (!(name in before)) return true;
+      const oldId = isPlainObject(oldValue) && looksListNode(oldValue)
+        ? (typeof oldValue.$objectId === 'string' ? oldValue.$objectId : oldValue.$ref)
+        : undefined;
+      const newId = isPlainObject(value) && looksListNode(value)
+        ? (typeof value.$objectId === 'string' ? value.$objectId : value.$ref)
+        : undefined;
+      if (oldId !== undefined && newId !== undefined && oldId === newId) return false;
+      return valueChanged(oldValue, value);
+    })
     .map(([name, value]) => (
       <VariableResult key={name} name={name} oldValue={before[name]} value={value} initialized={!(name in before)} />
     ));
@@ -1268,6 +1280,14 @@ function CollectionView({
 }
 
 function variableSummary(value: unknown): string {
+  if (isPlainObject(value) && looksListNode(value)) {
+    const id = typeof value.$objectId === 'string' ? value.$objectId
+      : typeof value.$ref === 'string' ? value.$ref : undefined;
+    const fields = objectFields(value);
+    const nodeValue = fields.val ?? fields.value ?? fields.data;
+    const shortId = id ? (id.length > 8 ? id.slice(-6) : id) : '?';
+    return 'node #' + shortId + (nodeValue !== undefined ? ' (val=' + compactValue(nodeValue) + ')' : '');
+  }
   if (isArraySnapshot(value)) {
     const type =
       typeof value.$type === 'string'
@@ -2505,7 +2525,7 @@ export function LinkedListView({
   const edgeSignature = [...edgeSnapshot.entries()].map(([id, target]) => `${id}:${target ?? 'null'}`).join('|');
   const pointerSignature = [...pointerSnapshot.entries()].map(([name, id]) => `${name}:${id}`).join('|');
   const graphRef = useRef<HTMLDivElement | null>(null);
-  const [connectionPaths, setConnectionPaths] = useState<Array<{ key: string; d: string; kind: 'prev' | 'cross-next' | 'cycle'; from: string; to: string }>>([]);
+  const [connectionPaths, setConnectionPaths] = useState<Array<{ key: string; d: string; kind: 'prev' | 'cross-next' | 'null-next' | 'cycle'; from: string; to: string }>>([]);
   const previousEdges = useRef<Map<string, string | null>>(new Map());
   const previousPointers = useRef<Map<string, string>>(new Map());
   const changedEdgeIds = new Set<string>();
@@ -2531,8 +2551,12 @@ export function LinkedListView({
         const id = element.dataset.linkedNodeValue;
         if (id) nodes.set(id, element.getBoundingClientRect());
       });
-      const nextPaths: Array<{ key: string; d: string; kind: 'prev' | 'cross-next' | 'cycle'; from: string; to: string }> = [];
-      const addPath = (from: string, to: string, kind: 'prev' | 'cross-next' | 'cycle') => {
+      graph.querySelectorAll<HTMLElement>('[data-linked-null-target]').forEach(element => {
+        const id = element.dataset.linkedNullTarget;
+        if (id) nodes.set('null:' + id, element.getBoundingClientRect());
+      });
+      const nextPaths: Array<{ key: string; d: string; kind: 'prev' | 'cross-next' | 'null-next' | 'cycle'; from: string; to: string }> = [];
+      const addPath = (from: string, to: string, kind: 'prev' | 'cross-next' | 'null-next' | 'cycle') => {
         const a = nodes.get(from), b = nodes.get(to);
         if (!a || !b) return;
         const sourcePort = graph.querySelector<HTMLElement>(`[data-linked-node-value="${CSS.escape(from)}"] .yv-linked-next-port`);
@@ -2549,10 +2573,10 @@ export function LinkedListView({
           const lift = Math.max(34, Math.min(90, Math.abs(ax - bx) * 0.28 + 24));
           const top = Math.max(4, Math.min(ay, by) - lift);
           d = `M ${ax} ${ay} C ${ax + 22} ${top}, ${bx + 22} ${top}, ${bx} ${by}`;
-        } else if (kind === 'cross-next' && bx > ax && Math.abs(by - ay) <= 10) {
+        } else if ((kind === 'cross-next' || kind === 'null-next') && bx > ax && Math.abs(by - ay) <= 10) {
           // Side-by-side nodes on the same row get a genuinely straight link.
           d = `M ${ax} ${ay} L ${bx} ${by}`;
-        } else if (kind === 'cross-next' && by < ay) {
+        } else if ((kind === 'cross-next' || kind === 'null-next') && by < ay) {
           // Angular S-curve: horizontal departure, a sharp diagonal middle,
           // then a horizontal approach to the destination's left outline.
           const midX = ax + (bx - ax) * 0.5;
@@ -2571,6 +2595,8 @@ export function LinkedListView({
         // node's left outline, including ordinary adjacent nodes in a chain.
         if (node.nextId && nodes.has(node.nextId)) {
           addPath(node.id, node.nextId, 'cross-next');
+        } else if (node.nextId == null && node.fields.next == null && nodes.has('null:' + node.id)) {
+          addPath(node.id, 'null:' + node.id, 'null-next');
         }
         const prev = resolveRef(node.fields.prev, objects);
         const prevId = isPlainObject(prev) ? String(prev.$objectId ?? prev.$ref ?? '') : '';
@@ -2613,7 +2639,7 @@ export function LinkedListView({
               d={path.d}
               data-connection-from={path.from}
               data-connection-to={path.to}
-              style={path.kind === 'cross-next' ? { stroke: linkedConnectionColor(path.from) } : undefined}
+              style={path.kind === 'cross-next' ? { stroke: linkedConnectionColor(path.from) } : path.kind === 'null-next' ? { stroke: '#fff' } : undefined}
             />
           ))}
         </svg>
@@ -2663,7 +2689,7 @@ export function LinkedListView({
                     </div>
                     {nextInComponent && <span className="yv-linked-edge-accessible-label" data-edge-kind="next" data-edge-from={node.id} data-edge-to={node.nextId} aria-label={`next points to ${idLabel(node.nextId)}`} />}
                     {nextIsCycle && <div className={`yv-edge yv-edge-cycle ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="cycle" data-edge-from={node.id} data-edge-to={component.cycleTo ?? 'unknown'} aria-label={`cycle back to ${idLabel(component.cycleTo)}`}>↶ {idLabel(component.cycleTo)}</div>}
-                    {isLast && !nextIsCycle && nextField == null && <div className={`yv-edge yv-edge-null ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="null" data-edge-from={node.id}><span className="yv-linked-null-line" aria-hidden="true" /> <span className="yv-null-value-box">null</span></div>}
+                    {isLast && !nextIsCycle && nextField == null && <div className={`yv-edge yv-edge-null ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="null" data-edge-from={node.id}><span className="yv-null-value-box" data-linked-null-target={node.id}>null</span></div>}
                     {isLast && !nextIsCycle && nextField != null && !nextInComponent && <div className={`yv-edge yv-edge-external ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="external" data-edge-from={node.id} data-edge-to={node.nextId ?? 'external'}>→ <span>{idLabel(node.nextId)}</span></div>}
                   </div>
                 );
