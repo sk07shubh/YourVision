@@ -2462,8 +2462,10 @@ export function LinkedListView({
       const addPath = (from: string, to: string, kind: 'prev' | 'cross-next' | 'cycle') => {
         const a = nodes.get(from), b = nodes.get(to);
         if (!a || !b) return;
-        const ax = (kind === 'cycle' ? a.right : a.right) - graphRect.left + graph.scrollLeft;
-        const ay = a.top + a.height / 2 - graphRect.top + graph.scrollTop;
+        const sourcePort = graph.querySelector<HTMLElement>(`[data-linked-node-value="${CSS.escape(from)}"] .yv-linked-next-port`);
+        const sourceRect = sourcePort?.getBoundingClientRect() ?? a;
+        const ax = (kind === 'prev' ? a.left : sourceRect.left + sourceRect.width / 2) - graphRect.left + graph.scrollLeft;
+        const ay = (kind === 'prev' ? a.top + a.height / 2 : sourceRect.top + sourceRect.height / 2) - graphRect.top + graph.scrollTop;
         const bx = (kind === 'cycle' ? b.right : b.left) - graphRect.left + graph.scrollLeft;
         const by = b.top + b.height / 2 - graphRect.top + graph.scrollTop;
         let d: string;
@@ -2482,7 +2484,9 @@ export function LinkedListView({
         nextPaths.push({ key: `${kind}:${from}:${to}`, d, kind, from, to });
       };
       for (const node of allNodes) {
-        if (node.nextId && nodes.has(node.nextId) && componentForNode.get(node.id) !== componentForNode.get(node.nextId)) {
+        // Every next link is drawn from the actual pointer dot to the next
+        // node's left outline, including ordinary adjacent nodes in a chain.
+        if (node.nextId && nodes.has(node.nextId)) {
           addPath(node.id, node.nextId, 'cross-next');
         }
         const prev = resolveRef(node.fields.prev, objects);
@@ -2519,13 +2523,8 @@ export function LinkedListView({
     <div ref={graphRef} className="yv-linked-graph" data-linked-list-root={isPlainObject(resolvedRoot) ? String(resolvedRoot.$objectId ?? 'root') : 'null'}>
       {connectionPaths.length > 0 && (
         <svg className="yv-linked-connections" aria-hidden="true" width={Math.max(graphRef.current?.scrollWidth ?? 0, graphRef.current?.clientWidth ?? 0)} height={Math.max(graphRef.current?.scrollHeight ?? 0, graphRef.current?.clientHeight ?? 0)}>
-          <defs>
-            <marker id="yv-linked-arrow" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto" markerUnits="strokeWidth">
-              <path d="M0,0 L7,3.5 L0,7 z" />
-            </marker>
-          </defs>
           {connectionPaths.map(path => (
-            <path key={path.key} className={`yv-linked-connection yv-linked-connection-${path.kind}`} d={path.d} markerEnd="url(#yv-linked-arrow)" data-connection-from={path.from} data-connection-to={path.to} />
+            <path key={path.key} className={`yv-linked-connection yv-linked-connection-${path.kind}`} d={path.d} data-connection-from={path.from} data-connection-to={path.to} />
           ))}
         </svg>
       )}
@@ -2563,9 +2562,9 @@ export function LinkedListView({
                       <span className="yv-node-identity" title={`Stable object identity: ${node.id}`}>#{node.id.length > 8 ? node.id.slice(-6) : node.id}</span>
                       {hasPrev && <span className="yv-node-link-meta" title={`prev references ${prevId ?? 'null'}`}>prev: {idLabel(prevId)}</span>}
                     </div>
-                    {nextInComponent && <div className={`yv-edge ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="next" data-edge-from={node.id} data-edge-to={node.nextId} aria-label={`next points to ${idLabel(node.nextId)}`}>→</div>}
+                    {nextInComponent && <span className="yv-linked-edge-accessible-label" data-edge-kind="next" data-edge-from={node.id} data-edge-to={node.nextId} aria-label={`next points to ${idLabel(node.nextId)}`} />}
                     {nextIsCycle && <div className={`yv-edge yv-edge-cycle ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="cycle" data-edge-from={node.id} data-edge-to={component.cycleTo ?? 'unknown'} aria-label={`cycle back to ${idLabel(component.cycleTo)}`}>↶ {idLabel(component.cycleTo)}</div>}
-                    {isLast && !nextIsCycle && nextField == null && <div className={`yv-edge yv-edge-null ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="null" data-edge-from={node.id}>→ <span>null</span></div>}
+                    {isLast && !nextIsCycle && nextField == null && <div className={`yv-edge yv-edge-null ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="null" data-edge-from={node.id}><span className="yv-linked-null-line" aria-hidden="true" /> <span>null</span></div>}
                     {isLast && !nextIsCycle && nextField != null && !nextInComponent && <div className={`yv-edge yv-edge-external ${changedEdgeIds.has(node.id) ? 'yv-edge-rewired' : ''}`} data-edge-kind="external" data-edge-from={node.id} data-edge-to={node.nextId ?? 'external'}>→ <span>{idLabel(node.nextId)}</span></div>}
                   </div>
                 );
