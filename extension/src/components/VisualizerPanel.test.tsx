@@ -1003,7 +1003,7 @@ describe('execution visualization feature matrix', () => {
     }
   });
 
-  it('keeps a removed stack value visible as a trace-backed removal cue for the current step', () => {
+  it('does not render a separate removal box when a stack value is popped', () => {
     const previousSession = sessionStore.get();
     const previous = state({
       sequence: 70,
@@ -1020,10 +1020,9 @@ describe('execution visualization feature matrix', () => {
     try {
       sessionStore.set({ source: 'stack.pop();', states: [previous, current], index: 1 });
       const html = renderToStaticMarkup(<DataStructures state={current} source="stack.pop();" />);
-      expect(html).toContain('yv-collection-removals');
-      expect(html).toContain('REMOVED');
-      expect(html).toContain('>3</');
-      expect(html).not.toContain('>3</div></div>');
+      expect(html).not.toContain('yv-collection-removals');
+      expect(html).not.toContain('yv-collection-item-exit');
+      expect(html).not.toContain('>3</');
     } finally {
       sessionStore.set(previousSession);
     }
@@ -1035,7 +1034,7 @@ describe('execution visualization feature matrix', () => {
     ['set', 'java.util.HashSet'],
     ['priorityQueue', 'java.util.PriorityQueue'],
     ['list', 'java.util.ArrayList'],
-  ])('uses the shared compact removal cue for %s', (kind, type) => {
+  ])('does not render a separate removal box for %s', (kind, type) => {
     const previousSession = sessionStore.get();
     const id = `remove-${kind}`;
     const previous = state({
@@ -1053,10 +1052,8 @@ describe('execution visualization feature matrix', () => {
     try {
       sessionStore.set({ source: 'items.remove();', states: [previous, current], index: 1 });
       const html = renderToStaticMarkup(<DataStructures state={current} source="items.remove();" />);
-      expect(html).toContain('yv-collection-removals');
-      expect(html).toContain('yv-collection-item-exit');
-      expect(html).toContain('REMOVED');
-      expect(html).toContain('>2</');
+      expect(html).not.toContain('yv-collection-removals');
+      expect(html).not.toContain('yv-collection-item-exit');
     } finally {
       sessionStore.set(previousSession);
     }
@@ -1080,9 +1077,8 @@ describe('execution visualization feature matrix', () => {
       sessionStore.set({ source: 'newName.addLast(3);', states: [previous, current], index: 1 });
       const html = renderToStaticMarkup(<DataStructures state={current} source="newName.addLast(3);" />);
       expect(html).toContain('yv-collection-item-enter');
-      expect(html).toContain('yv-collection-removals');
-      expect(html).toContain('REMOVED');
-      expect(html).toContain('>2</');
+      expect(html).not.toContain('yv-collection-removals');
+      expect(html).not.toContain('yv-collection-item-exit');
     } finally {
       sessionStore.set(previousSession);
     }
