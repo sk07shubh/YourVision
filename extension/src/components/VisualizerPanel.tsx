@@ -3060,12 +3060,17 @@ export function LinkedListView({
   );
 }
 
-export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>() }: {
+export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>(), state }: {
   value: unknown;
   objects: Record<string, unknown>;
   depth?: number;
   seen?: Set<string>;
+  state?: TraceState;
 }) {
+  const session = sessionStore.get();
+  const selectedIndex = state ? session.states.indexOf(state) : -1;
+  const previous = selectedIndex > 0 ? session.states[selectedIndex - 1] : undefined;
+  const previousObjects = previous?.objects ?? {};
   const resolved = resolveRef(value, objects);
   if (!isPlainObject(resolved)) return null;
   if (depth > 12) return <span className="yv-code">…</span>;
@@ -3076,21 +3081,29 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   if (id) nextSeen.add(id);
   const fields = objectFields(resolved);
   const hasChildren = fields.left != null || fields.right != null;
+  const previousNode = id ? previousObjects[id] : undefined;
+  const changed = Boolean(state && previous && session.states.includes(state) && previousNode !== undefined &&
+    stableStringify(previousNode) !== stableStringify(resolved));
+  const entered = Boolean(state && previous && id && session.states.includes(state) &&
+    Object.entries(state.variables).some(([name, currentValue]) =>
+      graphReferenceId(currentValue, objects) === id &&
+      graphReferenceId(previous.variables[name], previousObjects) !== id));
   return (
-    <div className="yv-tree-node" data-tree-node-id={id}>
-      <div className="yv-node">{displayValue(nodeValue(resolved))}</div>
+    <div className={'yv-tree-node' + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '')}
+      data-tree-node-id={id} data-tree-changed={changed ? 'true' : undefined} data-tree-entered={entered ? 'true' : undefined}>
+      <div className="yv-node" style={changed ? { background: 'var(--yv-highlight, #203b5b)' } : undefined}>{displayValue(nodeValue(resolved))}</div>
       {hasChildren && (
         <div className="yv-tree-children">
           <div data-tree-edge="left">
             <div className="yv-tree-edge-label">LEFT</div>
             {fields.left != null
-              ? <TreeNodeView value={fields.left} objects={objects} depth={depth + 1} seen={nextSeen} />
+              ? <TreeNodeView value={fields.left} objects={objects} depth={depth + 1} seen={nextSeen} state={state} />
               : <span className="yv-null">null</span>}
           </div>
           <div data-tree-edge="right">
             <div className="yv-tree-edge-label">RIGHT</div>
             {fields.right != null
-              ? <TreeNodeView value={fields.right} objects={objects} depth={depth + 1} seen={nextSeen} />
+              ? <TreeNodeView value={fields.right} objects={objects} depth={depth + 1} seen={nextSeen} state={state} />
               : <span className="yv-null">null</span>}
           </div>
         </div>
@@ -3144,7 +3157,7 @@ function ReturnValueView({
       <div className="yv-return-object">
         <div className="yv-return-reference yv-code">{text}</div>
         <div className="yv-return-caption">Returned root and reachable tree</div>
-        <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects ?? {}} /></div>
+        <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects ?? {}} state={state} /></div>
       </div>
     );
   }
@@ -3283,7 +3296,7 @@ function DataValue({
 
   if (Array.isArray(value)) return <ArrayView value={value} state={state} source={source} arrayName={name} depth={depth} seen={seen}/>;
   if (isPlainObject(value)) {
-    if (looksTreeNode(value)) return <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects??{}}/></div>;
+    if (looksTreeNode(value)) return <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects??{}} state={state}/></div>;
     if (looksListNode(value)) return <LinkedListView root={value} objects={state?.objects??{}} variables={state?.variables??{}}/>;
     const resolved = resolveObjects ? resolveRef(value, state?.objects ?? {}) : value;
     if (isPlainObject(resolved)) {
