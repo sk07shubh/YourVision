@@ -2335,25 +2335,25 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
   );
 }
 
-function mapChanges(state?: TraceState): Array<{
+function mapChanges(state?: TraceState, mapId?: string): Array<{
   kind: 'insert' | 'update' | 'delete';
   key: unknown;
   before?: unknown;
   after?: unknown;
 }> {
   const data = state?.lastEvent?.data;
-  if (!isPlainObject(data)) return [];
-
   const changes: unknown[] = [];
-  if (Array.isArray(data.changes)) changes.push(...data.changes);
-  if (Array.isArray(data.executionEvents)) {
-    for (const event of data.executionEvents) {
-      if (!isPlainObject(event) || event.type !== 'MAP_WRITE' || !isPlainObject(event.data)) continue;
-      if (Array.isArray(event.data.changes)) changes.push(...event.data.changes);
+  if (isPlainObject(data)) {
+    if (Array.isArray(data.changes)) changes.push(...data.changes);
+    if (Array.isArray(data.executionEvents)) {
+      for (const event of data.executionEvents) {
+        if (!isPlainObject(event) || event.type !== 'MAP_WRITE' || !isPlainObject(event.data)) continue;
+        if (Array.isArray(event.data.changes)) changes.push(...event.data.changes);
+      }
     }
   }
 
-  return changes.filter(
+  const authoritative = changes.filter(
     (change): change is {
       kind: 'insert' | 'update' | 'delete';
       key: unknown;
@@ -2364,6 +2364,27 @@ function mapChanges(state?: TraceState): Array<{
       (change.kind === 'insert' ||
         change.kind === 'update' ||
         change.kind === 'delete')
+  );
+  if (authoritative.length || !state || !mapId) return authoritative;
+
+  // Some runtime checkpoints contain exact before/after snapshots but no MAP_WRITE
+  // payload. Derive only the concrete map delta between adjacent captured states.
+  const session = sessionStore.get();
+  const currentIndex = session.states.findIndex(candidate =>
+    candidate === state || candidate.sequence === state.sequence
+  );
+  if (currentIndex <= 0) return [];
+  const previousState = session.states[currentIndex - 1];
+  const previousMap = Object.values(previousState?.dataStructures ?? {}).find(candidate =>
+    isPlainObject(candidate) && candidate.$mapId === mapId && Array.isArray(candidate.entries)
+  );
+  const currentMap = Object.values(state.dataStructures ?? {}).find(candidate =>
+    isPlainObject(candidate) && candidate.$mapId === mapId && Array.isArray(candidate.entries)
+  );
+  if (!isPlainObject(previousMap) || !isPlainObject(currentMap)) return [];
+  return compareMapEntries(
+    previousMap.entries as Array<{ key: unknown; value: unknown }>,
+    currentMap.entries as Array<{ key: unknown; value: unknown }>
   );
 }
 
@@ -2383,7 +2404,7 @@ function MapView({
   depth?: number;
   seen?: Set<string>;
 }) {
-  const changes = mapChanges(state);
+  const changes = mapChanges(state, value.$mapId);
 
   const findChange = (key: unknown) =>
     changes.find(
