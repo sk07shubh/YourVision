@@ -161,8 +161,11 @@ describe('linked-list graph visualization', () => {
         }
       }
       expect(html).toContain('data-pointer-name="head"');
-      expect(html).toContain('data-pointer-name="prev"');
-      expect(html).toContain('data-pointer-name="curr"');
+      for (const name of ['prev', 'curr']) {
+        const pointerValue = snapshot.variables[name];
+        if (pointerValue == null) expect(html).toContain(`${name} = null`);
+        else expect(html).toContain(`data-pointer-name="${name}"`);
+      }
     }
   });
 
