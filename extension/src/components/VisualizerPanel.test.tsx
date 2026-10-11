@@ -773,6 +773,18 @@ describe('execution visualization feature matrix', () => {
     });
   });
 
+  it('does not assume a PriorityQueue uses a min-heap comparator', () => {
+    const current = state({
+      dataStructures: {
+        pq: { $collectionId: 'pq-1', $type: 'java.util.PriorityQueue', $kind: 'priorityQueue', values: [9, 2, 5], size: 3 },
+      },
+    });
+    const html = renderToStaticMarkup(<DataStructures state={current} source="" />);
+    expect(html).toContain('HEAP · 3 items');
+    expect(html).not.toContain('MIN-HEAP');
+    expect(html).toContain('Heap tree · root is index 0');
+  });
+
   it('distinguishes sorted and insertion-ordered collection labels', () => {
     const current = state({
       dataStructures: {
