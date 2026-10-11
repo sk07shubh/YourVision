@@ -7,6 +7,13 @@ import type { TraceState } from '../types/trace';
 
 type Obj = Record<string, unknown>;
 
+const LINK_PALETTE = ['#60a5fa', '#34d399', '#fbbf24', '#c084fc', '#fb7185', '#22d3ee', '#a3e635', '#f97316'];
+function linkedConnectionColor(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i += 1) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return LINK_PALETTE[hash % LINK_PALETTE.length]!;
+}
+
 function eventLabel(state?: TraceState): string {
   const t = state?.lastEvent?.type;
   if (!t) return state ? 'Execution state' : 'Ready';
@@ -2462,10 +2469,9 @@ export function LinkedListView({
         if (!a || !b) return;
         const sourcePort = graph.querySelector<HTMLElement>(`[data-linked-node-value="${CSS.escape(from)}"] .yv-linked-next-port`);
         const sourceRect = sourcePort?.getBoundingClientRect() ?? a;
-        // Start at the visible edge of the pointer dot, not its center:
-        // this keeps the colored stroke visibly touching the dot instead of
-        // being hidden underneath its fill.
-        const ax = (kind === 'prev' ? a.left : sourceRect.right) - graphRect.left + graph.scrollLeft;
+        // Start at the exact center of the pointer dot. The dot's border is
+        // colored with the same edge color, so the line visually emerges from it.
+        const ax = (kind === 'prev' ? a.left : sourceRect.left + sourceRect.width / 2) - graphRect.left + graph.scrollLeft;
         const ay = (kind === 'prev' ? a.top + a.height / 2 : sourceRect.top + sourceRect.height / 2) - graphRect.top + graph.scrollTop;
         const bx = (kind === 'cycle' ? b.right : b.left) - graphRect.left + graph.scrollLeft;
         const by = b.top + b.height / 2 - graphRect.top + graph.scrollTop;
@@ -2524,20 +2530,16 @@ export function LinkedListView({
     <div ref={graphRef} className="yv-linked-graph" data-linked-list-root={isPlainObject(resolvedRoot) ? String(resolvedRoot.$objectId ?? 'root') : 'null'}>
       {connectionPaths.length > 0 && (
         <svg className="yv-linked-connections" aria-hidden="true" width={Math.max(graphRef.current?.scrollWidth ?? 0, graphRef.current?.clientWidth ?? 0)} height={Math.max(graphRef.current?.scrollHeight ?? 0, graphRef.current?.clientHeight ?? 0)}>
-          {connectionPaths.map((path, index) => {
-            // A stable per-link palette makes each next reference easy to trace.
-            const linkColors = ['#60a5fa', '#34d399', '#fbbf24', '#c084fc', '#fb7185', '#22d3ee', '#a3e635', '#f97316'];
-            return (
-              <path
-                key={path.key}
-                className={`yv-linked-connection yv-linked-connection-${path.kind}`}
-                d={path.d}
-                data-connection-from={path.from}
-                data-connection-to={path.to}
-                style={path.kind === 'cross-next' ? { stroke: linkColors[index % linkColors.length] } : undefined}
-              />
-            );
-          })}
+          {connectionPaths.map(path => (
+            <path
+              key={path.key}
+              className={`yv-linked-connection yv-linked-connection-${path.kind}`}
+              d={path.d}
+              data-connection-from={path.from}
+              data-connection-to={path.to}
+              style={path.kind === 'cross-next' ? { stroke: linkedConnectionColor(path.from) } : undefined}
+            />
+          ))}
         </svg>
       )}
       {nullPointers.length > 0 && (
@@ -2563,12 +2565,19 @@ export function LinkedListView({
                   <div className="yv-linked-piece" key={node.id} data-node-id={node.id} data-node-index={allNodes.findIndex(candidate => candidate.id === node.id)} data-next-target={node.nextId ?? 'null'} data-prev-target={prevId ?? 'null'}>
                     <div className="yv-linked-node-column">
                       {pointerNames.get(node.id)?.map(name => <div className={`yv-node-pointer ${movedPointerNames.has(name) ? 'yv-node-pointer-moved' : ''}`} data-pointer-name={name} key={name}>{name}</div>)}
-                      <div className={`yv-node yv-linked-node ${changedEdgeIds.has(node.id) ? 'yv-node-link-changed' : ''}`} data-linked-node-value={node.id}>
+                      <div
+                        className={`yv-node yv-linked-node ${changedEdgeIds.has(node.id) ? 'yv-node-link-changed' : ''}`}
+                        data-linked-node-value={node.id}
+                        style={(() => {
+                          const incoming = allNodes.find(candidate => candidate.nextId === node.id);
+                          return incoming ? { borderColor: linkedConnectionColor(incoming.id), boxShadow: `inset 0 0 0 1.5px ${linkedConnectionColor(incoming.id)}` } : undefined;
+                        })()}
+                      >
                         <span className="yv-linked-node-data">
                           <span className="yv-node-value">{displayValue(node.value)}</span>
                         </span>
                         <span className="yv-linked-node-next" aria-label={`next pointer slot; target ${idLabel(node.nextId)}`}>
-                          <span className="yv-linked-next-port" />
+                          <span className="yv-linked-next-port" style={node.nextId ? { borderColor: linkedConnectionColor(node.id), boxShadow: `0 0 0 2px ${linkedConnectionColor(node.id)}33` } : undefined} />
                         </span>
                       </div>
                       <span className="yv-node-identity" title={`Stable object identity: ${node.id}`}>#{node.id.length > 8 ? node.id.slice(-6) : node.id}</span>
