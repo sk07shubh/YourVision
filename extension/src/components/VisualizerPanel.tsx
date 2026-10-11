@@ -2344,7 +2344,7 @@ export function LinkedListView({
     const fields = objectFields(value);
     const next = fields.next;
     const resolvedNext = next == null ? null : resolveRef(next, objects);
-    const nextId = isPlainObject(resolvedNext) ? String(resolvedNext.$objectId ?? '') || null : null;
+    const nextId = isPlainObject(resolvedNext) ? String(resolvedNext.$objectId ?? resolvedNext.$ref ?? '') || null : null;
     records.set(id, { id, value: nodeValue(value), fields, nextId, cycleTo: null });
   }
   const resolvedRoot = resolveRef(root, objects);
@@ -2360,6 +2360,30 @@ export function LinkedListView({
         cycleTo: null
       });
     }
+  }
+
+  // Include nodes referenced by fields even when a trace snapshot has not
+  // materialized them in the top-level objects table yet.
+  const pending: unknown[] = [
+    resolvedRoot,
+    ...[...records.values()].flatMap(node => [node.fields.next, node.fields.prev]),
+  ];
+  const expanded = new Set<string>();
+  for (let guard = 0; pending.length > 0 && guard < 300; guard++) {
+    const candidate = resolveRef(pending.shift(), objects);
+    if (!isPlainObject(candidate) || !looksListNode(candidate)) continue;
+    const id = String(candidate.$objectId ?? '');
+    if (!id || expanded.has(id)) continue;
+    expanded.add(id);
+    const fields = objectFields(candidate);
+    if (!records.has(id)) {
+      const next = fields.next;
+      const resolvedNext = next == null ? null : resolveRef(next, objects);
+      const nextId = isPlainObject(resolvedNext) ? String(resolvedNext.$objectId ?? resolvedNext.$ref ?? '') || null : null;
+      records.set(id, { id, value: nodeValue(candidate), fields, nextId, cycleTo: null });
+    }
+    if (fields.next != null) pending.push(fields.next);
+    if (fields.prev != null) pending.push(fields.prev);
   }
 
   const startIds: string[] = [];
@@ -2421,7 +2445,7 @@ export function LinkedListView({
                 const nextField = node.fields.next;
                 const hasPrev = 'prev' in node.fields;
                 const prevValue = hasPrev ? resolveRef(node.fields.prev, objects) : null;
-                const prevId = isPlainObject(prevValue) ? String(prevValue.$objectId ?? '') || null : null;
+                const prevId = isPlainObject(prevValue) ? String(prevValue.$objectId ?? prevValue.$ref ?? '') || null : null;
                 const isLast = index === component.nodes.length - 1;
                 const nextInComponent = component.nodes[index + 1]?.id === node.nextId;
                 const nextIsCycle = isLast && component.cycleTo != null;
