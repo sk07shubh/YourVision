@@ -2429,6 +2429,8 @@ export function LinkedListView({
   for (const [nodeId, names] of pointerNames) for (const name of names) pointerSnapshot.set(name, nodeId);
   const edgeSignature = [...edgeSnapshot.entries()].map(([id, target]) => `${id}:${target ?? 'null'}`).join('|');
   const pointerSignature = [...pointerSnapshot.entries()].map(([name, id]) => `${name}:${id}`).join('|');
+  const graphRef = useRef<HTMLDivElement | null>(null);
+  const [connectionPaths, setConnectionPaths] = useState<Array<{ key: string; d: string; kind: 'prev' | 'cross-next'; from: string; to: string }>>([]);
   const previousEdges = useRef<Map<string, string | null>>(new Map());
   const previousPointers = useRef<Map<string, string>>(new Map());
   const changedEdgeIds = new Set<string>();
@@ -2444,6 +2446,55 @@ export function LinkedListView({
     previousEdges.current = new Map(edgeSnapshot);
     previousPointers.current = new Map(pointerSnapshot);
   }, [edgeSignature, pointerSignature]);
+  useLayoutEffect(() => {
+    const graph = graphRef.current;
+    if (!graph) return;
+    const measure = () => {
+      const graphRect = graph.getBoundingClientRect();
+      const nodes = new Map<string, DOMRect>();
+      graph.querySelectorAll<HTMLElement>('[data-linked-node-value]').forEach(element => {
+        const id = element.dataset.linkedNodeValue;
+        if (id) nodes.set(id, element.getBoundingClientRect());
+      });
+      const nextPaths: Array<{ key: string; d: string; kind: 'prev' | 'cross-next'; from: string; to: string }> = [];
+      const componentForNode = new Map<string, number>();
+      components.forEach((component, index) => component.nodes.forEach(node => componentForNode.set(node.id, index)));
+      const addPath = (from: string, to: string, kind: 'prev' | 'cross-next') => {
+        const a = nodes.get(from), b = nodes.get(to);
+        if (!a || !b) return;
+        const ax = a.right - graphRect.left + graph.scrollLeft;
+        const ay = a.top + a.height / 2 - graphRect.top + graph.scrollTop;
+        const bx = b.left - graphRect.left + graph.scrollLeft;
+        const by = b.top + b.height / 2 - graphRect.top + graph.scrollTop;
+        const lift = Math.max(28, Math.min(72, Math.abs(bx - ax) * 0.22));
+        const direction = kind === 'prev' ? -1 : 1;
+        const controlY = Math.min(ay, by) - lift * (kind === 'prev' ? 1 : 1);
+        const d = `M ${ax} ${ay} C ${ax + direction * lift} ${controlY}, ${bx - direction * lift} ${controlY}, ${bx} ${by}`;
+        nextPaths.push({ key: `${kind}:${from}:${to}`, d, kind, from, to });
+      };
+      for (const node of allNodes) {
+        if (node.nextId && nodes.has(node.nextId) && componentForNode.get(node.id) !== componentForNode.get(node.nextId)) {
+          addPath(node.id, node.nextId, 'cross-next');
+        }
+        const prev = resolveRef(node.fields.prev, objects);
+        const prevId = isPlainObject(prev) ? String(prev.$objectId ?? prev.$ref ?? '') : '';
+        if (prevId && nodes.has(prevId)) addPath(node.id, prevId, 'prev');
+      }
+      setConnectionPaths(previous => {
+        if (previous.length === nextPaths.length && previous.every((path, i) => path.key === nextPaths[i]?.key && path.d === nextPaths[i]?.d)) return previous;
+        return nextPaths;
+      });
+    };
+    measure();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    observer?.observe(graph);
+    graph.querySelectorAll<HTMLElement>('[data-linked-node-value]').forEach(node => observer?.observe(node));
+    graph.addEventListener('scroll', measure, { passive: true });
+    return () => {
+      observer?.disconnect();
+      graph.removeEventListener('scroll', measure);
+    };
+  }, [edgeSignature, pointerSignature, objects, components]);
   const idLabel = (id: string | null) => {
     if (id == null) return 'null';
     const node = allNodes.find(candidate => candidate.id === id);
@@ -2451,7 +2502,14 @@ export function LinkedListView({
   };
 
   return (
-    <div className="yv-linked-graph" data-linked-list-root={isPlainObject(resolvedRoot) ? String(resolvedRoot.$objectId ?? 'root') : 'null'}>
+    <div ref={graphRef} className="yv-linked-graph" data-linked-list-root={isPlainObject(resolvedRoot) ? String(resolvedRoot.$objectId ?? 'root') : 'null'}>
+      {connectionPaths.length > 0 && (
+        <svg className="yv-linked-connections" aria-hidden="true" width={Math.max(graphRef.current?.scrollWidth ?? 0, graphRef.current?.clientWidth ?? 0)} height={Math.max(graphRef.current?.scrollHeight ?? 0, graphRef.current?.clientHeight ?? 0)}>
+          {connectionPaths.map(path => (
+            <path key={path.key} className={`yv-linked-connection yv-linked-connection-${path.kind}`} d={path.d} data-connection-from={path.from} data-connection-to={path.to} />
+          ))}
+        </svg>
+      )}
       {nullPointers.length > 0 && (
         <div className="yv-linked-null-pointers" aria-label="Null references">
           {nullPointers.map(name => <span className="yv-node-pointer yv-node-pointer-null" key={name}>{name} = null</span>)}
