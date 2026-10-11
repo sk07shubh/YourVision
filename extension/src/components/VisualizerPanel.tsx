@@ -2534,6 +2534,11 @@ export function StringView({ value, state, name, source = '' }: { value: string;
           ))}
         </div>}
         {characters.map((character, index) => {
+          const codeUnit = character.charCodeAt(0);
+          const isSurrogateUnit = codeUnit >= 0xd800 && codeUnit <= 0xdfff;
+          const characterLabel = character === ' ' ? '\u00a0' : isSurrogateUnit
+            ? '\\u' + codeUnit.toString(16).toUpperCase().padStart(4, '0')
+            : character;
           const inRange = ranges.some(range => index >= range.start && index < range.end);
           const previousCharacter = transition?.before[index];
           const simpleAppend = Boolean(transition?.kind === 'result' &&
@@ -2561,7 +2566,7 @@ export function StringView({ value, state, name, source = '' }: { value: string;
             <div className="yv-string-cell-wrap" key={index} data-string-cell-index={index}>
               {removedHere && <div className="yv-string-removed-overlay" aria-hidden="true">{removedHere}</div>}
               <div className={`yv-string-cell ${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-string-cell-compared ' : ''}${inRange ? 'yv-cell-range ' : ''}${changed ? 'yv-string-cell-changed ' : ''}${added ? 'yv-string-cell-added ' : ''}${swapFromRight ? 'yv-string-cell-swap-right ' : ''}${swapFromLeft ? 'yv-string-cell-swap-left ' : ''}${shiftsRight ? 'yv-string-cell-shift-right ' : ''}${shiftsLeft ? 'yv-string-cell-shift-left' : ''}`} data-string-index={index}>
-                <div className="yv-string-character">{character === ' ' ? '\u00a0' : character}</div>
+                <div className={`yv-string-character ${isSurrogateUnit ? 'yv-string-code-unit' : ''}`} title={isSurrogateUnit ? `UTF-16 code unit U+${codeUnit.toString(16).toUpperCase().padStart(4, '0')}` : undefined}>{characterLabel}</div>
               </div>
               <div className="yv-string-index">{index}</div>
             </div>
