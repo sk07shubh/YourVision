@@ -811,6 +811,23 @@ describe('execution visualization feature matrix', () => {
     expect(unorderedCollectionDelta([1, 2], [2, 1])).toBeUndefined();
   });
 
+  it('classifies HashSet mutations by membership rather than snapshot iteration order', () => {
+    const previous = state({
+      dataStructures: {
+        seen: { $collectionId: 'set-id', $type: 'java.util.HashSet', $kind: 'set', values: [1, 2], size: 2 },
+      },
+    });
+    const current = state({
+      dataStructures: {
+        seen: { $collectionId: 'set-id', $type: 'java.util.HashSet', $kind: 'set', values: [2, 1, 3], size: 3 },
+      },
+    });
+    const html = markup(dataStructureResults(current, previous, 'seen.add(3);'));
+    expect(html).toContain('[Add]');
+    expect(html).toContain('3');
+    expect(html).not.toContain('[Set]');
+  });
+
   it('maps stack, queue, deque, priority queue, list, and set operations', () => {
     expect(collectionOperation('stack', 'push', { added: 5 })).toEqual({
       operation: 'Push', value: 5, position: 'Top',
