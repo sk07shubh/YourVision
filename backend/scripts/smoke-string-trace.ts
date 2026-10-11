@@ -25,7 +25,7 @@ const source = [
 ].join("\n");
 
 const result = await runJava(source, { method: "probe", arguments: [] });
-assert(result.success && result.result === "ananBANANA", "Java string fixture failed: " + result.kind);
+assert(result.success && result.result === "ananBANANA", "Java string fixture failed: " + result.kind + " result=" + JSON.stringify(result.result) + " message=" + (result.message ?? ""));
 const steps = result.trace?.events.filter(event => event.type === "STEP") ?? [];
 const effects = steps.flatMap(step => Array.isArray(step.data?.executionEvents) ? step.data.executionEvents : []);
 const access = effects.find(event => event.type === "STRING_ACCESS");
