@@ -2530,7 +2530,7 @@ export function LinkedListView({
                 const nextInComponent = component.nodes[index + 1]?.id === node.nextId;
                 const nextIsCycle = isLast && component.cycleTo != null;
                 return (
-                  <div className="yv-linked-piece" key={node.id} data-node-id={node.id} data-node-index={allNodes.findIndex(candidate => candidate.id === node.id)} data-next-target={node.nextId ?? 'null'}>
+                  <div className="yv-linked-piece" key={node.id} data-node-id={node.id} data-node-index={allNodes.findIndex(candidate => candidate.id === node.id)} data-next-target={node.nextId ?? 'null'} data-prev-target={prevId ?? 'null'}>
                     <div className="yv-linked-node-column">
                       {pointerNames.get(node.id)?.map(name => <div className={`yv-node-pointer ${movedPointerNames.has(name) ? 'yv-node-pointer-moved' : ''}`} data-pointer-name={name} key={name}>{name}</div>)}
                       <div className={`yv-node ${changedEdgeIds.has(node.id) ? 'yv-node-link-changed' : ''}`} data-linked-node-value={node.id}>
