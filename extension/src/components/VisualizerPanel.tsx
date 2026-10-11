@@ -2493,11 +2493,14 @@ export function TrieView({ objects, variables = {}, source = '' }: {
 
   if (!nodes.length) return <div className="yv-empty">No trie nodes captured.</div>;
 
+  const renderedNodes = new Set<string>();
   const renderNode = (id: string, edgeLabel: string, depth: number, path: Set<string>): React.ReactNode => {
     const node = byId.get(id);
     if (!node) return <span className="yv-code">unresolved</span>;
     if (depth > 12) return <span className="yv-code">…</span>;
     if (path.has(id)) return <span className="yv-code" data-trie-cycle={id}>↻ {id}</span>;
+    if (renderedNodes.has(id)) return <span className="yv-code" data-trie-reference={id}>↗ {id}</span>;
+    renderedNodes.add(id);
     const nextPath = new Set(path);
     nextPath.add(id);
     const pointers = pointerNames.get(id) ?? [];
@@ -2529,7 +2532,7 @@ export function TrieView({ objects, variables = {}, source = '' }: {
 
   return (
     <div className="yv-trie" data-trie-node-count={nodes.length}>
-      <div className="yv-collection-meta"><span>Trie</span><span>{nodes.length} nodes · {nodes.filter(node => node.terminal).length} word ends</span></div>
+      <div className="yv-collection-meta"><span>Trie</span><span>{nodes.length} nodes · {nodes.filter(node => node.terminal).length} word ends{nodes.length === 500 ? ' · display limit reached' : ''}</span></div>
       <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
         <div className="yv-trie-roots" style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', gap: 14, minWidth: 'max-content' }}>
           {rootNodes.map(root => renderNode(root.id, 'root', 0, new Set<string>()))}
