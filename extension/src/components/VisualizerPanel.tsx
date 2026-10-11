@@ -2413,6 +2413,7 @@ export function StringView({ value, state, name, source = '' }: { value: string;
   const structureNames = name.split(' / ');
   const matchesName = (candidate: unknown) => typeof candidate === 'string' && structureNames.includes(candidate);
   const accessed = new Set<number>();
+  const compared = new Set<number>();
   const ranges: Array<{ start: number; end: number }> = [];
   const pointers = new Map<string, number>();
   let transition: { operation: string; before: string; after: string; kind: 'result' | 'mutation'; index?: number; removed?: string; inserted?: string } | undefined;
@@ -2432,10 +2433,33 @@ export function StringView({ value, state, name, source = '' }: { value: string;
     if (event.type === 'STRING_SEARCH_RESULT' && matchesName(effect.name) && typeof effect.operation === 'string' && 'result' in effect) {
       operationResult = { operation: effect.operation, result: effect.result };
     }
-    if (event.type === 'STRING_SEARCH_RESULT' && matchesName(effect.name) && effect.matched === true &&
-        typeof effect.index === 'number' && typeof effect.end === 'number' &&
-        effect.index >= 0 && effect.end >= effect.index && effect.end <= value.length) {
-      ranges.push({ start: effect.index, end: effect.end });
+    if (event.type === 'STRING_SPLIT_RESULT' && matchesName(effect.name)) {
+      if (typeof effect.partCount === 'number') operationResult = { operation: 'split', result: effect.partCount + ' parts' };
+      if (Array.isArray(effect.delimiterRanges)) {
+        for (const range of effect.delimiterRanges) {
+          if (!isPlainObject(range) || typeof range.start !== 'number' || typeof range.end !== 'number') continue;
+          if (Number.isInteger(range.start) && Number.isInteger(range.end) && range.start >= 0 && range.end > range.start && range.end <= value.length) {
+            ranges.push({ start: range.start, end: range.end });
+          }
+        }
+      }
+    }
+    if (event.type === 'STRING_CONVERSION_RESULT' && matchesName(effect.name) &&
+        effect.operation === 'toCharArray' && typeof effect.resultLength === 'number') {
+      operationResult = { operation: 'toCharArray', result: effect.resultLength + ' chars' };
+    }
+    if (event.type === 'STRING_SEARCH_RESULT' && matchesName(effect.name) &&
+        typeof effect.index === 'number' && typeof effect.end === 'number') {
+      const isComparisonMismatch = effect.matched === false &&
+        ['equals', 'equalsIgnoreCase', 'compareTo'].includes(String(effect.operation));
+      if ((effect.matched === true || isComparisonMismatch) &&
+          effect.index >= 0 && effect.end > effect.index && effect.end <= value.length) {
+        if (isComparisonMismatch) {
+          for (let index = effect.index; index < effect.end; index++) compared.add(index);
+        } else {
+          ranges.push({ start: effect.index, end: effect.end });
+        }
+      }
     }
     if (event.type === 'STRING_RANGE_ACCESS' && matchesName(effect.name) &&
         typeof effect.start === 'number' && typeof effect.end === 'number') {
@@ -2519,6 +2543,10 @@ export function StringView({ value, state, name, source = '' }: { value: string;
             transition.before.length !== transition.after.length && !simpleAppend);
           const changed = Boolean(transition && transition.before !== transition.after &&
             (wholeValueChange || previousCharacter !== character));
+          const swapped = Boolean(transition?.kind === 'mutation' && transition.operation === 'reverse' &&
+            transition.before[index] !== character);
+          const swapFromRight = swapped && transition !== undefined && index < transition.before.length / 2;
+          const swapFromLeft = swapped && transition !== undefined && index >= transition.before.length / 2;
           const inserted = Boolean(transition?.kind === 'mutation' && transition.inserted && transition.index !== undefined && index >= transition.index && index < transition.index + transition.inserted.length);
           const added = Boolean((transition?.kind === 'result' && transition.before.length === 0 && index < transition.after.length) ||
             (simpleAppend && transition && index >= transition.before.length && index < transition.after.length) || inserted);
@@ -2532,7 +2560,7 @@ export function StringView({ value, state, name, source = '' }: { value: string;
           return (
             <div className="yv-string-cell-wrap" key={index} data-string-cell-index={index}>
               {removedHere && <div className="yv-string-removed-overlay" aria-hidden="true">{removedHere}</div>}
-              <div className={`yv-string-cell ${accessed.has(index) ? 'yv-cell-read ' : ''}${inRange ? 'yv-cell-range ' : ''}${changed ? 'yv-string-cell-changed ' : ''}${added ? 'yv-string-cell-added ' : ''}${shiftsRight ? 'yv-string-cell-shift-right ' : ''}${shiftsLeft ? 'yv-string-cell-shift-left' : ''}`} data-string-index={index}>
+              <div className={`yv-string-cell ${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-string-cell-compared ' : ''}${inRange ? 'yv-cell-range ' : ''}${changed ? 'yv-string-cell-changed ' : ''}${added ? 'yv-string-cell-added ' : ''}${swapFromRight ? 'yv-string-cell-swap-right ' : ''}${swapFromLeft ? 'yv-string-cell-swap-left ' : ''}${shiftsRight ? 'yv-string-cell-shift-right ' : ''}${shiftsLeft ? 'yv-string-cell-shift-left' : ''}`} data-string-index={index}>
                 <div className="yv-string-character">{character === ' ' ? '\u00a0' : character}</div>
               </div>
               <div className="yv-string-index">{index}</div>
