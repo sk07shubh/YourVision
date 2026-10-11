@@ -2388,11 +2388,13 @@ export function LinkedListView({
             const isLast = index === nodes.length - 1;
             return (
               <div className="yv-linked-piece" key={node.id} data-node-id={node.id} data-node-index={index} data-next-target={node.nextId ?? 'null'}>
-                {pointerNames.get(node.id)?.map(name => <div className="yv-node-pointer" data-pointer-name={name} key={name}>{name}</div>)}
-                <div className="yv-node" data-linked-node-value={node.id}>
-                  <span className="yv-node-value">{displayValue(node.value)}</span>
-                  <span className="yv-node-identity">N{index + 1}</span>
-                  {hasPrev && <span className="yv-node-link-meta" title={`prev references ${prevId ?? 'null'}`}>prev: {idLabel(prevId)}</span>}
+                <div className="yv-linked-node-column">
+                  {pointerNames.get(node.id)?.map(name => <div className="yv-node-pointer" data-pointer-name={name} key={name}>{name}</div>)}
+                  <div className="yv-node" data-linked-node-value={node.id}>
+                    <span className="yv-node-value">{displayValue(node.value)}</span>
+                    <span className="yv-node-identity">N{index + 1}</span>
+                    {hasPrev && <span className="yv-node-link-meta" title={`prev references ${prevId ?? 'null'}`}>prev: {idLabel(prevId)}</span>}
+                  </div>
                 </div>
                 {!isLast && <div className="yv-edge" data-edge-kind="next" data-edge-from={node.id} data-edge-to={node.nextId ?? 'null'} aria-label={`next points to ${idLabel(node.nextId)}`}>→</div>}
                 {isLast && isCycleEdge && <div className="yv-edge yv-edge-cycle" data-edge-kind="cycle" data-edge-from={node.id} data-edge-to={node.cycleTo ?? 'unknown'} aria-label={`cycle back to ${idLabel(node.cycleTo)}`}>↶ {idLabel(node.cycleTo)}</div>}
