@@ -3450,8 +3450,10 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
 
   for (const [id, value] of objectEntries) {
     if (isPlainObject(value) && (looksListNode(value) || looksGraphNode(value) || looksTrieNode(value))) continue;
-    if (isPlainObject(value) && /Trie$/.test(objectType(value)) &&
-        graphReferenceId(objectFields(value).root, state?.objects ?? '') !== undefined) continue;
+    if (isPlainObject(value) && /Trie$/.test(objectType(value))) {
+      const rootId = graphReferenceId(objectFields(value).root, state?.objects ?? {});
+      if (rootId && trieNodeIds.has(rootId)) continue;
+    }
     const names = namedObjectIds.get(id);
     if (!names?.length) continue;
     grouped.set(`object:${id}`, { names, value });
