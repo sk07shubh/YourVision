@@ -13,6 +13,11 @@ const source = [
     "  String part = s.substring(1, 4);",
     "  String suffix = s.substring(3, s.length());",
     "  String upper = s.toUpperCase();",
+    '  String replaced = s.replace("a", "o");',
+    '  String compact = s.replaceAll("a", "");',
+    '  String padded = "  hi  "; ',
+    "  String trimmed = padded.trim();",
+    '  String joined = s.concat("x");',
     "  String combined = s + c;",
     '  String appended = "a";',
     '  appended += "b";',
@@ -47,6 +52,10 @@ assert(results.some(event => event.data?.resultName === "part" && event.data.aft
 assert(results.some(event => event.data?.resultName === "suffix" && event.data.after === "ana"), "substring with nested length() result missing");
 assert(effects.some(event => event.type === "STRING_RANGE_ACCESS" && event.data?.start === 3 && event.data.end === 6), "substring with nested length() range missing");
 assert(results.some(event => event.data?.resultName === "upper" && event.data.after === "BANANA"), "case-conversion result missing");
+assert(results.some(event => event.data?.resultName === "replaced" && event.data.after === "bonono" && event.data.operation === "replace"), "replace result missing");
+assert(results.some(event => event.data?.resultName === "compact" && event.data.after === "bnn" && event.data.operation === "replaceAll"), "replaceAll result missing");
+assert(results.some(event => event.data?.resultName === "trimmed" && event.data.after === "hi" && event.data.operation === "trim"), "trim result missing");
+assert(results.some(event => event.data?.resultName === "joined" && event.data.after === "bananax" && event.data.operation === "concat"), "concat result missing");
 assert(results.some(event => event.data?.resultName === "combined" && event.data.after === "bananan" && event.data.operation === "concatenate"), "string plus result missing");
 assert(results.some(event => event.data?.resultName === "appended" && event.data.after === "ab" && event.data.operation === "concatenate"), "compound string concatenation result missing");
 const search = effects.find(event => event.type === "STRING_SEARCH_RESULT" && event.data?.operation === "contains");
