@@ -63,6 +63,38 @@ describe('linked-list graph visualization', () => {
     expect(html).toContain('data-next-target="n2"');
   });
 
+  it('groups all runtime ListNode objects into one graph instead of duplicate per-node lists', () => {
+    const current = state({
+      variables: { head: { $objectId: 'n1' }, curr: { $objectId: 'n2' } },
+      objects: {
+        n1: { $objectId: 'n1', $type: 'ListNode', fields: { val: 10, next: { $ref: 'n2' } } },
+        n2: { $objectId: 'n2', $type: 'ListNode', fields: { val: 20, next: null } },
+      },
+    });
+    const html = renderToStaticMarkup(<DataStructures state={current} source="curr = curr.next;" />);
+    expect(html).toContain('Linked List → head / curr');
+    expect((html.match(/data-node-id="n1"/g) ?? []).length).toBe(1);
+    expect((html.match(/data-node-id="n2"/g) ?? []).length).toBe(1);
+  });
+
+  it('keeps disconnected chains visible after a pointer rewrite disconnects them from head', () => {
+    const current = state({
+      variables: { head: { $objectId: 'n1' }, prev: { $objectId: 'n2' } },
+      objects: {
+        n1: { $objectId: 'n1', $type: 'ListNode', fields: { val: 10, next: null } },
+        n2: { $objectId: 'n2', $type: 'ListNode', fields: { val: 20, next: { $ref: 'n3' } } },
+        n3: { $objectId: 'n3', $type: 'ListNode', fields: { val: 30, next: null } },
+      },
+    });
+    const html = renderToStaticMarkup(<LinkedListView root={{ $objectId: 'n1' }} objects={current.objects} variables={current.variables} />);
+    expect(html).toContain('data-linked-component="0"');
+    expect(html).toContain('data-linked-component="1"');
+    expect(html).toContain('data-node-id="n1"');
+    expect(html).toContain('data-node-id="n2"');
+    expect(html).toContain('data-node-id="n3"');
+    expect(html).toContain('data-edge-kind="null"');
+  });
+
   it('renders a cycle as a reference back to an existing node instead of a fake node', () => {
     const current = state({
       variables: { head: { $objectId: 'n1' } },
