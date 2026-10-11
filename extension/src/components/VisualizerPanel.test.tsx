@@ -1047,6 +1047,43 @@ describe('execution visualization feature matrix', () => {
     }
   });
 
+  it('preserves collection item identity when a captured object mutates in place', () => {
+    const previousSession = sessionStore.get();
+    const previous = state({
+      sequence: 91,
+      dataStructures: {
+        queue: {
+          $collectionId: 'mutable-item-queue',
+          $type: 'java.util.ArrayDeque',
+          $kind: 'queue',
+          values: [{ $objectId: 'mutable-item', fields: { value: 1 } }, 7],
+          size: 2,
+        },
+      },
+    });
+    const current = state({
+      sequence: 92,
+      dataStructures: {
+        queue: {
+          $collectionId: 'mutable-item-queue',
+          $type: 'java.util.ArrayDeque',
+          $kind: 'queue',
+          values: [{ $objectId: 'mutable-item', fields: { value: 2 } }, 7],
+          size: 2,
+        },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'queue.peek().value = 2;', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source="queue.peek().value = 2;" />);
+      expect(html).not.toContain('yv-collection-item-enter');
+      expect(html).not.toContain('yv-collection-removals');
+      expect(html).toContain('data-collection-item-key="\u0024objectId:mutable-item#0"');
+    } finally {
+      sessionStore.set(previousSession);
+    }
+  });
+
   it('keeps duplicate queue item identities stable when an item is inserted at the front', () => {
     const previousSession = sessionStore.get();
     const previous = state({
