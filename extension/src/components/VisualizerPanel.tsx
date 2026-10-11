@@ -2462,7 +2462,10 @@ export function LinkedListView({
         if (!a || !b) return;
         const sourcePort = graph.querySelector<HTMLElement>(`[data-linked-node-value="${CSS.escape(from)}"] .yv-linked-next-port`);
         const sourceRect = sourcePort?.getBoundingClientRect() ?? a;
-        const ax = (kind === 'prev' ? a.left : sourceRect.left + sourceRect.width / 2) - graphRect.left + graph.scrollLeft;
+        // Start at the visible edge of the pointer dot, not its center:
+        // this keeps the colored stroke visibly touching the dot instead of
+        // being hidden underneath its fill.
+        const ax = (kind === 'prev' ? a.left : sourceRect.right) - graphRect.left + graph.scrollLeft;
         const ay = (kind === 'prev' ? a.top + a.height / 2 : sourceRect.top + sourceRect.height / 2) - graphRect.top + graph.scrollTop;
         const bx = (kind === 'cycle' ? b.right : b.left) - graphRect.left + graph.scrollLeft;
         const by = b.top + b.height / 2 - graphRect.top + graph.scrollTop;
@@ -2521,9 +2524,20 @@ export function LinkedListView({
     <div ref={graphRef} className="yv-linked-graph" data-linked-list-root={isPlainObject(resolvedRoot) ? String(resolvedRoot.$objectId ?? 'root') : 'null'}>
       {connectionPaths.length > 0 && (
         <svg className="yv-linked-connections" aria-hidden="true" width={Math.max(graphRef.current?.scrollWidth ?? 0, graphRef.current?.clientWidth ?? 0)} height={Math.max(graphRef.current?.scrollHeight ?? 0, graphRef.current?.clientHeight ?? 0)}>
-          {connectionPaths.map(path => (
-            <path key={path.key} className={`yv-linked-connection yv-linked-connection-${path.kind}`} d={path.d} data-connection-from={path.from} data-connection-to={path.to} />
-          ))}
+          {connectionPaths.map((path, index) => {
+            // A stable per-link palette makes each next reference easy to trace.
+            const linkColors = ['#60a5fa', '#34d399', '#fbbf24', '#c084fc', '#fb7185', '#22d3ee', '#a3e635', '#f97316'];
+            return (
+              <path
+                key={path.key}
+                className={`yv-linked-connection yv-linked-connection-${path.kind}`}
+                d={path.d}
+                data-connection-from={path.from}
+                data-connection-to={path.to}
+                style={path.kind === 'cross-next' ? { stroke: linkColors[index % linkColors.length] } : undefined}
+              />
+            );
+          })}
         </svg>
       )}
       {nullPointers.length > 0 && (
