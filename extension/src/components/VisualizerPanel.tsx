@@ -2468,7 +2468,7 @@ function MapView({
   );
 
   return (
-    <div className="yv-hashmap">
+    <div className="yv-hashmap" data-map-id={value.$mapId}>
       <div className="yv-map-meta">
         <span>
           {typeof value.$type === 'string'
@@ -2494,7 +2494,7 @@ function MapView({
           return (
             <div
               className={`yv-map-row ${change ? `yv-map-${change.kind}` : ''}`}
-              key={stableStringify(entry.key) || index}
+              key={mapKeySignature(entry.key)} data-map-key-identity={mapKeySignature(entry.key)}
             >
               <div className="yv-map-key">
                 <DataValue value={entry.key} state={state} source={source} depth={depth + 1} seen={seen}/>
@@ -2524,7 +2524,7 @@ function MapView({
         {deleted.map((change, index) => (
           <div
             className="yv-map-row yv-map-delete"
-            key={`deleted-${stableStringify(change.key)}-${index}`}
+            key={`deleted-${mapKeySignature(change.key)}-${index}`} data-map-key-identity={mapKeySignature(change.key)}
           >
             <div className="yv-map-key">
               <DataValue value={change.key} state={state} source={source} depth={depth + 1} seen={seen}/>
