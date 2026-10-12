@@ -2296,7 +2296,9 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
       }
 
       for (const target of targets.rows) {
-        const cell = matrixCellRefs.current[target.index + ',0'];
+        // Anchor to the row fragment, not column zero: jagged matrices may
+        // contain an empty row with no [row, 0] cell to measure.
+        const cell = matrixCellRefs.current['__row,' + target.index];
         if (!cell) continue;
         const group = rowGroups.get(target.index) ?? [];
         group.push(target);
@@ -2307,7 +2309,7 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
         next.set(key, target.index);
       }
       for (const [index, group] of rowGroups) {
-        const cell = matrixCellRefs.current[index + ',0'];
+        const cell = matrixCellRefs.current['__row,' + index];
         if (!cell) continue;
         const center = cell.offsetTop + cell.offsetHeight / 2;
         const gap = 3;
@@ -2349,7 +2351,11 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
         >{column}</div>
       ))}
       {rows.map((row, r) => (
-        <div className="yv-matrix-row-fragment" key={'row-' + r}>
+        <div
+          className="yv-matrix-row-fragment"
+          key={'row-' + r}
+          ref={element => { matrixCellRefs.current['__row,' + r] = element; }}
+        >
           <div className={`yv-matrix-row-index ${activeRows.has(r) ? 'yv-matrix-axis-active' : ''}`}>{r}</div>
           {Array.from({ length: columnCount }, (_, column) => {
             const path = r + ',' + column;
@@ -2393,9 +2399,11 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
         ))}
         {targets.rows.flatMap(rowTarget =>
           targets.columns
-            .filter(columnTarget =>
-              !hasAuthoritativeAccessEvents || readPaths.has(rowTarget.index + ',' + columnTarget.index)
-            )
+            .filter(columnTarget => {
+              const path = rowTarget.index + ',' + columnTarget.index;
+              const cellExists = columnTarget.index < (rows[rowTarget.index]?.length ?? 0);
+              return cellExists && (!hasAuthoritativeAccessEvents || readPaths.has(path));
+            })
             .map(columnTarget => (
               <div
                 key={`intersection:${rowTarget.name}:${columnTarget.name}`}
@@ -3977,6 +3985,7 @@ export function StringView({ value, state, name, source = '' }: { value: string;
       const isComparisonMismatch = effect.matched === false &&
         ['equals', 'equalsIgnoreCase', 'compareTo'].includes(String(effect.operation));
       if ((effect.matched === true || isComparisonMismatch) &&
+          Number.isInteger(effect.index) && Number.isInteger(effect.end) &&
           effect.index >= 0 && effect.end > effect.index && effect.end <= value.length) {
         if (isComparisonMismatch) {
           for (let index = effect.index; index < effect.end; index++) compared.add(index);
