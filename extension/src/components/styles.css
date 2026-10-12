@@ -56,6 +56,10 @@
 .yv-list-slot{display:flex;flex:0 0 auto;flex-direction:column;align-items:center;min-width:36px}
 .yv-list-cell{display:flex;align-items:center;justify-content:center;box-sizing:border-box;min-width:36px;min-height:36px;padding:5px 8px;border:1px solid var(--yv-border);border-radius:6px;background:var(--yv-elevated);text-align:center}
 .yv-list-slot .yv-cell-index{width:100%;text-align:center;font-variant-numeric:tabular-nums}
+.yv-list-pointer-row{display:flex;justify-content:center;align-items:flex-end;gap:3px;min-height:22px;max-width:100%;padding-bottom:3px;box-sizing:border-box}
+.yv-list-pointer{display:inline-flex;align-items:center;justify-content:center;min-height:18px;padding:1px 5px;border:1px solid color-mix(in srgb,var(--yv-accent,#65a9ff),var(--yv-border) 35%);border-radius:4px;background:var(--yv-elevated);color:var(--yv-accent,#65a9ff);font:10px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}
+.yv-list-pointer-end{border-style:dashed;border-color:var(--yv-warning,#f59e0b);color:var(--yv-warning,#f59e0b)}
+
 /* One-past-end sentinels mark the boundary; they are never real elements. */
 .yv-array-end-slot,.yv-list-end-slot{flex:0 0 auto;min-width:36px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start}
 .yv-array-end-marker,.yv-list-end-marker,.yv-string-end-marker{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:36px;min-width:36px;height:36px;border:1.5px dashed var(--yv-warning,#f59e0b);border-radius:6px;background:color-mix(in srgb,var(--yv-warning,#f59e0b),transparent 91%);color:var(--yv-warning,#f59e0b);font:700 18px/1 ui-monospace,SFMono-Regular,Menlo,monospace}
