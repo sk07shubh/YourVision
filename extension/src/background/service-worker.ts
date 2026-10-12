@@ -64,11 +64,6 @@ chrome.runtime.onMessage.addListener((msg: ExtensionRequest | {type:'REVEAL_LINE
   void (async () => {
     try {
       if (msg.type === 'READ_ENTRY_METHOD') {
-        if (!sender.tab?.id) throw new Error('No active LeetCode tab.');
-        const source = await readLeetCodeJavaStarter(sender.tab.id, sender.tab.url ?? '');
-        sendResponse({ok:true,source} satisfies ExtensionResponse); return;
-      }
-      if (msg.type === 'READ_ENTRY_METHOD') {
         if (!sender.tab?.url) throw new Error('Could not identify the current LeetCode problem URL.');
         const source = await readLeetCodeJavaStarter(sender.tab.url);
         sendResponse({ok:true,source} satisfies ExtensionResponse); return;
