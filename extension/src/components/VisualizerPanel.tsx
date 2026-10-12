@@ -3237,9 +3237,14 @@ export function LinkedListView({
     }
   }
   const changedValueIds = new Set<string>();
+  const createdNodeIds = new Set<string>();
   if (previous && selectedIndex >= 0) {
     for (const node of allNodes) {
       const previousRaw = previousObjects[node.id];
+      if (previousRaw === undefined) {
+        createdNodeIds.add(node.id);
+        continue;
+      }
       const previousNode = resolveRef(previousRaw, previousObjects);
       if (!isPlainObject(previousNode) || !looksListNode(previousNode)) continue;
       if (valueChanged(nodeValue(previousNode), node.value)) changedValueIds.add(node.id);
@@ -3377,7 +3382,7 @@ export function LinkedListView({
                         {pointerNames.get(node.id)?.map(name => <div className={`yv-node-pointer ${movedPointerNames.has(name) ? 'yv-node-pointer-moved' : ''}`} data-pointer-name={name} key={name}>{name}</div>)}
                       </div>
                       <div
-                        className={`yv-node yv-linked-node ${changedEdgeIds.has(node.id) ? 'yv-node-link-changed' : ''} ${changedValueIds.has(node.id) ? 'yv-node-value-changed' : ''}`}
+                        className={`yv-node yv-linked-node ${changedEdgeIds.has(node.id) ? 'yv-node-link-changed' : ''} ${changedValueIds.has(node.id) ? 'yv-node-value-changed' : ''} ${createdNodeIds.has(node.id) ? 'yv-linked-node-created' : ''}`}
                         data-linked-node-value={node.id}
                         style={(() => {
                           const incoming = allNodes.find(candidate => candidate.nextId === node.id);
