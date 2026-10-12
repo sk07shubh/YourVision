@@ -1801,7 +1801,7 @@ export function pointerTargets(
       typeof value !== 'number' ||
       !Number.isInteger(value) ||
       value < 0 ||
-      value > length
+      value >= length
     ) continue;
     targets.push({ name, index: value });
   }
