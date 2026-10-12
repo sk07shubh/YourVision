@@ -569,11 +569,7 @@
 .yv-string-pointer-group{position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;gap:3px;width:max-content;max-width:180px;transform:translateX(-50%);transition:left 180ms cubic-bezier(.4,0,.2,1);pointer-events:none}.yv-string-pointer{position:static;left:auto;top:auto;transform:none;transition:none;max-width:72px}
 @media(prefers-reduced-motion:reduce){.yv-string-pointer-group{transition:none}}
 
-.yv-string-cell.yv-string-cell-shift-right{animation:yv-string-shift-right 380ms cubic-bezier(.2,.75,.25,1)}
-.yv-string-cell.yv-string-cell-shift-left{animation:yv-string-shift-left 380ms cubic-bezier(.2,.75,.25,1)}
-@keyframes yv-string-shift-right{0%{transform:translateX(-6px);opacity:.65}100%{transform:translateX(0);opacity:1}}
-@keyframes yv-string-shift-left{0%{transform:translateX(6px);opacity:.65}100%{transform:translateX(0);opacity:1}}
-@media(prefers-reduced-motion:reduce){.yv-string-cell.yv-string-cell-shift-right,.yv-string-cell.yv-string-cell-shift-left{animation:none}}
+/* Structural string edits move surviving keyed cells in place via FLIP. */
 
 
 /* String comparisons reveal the first differing UTF-16 unit without claiming a match. */
