@@ -3548,7 +3548,6 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const nextSeen = new Set(seen);
   if (id) nextSeen.add(id);
   const fields = objectFields(resolved);
-  const hasChildren = fields.left != null || fields.right != null;
   const previousNode = id ? previousObjects[id] : undefined;
   const previousFields = isPlainObject(previousNode) ? objectFields(previousNode) : {};
   const hasPreviousSnapshot = Boolean(state && previous && session.states.includes(state) && previousNode !== undefined);
@@ -3560,6 +3559,9 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const rightAfter = graphReferenceId(fields.right, objects);
   const leftEdgeChanged = Boolean(hasPreviousSnapshot && leftBefore !== leftAfter);
   const rightEdgeChanged = Boolean(hasPreviousSnapshot && rightBefore !== rightAfter);
+  // Keep the branch row for the removal step even if its last child vanished,
+  // so the changed edge can still show the transition to null.
+  const hasChildren = fields.left != null || fields.right != null || leftEdgeChanged || rightEdgeChanged;
   const edgeStatus = (before: string | null | undefined, after: string | null | undefined) =>
     before == null ? 'added' : after == null ? 'removed' : 'rewired';
   const movedPointerTargets = new Set<string>();
