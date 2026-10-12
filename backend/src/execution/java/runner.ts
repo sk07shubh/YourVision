@@ -567,9 +567,14 @@ await fs.writeFile(
                 ...(errorType
                     ? { errorType }
                     : {}),
+                // Keep the actual tracer failure visible. A generic
+                // message hides JDI/harness crashes and makes Java snippets
+                // fail without actionable diagnostics in the UI.
                 message:
                     message ||
-                    "Java execution failed"
+                    (stderr.trim()
+                        ? `Java tracer failed: ${stderr.trim().split(/\\r?\\n/).slice(-8).join(" | ")}`
+                        : "Java execution failed (the tracer exited without diagnostic output)")
             };
         }
 
