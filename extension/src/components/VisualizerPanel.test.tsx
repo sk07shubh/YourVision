@@ -593,6 +593,16 @@ describe('string data structure visualization', () => {
     expect(effects.some(text => text.includes('builder.reverse'))).toBe(true);
   });
 
+  it('ignores invalid string range coordinates and their pointer labels', () => {
+    const current = state({ lastEvent: { type: 'STEP', line: 4, data: { executionEvents: [
+      { type: 'STRING_RANGE_ACCESS', data: { name: 's', start: -1, end: 99, startVariable: 'left', endVariable: 'right' } },
+    ] } } });
+    const html = renderToStaticMarkup(<StringView value="hello" state={current} name="s" />);
+    expect(html).not.toContain('yv-cell-range');
+    expect(html).not.toContain('data-string-pointer="left"');
+    expect(html).not.toContain('data-string-pointer="right"');
+  });
+
   it('preserves Java UTF-16 indexing for supplementary Unicode characters', () => {
     const html = renderToStaticMarkup(<StringView value="😀" state={state()} name="s" />);
     expect(html).toContain('data-string-length="2"');
