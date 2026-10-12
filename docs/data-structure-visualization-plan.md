@@ -564,7 +564,7 @@ This section records code that has been implemented after the design audit. It d
 
 ## Implementation log — matrix pointer and string-range edge cases
 
-- Matrix row pointers now anchor to the rendered row fragment instead of assuming every row has a column-zero cell. This preserves row targeting for jagged matrices that contain empty rows.
+- Matrix row pointers now anchor to the rendered row-index cell instead of assuming every row has a column-zero data cell. This preserves measurable row targeting for jagged matrices that contain empty rows.
 - Matrix row/column pointer intersections are only rendered when the corresponding cell actually exists. A missing cell in a jagged row is not represented as a real intersection or access.
 - String search-result ranges now require integer UTF-16 start/end offsets in addition to valid bounds, matching the strict range-access contract and ignoring malformed fractional coordinates.
 - Added focused component tests for empty matrix rows and fractional string search ranges. As requested, tests/typecheck/build remain deferred to the consolidated verification pass.
