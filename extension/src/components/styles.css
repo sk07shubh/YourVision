@@ -813,6 +813,11 @@
   animation: yv-map-entry-delete 420ms ease-in both;
   transform-origin: left center;
 }
+/* Deletions update the map in place; never render a detached ghost entry. */
+.yv-map-delete-pulse{animation:yv-map-delete-pulse 420ms ease-out both;border-radius:8px}
+@keyframes yv-map-delete-pulse{0%{box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--yv-warning,#f59e0b),transparent 35%);background:color-mix(in srgb,var(--yv-warning,#f59e0b),transparent 92%)}100%{box-shadow:inset 0 0 0 0 transparent;background:transparent}}
+@media(prefers-reduced-motion:reduce){.yv-map-delete-pulse{animation:none}}
+
 @keyframes yv-map-entry-insert {
   0% { opacity: .2; transform: translateX(-7px); background: color-mix(in srgb, var(--yv-success), transparent 84%); }
   100% { opacity: 1; transform: translateX(0); }
