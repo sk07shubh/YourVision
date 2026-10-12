@@ -560,3 +560,11 @@ This section records code that has been implemented after the design audit. It d
 - Collection snapshots now mark the exact step when a non-empty stack, queue/deque, set, indexed list, or heap becomes empty. The empty-state surface gets a brief in-place mutation cue, with no detached removal box; reduced-motion preferences are respected. Added a focused stack-to-empty component regression case, pending the consolidated test run.
 - Matrix rendering now distinguishes an empty two-dimensional array from an ordinary empty one-dimensional array when the source has an observed two-index access, and renders an explicit zero-row empty state instead of a blank grid. A focused component regression case is added; consolidated tests remain deferred.
 - String range events now require valid integer UTF-16 half-open coordinates within the captured string before they can highlight cells or place pointer labels; malformed/out-of-range trace coordinates are ignored. A regression case covers invalid bounds. A string mutation that removes the final character also gets an in-place empty-state cue, respecting reduced-motion settings and without detached character overlays.
+
+
+## Implementation log — matrix pointer and string-range edge cases
+
+- Matrix row pointers now anchor to the rendered row fragment instead of assuming every row has a column-zero cell. This preserves row targeting for jagged matrices that contain empty rows.
+- Matrix row/column pointer intersections are only rendered when the corresponding cell actually exists. A missing cell in a jagged row is not represented as a real intersection or access.
+- String search-result ranges now require integer UTF-16 start/end offsets in addition to valid bounds, matching the strict range-access contract and ignoring malformed fractional coordinates.
+- Added focused component tests for empty matrix rows and fractional string search ranges. As requested, tests/typecheck/build remain deferred to the consolidated verification pass.
