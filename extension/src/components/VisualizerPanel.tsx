@@ -1261,9 +1261,6 @@ function HeapTreeView({
   useLayoutEffect(() => {
     const tree = treeRef.current;
     if (!tree) return;
-    const bounds = tree.getBoundingClientRect();
-    const width = Math.max(tree.clientWidth, tree.scrollWidth);
-    const height = Math.max(tree.clientHeight, tree.scrollHeight);
     const measure = () => {
       const currentTree = treeRef.current;
       if (!currentTree) return;
