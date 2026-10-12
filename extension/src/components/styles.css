@@ -62,7 +62,7 @@
 
 /* One-past-end sentinels mark the boundary; they are never real elements. */
 .yv-array-end-slot,.yv-list-end-slot{flex:0 0 auto;min-width:36px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start}
-.yv-array-end-marker,.yv-list-end-marker,.yv-string-end-marker{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:100%;min-width:36px;min-height:34px;height:auto;padding:7px 6px;border:1px solid var(--yv-border);border-radius:0;background:var(--yv-elevated);color:var(--yv-warning,#f59e0b);font:700 14px/18px ui-monospace,SFMono-Regular,Menlo,monospace}
+.yv-array-end-marker{display:flex;align-items:center;justify-content:center;color:var(--yv-warning,#f59e0b)}
 .yv-pointer-out-of-bounds{z-index:2;border:1px solid var(--yv-border)!important;border-radius:0!important;background:var(--yv-elevated)!important;color:var(--yv-accent)!important}
 .yv-string-end-pointer{display:flex;flex-direction:column;align-items:center;flex:0 0 40px;width:40px}
 .yv-string-end-pointer .yv-string-end-marker{width:30px;min-width:30px;height:30px}
@@ -579,7 +579,7 @@
 .yv-string-cell.yv-cell-range{border-bottom-color:color-mix(in srgb,var(--yv-accent),var(--yv-border) 20%);background:color-mix(in srgb,var(--yv-accent),var(--yv-elevated) 91%)}
 .yv-string-cell.yv-string-cell-changed{border-color:color-mix(in srgb,var(--yv-accent),var(--yv-border) 20%);background:color-mix(in srgb,var(--yv-accent),var(--yv-elevated) 88%);animation:yv-string-change 420ms cubic-bezier(.2,.75,.25,1)}
 .yv-string-cell.yv-string-cell-added{border-color:color-mix(in srgb,var(--yv-success),var(--yv-border) 25%);background:color-mix(in srgb,var(--yv-success),var(--yv-elevated) 89%);animation:yv-string-enter 260ms ease-out both}
-.yv-string-end-marker{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:36px;height:34px;padding:7px 6px;border:1px solid var(--yv-border);border-radius:0;background:var(--yv-elevated);color:var(--yv-warning,#f59e0b);font:700 14px/18px ui-monospace,SFMono-Regular,Menlo,monospace}
+.yv-string-end-pointer .yv-string-cell .yv-string-character{color:var(--yv-warning,#f59e0b)}
 @keyframes yv-string-read{0%{transform:translateY(-1px) scale(.97)}100%{transform:translateY(0) scale(1)}}
 @keyframes yv-string-change{0%{transform:scale(.94);opacity:.45}70%{transform:scale(1.035);opacity:1}100%{transform:scale(1)}}
 @keyframes yv-string-enter{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
