@@ -693,6 +693,30 @@ export function collectionOperation(kind: string, method: string | undefined, de
     if (['removefirst','pollfirst','remove','poll','pop'].includes(m)) return {operation:m === 'pop' ? 'Pop' : 'removeFirst',value:delta.removed,position:'Front'};
     if (['removelast','polllast'].includes(m)) return {operation:'removeLast',value:delta.removed,position:'Back'};
   }
+  if (kind === 'list' || kind === 'arrayList' || /^(ArrayList|Vector|CopyOnWriteArrayList)$/.test(type)) {
+    return (
+      <div className="yv-collection" ref={collectionRootRef}>
+        <div className="yv-collection-meta">
+          <span>{type}</span>
+          <span>INDEXED ORDER · {itemCount} items</span>
+        </div>
+        <div className="yv-list-view">
+          {value.values.map((item, index) => (
+            <div className="yv-list-slot" key={collectionItemReactKey(item, index, value.values)}
+              data-collection-item-key={collectionItemReactKey(item, index, value.values)}>
+              <div className={"yv-list-cell " + collectionItemMotionClass(value, item, index, state, name)}>
+                <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
+              </div>
+              <div className="yv-cell-index">{index}</div>
+            </div>
+          ))}
+          {!value.values.length && <div className="yv-empty">Empty list</div>}
+        </div>
+        <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
+      </div>
+    );
+  }
+
   if (kind === 'priorityQueue') {
     if (['add','offer'].includes(m)) return {operation:'Offer',value:delta.added,position:'Queue'};
     if (['poll','remove'].includes(m)) return {operation:'Poll',value:delta.removed,position:'Priority'};
@@ -1263,6 +1287,7 @@ function CollectionView({
       ':scope > .yv-stack-view > [data-collection-item-key], ' +
       ':scope > .yv-queue-view > [data-collection-item-key], ' +
       ':scope > .yv-set-view > [data-collection-item-key], ' +
+      ':scope > .yv-list-view > [data-collection-item-key], ' +
       ':scope > .yv-heap-tree .yv-heap-node[data-collection-item-key]'
     ));
     const nextRects = new Map<string, DOMRect>();
