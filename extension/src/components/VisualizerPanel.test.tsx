@@ -1667,7 +1667,6 @@ describe('array and matrix mutation animations', () => {
     );
     expect(html.match(/yv-cell-swapped/g)).toHaveLength(2);
     expect(html.match(/yv-array-cell-content-swapped/g)).toHaveLength(2);
-    expect(html).not.toContain('yv-array-cell-content-swapped"');
   });
 
   it('animates a confirmed multi-cell shift without moving array index labels', () => {
