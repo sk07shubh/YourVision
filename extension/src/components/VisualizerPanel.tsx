@@ -4095,8 +4095,12 @@ export function StringView({ value, state, name, source = '' }: { value: string;
     previousCharacterPositions.current = nextPositions;
   });
   const hasPointers = [...pointers.values()].some(index => index >= 0 && index <= value.length);
+  const emptiedThisStep = Boolean(transition?.kind === 'mutation' &&
+    transition.before.length > 0 && transition.after.length === 0 && value === transition.after);
   return (
-    <div ref={stringRootRef} className={`yv-string-view ${hasPointers ? 'has-pointers' : ''}`} data-string-structure={name} data-string-length={value.length}>
+    <div ref={stringRootRef} className={`yv-string-view ${hasPointers ? 'has-pointers' : ''}`}
+      data-string-structure={name} data-string-length={value.length}
+      data-string-emptied={emptiedThisStep ? 'true' : undefined}>
       {(transition || operationResult) && <div className="yv-string-operation">
         {transition && <span>{transition.operation} · {transition.kind === 'mutation' ? 'mutated' : 'result'}</span>}
         {operationResult && <span>{operationResult.operation} → {String(operationResult.result)}</span>}
