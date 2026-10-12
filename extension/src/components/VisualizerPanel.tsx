@@ -2874,12 +2874,18 @@ export function GraphView({ objects, variables = {}, state }: {
 export function LinkedListView({
   root,
   objects,
-  variables = {}
+  variables = {},
+  state
 }: {
   root: unknown;
   objects: Record<string, unknown>;
   variables?: Record<string, unknown>;
+  state?: TraceState;
 }) {
+  const session = sessionStore.get();
+  const selectedIndex = state ? session.states.indexOf(state) : -1;
+  const previous = selectedIndex > 0 ? session.states[selectedIndex - 1] : undefined;
+  const previousObjects = previous?.objects ?? {};
   type ListNodeRecord = { id: string; value: unknown; fields: Obj; nextId: string | null; cycleTo: string | null };
   type ListComponent = { nodes: ListNodeRecord[]; cycleTo: string | null };
   const pointerNames = new Map<string, string[]>();
@@ -3001,21 +3007,37 @@ export function LinkedListView({
   const pointerSignature = [...pointerSnapshot.entries()].map(([name, id]) => `${name}:${id}`).join('|');
   const graphRef = useRef<HTMLDivElement | null>(null);
   const [connectionPaths, setConnectionPaths] = useState<Array<{ key: string; d: string; kind: 'prev' | 'cross-next' | 'null-next' | 'cycle'; from: string; to: string }>>([]);
-  const previousEdges = useRef<Map<string, string | null>>(new Map());
-  const previousPointers = useRef<Map<string, string>>(new Map());
+  // Derive transitions from the selected trace step, not render history. This
+  // keeps pointer/edge cues correct when users step backward or seek directly.
+  const previousEdges = new Map<string, string | null>();
+  for (const [key, raw] of Object.entries(previousObjects)) {
+    const value = resolveRef(raw, previousObjects);
+    if (!isPlainObject(value) || !looksListNode(value)) continue;
+    const id = String(value.$objectId ?? key);
+    const next = objectFields(value).next;
+    const resolvedNext = next == null ? null : resolveRef(next, previousObjects);
+    const target = isPlainObject(resolvedNext) ? String(resolvedNext.$objectId ?? resolvedNext.$ref ?? '') || null : null;
+    previousEdges.set(id, target);
+  }
+  const previousPointers = new Map<string, string>();
+  for (const [name, value] of Object.entries(previous?.variables ?? {})) {
+    if (!isPlainObject(value)) continue;
+    const id = typeof value.$objectId === 'string' ? value.$objectId : typeof value.$ref === 'string' ? value.$ref : null;
+    if (id) previousPointers.set(name, id);
+  }
   const changedEdgeIds = new Set<string>();
-  for (const [id, target] of edgeSnapshot) {
-    if (previousEdges.current.has(id) && previousEdges.current.get(id) !== target) changedEdgeIds.add(id);
+  if (previous && selectedIndex >= 0) {
+    for (const [id, target] of edgeSnapshot) {
+      if (previousEdges.has(id) && previousEdges.get(id) !== target) changedEdgeIds.add(id);
+    }
   }
   const movedPointerNames = new Set<string>();
-  for (const [name, nodeId] of pointerSnapshot) {
-    const previousNode = previousPointers.current.get(name);
-    if (previousNode && previousNode !== nodeId) movedPointerNames.add(name);
+  if (previous && selectedIndex >= 0) {
+    for (const [name, nodeId] of pointerSnapshot) {
+      const previousNode = previousPointers.get(name);
+      if (previousNode && previousNode !== nodeId) movedPointerNames.add(name);
+    }
   }
-  useEffect(() => {
-    previousEdges.current = new Map(edgeSnapshot);
-    previousPointers.current = new Map(pointerSnapshot);
-  }, [edgeSignature, pointerSignature]);
   useLayoutEffect(() => {
     const graph = graphRef.current;
     if (!graph) return;
@@ -3417,7 +3439,7 @@ function DataValue({
   if (Array.isArray(value)) return <ArrayView value={value} state={state} source={source} arrayName={name} depth={depth} seen={seen}/>;
   if (isPlainObject(value)) {
     if (looksTreeNode(value)) return <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects??{}} state={state}/></div>;
-    if (looksListNode(value)) return <LinkedListView root={value} objects={state?.objects??{}} variables={state?.variables??{}}/>;
+    if (looksListNode(value)) return <LinkedListView root={value} objects={state?.objects??{}} variables={state?.variables??{}} state={state}/>;
     const resolved = resolveObjects ? resolveRef(value, state?.objects ?? {}) : value;
     if (isPlainObject(resolved)) {
       return <ObjectView value={resolved} state={state} source={source} depth={depth} seen={seen}/>;
