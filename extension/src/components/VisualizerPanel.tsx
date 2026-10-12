@@ -3711,6 +3711,18 @@ export function DisjointSetView({ parent, name, state, rank, size, rankName, siz
   const changed = changedArrayIndices(state, name);
   const changedRanks = rankName ? changedArrayIndices(state, rankName) : new Set<number>();
   const changedSizes = sizeName ? changedArrayIndices(state, sizeName) : new Set<number>();
+  const session = sessionStore.get();
+  const selectedIndex = state ? session.states.indexOf(state) : -1;
+  const previous = selectedIndex > 0 ? session.states[selectedIndex - 1] : undefined;
+  const previousParent = previous ? [
+    ...Object.entries(previous.variables ?? {}),
+    ...Object.entries(previous.dataStructures ?? {})
+  ].find(([candidateName, candidate]) => candidateName === name && isArraySnapshot(candidate))?.[1] : undefined;
+  const previousLength = isArraySnapshot(previousParent) ? previousParent.values.length : count;
+  const created = new Set<number>();
+  if (previous && selectedIndex >= 0) {
+    for (let index = previousLength; index < count; index++) created.add(index);
+  }
   const visited = new Set<number>();
   const renderNode = (index: number, path: Set<number>): React.ReactNode => {
     if (path.has(index)) return <span className="yv-code" data-dsu-cycle={index}>↻ {index}</span>;
@@ -3721,8 +3733,9 @@ export function DisjointSetView({ parent, name, state, rank, size, rankName, siz
     const parentIndex = values[index];
     const isRoot = parentIndex === index || parentIndex === -1;
     return (
-      <div className={'yv-dsu-branch' + (changed.has(index) || changedRanks.has(index) || changedSizes.has(index) ? ' yv-dsu-changed' : '')} key={index}
+      <div className={'yv-dsu-branch' + (changed.has(index) || changedRanks.has(index) || changedSizes.has(index) ? ' yv-dsu-changed' : '') + (created.has(index) ? ' yv-dsu-created' : '')} key={index}
         data-dsu-node-index={index} data-dsu-parent={typeof parentIndex === 'number' ? parentIndex : 'invalid'}
+        data-dsu-created={created.has(index) ? 'true' : undefined}
         data-dsu-parent-changed={changed.has(index) ? 'true' : undefined}
         data-dsu-rank-changed={changedRanks.has(index) ? 'true' : undefined}
         data-dsu-size-changed={changedSizes.has(index) ? 'true' : undefined}
