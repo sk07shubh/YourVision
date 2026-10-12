@@ -3223,7 +3223,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const previousFields = isPlainObject(previousNode) ? objectFields(previousNode) : {};
   const hasPreviousSnapshot = Boolean(state && previous && session.states.includes(state) && previousNode !== undefined);
   const changed = Boolean(hasPreviousSnapshot && stableStringify(previousNode) !== stableStringify(resolved));
-  const created = Boolean(hasPreviousSnapshot && previousNode === undefined);
+  const created = Boolean(state && previous && session.states.includes(state) && id && previousNode === undefined);
   const leftBefore = hasPreviousSnapshot ? graphReferenceId(previousFields.left, previousObjects) : undefined;
   const leftAfter = graphReferenceId(fields.left, objects);
   const rightBefore = hasPreviousSnapshot ? graphReferenceId(previousFields.right, previousObjects) : undefined;
