@@ -1718,7 +1718,16 @@ function collectionIndexVariableNames(source: string, collectionName?: string): 
   const names = new Set<string>();
   if (!collectionName) return names;
   for (const candidate of collectionName.split('/').map(part => part.trim()).filter(Boolean)) {
-    const escaped = candidate.replace(/[$]/g, '\\function arrayIndexVariableNames(source: string, arrayName?: string): Set<string> {');
+    const escaped = candidate.replace(/[$]/g, '\\$&');
+    const pattern = new RegExp('\\b' + escaped + '\\s*\\.\\s*(?:get|set|remove)\\s*\\(\\s*([^,)]+)', 'g');
+    for (const match of source.matchAll(pattern)) {
+      for (const identifier of (match[1] ?? '').matchAll(/\b[A-Za-z_$][\w$]*\b/g)) names.add(identifier[0]);
+    }
+  }
+  return names;
+}
+
+function arrayIndexVariableNames(source: string, arrayName?: string): Set<string> {');
     const pattern = new RegExp('\\b' + escaped + '\\s*\\.\\s*(?:get|set|remove)\\s*\\(\\s*([^,)]+)', 'g');
     for (const match of source.matchAll(pattern)) {
       for (const identifier of (match[1] ?? '').matchAll(/\\b[A-Za-z_$][\\w$]*\\b/g)) names.add(identifier[0]);
