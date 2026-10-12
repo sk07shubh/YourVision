@@ -1269,6 +1269,18 @@ function CollectionView({
       : 'collection';
 
   const itemCount = value.size ?? value.values.length;
+  const previousSnapshot = previousCollectionSnapshot(state, value.$collectionId);
+  const sameLengthTopReplacement = kind === 'stack' && Boolean(previousSnapshot &&
+    previousSnapshot.values.length === value.values.length && value.values.length > 0 &&
+    collectionItemIdentity(previousSnapshot.values[previousSnapshot.values.length - 1]) !==
+      collectionItemIdentity(value.values[value.values.length - 1]));
+  const queueFrontChanged = (kind === 'queue' || kind === 'deque') && Boolean(previousSnapshot &&
+    previousSnapshot.values.length > 0 && value.values.length > 0 &&
+    collectionItemIdentity(previousSnapshot.values[0]) !== collectionItemIdentity(value.values[0]));
+  const queueRearChanged = (kind === 'queue' || kind === 'deque') && Boolean(previousSnapshot &&
+    previousSnapshot.values.length > 0 && value.values.length > 0 &&
+    collectionItemIdentity(previousSnapshot.values[previousSnapshot.values.length - 1]) !==
+      collectionItemIdentity(value.values[value.values.length - 1]));
   const collectionRootRef = useRef<HTMLDivElement | null>(null);
   const previousItemRects = useRef<Map<string, DOMRect>>(new Map());
   const itemAnimations = useRef<WeakMap<HTMLElement, Animation>>(new WeakMap());
@@ -1321,7 +1333,7 @@ function CollectionView({
         </div>
         <div className="yv-stack-view">
           {[...value.values].reverse().map((item, index) => (
-            <div className={"yv-stack-cell " + collectionItemMotionClass(value, item, value.values.length - 1 - index, state)} key={collectionItemReactKey(item, value.values.length - 1 - index, value.values)} data-collection-item-key={collectionItemReactKey(item, value.values.length - 1 - index, value.values)}>
+            <div className={"yv-stack-cell " + collectionItemMotionClass(value, item, value.values.length - 1 - index, state) + (sameLengthTopReplacement && index === 0 ? ' yv-stack-top-updated' : '')} key={collectionItemReactKey(item, value.values.length - 1 - index, value.values)} data-collection-item-key={collectionItemReactKey(item, value.values.length - 1 - index, value.values)}>
               <span className="yv-stack-position">{index === 0 ? 'TOP' : ''}</span>
               <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
             </div>
@@ -1342,7 +1354,7 @@ function CollectionView({
         <div className="yv-queue-view">
           <div className="yv-queue-end">FRONT</div>
           {value.values.map((item, index) => (
-            <div className={"yv-queue-cell " + collectionItemMotionClass(value, item, index, state)} key={collectionItemReactKey(item, index, value.values)} data-collection-item-key={collectionItemReactKey(item, index, value.values)}>
+            <div className={"yv-queue-cell " + collectionItemMotionClass(value, item, index, state) + (queueFrontChanged && index === 0 ? ' yv-queue-front-changed' : '') + (queueRearChanged && index === value.values.length - 1 ? ' yv-queue-rear-changed' : '')} key={collectionItemReactKey(item, index, value.values)} data-collection-item-key={collectionItemReactKey(item, index, value.values)}>
               <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
             </div>
           ))}
