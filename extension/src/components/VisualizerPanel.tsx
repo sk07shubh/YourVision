@@ -3647,7 +3647,25 @@ function ObjectView({
   }
 
   const removedFieldNames = [...changedFields].filter(field => !(field in fields));
+  const objectClassName = "yv-object" +
+    (createdFields.size ? ' yv-object-has-created-fields' : '') +
+    (removedFieldNames.length ? ' yv-object-has-removed-fields' : '');
+
   if (!entries.length) {
+    // Keep the object container mounted for this trace step when its final field
+    // was removed, so the in-place mutation cue is not lost with the last row.
+    if (removedFieldNames.length) {
+      return (
+        <div className={objectClassName}
+          data-object-removed-fields={removedFieldNames.join(',')}>
+          <div className="yv-code yv-object-empty">
+            {objectType(value) || 'Object'}
+            {objectId ? ` · ${objectId}` : ''}
+            <span> · no fields</span>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="yv-code">
         {objectType(value) || 'Object'}
@@ -3657,7 +3675,7 @@ function ObjectView({
   }
 
   return (
-    <div className={"yv-object" + (createdFields.size ? ' yv-object-has-created-fields' : '') + (removedFieldNames.length ? ' yv-object-has-removed-fields' : '')}
+    <div className={objectClassName}
       data-object-removed-fields={removedFieldNames.length ? removedFieldNames.join(',') : undefined}>
       {entries.map(([key, fieldValue]) => (
         <div className={"yv-object-field" + (changedFields.has(key) ? ' yv-object-field-changed' : '') + (createdFields.has(key) ? ' yv-object-field-created' : '')} key={key}
