@@ -138,10 +138,10 @@
   transition: transform 180ms cubic-bezier(.4, 0, .2, 1);
 }
 .yv-pointer-layer .yv-pointer-out-of-bounds {
-  background: color-mix(in srgb, var(--yv-warning, #f59e0b), transparent 86%);
-  color: var(--yv-warning, #f59e0b);
+  background: var(--yv-elevated);
+  color: var(--yv-accent);
   border: 1px solid var(--yv-border);
-  border-radius: 5px 5px 2px 2px;
+  border-radius: 0;
 }
 @media (prefers-reduced-motion: reduce) {
   .yv-pointer-layer .yv-pointer-moving {
