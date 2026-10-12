@@ -3460,9 +3460,11 @@ function ObjectView({
   const changedFields = new Set<string>();
   const eventData = state?.lastEvent?.data;
   const collectChangedFields = (candidate: unknown, eventObjectId?: unknown) => {
-    if (eventObjectId !== objectId || !isPlainObject(candidate) || !Array.isArray(candidate.changes)) return;
+    if (!isPlainObject(candidate) || !Array.isArray(candidate.changes)) return;
     for (const change of candidate.changes) {
       if (!isPlainObject(change)) continue;
+      const changedObjectId = change.objectId ?? eventObjectId;
+      if (changedObjectId !== objectId) continue;
       const path = Array.isArray(change.fields) ? change.fields : Array.isArray(change.path) ? change.path : [];
       const field = path.find((part): part is string => typeof part === 'string');
       if (field) changedFields.add(field);
