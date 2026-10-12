@@ -1873,7 +1873,7 @@ describe('array and matrix mutation animations', () => {
 
   it('renders an explicit empty state for a zero-row matrix', () => {
     const html = renderToStaticMarkup(
-      <ArrayView value={[]} state={state()} source="" arrayName="matrix" />,
+      <ArrayView value={[]} state={state()} source="matrix[row][col]" arrayName="matrix" />,
     );
     expect(html).toContain('data-matrix-empty="true"');
     expect(html).toContain('Empty matrix · 0 rows');
