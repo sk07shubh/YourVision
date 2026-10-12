@@ -3072,30 +3072,45 @@ export function GraphView({ objects, variables = {}, state }: {
       if (from && to && from !== to) traversedEdgePairs.add(from + ':' + to);
     }
   }
+  // Compare edge multiplicities, not just endpoint pairs. Adjacency lists can
+  // contain parallel edges, so adding/removing one occurrence must not make all
+  // edges between the same two nodes look unchanged.
+  const edgePairKey = (from: string, to: string) => JSON.stringify([from, to]);
+  const previousEdgeCounts = new Map<string, number>();
+  const previousEdgeOccurrences: Array<{ key: string; from: string; to: string }> = [];
+  if (previous) {
+    for (const [objectKey, value] of Object.entries(previousObjects)) {
+      if (!isPlainObject(value) || !looksGraphNode(value)) continue;
+      const from = typeof value.$objectId === 'string' ? value.$objectId : objectKey;
+      if (!ids.has(from)) continue;
+      (graphNeighborValues(value) ?? []).forEach((neighbor, index) => {
+        const to = graphReferenceId(neighbor, previousObjects);
+        if (!to || !ids.has(to)) return;
+        const pair = edgePairKey(from, to);
+        previousEdgeCounts.set(pair, (previousEdgeCounts.get(pair) ?? 0) + 1);
+        previousEdgeOccurrences.push({ key: pair + ':' + index, from, to });
+      });
+    }
+  }
+  const currentEdgeCounts = new Map<string, number>();
   const edges = nodes.flatMap(node => node.neighbors.flatMap((neighbor, index) => {
     const target = graphReferenceId(neighbor, objects);
     if (!target || !ids.has(target)) return [];
-    const key = node.id + ':' + target + ':' + index;
-    const previousHadEdge = Object.entries(previousObjects).some(([previousKey, previousValue]) => {
-      if (!isPlainObject(previousValue) || !looksGraphNode(previousValue)) return false;
-      const from = typeof previousValue.$objectId === 'string' ? previousValue.$objectId : previousKey;
-      return from === node.id && (graphNeighborValues(previousValue) ?? []).some(previousNeighbor =>
-        graphReferenceId(previousNeighbor, previousObjects) === target);
-    });
-    return [{ key, from: node.id, to: target, status: previous && !previousHadEdge ? 'added' as const :
+    const pair = edgePairKey(node.id, target);
+    const occurrence = currentEdgeCounts.get(pair) ?? 0;
+    currentEdgeCounts.set(pair, occurrence + 1);
+    const added = Boolean(previous && occurrence >= (previousEdgeCounts.get(pair) ?? 0));
+    return [{ key: pair + ':' + index, from: node.id, to: target, status: added ? 'added' as const :
       traversedEdgePairs.has(node.id + ':' + target) ? 'traversed' as const : 'steady' as const }];
   }));
-  const currentEdgePairs = new Set(edges.map(edge => edge.from + ':' + edge.to));
-  const removedEdges = previous ? Object.entries(previousObjects).flatMap(([key, value]) => {
-    if (!isPlainObject(value) || !looksGraphNode(value)) return [];
-    const from = typeof value.$objectId === 'string' ? value.$objectId : key;
-    if (!ids.has(from)) return [];
-    return (graphNeighborValues(value) ?? []).flatMap((neighbor, index) => {
-      const to = graphReferenceId(neighbor, previousObjects);
-      if (!to || !ids.has(to) || currentEdgePairs.has(from + ':' + to)) return [];
-      return [{ key: 'removed:' + from + ':' + to + ':' + index, from, to, status: 'removed' as const }];
-    });
-  }) : [];
+  const removedCounts = new Map<string, number>();
+  const removedEdges = previousEdgeOccurrences.flatMap(edge => {
+    const pair = edgePairKey(edge.from, edge.to);
+    const occurrence = removedCounts.get(pair) ?? 0;
+    removedCounts.set(pair, occurrence + 1);
+    if (occurrence < (currentEdgeCounts.get(pair) ?? 0)) return [];
+    return [{ key: 'removed:' + edge.key, from: edge.from, to: edge.to, status: 'removed' as const }];
+  });
   const pointerNames = new Map<string, string[]>();
   for (const [name, value] of Object.entries(variables)) {
     const id = graphReferenceId(value, objects);
