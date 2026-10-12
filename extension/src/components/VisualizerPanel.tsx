@@ -704,7 +704,7 @@ export function collectionOperation(kind: string, method: string | undefined, de
           {value.values.map((item, index) => (
             <div className="yv-list-slot" key={collectionItemReactKey(item, index, value.values)}
               data-collection-item-key={collectionItemReactKey(item, index, value.values)}>
-              <div className={"yv-list-cell " + collectionItemMotionClass(value, item, index, state, name)}>
+              <div className={"yv-list-cell " + collectionItemMotionClass(value, item, index, state)}>
                 <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
               </div>
               <div className="yv-cell-index">{index}</div>
@@ -1222,10 +1222,8 @@ function collectionItemMotionClass(
   value: { $collectionId: string; values: unknown[] },
   item: unknown,
   occurrenceIndex: number,
-  state: TraceState | undefined,
-  name: string | undefined
+  state: TraceState | undefined
 ): string {
-  if (!name) return '';
   const prior = previousCollectionSnapshot(state, value.$collectionId);
   if (!prior) return '';
 
@@ -1324,7 +1322,7 @@ function CollectionView({
         </div>
         <div className="yv-stack-view">
           {[...value.values].reverse().map((item, index) => (
-            <div className={"yv-stack-cell " + collectionItemMotionClass(value, item, value.values.length - 1 - index, state, name)} key={collectionItemReactKey(item, value.values.length - 1 - index, value.values)} data-collection-item-key={collectionItemReactKey(item, value.values.length - 1 - index, value.values)}>
+            <div className={"yv-stack-cell " + collectionItemMotionClass(value, item, value.values.length - 1 - index, state)} key={collectionItemReactKey(item, value.values.length - 1 - index, value.values)} data-collection-item-key={collectionItemReactKey(item, value.values.length - 1 - index, value.values)}>
               <span className="yv-stack-position">{index === 0 ? 'TOP' : ''}</span>
               <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
             </div>
@@ -1346,7 +1344,7 @@ function CollectionView({
         <div className="yv-queue-view">
           <div className="yv-queue-end">FRONT</div>
           {value.values.map((item, index) => (
-            <div className={"yv-queue-cell " + collectionItemMotionClass(value, item, index, state, name)} key={collectionItemReactKey(item, index, value.values)} data-collection-item-key={collectionItemReactKey(item, index, value.values)}>
+            <div className={"yv-queue-cell " + collectionItemMotionClass(value, item, index, state)} key={collectionItemReactKey(item, index, value.values)} data-collection-item-key={collectionItemReactKey(item, index, value.values)}>
               <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
             </div>
           ))}
@@ -1367,7 +1365,7 @@ function CollectionView({
         </div>
         <div className="yv-set-view">
           {value.values.map((item, index) => (
-            <div className={"yv-set-element " + collectionItemMotionClass(value, item, index, state, name)} key={collectionItemReactKey(item, index, value.values)} data-collection-item-key={collectionItemReactKey(item, index, value.values)}>
+            <div className={"yv-set-element " + collectionItemMotionClass(value, item, index, state)} key={collectionItemReactKey(item, index, value.values)} data-collection-item-key={collectionItemReactKey(item, index, value.values)}>
               <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
             </div>
           ))}
@@ -1396,7 +1394,7 @@ function CollectionView({
               <div className="yv-heap-level" key={level}>
                 {items.map((item, index) => (
                   <div className="yv-heap-node-wrap" key={collectionItemReactKey(item, (2 ** level) - 1 + index, value.values)}>
-                    <div data-collection-item-key={collectionItemReactKey(item, (2 ** level) - 1 + index, value.values)} className={"yv-heap-node " + collectionItemMotionClass(value, item, (2 ** level) - 1 + index, state, name)}><DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/></div>
+                    <div data-collection-item-key={collectionItemReactKey(item, (2 ** level) - 1 + index, value.values)} className={"yv-heap-node " + collectionItemMotionClass(value, item, (2 ** level) - 1 + index, state)}><DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/></div>
                     <div className="yv-cell-index">[{(2 ** level) - 1 + index}]</div>
                   </div>
                 ))}
