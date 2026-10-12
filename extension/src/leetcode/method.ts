@@ -28,7 +28,20 @@ export function inferJavaMethods(source: string): JavaMethod[] {
 export function inferMethod(source: string): JavaMethod {
   const methods = inferJavaMethods(source).filter(m => m.name !== 'main');
   if (!methods.length) throw new Error('Could not find a Java solution method.');
-  return methods[0];
+
+  // LeetCode's entry point is normally public, while recursive helpers are
+  // often private and may appear before it in the editor. Prefer the first
+  // public method so declaration order cannot accidentally select a helper.
+  const withoutComments = source
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\/\/.*$/gm, ' ');
+  const publicNames = new Set<string>();
+  const publicMethodRx = /\bpublic\s+(?:(?:static|final|synchronized|native|abstract|strictfp)\s+)*[\w$<>\[\].?,\s]+?\s+(\w+)\s*\(/g;
+  for (const match of withoutComments.matchAll(publicMethodRx)) {
+    if (match[1] !== 'main') publicNames.add(match[1]);
+  }
+
+  return methods.find(method => publicNames.has(method.name)) ?? methods[0];
 }
 
 function splitParams(text: string): Array<{ type: string; name: string }> {
