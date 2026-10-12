@@ -3690,12 +3690,14 @@ export function StringView({ value, state, name, source = '' }: { value: string;
   );
 }
 
-export function DisjointSetView({ parent, name, state, rank, size }: {
+export function DisjointSetView({ parent, name, state, rank, size, rankName, sizeName }: {
   parent: unknown[];
   name: string;
   state?: TraceState;
   rank?: unknown[];
   size?: unknown[];
+  rankName?: string;
+  sizeName?: string;
 }) {
   const count = Math.min(parent.length, 100);
   const values = parent.slice(0, count);
@@ -3707,6 +3709,8 @@ export function DisjointSetView({ parent, name, state, rank, size }: {
     else children[value]!.push(index);
   });
   const changed = changedArrayIndices(state, name);
+  const changedRanks = rankName ? changedArrayIndices(state, rankName) : new Set<number>();
+  const changedSizes = sizeName ? changedArrayIndices(state, sizeName) : new Set<number>();
   const visited = new Set<number>();
   const renderNode = (index: number, path: Set<number>): React.ReactNode => {
     if (path.has(index)) return <span className="yv-code" data-dsu-cycle={index}>↻ {index}</span>;
@@ -3717,8 +3721,11 @@ export function DisjointSetView({ parent, name, state, rank, size }: {
     const parentIndex = values[index];
     const isRoot = parentIndex === index || parentIndex === -1;
     return (
-      <div className={'yv-dsu-branch' + (changed.has(index) ? ' yv-dsu-changed' : '')} key={index}
+      <div className={'yv-dsu-branch' + (changed.has(index) || changedRanks.has(index) || changedSizes.has(index) ? ' yv-dsu-changed' : '')} key={index}
         data-dsu-node-index={index} data-dsu-parent={typeof parentIndex === 'number' ? parentIndex : 'invalid'}
+        data-dsu-parent-changed={changed.has(index) ? 'true' : undefined}
+        data-dsu-rank-changed={changedRanks.has(index) ? 'true' : undefined}
+        data-dsu-size-changed={changedSizes.has(index) ? 'true' : undefined}
         style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, padding: 7 }}>
         <div className="yv-dsu-node" style={{ minWidth: 52, padding: '7px 9px', border: '1px solid var(--yv-accent, #65a9ff)',
           borderRadius: 9, background: changed.has(index) ? 'var(--yv-highlight, #203b5b)' : 'var(--yv-panel, #101b2d)',
@@ -3727,8 +3734,8 @@ export function DisjointSetView({ parent, name, state, rank, size }: {
           <div style={{ fontSize: 10, color: isRoot ? 'var(--yv-accent, #65a9ff)' : 'var(--yv-muted, #8b9bb4)' }}>
             {isRoot ? 'ROOT' : 'parent → ' + String(parentIndex)}
           </div>
-          {rank?.[index] !== undefined && <div style={{ fontSize: 10 }}>rank {displayValue(rank[index])}</div>}
-          {size?.[index] !== undefined && <div style={{ fontSize: 10 }}>size {displayValue(size[index])}</div>}
+          {rank?.[index] !== undefined && <div className={changedRanks.has(index) ? 'yv-dsu-field-changed' : undefined} style={{ fontSize: 10 }}>rank {displayValue(rank[index])}</div>}
+          {size?.[index] !== undefined && <div className={changedSizes.has(index) ? 'yv-dsu-field-changed' : undefined} style={{ fontSize: 10 }}>size {displayValue(size[index])}</div>}
         </div>
         {children[index]!.length > 0 && (
           <div className="yv-dsu-children" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
@@ -3916,7 +3923,9 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
             name={dsuParentEntry[0]}
             state={state}
             rank={dsuRankEntry && isArraySnapshot(dsuRankEntry[1]) ? dsuRankEntry[1].values : undefined}
+            rankName={dsuRankEntry?.[0]}
             size={dsuSizeEntry && isArraySnapshot(dsuSizeEntry[1]) ? dsuSizeEntry[1].values : undefined}
+            sizeName={dsuSizeEntry?.[0]}
           />
         </div>
       )}
