@@ -2478,7 +2478,52 @@ function mapChanges(state?: TraceState, mapId?: string): Array<{
         change.kind === 'update' ||
         change.kind === 'delete')
   );
-  if (authoritative.length || !state || !mapId) return authoritative;
+  const collapseSameKeyWrites = (input: typeof authoritative) => {
+    const grouped = new Map<string, {
+      key: unknown;
+      firstKind: 'insert' | 'update' | 'delete';
+      lastKind: 'insert' | 'update' | 'delete';
+      before?: unknown;
+      after?: unknown;
+    }>();
+    for (const change of input) {
+      const signature = mapKeySignature(change.key);
+      const previous = grouped.get(signature);
+      if (!previous) {
+        grouped.set(signature, {
+          key: change.key,
+          firstKind: change.kind,
+          lastKind: change.kind,
+          before: change.before,
+          after: change.kind === 'delete' ? undefined : change.after
+        });
+      } else {
+        previous.lastKind = change.kind;
+        if (previous.before === undefined && change.kind !== 'insert' && change.before !== undefined) {
+          previous.before = change.before;
+        }
+        previous.after = change.kind === 'delete' ? undefined : change.after;
+      }
+    }
+    const collapsed: typeof authoritative = [];
+    for (const change of grouped.values()) {
+      // A transient insert followed by delete has no visible final-state delta.
+      if (change.firstKind === 'insert' && change.lastKind === 'delete') continue;
+      const kind = change.firstKind === 'insert' ? 'insert' :
+        change.lastKind === 'delete' ? 'delete' :
+        change.firstKind === 'delete' && change.lastKind === 'insert' ? 'update' :
+        change.firstKind === 'delete' ? 'delete' : 'update';
+      collapsed.push({
+        kind,
+        key: change.key,
+        ...(kind === 'insert' ? {} : change.before !== undefined ? { before: change.before } : {}),
+        ...(kind === 'delete' ? {} : change.after !== undefined ? { after: change.after } : {})
+      });
+    }
+    return collapsed;
+  };
+  if (authoritative.length) return collapseSameKeyWrites(authoritative);
+  if (!state || !mapId) return [];
 
   // Some runtime checkpoints contain exact before/after snapshots but no MAP_WRITE
   // payload. Derive only the concrete map delta between adjacent captured states.
