@@ -74,6 +74,11 @@ export function inferMethod(source: string): JavaMethod {
   });
   if (uncalled.length === 1) return uncalled[0];
   if (pool.length === 1) return pool[0];
+  // Legacy fallback for pasted snippets: prefer the uniquely smallest public
+  // signature. This is not used by the LeetCode page integration.
+  const smallestArity = Math.min(...pool.map(method => method.parameterTypes.length));
+  const smallest = pool.filter(method => method.parameterTypes.length === smallestArity);
+  if (smallest.length === 1) return smallest[0];
   throw new Error('Could not uniquely identify the Java entry method. Use the original LeetCode starter signature.');
 }
 
