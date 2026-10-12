@@ -2351,12 +2351,11 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
         >{column}</div>
       ))}
       {rows.map((row, r) => (
-        <div
-          className="yv-matrix-row-fragment"
-          key={'row-' + r}
-          ref={element => { matrixCellRefs.current['__row,' + r] = element; }}
-        >
-          <div className={`yv-matrix-row-index ${activeRows.has(r) ? 'yv-matrix-axis-active' : ''}`}>{r}</div>
+        <div className="yv-matrix-row-fragment" key={'row-' + r}>
+          <div
+            className={`yv-matrix-row-index ${activeRows.has(r) ? 'yv-matrix-axis-active' : ''}`}
+            ref={element => { matrixCellRefs.current['__row,' + r] = element; }}
+          >{r}</div>
           {Array.from({ length: columnCount }, (_, column) => {
             const path = r + ',' + column;
             const exists = column < row.length;
