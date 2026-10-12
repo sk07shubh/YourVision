@@ -238,6 +238,33 @@ describe('binary-tree visualization', () => {
     }
   });
 
+  it('keeps the removed-child cue when the last child is detached', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 117,
+      objects: {
+        t1: { $objectId: 't1', $type: 'TreeNode', fields: { val: 1, left: { $ref: 't2' }, right: null } },
+        t2: { $objectId: 't2', $type: 'TreeNode', fields: { val: 2, left: null, right: null } },
+      },
+    });
+    const current = state({
+      sequence: 118,
+      objects: {
+        t1: { $objectId: 't1', $type: 'TreeNode', fields: { val: 1, left: null, right: null } },
+        t2: { $objectId: 't2', $type: 'TreeNode', fields: { val: 2, left: null, right: null } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'root.left = null;', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 't1' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-tree-edge="left"');
+      expect(html).toContain('data-tree-edge-status="removed"');
+      expect(html).toContain('class="yv-null">null</span>');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
   it('renders a cycle reference instead of recursing into a duplicate tree node', () => {
     const html = renderToStaticMarkup(<TreeNodeView
       value={{ $objectId: 'cycle-root' }}
