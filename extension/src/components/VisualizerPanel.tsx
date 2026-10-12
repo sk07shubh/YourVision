@@ -2336,9 +2336,11 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
     <div
       className="yv-matrix yv-matrix-grid"
       ref={matrixRef}
+      data-matrix-empty={rowCount === 0 ? 'true' : undefined}
       style={{ gridTemplateColumns: `62px repeat(${columnCount}, minmax(36px, max-content))` }}
     >
       <div className="yv-matrix-corner" />
+      {rowCount === 0 && <div className="yv-empty yv-matrix-empty-state">Empty matrix · 0 rows</div>}
       {Array.from({ length: columnCount }, (_, column) => (
         <div
           className={`yv-matrix-column-index ${activeColumns.has(column) ? 'yv-matrix-axis-active' : ''}`}
