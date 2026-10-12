@@ -1264,30 +1264,48 @@ function HeapTreeView({
     const bounds = tree.getBoundingClientRect();
     const width = Math.max(tree.clientWidth, tree.scrollWidth);
     const height = Math.max(tree.clientHeight, tree.scrollHeight);
-    const nodes = Array.from(tree.querySelectorAll<HTMLElement>('.yv-heap-node[data-heap-index]'));
-    const centers = new Map<number, { x: number; top: number; bottom: number }>();
-    for (const node of nodes) {
-      const index = Number(node.dataset.heapIndex);
-      if (!Number.isInteger(index) || index < 0) continue;
-      const rect = node.getBoundingClientRect();
-      centers.set(index, {
-        x: rect.left - bounds.left + tree.scrollLeft + rect.width / 2,
-        top: rect.top - bounds.top + tree.scrollTop,
-        bottom: rect.bottom - bounds.top + tree.scrollTop
-      });
-    }
-    const paths: string[] = [];
-    for (const [index, child] of centers) {
-      if (index === 0) continue;
-      const parent = centers.get(Math.floor((index - 1) / 2));
-      if (!parent) continue;
-      paths.push(`M ${parent.x.toFixed(2)} ${parent.bottom.toFixed(2)} L ${child.x.toFixed(2)} ${child.top.toFixed(2)}`);
-    }
-    const pathData = paths.join(' ');
-    const signature = width + ':' + height + ':' + pathData;
-    setGeometry(previous => previous.signature === signature
-      ? previous
-      : { width, height, paths: pathData, signature });
+    const measure = () => {
+      const currentTree = treeRef.current;
+      if (!currentTree) return;
+      const currentBounds = currentTree.getBoundingClientRect();
+      const currentWidth = Math.max(currentTree.clientWidth, currentTree.scrollWidth);
+      const currentHeight = Math.max(currentTree.clientHeight, currentTree.scrollHeight);
+      const nodes = Array.from(currentTree.querySelectorAll<HTMLElement>('.yv-heap-node[data-heap-index]'));
+      const centers = new Map<number, { x: number; top: number; bottom: number }>();
+      for (const node of nodes) {
+        const index = Number(node.dataset.heapIndex);
+        if (!Number.isInteger(index) || index < 0) continue;
+        const rect = node.getBoundingClientRect();
+        centers.set(index, {
+          x: rect.left - currentBounds.left + currentTree.scrollLeft + rect.width / 2,
+          top: rect.top - currentBounds.top + currentTree.scrollTop,
+          bottom: rect.bottom - currentBounds.top + currentTree.scrollTop
+        });
+      }
+      const paths: string[] = [];
+      for (const [index, child] of centers) {
+        if (index === 0) continue;
+        const parent = centers.get(Math.floor((index - 1) / 2));
+        if (!parent) continue;
+        paths.push(`M ${parent.x.toFixed(2)} ${parent.bottom.toFixed(2)} L ${child.x.toFixed(2)} ${child.top.toFixed(2)}`);
+      }
+      const pathData = paths.join(' ');
+      const signature = currentWidth + ':' + currentHeight + ':' + pathData;
+      setGeometry(previous => previous.signature === signature
+        ? previous
+        : { width: currentWidth, height: currentHeight, paths: pathData, signature });
+    };
+    measure();
+    const observer = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(measure)
+      : undefined;
+    observer?.observe(tree);
+    tree.querySelectorAll<HTMLElement>('.yv-heap-node[data-heap-index]').forEach(node => observer?.observe(node));
+    tree.addEventListener('scroll', measure, { passive: true });
+    return () => {
+      observer?.disconnect();
+      tree.removeEventListener('scroll', measure);
+    };
   });
 
   const levels: unknown[][] = [];
