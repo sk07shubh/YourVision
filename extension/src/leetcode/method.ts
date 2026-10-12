@@ -1,14 +1,14 @@
 import type { JavaMethod } from '../types/leetcode';
 
-const MODIFIERS = String.raw`(?:public|private|protected|static|final|synchronized|native|abstract|strictfp|default)\s+`;
+const MODIFIERS = String.raw\`(?:public|private|protected|static|final|synchronized|native|abstract|strictfp|default)\\s+\`;
 
 export function inferJavaMethods(source: string): JavaMethod[] {
   const withoutComments = source
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/\/\/.*$/gm, ' ');
+    .replace(/\\/\\*[\\s\\S]*?\\*\\//g, ' ')
+    .replace(/\\/\\/.*$/gm, ' ');
 
   const rx = new RegExp(
-    String.raw`(?:${MODIFIERS})*([\w$<>\[\].?,\s]+?)\s+(\w+)\s*\(([^)]*)\)\s*(?:throws\s+[^{]+)?\{`,
+    String.raw\`(?:\${MODIFIERS})*([\\w$<>\\[\\].?,\\s]+?)\\s+(\\w+)\\s*\\(([^)]*)\\)\\s*(?:throws\\s+[^{]+)?\\{\`,
     'g'
   );
   const methods: JavaMethod[] = [];
@@ -29,14 +29,11 @@ export function inferMethod(source: string): JavaMethod {
   const methods = inferJavaMethods(source).filter(m => m.name !== 'main');
   if (!methods.length) throw new Error('Could not find a Java solution method.');
 
-  // LeetCode's entry point is normally public, while recursive helpers are
-  // often private and may appear before it in the editor. Prefer the first
-  // public method so declaration order cannot accidentally select a helper.
   const withoutComments = source
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/\/\/.*$/gm, ' ');
+    .replace(/\\/\\*[\\s\\S]*?\\*\\//g, ' ')
+    .replace(/\\/\\/.*$/gm, ' ');
   const publicNames = new Set<string>();
-  const publicMethodRx = /\bpublic\s+(?:(?:static|final|synchronized|native|abstract|strictfp)\s+)*[\w$<>\[\].?,\s]+?\s+(\w+)\s*\(/g;
+  const publicMethodRx = /\\bpublic\\s+(?:(?:static|final|synchronized|native|abstract|strictfp)\\s+)*[\\w$<>\\[\\].?,\\s]+?\\s+(\\w+)\\s*\\(/g;
   for (const match of withoutComments.matchAll(publicMethodRx)) {
     if (match[1] !== 'main') publicNames.add(match[1]);
   }
@@ -44,38 +41,17 @@ export function inferMethod(source: string): JavaMethod {
   const publicMethods = methods.filter(method => publicNames.has(method.name));
   const candidates = publicMethods.length ? publicMethods : methods;
 
-  // Pick the solution entry point, not merely the first public declaration.
-  // Helpers are normally called by the solution method (and recursive helpers
-  // call themselves), whereas the LeetCode-provided entry method is usually
-  // only declared and not invoked from another method in the submitted class.
-  // Count calls after removing method declarations so declaration parentheses
-  // do not make every candidate look referenced.
-  const declarationRx = new RegExp(
-    String.raw`(?:${MODIFIERS})*[\\w$<>\\[\\].?,\\s]+?\\s+(\\w+)\\s*\\([^)]*\\)\\s*(?:throws\\s+[^{]+)?\\{`,
-    'g'
-  );
-  const executableSource = withoutComments.replace(declarationRx, match =>
-    match.replace(/\\([^)]*\\)/, '()')
-  );
+  // The LeetCode-provided method is the entry point; helper methods are
+  // typically invoked by it, and recursive helpers also invoke themselves.
+  // Prefer a candidate whose name occurs only in its declaration, rather
+  // than guessing from visibility or parameter count.
   const uncalled = candidates.filter(method => {
-    const callRx = new RegExp(String.raw`\\b${escapeRegExp(method.name)}\\s*\\(`, 'g');
-    return [...executableSource.matchAll(callRx)].length <= 1;
+    const callRx = new RegExp('\\\\b' + method.name + '\\\\s*\\\\(', 'g');
+    return [...withoutComments.matchAll(callRx)].length <= 1;
   });
 
-  if (uncalled.length === 1) return uncalled[0];
-  if (uncalled.length > 1) {
-    // Ambiguous classes are unusual in LeetCode submissions; retain source
-    // order rather than guessing based on visibility or parameter count.
-    return uncalled[0];
-  }
-
-  // Fall back to source order when every candidate is called, e.g. unusual
-  // mutually-recursive solutions.
+  if (uncalled.length) return uncalled[0];
   return candidates[0];
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\function splitParams(text: string): Array<{ type: string; name: string }> {');
 }
 
 function splitParams(text: string): Array<{ type: string; name: string }> {
@@ -95,9 +71,9 @@ function splitParams(text: string): Array<{ type: string; name: string }> {
   }
   parts.push(text.slice(start));
   return parts.map(raw => {
-    const clean = raw.trim().replace(/\bfinal\s+/g, '').replace(/@[\w.]+(?:\([^)]*\))?\s*/g, '');
-    const match = clean.match(/^(.*?)\s+(\w+)$/);
-    if (!match) return { type: clean, name: `arg${parts.indexOf(raw)}` };
+    const clean = raw.trim().replace(/\\bfinal\\s+/g, '').replace(/@[\\w.]+(?:\\([^)]*\\))?\\s*/g, '');
+    const match = clean.match(/^(.*?)\\s+(\\w+)$/);
+    if (!match) return { type: clean, name: \`arg\${parts.indexOf(raw)}\` };
     return { type: match[1].trim(), name: match[2].trim() };
   });
 }
