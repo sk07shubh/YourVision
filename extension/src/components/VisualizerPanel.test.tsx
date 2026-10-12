@@ -797,7 +797,7 @@ describe('string data structure visualization', () => {
     const html = renderToStaticMarkup(<StringView value="banana" state={current} name="s" source="String suffix = s.substring(start, s.length());" />);
     expect(html).toContain('data-string-pointer="start"');
     expect(html).toContain('data-string-pointer="end"');
-    expect(html).toContain('yv-string-end-marker');
+    expect(html).toContain('yv-string-end-pointer');
   });
 
   it('shows scalar string operation results without inventing character reads', () => {
