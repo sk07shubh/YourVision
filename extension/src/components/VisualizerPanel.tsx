@@ -1409,7 +1409,11 @@ function CollectionView({
         <span>{type}</span>
         <span>{kind} · {itemCount} items</span>
       </div>
-      <Collectio
+      <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
+    </div>
+  );
+}
+
 function variableSummary(value: unknown): string {
   if (isPlainObject(value) && looksListNode(value)) {
     const id = typeof value.$objectId === 'string' ? value.$objectId
