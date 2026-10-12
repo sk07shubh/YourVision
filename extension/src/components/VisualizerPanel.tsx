@@ -3366,26 +3366,46 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const rightEdgeChanged = Boolean(hasPreviousSnapshot && rightBefore !== rightAfter);
   const edgeStatus = (before: string | null | undefined, after: string | null | undefined) =>
     before == null ? 'added' : after == null ? 'removed' : 'rewired';
+  const movedPointerTargets = new Set<string>();
+  if (state && previous && session.states.includes(state)) {
+    for (const [name, currentValue] of Object.entries(state.variables)) {
+      const currentTarget = graphReferenceId(currentValue, objects);
+      const previousTarget = graphReferenceId(previous.variables[name], previousObjects);
+      if (currentTarget && currentTarget !== previousTarget) movedPointerTargets.add(currentTarget);
+    }
+  }
+  const pointerNames = Object.entries(state?.variables ?? {})
+    .filter(([, pointerValue]) => graphReferenceId(pointerValue, objects) === id)
+    .map(([pointerName]) => pointerName);
+  const leftChildId = graphReferenceId(fields.left, objects);
+  const rightChildId = graphReferenceId(fields.right, objects);
+  const leftTraversal = Boolean(leftChildId && movedPointerTargets.has(leftChildId));
+  const rightTraversal = Boolean(rightChildId && movedPointerTargets.has(rightChildId));
   const entered = Boolean(state && previous && id && session.states.includes(state) &&
-    Object.entries(state.variables).some(([name, currentValue]) =>
-      graphReferenceId(currentValue, objects) === id &&
-      graphReferenceId(previous.variables[name], previousObjects) !== id));
+    movedPointerTargets.has(id));
   return (
     <div className={'yv-tree-node' + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '')}
       data-tree-node-id={id} data-tree-changed={changed ? 'true' : undefined} data-tree-entered={entered ? 'true' : undefined}
       data-tree-created={created ? 'true' : undefined}>
-      <div className="yv-node" style={changed ? { background: 'var(--yv-highlight, #203b5b)' } : undefined}>{displayValue(nodeValue(resolved))}</div>
+      <div className="yv-node" style={changed ? { background: 'var(--yv-highlight, #203b5b)' } : undefined}>
+        <span>{displayValue(nodeValue(resolved))}</span>
+        {pointerNames.length > 0 && <span className="yv-tree-pointer-labels">
+          {pointerNames.map(pointerName => <span className="yv-tree-pointer-label" key={pointerName}>{pointerName}</span>)}
+        </span>}
+      </div>
       {hasChildren && (
         <div className="yv-tree-children">
-          <div data-tree-edge="left" className={leftEdgeChanged ? 'yv-tree-edge-changed' : undefined}
-            data-tree-edge-status={leftEdgeChanged ? edgeStatus(leftBefore, leftAfter) : undefined}>
+          <div data-tree-edge="left" className={[leftEdgeChanged ? 'yv-tree-edge-changed' : '', leftTraversal ? 'yv-tree-edge-traversed' : ''].filter(Boolean).join(' ')}
+            data-tree-edge-status={leftEdgeChanged ? edgeStatus(leftBefore, leftAfter) : undefined}
+            data-tree-edge-traversed={leftTraversal ? 'true' : undefined}>
             <div className="yv-tree-edge-label">LEFT</div>
             {fields.left != null
               ? <TreeNodeView value={fields.left} objects={objects} depth={depth + 1} seen={nextSeen} state={state} />
               : <span className="yv-null">null</span>}
           </div>
-          <div data-tree-edge="right" className={rightEdgeChanged ? 'yv-tree-edge-changed' : undefined}
-            data-tree-edge-status={rightEdgeChanged ? edgeStatus(rightBefore, rightAfter) : undefined}>
+          <div data-tree-edge="right" className={[rightEdgeChanged ? 'yv-tree-edge-changed' : '', rightTraversal ? 'yv-tree-edge-traversed' : ''].filter(Boolean).join(' ')}
+            data-tree-edge-status={rightEdgeChanged ? edgeStatus(rightBefore, rightAfter) : undefined}
+            data-tree-edge-traversed={rightTraversal ? 'true' : undefined}>
             <div className="yv-tree-edge-label">RIGHT</div>
             {fields.right != null
               ? <TreeNodeView value={fields.right} objects={objects} depth={depth + 1} seen={nextSeen} state={state} />
