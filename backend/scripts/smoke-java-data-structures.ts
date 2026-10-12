@@ -21,6 +21,13 @@ class Solution {
         GraphNode(int val) { this.val = val; }
     }
 
+    static class TreeNode {
+        int val;
+        TreeNode left;
+        TreeNode right;
+        TreeNode(int val) { this.val = val; }
+    }
+
     static class TrieNode {
         boolean isEnd;
         HashMap<Character, TrieNode> children = new HashMap<>();
@@ -81,6 +88,28 @@ class Solution {
         first.neighbors.add(second);
         second.neighbors.add(first);
         return first;
+    }
+
+    public GraphNode graphMutationTraversal() {
+        GraphNode first = new GraphNode(1);
+        GraphNode second = new GraphNode(2);
+        first.neighbors.add(second);
+        GraphNode cursor = first;
+        cursor = cursor.neighbors.get(0);
+        cursor.val = 7;
+        cursor.neighbors.add(first);
+        return first;
+    }
+
+    public TreeNode treeMutationTraversal() {
+        TreeNode root = new TreeNode(4);
+        root.left = new TreeNode(2);
+        root.right = new TreeNode(6);
+        TreeNode cursor = root;
+        cursor = cursor.left;
+        cursor.val = 3;
+        cursor.right = new TreeNode(5);
+        return root;
     }
 
     public Trie trie() {
@@ -246,6 +275,39 @@ const graphObjects = Object.values(graphState?.objects ?? {}).filter((value: any
 );
 assert(graphObjects.length >= 2, "graph node snapshots were not preserved");
 assert(graphObjects.some((value: any) => Array.isArray(value.fields?.neighbors?.values)), "graph adjacency collection was not preserved");
+
+// Exercise pointer movement, node mutation, and edge insertion through the real Java tracer.
+const graphMutation = await runJava(source, { method: "graphMutationTraversal" });
+assert(graphMutation.kind === "OK", "graph traversal/mutation execution failed");
+const graphMutationStates = graphMutation.states ?? [];
+assert(graphMutationStates.some((state: any) => {
+    const cursor = state.variables?.cursor as Record<string, any> | undefined;
+    const id = cursor?.$objectId ?? cursor?.$ref;
+    const target = typeof id === "string" ? state.objects?.[id] as Record<string, any> | undefined : undefined;
+    return target?.fields?.val === 2;
+}), "graph pointer traversal did not preserve the reached node identity");
+assert(graphMutationStates.some((state: any) => Object.values(state.objects ?? {}).some((value: any) =>
+    value && typeof value === "object" && value.$type?.includes("GraphNode") && value.fields?.val === 7
+)), "graph node mutation was not preserved in a trace snapshot");
+const graphMutationFinalObjects = Object.values(graphMutationStates.at(-1)?.objects ?? {}) as Array<Record<string, any>>;
+const mutatedGraphNode = graphMutationFinalObjects.find(value => value?.$type?.includes("GraphNode") && value.fields?.val === 7);
+assert(Array.isArray(mutatedGraphNode?.fields?.neighbors?.values) && mutatedGraphNode.fields.neighbors.values.length === 1,
+    "graph edge insertion was not preserved in the final snapshot");
+
+// Tree pointer movement and in-place node/child mutations must survive trace capture too.
+const treeMutation = await runJava(source, { method: "treeMutationTraversal" });
+assert(treeMutation.kind === "OK", "tree traversal/mutation execution failed");
+const treeMutationStates = treeMutation.states ?? [];
+assert(treeMutationStates.some((state: any) => {
+    const cursor = state.variables?.cursor as Record<string, any> | undefined;
+    const id = cursor?.$objectId ?? cursor?.$ref;
+    const target = typeof id === "string" ? state.objects?.[id] as Record<string, any> | undefined : undefined;
+    return target?.$type?.includes("TreeNode") && target.fields?.val === 2;
+}), "tree pointer traversal did not preserve the reached node identity");
+assert(treeMutationStates.some((state: any) => Object.values(state.objects ?? {}).some((value: any) =>
+    value && typeof value === "object" && value.$type?.includes("TreeNode") && value.fields?.val === 3 && value.fields?.right
+)),
+    "tree node value/child mutation was not preserved in a trace snapshot");
 
 const trie = await runJava(source, { method: "trie" });
 assert(trie.kind === "OK", "trie structure execution failed");
