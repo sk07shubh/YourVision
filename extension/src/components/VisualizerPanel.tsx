@@ -1398,7 +1398,8 @@ function CollectionView({
               const level = Math.floor(Math.log2(index + 1));
               (levels[level] ??= []).push(item);
             });
-            return levels.map((items, level) => (
+            return <>
+              {levels.map((items, level) => (
               <div className="yv-heap-level" key={level}>
                 {items.map((item, index) => (
                   <div className="yv-heap-node-wrap" key={collectionItemReactKey(item, (2 ** level) - 1 + index, value.values)}>
@@ -1407,7 +1408,9 @@ function CollectionView({
                   </div>
                 ))}
               </div>
-            ));
+              ))}
+              {!value.values.length && <div className="yv-empty">Empty priority queue</div>}
+            </>;
           })()}
         </div>
         <div className="yv-code yv-heap-note">Heap tree · root is index 0</div>
@@ -2678,6 +2681,7 @@ function MapView({
           <div>Value</div>
         </div>
 
+        {!value.entries.length && <div className="yv-empty yv-map-empty">Empty map</div>}
         {value.entries.map((entry, index) => {
           const change = findChange(entry.key);
 
