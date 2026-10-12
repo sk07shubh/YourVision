@@ -56,6 +56,13 @@
 .yv-list-slot{display:flex;flex:0 0 auto;flex-direction:column;align-items:center;min-width:36px}
 .yv-list-cell{display:flex;align-items:center;justify-content:center;box-sizing:border-box;min-width:36px;min-height:36px;padding:5px 8px;border:1px solid var(--yv-border);border-radius:6px;background:var(--yv-elevated);text-align:center}
 .yv-list-slot .yv-cell-index{width:100%;text-align:center;font-variant-numeric:tabular-nums}
+/* One-past-end sentinels mark the boundary; they are never real elements. */
+.yv-array-end-slot,.yv-list-end-slot{flex:0 0 auto;min-width:36px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start}
+.yv-array-end-marker,.yv-list-end-marker,.yv-string-end-marker{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:36px;min-width:36px;height:36px;border:1.5px dashed var(--yv-warning,#f59e0b);border-radius:6px;background:color-mix(in srgb,var(--yv-warning,#f59e0b),transparent 91%);color:var(--yv-warning,#f59e0b);font:700 18px/1 ui-monospace,SFMono-Regular,Menlo,monospace}
+.yv-pointer-out-of-bounds{z-index:2;border:1px dashed var(--yv-warning,#f59e0b)!important;border-radius:5px 5px 2px 2px!important;background:color-mix(in srgb,var(--yv-warning,#f59e0b),transparent 86%)!important;color:var(--yv-warning,#f59e0b)!important}
+.yv-string-end-pointer{display:flex;flex-direction:column;align-items:center;flex:0 0 40px;width:40px}
+.yv-string-end-pointer .yv-string-end-marker{width:30px;min-width:30px;height:30px}
+
 @media(prefers-reduced-motion:reduce){.yv-list-cell.yv-collection-item-enter{animation:none}}
 
 .yv-node-pointer{display:block;flex:0 0 auto;box-sizing:border-box;min-height:19px;line-height:14px;font-size:10px;color:var(--yv-accent);text-align:center;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin:0;padding:2px 7px;width:max-content;max-width:none;overflow:visible;text-overflow:clip;white-space:nowrap;border:1px solid color-mix(in srgb,var(--yv-accent),var(--yv-border) 35%);border-radius:5px;background:var(--yv-elevated);box-shadow:0 1px 3px rgb(0 0 0 / 10%);animation:yv-node-pointer-arrive 220ms ease-out both}.yv-linked-piece{position:relative}
