@@ -845,6 +845,21 @@ if (failures > 0) {
     );
 }
 
+
+const sessionResult = await runJava(
+    "class Counter { int value; Counter(int start) { value = start; } public void add(int amount) { value += amount; } public int read() { return value; } }",
+    { mode: "design", className: "Counter", constructorArguments: ["5"], operations: [
+        { method: "add", arguments: ["3"] },
+        { method: "read", arguments: [] },
+        { method: "add", arguments: ["2"] },
+        { method: "read", arguments: [] }
+    ] }
+);
+if (sessionResult.kind !== "OK" || sessionResult.result !== "[null,null,8,null,10]") {
+    throw new Error("Persistent design execution failed: " + sessionResult.kind + " " + sessionResult.result + " " + sessionResult.message);
+}
+console.log("PASS: persistent design-class execution");
+
 console.log(
     "All Java runtime smoke tests passed."
 );
