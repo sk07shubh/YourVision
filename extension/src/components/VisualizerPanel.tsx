@@ -3923,9 +3923,10 @@ export function StringView({ value, state, name, source = '' }: { value: string;
           const added = Boolean((transition?.kind === 'result' && transition.before.length === 0 && index < transition.after.length) ||
             (simpleAppend && transition && index >= transition.before.length && index < transition.after.length) || inserted);
           return (
-            <div className="yv-string-cell-wrap" key={usesStableCharacterKeys ? String(codeUnit) + '#' + characters.slice(0, index).filter(candidate => candidate === character).length : index}
+            <div className="yv-string-cell-wrap"
+              key={String(codeUnit) + '#' + characters.slice(0, index).filter(candidate => candidate === character).length}
               data-string-cell-index={index}
-              data-string-cell-key={usesStableCharacterKeys ? String(codeUnit) + '#' + characters.slice(0, index).filter(candidate => candidate === character).length : String(index)}
+              data-string-cell-key={String(codeUnit) + '#' + characters.slice(0, index).filter(candidate => candidate === character).length}
               style={enhancedBinding?.index === index ? { position: "relative" } : undefined}>
               {enhancedBinding?.index === index && <EnhancedForValueCard binding={enhancedBinding} />}
               <div className={`yv-string-cell ${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-string-cell-compared ' : ''}${inRange ? 'yv-cell-range ' : ''}${changed ? 'yv-string-cell-changed ' : ''}${added ? 'yv-string-cell-added ' : ''}${swapFromRight ? 'yv-string-cell-swap-right ' : ''}${swapFromLeft ? 'yv-string-cell-swap-left ' : ''}`} data-string-index={index}>
