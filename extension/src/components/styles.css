@@ -850,4 +850,11 @@
 /* Binary-tree node changes and pointer arrivals are trace-derived. */
 .yv-tree-node-entered>.yv-node{animation:yv-graph-node-entered 420ms ease-out both;box-shadow:0 0 0 2px color-mix(in srgb,var(--yv-accent,#65a9ff),transparent 45%)}
 .yv-tree-node-changed>.yv-node{animation:yv-graph-node-changed 420ms ease-out both}
+/* Disjoint-set parent, rank, and size writes share a short, local mutation cue. */
+.yv-dsu-changed>.yv-dsu-node{animation:yv-dsu-mutation 440ms ease-out both}
+.yv-dsu-field-changed{animation:yv-dsu-field-mutation 440ms ease-out both;border-radius:3px}
+@keyframes yv-dsu-mutation{0%{filter:brightness(1.35);box-shadow:0 0 0 3px color-mix(in srgb,var(--yv-accent,#65a9ff),transparent 45%)}100%{filter:brightness(1);box-shadow:0 0 0 0 transparent}}
+@keyframes yv-dsu-field-mutation{0%{color:var(--yv-accent,#65a9ff);background:color-mix(in srgb,var(--yv-accent,#65a9ff),transparent 82%)}100%{color:inherit;background:transparent}}
+@media(prefers-reduced-motion:reduce){.yv-dsu-changed>.yv-dsu-node,.yv-dsu-field-changed{animation:none}}
+
 @media(prefers-reduced-motion:reduce){.yv-tree-node-entered>.yv-node,.yv-tree-node-changed>.yv-node{animation:none}}
