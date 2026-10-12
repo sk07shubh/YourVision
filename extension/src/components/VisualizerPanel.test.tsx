@@ -1652,3 +1652,91 @@ describe('semantic roles in rendered visualization', () => {
   });
 
 });
+
+describe('array and matrix mutation animations', () => {
+  it('animates only the cells involved in a trace-confirmed array swap', () => {
+    const current = state({ lastEvent: { type: 'ARRAY_WRITE', line: 2, data: {
+      name: 'nums',
+      changes: [
+        { indices: [0], before: 1, after: 2 },
+        { indices: [1], before: 2, after: 1 },
+      ],
+    } } });
+    const html = renderToStaticMarkup(
+      <ArrayView value={[2, 1, 3]} state={current} source="int t = nums[i];" arrayName="nums" />,
+    );
+    expect(html.match(/yv-cell-swapped/g)).toHaveLength(2);
+    expect(html.match(/yv-array-cell-content-swapped/g)).toHaveLength(2);
+    expect(html).not.toContain('yv-array-cell-content-swapped"');
+  });
+
+  it('animates a confirmed multi-cell shift without moving array index labels', () => {
+    const current = state({ lastEvent: { type: 'ARRAY_WRITE', line: 3, data: {
+      name: 'nums',
+      changes: [
+        { indices: [1], before: 2, after: 9 },
+        { indices: [2], before: 3, after: 2 },
+        { indices: [3], before: 4, after: 3 },
+      ],
+    } } });
+    const html = renderToStaticMarkup(
+      <ArrayView value={[1, 9, 2, 3]} state={current} source="nums[i] = value;" arrayName="nums" />,
+    );
+    expect(html.match(/yv-array-cell-content-shift-right/g)).toHaveLength(3);
+    expect(html).toContain('class="yv-cell-index">1</div>');
+    expect(html).toContain('class="yv-cell-index">3</div>');
+  });
+
+  it('animates a trace-confirmed cyclic array rotation without guessing from final values alone', () => {
+    const current = state({ lastEvent: { type: 'ARRAY_WRITE', line: 4, data: {
+      name: 'nums',
+      changes: [
+        { indices: [0], before: 1, after: 2 },
+        { indices: [1], before: 2, after: 3 },
+        { indices: [2], before: 3, after: 1 },
+      ],
+    } } });
+    const html = renderToStaticMarkup(
+      <ArrayView value={[2, 3, 1]} state={current} source="rotate(nums);" arrayName="nums" />,
+    );
+    expect(html.match(/yv-cell-rotated-left/g)).toHaveLength(3);
+    expect(html.match(/yv-array-cell-content-rotate-left/g)).toHaveLength(3);
+  });
+
+  it('animates matrix cell swaps only when the recorded writes exchange before-values', () => {
+    const swapped = state({ lastEvent: { type: 'ARRAY_WRITE', line: 5, data: {
+      name: 'matrix',
+      changes: [
+        { indices: [0, 0], before: 1, after: 2 },
+        { indices: [1, 0], before: 2, after: 1 },
+      ],
+    } } });
+    const html = renderToStaticMarkup(
+      <ArrayView value={[[2, 3], [1, 4]]} state={swapped} source="swap(matrix);" arrayName="matrix" />,
+    );
+    expect(html).toContain('data-matrix-cell="[0,0]"');
+    expect(html).toContain('data-matrix-cell="[1,0]"');
+    expect(html.match(/yv-matrix-cell-swapped/g)).toHaveLength(2);
+
+    const notSwapped = state({ lastEvent: { type: 'ARRAY_WRITE', line: 5, data: {
+      name: 'matrix',
+      changes: [
+        { indices: [0, 0], before: 1, after: 2 },
+        { indices: [1, 0], before: 2, after: 3 },
+      ],
+    } } });
+    const plainHtml = renderToStaticMarkup(
+      <ArrayView value={[[2, 3], [3, 4]]} state={notSwapped} source="matrix[row][col] = value;" arrayName="matrix" />,
+    );
+    expect(plainHtml).not.toContain('yv-matrix-cell-swapped');
+  });
+
+  it('preserves jagged matrix rows instead of inventing missing values', () => {
+    const html = renderToStaticMarkup(
+      <ArrayView value={[[1, 2, 3], [4], []]} state={state()} source="" arrayName="matrix" />,
+    );
+    expect(html).toContain('yv-matrix-cell-empty');
+    expect(html).toContain('yv-matrix-missing');
+    expect((html.match(/class="yv-matrix-row-fragment"/g) ?? []).length).toBe(3);
+  });
+});
