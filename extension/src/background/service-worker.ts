@@ -77,7 +77,7 @@ chrome.runtime.onMessage.addListener((msg: ExtensionRequest | {type:'REVEAL_LINE
         if (sender.tab?.id) await revealLine(sender.tab.id,msg.line,msg.source ?? '');
         sendResponse({ok:true}); return;
       }
-      if (msg.type === 'RUN_VISUALIZATION') {
+      if (msg.type === 'RUN_DESIGN_VISUALIZATION') {\n        const res = await fetch('http://127.0.0.1:3000/visualize',{method:'POST',headers:{'content-type':'application/json'},body: JSON.stringify({\n          language: 'java', source: msg.source, testcase: { mode: 'design', className: msg.className, constructorArguments: msg.constructorArguments, operations: msg.operations }\n        })});\n        const text = await res.text();\n        let data: unknown; try { data=JSON.parse(text); } catch { throw new Error(\`Backend returned \${res.status}: \${text.slice(0,300)}\`); }\n        if (!res.ok) throw new Error((data as {message?:string})?.message ?? \`Backend returned \${res.status}\`);\n        const responseData = data as { execution?: VisualizationResponse };\n        sendResponse({ok:true,data:responseData.execution ?? (data as VisualizationResponse)} satisfies ExtensionResponse); return;\n      }\n      if (msg.type === 'RUN_VISUALIZATION') {
         const res = await fetch('http://127.0.0.1:3000/visualize',{method:'POST',headers:{'content-type':'application/json'},body: JSON.stringify({
     language: 'java',
     source: msg.source,
