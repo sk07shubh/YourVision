@@ -426,6 +426,58 @@ describe('graph data structure visualization', () => {
     }
   });
 
+  it('marks only the additional parallel edge as added', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 113,
+      objects: {
+        g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'g2' }] } } },
+        g2: { $objectId: 'g2', $type: 'Node', fields: { val: 2, neighbors: { values: [] } } },
+      },
+    });
+    const current = state({
+      sequence: 114,
+      objects: {
+        g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'g2' }, { $ref: 'g2' }] } } },
+        g2: { $objectId: 'g2', $type: 'Node', fields: { val: 2, neighbors: { values: [] } } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'g1.neighbors.add(g2);', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<GraphView objects={current.objects} state={current} />);
+      expect((html.match(/data-graph-edge-status="added"/g) ?? []).length).toBe(1);
+      expect((html.match(/data-graph-edge-status="steady"/g) ?? []).length).toBe(1);
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('shows one removed transition when a parallel edge is deleted', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 115,
+      objects: {
+        g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'g2' }, { $ref: 'g2' }] } } },
+        g2: { $objectId: 'g2', $type: 'Node', fields: { val: 2, neighbors: { values: [] } } },
+      },
+    });
+    const current = state({
+      sequence: 116,
+      objects: {
+        g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'g2' }] } } },
+        g2: { $objectId: 'g2', $type: 'Node', fields: { val: 2, neighbors: { values: [] } } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'g1.neighbors.remove(g2);', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<GraphView objects={current.objects} state={current} />);
+      expect((html.match(/data-graph-edge-status="removed"/g) ?? []).length).toBe(1);
+      expect((html.match(/data-graph-edge-status="steady"/g) ?? []).length).toBe(1);
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
   it('handles a self-loop without duplicating the graph node', () => {
     const html = renderToStaticMarkup(<GraphView
       objects={{
