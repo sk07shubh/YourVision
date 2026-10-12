@@ -17,5 +17,13 @@ describe('Java method inference', () => {
     expect(m.name).toBe('numIslands');
     expect(m.parameterNames).toEqual(['grid']);
   });
+  it('does not select a public DFS helper with extra parameters over the entry method', () => {
+    const m = inferMethod(`class Solution {
+      public void dfs(char[][] grid, int r, int c) { }
+      public int numIslands(char[][] grid) { return 0; }
+    }`);
+    expect(m.name).toBe('numIslands');
+    expect(m.parameterNames).toEqual(['grid']);
+  });
 
 });
