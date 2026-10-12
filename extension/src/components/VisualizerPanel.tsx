@@ -3608,6 +3608,16 @@ function ObjectView({
 
   const fields = objectFields(value);
   const entries = Object.entries(fields);
+  const session = sessionStore.get();
+  const selectedIndex = state ? session.states.findIndex(candidate =>
+    candidate === state || (state.sequence !== undefined && candidate.sequence === state.sequence)
+  ) : -1;
+  const previousState = selectedIndex > 0 ? session.states[selectedIndex - 1] : undefined;
+  const previousObject = objectId ? previousState?.objects?.[objectId] : undefined;
+  const previousFields = isPlainObject(previousObject) ? objectFields(previousObject) : {};
+  const createdFields = new Set(entries.filter(([key]) =>
+    previousObject !== undefined && !(key in previousFields)
+  ).map(([key]) => key));
   const changedFields = new Set<string>();
   const eventData = state?.lastEvent?.data;
   const collectChangedFields = (candidate: unknown, eventObjectId?: unknown) => {
@@ -3642,10 +3652,11 @@ function ObjectView({
   }
 
   return (
-    <div className="yv-object">
+    <div className={"yv-object" + (createdFields.size ? ' yv-object-has-created-fields' : '')}>
       {entries.map(([key, fieldValue]) => (
-        <div className={"yv-object-field" + (changedFields.has(key) ? ' yv-object-field-changed' : '')} key={key}
-          data-object-field={key} data-object-field-changed={changedFields.has(key) ? 'true' : undefined}>
+        <div className={"yv-object-field" + (changedFields.has(key) ? ' yv-object-field-changed' : '') + (createdFields.has(key) ? ' yv-object-field-created' : '')} key={key}
+          data-object-field={key} data-object-field-changed={changedFields.has(key) ? 'true' : undefined}
+          data-object-field-created={createdFields.has(key) ? 'true' : undefined}>
           <div className="yv-code yv-object-key">{key}</div>
           <div className="yv-object-value">
             <DataValue
