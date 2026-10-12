@@ -2485,7 +2485,8 @@ function MapView({
             : value.entries.length + ' entries'}</span>
       </div>
 
-      <div className="yv-map-table">
+      <div className={"yv-map-table" + (deleted.length ? ' yv-map-delete-pulse' : '')}
+        data-map-delete-count={deleted.length || undefined}>
         <div className="yv-map-header">
           <div>Key</div>
           <div>Value</div>
@@ -2524,22 +2525,7 @@ function MapView({
           );
         })}
 
-        {deleted.map((change, index) => (
-          <div
-            className="yv-map-row yv-map-delete"
-            key={`deleted-${mapKeySignature(change.key)}-${index}`} data-map-key-identity={mapKeySignature(change.key)}
-          >
-            <div className="yv-map-key">
-              <DataValue value={change.key} state={state} source={source} depth={depth + 1} seen={seen}/>
-            </div>
-            <div className="yv-map-value">
-              <span className="yv-old-value">
-                <DataValue value={change.before} state={state} source={source} depth={depth + 1} seen={seen} resolveObjects={false}/>
-              </span>
-              <span className="yv-map-tag">REMOVED</span>
-            </div>
-          </div>
-        ))}
+
       </div>
     </div>
   );
