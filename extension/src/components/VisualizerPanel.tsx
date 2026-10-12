@@ -2942,6 +2942,24 @@ export function TrieView({ objects, variables = {}, source = '', state }: {
     const nextPath = new Set(path);
     nextPath.add(id);
     const pointers = pointerNames.get(id) ?? [];
+    const previousTrieNode = previousObjects[id];
+    const previousChildren = isPlainObject(previousTrieNode) && looksTrieNode(previousTrieNode)
+      ? trieChildEntries(previousTrieNode, source)
+      : [];
+    const childSignature = (child: { label: string; target: unknown }, objectMap: Record<string, unknown>) =>
+      JSON.stringify([child.label, graphReferenceId(child.target, objectMap) ?? stableStringify(child.target)]);
+    const currentChildCounts = new Map<string, number>();
+    for (const child of node.children) {
+      const signature = childSignature(child, objects);
+      currentChildCounts.set(signature, (currentChildCounts.get(signature) ?? 0) + 1);
+    }
+    const previousChildCounts = new Map<string, number>();
+    const removedChildren = previousChildren.flatMap(child => {
+      const signature = childSignature(child, previousObjects);
+      const occurrence = previousChildCounts.get(signature) ?? 0;
+      previousChildCounts.set(signature, occurrence + 1);
+      return occurrence < (currentChildCounts.get(signature) ?? 0) ? [] : [{ label: child.label, signature }];
+    });
     return (
       <div className={'yv-trie-branch' + (changedNodeIds.has(id) ? ' yv-trie-node-changed' : '') + (enteredNodeIds.has(id) ? ' yv-trie-node-entered' : '') + (createdNodeIds.has(id) ? ' yv-trie-node-created' : '')}
         key={id + ':' + edgeLabel} data-trie-node-id={id} data-trie-changed={changedNodeIds.has(id) ? 'true' : undefined}
@@ -2957,7 +2975,7 @@ export function TrieView({ objects, variables = {}, source = '', state }: {
           <div style={{ color: 'var(--yv-muted, #8b9bb4)', fontSize: 10 }}>{id}</div>
           {pointers.map(pointer => <div key={pointer} style={{ color: 'var(--yv-accent, #65a9ff)', fontSize: 10 }}>{pointer}</div>)}
         </div>
-        {node.children.length > 0 && (
+        {(node.children.length > 0 || removedChildren.length > 0) && (
           <div className="yv-trie-children" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 10, flexWrap: 'wrap',
             borderTop: '1px solid var(--yv-border, #334155)', paddingTop: 8 }}>
             {node.children.map((child, index) => {
@@ -2967,6 +2985,10 @@ export function TrieView({ objects, variables = {}, source = '', state }: {
                 {renderNode(childId, child.label, depth + 1, nextPath)}
               </div>;
             })}
+            {removedChildren.map((child, index) => (
+              <span key={'removed:' + child.signature + ':' + index} className="yv-trie-edge-removed"
+                data-trie-edge-label={child.label} data-trie-edge-status="removed">{child.label} · removed</span>
+            ))}
           </div>
         )}
       </div>
