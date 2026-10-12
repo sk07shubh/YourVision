@@ -62,7 +62,7 @@
 
 /* One-past-end sentinels mark the boundary; they are never real elements. */
 .yv-array-end-slot,.yv-list-end-slot{flex:0 0 auto;min-width:36px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start}
-.yv-array-end-marker,.yv-list-end-marker,.yv-string-end-marker{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:36px;min-width:36px;height:36px;border:1.5px dashed var(--yv-warning,#f59e0b);border-radius:6px;background:color-mix(in srgb,var(--yv-warning,#f59e0b),transparent 91%);color:var(--yv-warning,#f59e0b);font:700 18px/1 ui-monospace,SFMono-Regular,Menlo,monospace}
+.yv-array-end-marker,.yv-list-end-marker,.yv-string-end-marker{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:100%;min-width:36px;min-height:34px;height:auto;padding:7px 6px;border:1px dashed var(--yv-warning,#f59e0b);border-radius:0;background:color-mix(in srgb,var(--yv-warning,#f59e0b),transparent 91%);color:var(--yv-warning,#f59e0b);font:700 14px/18px ui-monospace,SFMono-Regular,Menlo,monospace}
 .yv-pointer-out-of-bounds{z-index:2;border:1px dashed var(--yv-warning,#f59e0b)!important;border-radius:5px 5px 2px 2px!important;background:color-mix(in srgb,var(--yv-warning,#f59e0b),transparent 86%)!important;color:var(--yv-warning,#f59e0b)!important}
 .yv-string-end-pointer{display:flex;flex-direction:column;align-items:center;flex:0 0 40px;width:40px}
 .yv-string-end-pointer .yv-string-end-marker{width:30px;min-width:30px;height:30px}
