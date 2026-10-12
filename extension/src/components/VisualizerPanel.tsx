@@ -2550,6 +2550,41 @@ function mapChanges(state?: TraceState, mapId?: string): Array<{
   );
 }
 
+function mapReorderedKeys(
+  state: TraceState | undefined,
+  mapId: string,
+  currentEntries: Array<{ key: unknown; value: unknown }>
+): Set<string> {
+  if (!state) return new Set<string>();
+  const session = sessionStore.get();
+  const currentIndex = session.states.findIndex(candidate =>
+    candidate === state || candidate.sequence === state.sequence
+  );
+  if (currentIndex <= 0) return new Set<string>();
+  const previousState = session.states[currentIndex - 1];
+  const previousMap = [
+    ...Object.values(previousState?.variables ?? {}),
+    ...Object.values(previousState?.dataStructures ?? {}),
+  ].find(candidate =>
+    isPlainObject(candidate) && candidate.$mapId === mapId && Array.isArray(candidate.entries)
+  );
+  if (!isPlainObject(previousMap) || !Array.isArray(previousMap.entries) ||
+      previousMap.entries.length !== currentEntries.length) return new Set<string>();
+  const previousIndices = new Map<string, number>();
+  (previousMap.entries as Array<{ key: unknown }>).forEach((entry, index) =>
+    previousIndices.set(mapKeySignature(entry.key), index)
+  );
+  const currentIndices = new Map<string, number>();
+  currentEntries.forEach((entry, index) => currentIndices.set(mapKeySignature(entry.key), index));
+  if (previousIndices.size !== currentIndices.size ||
+      [...previousIndices.keys()].some(key => !currentIndices.has(key))) return new Set<string>();
+  const moved = new Set<string>();
+  for (const [key, index] of currentIndices) {
+    if (previousIndices.get(key) !== index) moved.add(key);
+  }
+  return moved;
+}
+
 function MapView({
   value,
   state,
@@ -2567,6 +2602,10 @@ function MapView({
   seen?: Set<string>;
 }) {
   const changes = mapChanges(state, value.$mapId);
+  const typeName = typeof value.$type === 'string' ? value.$type.split('.').pop() : '';
+  const reorderedKeys = typeName === 'LinkedHashMap'
+    ? mapReorderedKeys(state, value.$mapId, value.entries)
+    : new Set<string>();
 
   const findChange = (key: unknown) =>
     changes.find(
@@ -2606,8 +2645,9 @@ function MapView({
 
           return (
             <div
-              className={`yv-map-row ${change ? `yv-map-${change.kind}` : ''}`}
+              className={`yv-map-row ${change ? `yv-map-${change.kind}` : ''}${reorderedKeys.has(mapKeySignature(entry.key)) ? ' yv-map-reordered' : ''}`}
               key={mapKeySignature(entry.key)} data-map-key-identity={mapKeySignature(entry.key)}
+              data-map-reordered={reorderedKeys.has(mapKeySignature(entry.key)) ? 'true' : undefined}
             >
               <div className="yv-map-key">
                 <DataValue value={entry.key} state={state} source={source} depth={depth + 1} seen={seen}/>
