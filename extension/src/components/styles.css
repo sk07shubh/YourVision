@@ -575,6 +575,10 @@
 .yv-string-operation{display:flex;flex-wrap:wrap;gap:8px}
 
 .yv-string-cells{position:relative}
+.yv-string-view[data-string-emptied="true"] .yv-empty{border-radius:6px;animation:yv-string-emptied 460ms ease-out both}
+@keyframes yv-string-emptied{0%{box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--yv-warning,#f59e0b),transparent 25%);background:color-mix(in srgb,var(--yv-warning,#f59e0b),transparent 90%)}100%{box-shadow:inset 0 0 0 0 transparent;background:transparent}}
+@media(prefers-reduced-motion:reduce){.yv-string-view[data-string-emptied="true"] .yv-empty{animation:none}}
+
 .yv-string-pointer-layer{position:absolute;left:0;top:0;width:100%;height:21px;pointer-events:none;z-index:5}
 .yv-string-pointer-group{position:absolute;top:0;left:0;display:flex;align-items:center;justify-content:center;gap:3px;width:max-content;max-width:180px;transform:translateX(-50%);transition:left 180ms cubic-bezier(.4,0,.2,1);pointer-events:none}.yv-string-pointer{position:static;left:auto;top:auto;transform:none;transition:none;max-width:72px}
 @media(prefers-reduced-motion:reduce){.yv-string-pointer-group{transition:none}}
