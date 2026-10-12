@@ -1328,7 +1328,10 @@ function CollectionView({
           ))}
           {!value.values.length && <div className="yv-empty">Empty stack</div>}
         </div>
-        <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
+      </div>
+    );
+  }
+ngArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
       </div>
     );
   }
@@ -1350,7 +1353,10 @@ function CollectionView({
           <div className="yv-queue-end">REAR</div>
           {!value.values.length && <div className="yv-empty">Empty queue</div>}
         </div>
-        <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
+      </div>
+    );
+  }
+ngArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
       </div>
     );
   }
@@ -1370,7 +1376,10 @@ function CollectionView({
           ))}
           {!value.values.length && <div className="yv-empty">Empty set</div>}
         </div>
-        <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
+      </div>
+    );
+  }
+ngArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
       </div>
     );
   }
@@ -1402,7 +1411,6 @@ function CollectionView({
           })()}
         </div>
         <div className="yv-code yv-heap-note">Heap tree · root is index 0</div>
-        <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
       </div>
     );
   }
@@ -1414,6 +1422,10 @@ function CollectionView({
         <span>{kind} · {itemCount} items</span>
       </div>
       <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
+    </div>
+  );
+}
+nBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
     </div>
   );
 }
