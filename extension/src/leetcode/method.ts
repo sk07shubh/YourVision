@@ -41,18 +41,41 @@ export function inferMethod(source: string): JavaMethod {
     if (match[1] !== 'main') publicNames.add(match[1]);
   }
 
-  // A helper can also be public (for example, users may change a recursive
-  // DFS helper from private to public while debugging). In that case, prefer
-  // the public candidate with the fewest parameters: LeetCode entry methods
-  // generally take the testcase inputs, while helpers add traversal/state args.
   const publicMethods = methods.filter(method => publicNames.has(method.name));
-  if (publicMethods.length) {
-    return publicMethods.reduce((best, method) =>
-      method.parameterNames.length < best.parameterNames.length ? method : best
-    );
+  const candidates = publicMethods.length ? publicMethods : methods;
+
+  // Pick the solution entry point, not merely the first public declaration.
+  // Helpers are normally called by the solution method (and recursive helpers
+  // call themselves), whereas the LeetCode-provided entry method is usually
+  // only declared and not invoked from another method in the submitted class.
+  // Count calls after removing method declarations so declaration parentheses
+  // do not make every candidate look referenced.
+  const declarationRx = new RegExp(
+    String.raw`(?:${MODIFIERS})*[\\w$<>\\[\\].?,\\s]+?\\s+(\\w+)\\s*\\([^)]*\\)\\s*(?:throws\\s+[^{]+)?\\{`,
+    'g'
+  );
+  const executableSource = withoutComments.replace(declarationRx, match =>
+    match.replace(/\\([^)]*\\)/, '()')
+  );
+  const uncalled = candidates.filter(method => {
+    const callRx = new RegExp(String.raw`\\b${escapeRegExp(method.name)}\\s*\\(`, 'g');
+    return [...executableSource.matchAll(callRx)].length <= 1;
+  });
+
+  if (uncalled.length === 1) return uncalled[0];
+  if (uncalled.length > 1) {
+    // Ambiguous classes are unusual in LeetCode submissions; retain source
+    // order rather than guessing based on visibility or parameter count.
+    return uncalled[0];
   }
 
-  return methods[0];
+  // Fall back to source order when every candidate is called, e.g. unusual
+  // mutually-recursive solutions.
+  return candidates[0];
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\function splitParams(text: string): Array<{ type: string; name: string }> {');
 }
 
 function splitParams(text: string): Array<{ type: string; name: string }> {
