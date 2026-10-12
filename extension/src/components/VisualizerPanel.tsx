@@ -2852,14 +2852,53 @@ export function GraphView({ objects, variables = {}, state }: {
     return [{ id, value, label: nodeValue(value), neighbors: graphNeighborValues(value) ?? [] }];
   }).slice(0, 80);
   const ids = new Set(nodes.map(node => node.id));
-  const positions = new Map<string, { x: number; y: number }>();
-  nodes.forEach((node, index) => {
-    const angle = -Math.PI / 2 + (2 * Math.PI * index) / Math.max(1, nodes.length);
-    positions.set(node.id, {
-      x: 300 + (nodes.length <= 1 ? 0 : 205 * Math.cos(angle)),
-      y: 160 + (nodes.length <= 1 ? 0 : 112 * Math.sin(angle)),
+  const positionSession = useRef(session.states[0]);
+  const stableGraphPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
+  if (positionSession.current !== session.states[0]) {
+    stableGraphPositions.current.clear();
+    positionSession.current = session.states[0];
+  }
+  const stablePositions = stableGraphPositions.current;
+  // Lay out the first observed snapshot once. Later vertices take an unused
+  // slot; existing vertices never orbit/reflow merely because another is added.
+  if (stablePositions.size === 0 && nodes.length) {
+    nodes.forEach((node, index) => {
+      const angle = -Math.PI / 2 + (2 * Math.PI * index) / Math.max(1, nodes.length);
+      stablePositions.set(node.id, {
+        x: 300 + (nodes.length <= 1 ? 0 : 205 * Math.cos(angle)),
+        y: 160 + (nodes.length <= 1 ? 0 : 112 * Math.sin(angle)),
+      });
     });
-  });
+  } else {
+    const slots = Array.from({ length: 80 }, (_, index) => ({
+      x: 30 + (index % 10) * 60,
+      y: 20 + Math.floor(index / 10) * 40,
+    }));
+    for (const node of nodes) {
+      if (stablePositions.has(node.id)) continue;
+      let hash = 0;
+      for (let index = 0; index < node.id.length; index++) hash = (hash * 31 + node.id.charCodeAt(index)) >>> 0;
+      let chosen: { x: number; y: number } | undefined;
+      let bestDistance = -1;
+      for (let offset = 0; offset < slots.length; offset++) {
+        const candidate = slots[(hash + offset) % slots.length]!;
+        const minDistance = stablePositions.size
+          ? Math.min(...[...stablePositions.values()].map(point => Math.hypot(point.x - candidate.x, point.y - candidate.y)))
+          : Infinity;
+        if (minDistance > bestDistance) {
+          bestDistance = minDistance;
+          chosen = candidate;
+        }
+        if (minDistance >= 50) break;
+      }
+      stablePositions.set(node.id, chosen ?? { x: 300, y: 160 });
+    }
+  }
+  const positions = new Map<string, { x: number; y: number }>();
+  for (const node of nodes) {
+    const position = stablePositions.get(node.id);
+    if (position) positions.set(node.id, position);
+  }
   const edges = nodes.flatMap(node => node.neighbors.flatMap((neighbor, index) => {
     const target = graphReferenceId(neighbor, objects);
     if (!target || !ids.has(target)) return [];
