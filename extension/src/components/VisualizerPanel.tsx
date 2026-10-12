@@ -1308,7 +1308,7 @@ function CollectionView({
 
   if (kind === 'queue' || kind === 'deque') {
     return (
-      <div className="yv-collection">
+      <div className="yv-collection" ref={collectionRootRef}>
         <div className="yv-collection-meta">
           <span>{type}</span>
           <span>{kind === 'deque' ? 'FRONT ↔ REAR' : 'FRONT → REAR'} · {itemCount} items</span>
@@ -1330,7 +1330,7 @@ function CollectionView({
 
   if (kind === 'set' || kind === 'sortedSet' || kind === 'insertionOrderedSet') {
     return (
-      <div className="yv-collection">
+      <div className="yv-collection" ref={collectionRootRef}>
         <div className="yv-collection-meta">
           <span>{type}</span>
           <span>{kind === 'sortedSet' ? 'SORTED · ' : kind === 'insertionOrderedSet' ? 'INSERTION ORDER · ' : 'UNORDERED · '}{itemCount} elements</span>
@@ -1350,7 +1350,7 @@ function CollectionView({
 
   if (kind === 'priorityQueue') {
     return (
-      <div className="yv-collection">
+      <div className="yv-collection" ref={collectionRootRef}>
         <div className="yv-collection-meta">
           <span>{type}</span>
           <span>HEAP · {itemCount} items</span>
@@ -1381,7 +1381,7 @@ function CollectionView({
   }
 
   return (
-    <div className="yv-collection">
+    <div className="yv-collection" ref={collectionRootRef}>
       <div className="yv-collection-meta">
         <span>{type}</span>
         <span>{kind} · {itemCount} items</span>
