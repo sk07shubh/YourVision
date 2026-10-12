@@ -1176,6 +1176,32 @@ describe('execution visualization feature matrix', () => {
     }
   });
 
+  it('marks a collection emptied by the current step without a detached removal box', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 79,
+      dataStructures: {
+        items: { $collectionId: 'emptied-stack', $type: 'java.util.Stack', $kind: 'stack', values: [1], size: 1 },
+      },
+    });
+    const current = state({
+      sequence: 80,
+      dataStructures: {
+        items: { $collectionId: 'emptied-stack', $type: 'java.util.Stack', $kind: 'stack', values: [], size: 0 },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'items.pop();', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source="items.pop();" />);
+      expect(html).toContain('data-collection-emptied="true"');
+      expect(html).toContain('Empty stack');
+      expect(html).not.toContain('yv-collection-removals');
+      expect(html).not.toContain('yv-collection-item-exit');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
   it('tracks collection insertion and removal across variable aliases by collection identity', () => {
     const previousSession = sessionStore.get();
     const previous = state({
