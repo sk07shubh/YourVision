@@ -1274,6 +1274,7 @@ function CollectionView({
   const itemCount = value.size ?? value.values.length;
   const collectionRootRef = useRef<HTMLDivElement | null>(null);
   const previousItemRects = useRef<Map<string, DOMRect>>(new Map());
+  const itemAnimations = useRef<WeakMap<HTMLElement, Animation>>(new WeakMap());
 
   // FLIP only the surviving logical items when insertions/removals change layout.
   // Removed items disappear in place; no detached "pop-out" element is rendered.
@@ -1294,6 +1295,8 @@ function CollectionView({
     for (const element of items) {
       const key = element.dataset.collectionItemKey;
       if (!key) continue;
+      // Rapid Next/Prev playback must not stack competing transforms.
+      itemAnimations.current.get(element)?.cancel();
       const rect = element.getBoundingClientRect();
       nextRects.set(key, rect);
       const before = previousItemRects.current.get(key);
@@ -1301,10 +1304,11 @@ function CollectionView({
         const dx = before.left - rect.left;
         const dy = before.top - rect.top;
         if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-          element.animate(
+          const animation = element.animate(
             [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }],
             { duration: 220, easing: 'cubic-bezier(.2,.75,.25,1)' }
           );
+          itemAnimations.current.set(element, animation);
         }
       }
     }
