@@ -614,6 +614,16 @@ describe('string data structure visualization', () => {
     expect(html).toContain('UTF-16 code unit U+DE00');
   });
 
+  it('keeps an in-place cue when a string mutation removes its final character', () => {
+    const current = state({ lastEvent: { type: 'STEP', line: 4, data: { executionEvents: [
+      { type: 'STRING_MUTATION', data: { name: 'builder', operation: 'delete', before: 'x', after: '', index: 0, removed: 'x' } },
+    ] } } });
+    const html = renderToStaticMarkup(<StringView value="" state={current} name="builder" />);
+    expect(html).toContain('data-string-emptied="true"');
+    expect(html).toContain('Empty string');
+    expect(html).not.toContain('yv-string-cell-exit');
+  });
+
   it('renders spaces as blank fixed-width cells and keeps every index in its own aligned wrapper', () => {
     const html = renderToStaticMarkup(<StringView value="a b  c" state={state()} name="s" />);
     expect(html).toContain('data-string-length="6"');
