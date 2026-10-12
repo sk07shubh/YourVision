@@ -174,3 +174,5 @@ export function readSelectedTestcase(
     method
   );
 }
+
+// Design-class testcase parsing is implemented alongside the execution contract.
