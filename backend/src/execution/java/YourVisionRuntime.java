@@ -13,6 +13,10 @@ public class YourVisionRuntime {
 
         String className = args[0];
         String methodName = args[1];
+        if ("__YV_DESIGN__".equals(methodName)) {
+            runDesignSession(args);
+            return;
+        }
         List<String> rawArguments = new ArrayList<>();
 
         if (args.length == 3 && NO_ARGS.equals(args[2])) {
@@ -96,6 +100,148 @@ public class YourVisionRuntime {
             cause.printStackTrace(System.err);
             System.exit(7);
         }
+    }
+
+    /**
+     * Runs a LeetCode design-class testcase in one JVM and on one instance.
+     * Arguments use a length-prefixed protocol so user values can safely contain
+     * commas, brackets, spaces, or JSON-like structures.
+     */
+    private static void runDesignSession(String[] args) throws Exception {
+        if (args.length < 5) {
+            throw new IllegalArgumentException("Malformed design testcase header");
+        }
+        Class<?> targetClass = Class.forName(args[0]);
+        int cursor = 2;
+        int constructorCount = parseCount(args[cursor++], "constructor argument count");
+        List<String> constructorRaw = readArguments(args, cursor, constructorCount);
+        cursor = advanceArgumentCursor(cursor, constructorCount);
+        int operationCount = parseCount(args[cursor++], "operation count");
+        if (operationCount < 1) {
+            throw new IllegalArgumentException("A design testcase must contain at least one operation");
+        }
+
+        ConstructorResolution constructorResolution =
+            resolveConstructor(targetClass, constructorRaw);
+        Constructor<?> constructor = constructorResolution.constructor;
+        constructor.setAccessible(true);
+        Object instance;
+        try {
+            instance = constructor.newInstance(constructorResolution.arguments);
+        } catch (InvocationTargetException ex) {
+            reportInvocationFailure(ex);
+            return;
+        }
+
+        List<Object> results = new ArrayList<>();
+        for (int operationIndex = 0; operationIndex < operationCount; operationIndex++) {
+            if (cursor + 1 >= args.length) {
+                throw new IllegalArgumentException("Malformed operation " + operationIndex);
+            }
+            String operationName = args[cursor++];
+            int argumentCount = parseCount(args[cursor++], "operation argument count");
+            List<String> operationRaw = readArguments(args, cursor, argumentCount);
+            cursor = advanceArgumentCursor(cursor, argumentCount);
+
+            MethodResolution resolution = resolveMethod(targetClass, operationName, operationRaw);
+            Method method = resolution.method;
+            method.setAccessible(true);
+            try {
+                Object result = method.invoke(
+                    Modifier.isStatic(method.getModifiers()) ? null : instance,
+                    resolution.arguments
+                );
+                results.add(result);
+                emitEvent("OPERATION_RESULT", operationName, operationIndex + 1,
+                    result == null ? "null" : formatValue(result));
+            } catch (InvocationTargetException ex) {
+                reportInvocationFailure(ex);
+                return;
+            }
+        }
+        if (cursor != args.length) {
+            throw new IllegalArgumentException("Unexpected trailing design testcase arguments");
+        }
+
+        System.out.println("__YV_RESULT__=" + formatValue(results));
+    }
+
+    private static int parseCount(String value, String label) {
+        try {
+            int count = Integer.parseInt(value);
+            if (count < 0 || count > 10000) {
+                throw new IllegalArgumentException(label + " is out of range");
+            }
+            return count;
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException("Invalid " + label, ex);
+        }
+    }
+
+    private static List<String> readArguments(String[] args, int start, int count) {
+        if (count == 0) {
+            if (start >= args.length || !NO_ARGS.equals(args[start])) {
+                throw new IllegalArgumentException("Missing zero-argument marker");
+            }
+            return new ArrayList<>();
+        }
+        if (start + count > args.length) {
+            throw new IllegalArgumentException("Argument count exceeds testcase payload");
+        }
+        List<String> values = new ArrayList<>();
+        for (int i = start; i < start + count; i++) {
+            values.add(decodeArgument(args[i]));
+        }
+        return values;
+    }
+
+    private static int advanceArgumentCursor(int cursor, int count) {
+        return cursor + Math.max(1, count);
+    }
+
+    private static ConstructorResolution resolveConstructor(
+        Class<?> targetClass,
+        List<String> raw
+    ) {
+        List<ConstructorResolution> matches = new ArrayList<>();
+        List<String> failures = new ArrayList<>();
+        for (Constructor<?> constructor : targetClass.getDeclaredConstructors()) {
+            if (constructor.getParameterCount() != raw.size()) continue;
+            try {
+                Class<?>[] types = constructor.getParameterTypes();
+                Object[] parsed = new Object[types.length];
+                int score = 0;
+                for (int i = 0; i < types.length; i++) {
+                    ParseResult result = parseValue(raw.get(i), types[i]);
+                    parsed[i] = result.value;
+                    score += result.score;
+                }
+                matches.add(new ConstructorResolution(constructor, parsed, score));
+            } catch (RuntimeException ex) {
+                failures.add(constructor.toGenericString() + ": " + ex.getMessage());
+            }
+        }
+        if (matches.isEmpty()) {
+            throw new IllegalArgumentException("No compatible constructor for " +
+                targetClass.getName() + " with " + raw.size() + " argument(s). " +
+                String.join(" | ", failures));
+        }
+        matches.sort((a, b) -> Integer.compare(b.score, a.score));
+        if (matches.size() > 1 && matches.get(0).score == matches.get(1).score) {
+            throw new IllegalArgumentException("Ambiguous constructor for " +
+                targetClass.getName() + ": " + matches.get(0).constructor.toGenericString() +
+                " vs " + matches.get(1).constructor.toGenericString());
+        }
+        return matches.get(0);
+    }
+
+    private static void reportInvocationFailure(InvocationTargetException ex) {
+        Throwable cause = ex.getCause() == null ? ex : ex.getCause();
+        emitEvent("ERROR", cause.getClass().getSimpleName(), 1, String.valueOf(cause.getMessage()));
+        System.err.println("__YV_EXCEPTION_TYPE__=" + cause.getClass().getName());
+        System.err.println("__YV_EXCEPTION_MESSAGE__=" + String.valueOf(cause.getMessage()));
+        cause.printStackTrace(System.err);
+        System.exit(7);
     }
 
     private static String decodeArgument(
@@ -1326,6 +1472,18 @@ if (isTreeNodeType(type)) {
             int score
         ) {
             this.method = method;
+            this.arguments = arguments;
+            this.score = score;
+        }
+    }
+
+    private static final class ConstructorResolution {
+        final Constructor<?> constructor;
+        final Object[] arguments;
+        final int score;
+
+        ConstructorResolution(Constructor<?> constructor, Object[] arguments, int score) {
+            this.constructor = constructor;
             this.arguments = arguments;
             this.score = score;
         }
