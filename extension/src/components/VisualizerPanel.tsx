@@ -693,39 +693,16 @@ export function collectionOperation(kind: string, method: string | undefined, de
     if (['removefirst','pollfirst','remove','poll','pop'].includes(m)) return {operation:m === 'pop' ? 'Pop' : 'removeFirst',value:delta.removed,position:'Front'};
     if (['removelast','polllast'].includes(m)) return {operation:'removeLast',value:delta.removed,position:'Back'};
   }
-  if (kind === 'list' || kind === 'arrayList' || /^(ArrayList|Vector|CopyOnWriteArrayList)$/.test(type)) {
-    return (
-      <div className="yv-collection" ref={collectionRootRef} data-collection-emptied={emptiedThisStep ? 'true' : undefined}>
-        <div className="yv-collection-meta">
-          <span>{type}</span>
-          <span>INDEXED ORDER · {itemCount} items</span>
-        </div>
-        <div className="yv-list-view">
-          {value.values.map((item, index) => (
-            <div className="yv-list-slot" key={collectionItemReactKey(item, index, value.values)}
-              data-collection-item-key={collectionItemReactKey(item, index, value.values)}>
-              <div className={"yv-list-cell " + collectionItemMotionClass(value, item, index, state)}>
-                <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
-              </div>
-              <div className="yv-cell-index">{index}</div>
-            </div>
-          ))}
-          {!value.values.length && <div className="yv-empty">Empty list</div>}
-        </div>
-      </div>
-    );
-  }
-
   if (kind === 'priorityQueue') {
     if (['add','offer'].includes(m)) return {operation:'Offer',value:delta.added,position:'Queue'};
     if (['poll','remove'].includes(m)) return {operation:'Poll',value:delta.removed,position:'Priority'};
   }
-  if (kind === 'list') {
+  if (kind === 'list' || kind === 'arrayList' || /^(ArrayList|Vector|CopyOnWriteArrayList)$/.test(kind)) {
     if (m === 'add') return argCount >= 2
       ? {operation:'Insert',value:delta.added,position:'Index: ' + (delta.index ?? '?')}
       : {operation:'Add',value:delta.added,position:'End'};
-    if (['addlast','offer'].includes(m)) return {operation:'Add',value:delta.added,position:'End'};
-    if (['remove','removelast','poll'].includes(m)) return {operation:'Remove',value:delta.removed,position:typeof delta.index === 'number' ? 'Index: ' + delta.index : 'End'};
+    if (['addlast','offer','append'].includes(m)) return {operation:'Add',value:delta.added,position:'End'};
+    if (['remove','removelast','poll','removeat'].includes(m)) return {operation:'Remove',value:delta.removed,position:typeof delta.index === 'number' ? 'Index: ' + delta.index : 'End'};
     if (m === 'set') return {operation:'Set',value:delta.added,oldValue:delta.removed,position:'Index: ' + (delta.index ?? '?'),showOld:true};
   }
   if (kind === 'set' || kind === 'sortedSet' || kind === 'insertionOrderedSet') {
@@ -2812,8 +2789,18 @@ function MapView({
             </div>
           );
         })}
-
-
+        {deleted.map((change, index) => (
+          <div className="yv-map-row yv-map-delete" key={`deleted-${mapKeySignature(change.key)}-${index}`}
+            data-map-key-identity={mapKeySignature(change.key)} data-map-deleted="true">
+            <div className="yv-map-key">
+              <DataValue value={change.key} state={state} source={source} depth={depth + 1} seen={seen} resolveObjects={false}/>
+            </div>
+            <div className="yv-map-value">
+              <DataValue value={change.before} state={state} source={source} depth={depth + 1} seen={seen} resolveObjects={false}/>
+              <span className="yv-map-tag">REMOVED</span>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
