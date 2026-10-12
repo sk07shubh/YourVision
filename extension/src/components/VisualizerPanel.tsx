@@ -3534,15 +3534,24 @@ export function StringView({ value, state, name, source = '' }: { value: string;
     }
     if (event.type === 'STRING_MUTATION' && matchesName(effect.name) &&
         typeof effect.after === 'string' && typeof effect.before === 'string' && typeof effect.operation === 'string') {
+      // Appends often have no explicit index in the runtime event. The exact
+      // before snapshot gives an authoritative insertion point at its length.
+      const mutationIndex = typeof effect.index === 'number' ? effect.index
+        : effect.operation === 'append' ? effect.before.length : undefined;
+      const mutationInserted = typeof effect.inserted === 'string' ? effect.inserted
+        : effect.operation === 'append' && effect.after.startsWith(effect.before)
+          ? effect.after.slice(effect.before.length) : undefined;
       if (effect.after === value) {
-        transition = { operation: effect.operation, before: effect.before, after: effect.after, kind: 'mutation', index: typeof effect.index === 'number' ? effect.index : undefined, removed: typeof effect.removed === 'string' ? effect.removed : undefined, inserted: typeof effect.inserted === 'string' ? effect.inserted : undefined };
+        transition = { operation: effect.operation, before: effect.before, after: effect.after, kind: 'mutation',
+          index: mutationIndex, removed: typeof effect.removed === 'string' ? effect.removed : undefined,
+          inserted: mutationInserted };
       } else if (effect.before === value) {
         const operation = effect.operation === 'append' || effect.operation === 'insert' ? 'delete'
           : effect.operation === 'delete' || effect.operation === 'deleteCharAt' ? 'insert'
           : effect.operation;
         transition = { operation, before: effect.after, after: effect.before, kind: 'mutation',
-          index: typeof effect.index === 'number' ? effect.index : undefined,
-          removed: typeof effect.inserted === 'string' ? effect.inserted : undefined,
+          index: mutationIndex,
+          removed: mutationInserted,
           inserted: typeof effect.removed === 'string' ? effect.removed : undefined };
       }
     }
