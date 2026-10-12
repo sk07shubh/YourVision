@@ -1331,10 +1331,6 @@ function CollectionView({
       </div>
     );
   }
-ngArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
-      </div>
-    );
-  }
 
   if (kind === 'queue' || kind === 'deque') {
     return (
@@ -1356,10 +1352,6 @@ ngArray value={value} state={state} source={source} name={name} depth={depth} se
       </div>
     );
   }
-ngArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
-      </div>
-    );
-  }
 
   if (kind === 'set' || kind === 'sortedSet' || kind === 'insertionOrderedSet') {
     return (
@@ -1376,10 +1368,6 @@ ngArray value={value} state={state} source={source} name={name} depth={depth} se
           ))}
           {!value.values.length && <div className="yv-empty">Empty set</div>}
         </div>
-      </div>
-    );
-  }
-ngArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
       </div>
     );
   }
@@ -1421,15 +1409,7 @@ ngArray value={value} state={state} source={source} name={name} depth={depth} se
         <span>{type}</span>
         <span>{kind} · {itemCount} items</span>
       </div>
-      <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
-    </div>
-  );
-}
-nBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
-    </div>
-  );
-}
-
+      <Collectio
 function variableSummary(value: unknown): string {
   if (isPlainObject(value) && looksListNode(value)) {
     const id = typeof value.$objectId === 'string' ? value.$objectId
