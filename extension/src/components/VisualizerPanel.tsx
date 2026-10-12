@@ -1262,7 +1262,8 @@ function CollectionView({
     const items = Array.from(root.querySelectorAll<HTMLElement>(
       ':scope > .yv-stack-view > [data-collection-item-key], ' +
       ':scope > .yv-queue-view > [data-collection-item-key], ' +
-      ':scope > .yv-set-view > [data-collection-item-key]'
+      ':scope > .yv-set-view > [data-collection-item-key], ' +
+      ':scope > .yv-heap-tree .yv-heap-node[data-collection-item-key]'
     ));
     const nextRects = new Map<string, DOMRect>();
     for (const element of items) {
