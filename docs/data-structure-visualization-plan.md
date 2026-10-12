@@ -551,3 +551,5 @@ This section records code that has been implemented after the design audit. It d
 - Queue/deque endpoint changes are highlighted on the new front/rear cells when adjacent snapshots show a genuine endpoint identity change. Layout movement remains handled by stable-item FLIP transitions.
 - Generic object fields now distinguish trace-snapshot-confirmed newly added fields from ordinary field writes. When an observed field write targets a field absent from the current object snapshot, the containing object receives a brief in-place removal cue; no removed-field card or overlay is fabricated.
 - These additions remain unverified until the consolidated regression/typecheck/build pass at the end of the implementation priorities.
+
+- Empty PriorityQueue and Map snapshots now show explicit empty-state content rather than a blank visual container. The map empty state spans both key/value columns.
