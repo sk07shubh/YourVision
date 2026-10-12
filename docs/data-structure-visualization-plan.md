@@ -532,3 +532,14 @@ This section records code that has been implemented after the design audit. It d
 - **Binary-tree traversal/mutation cues:** pointer arrivals and changed node snapshots are highlighted while retaining existing left/right labels and cycle guards.
 - **Regression tests:** added stack removal, graph pointer movement, trie pointer movement, tree mutation/pointer movement, and graph edge-removal coverage.
 - **Verification status:** CI is running for the latest feature-branch commit. Do not treat this slice as verified until the extension test/typecheck/build and full backend regression jobs complete successfully. Real trace checks remain required in addition to component-level synthetic tests.
+
+
+## Implementation log — follow-up motion and mutation pass
+
+- Collection insertions/removals now animate surviving stack, queue/deque, set, indexed-list, and heap items through layout changes. The implementation uses stable occurrence keys, cancels overlapping FLIP animations during rapid stepping, and honors reduced-motion preferences. Nested unnamed collections can animate because snapshot identity—not a variable label—selects the previous snapshot.
+- Indexed list collections have a dedicated horizontal cell lane with aligned indices. Heap nodes participate in the same stable-position transition.
+- Map writes to the same key within one trace step are coalesced into a single before-to-final-state cue. Deletions pulse the map in place rather than rendering a detached removed-entry row.
+- String deletion no longer renders a detached removed-character overlay; surviving characters show the actual index shift. String pointers account for the enhanced-for card offset.
+- Generic object fields animate only when an `OBJECT_FIELD_WRITE` change matches the exact object identity. Tree views show pointer labels and highlight child edges when a runtime-observed variable pointer moves into that child. Trie edge labels and graph edges similarly highlight pointer-observed traversal.
+- Graph vertex positions persist across trace steps; adding a vertex does not cause existing vertices to be redistributed.
+- **Verification status:** these follow-up edits have not been regression-tested or typechecked yet, per the requested plan to run one consolidated check after the implementation pass. Do not treat this log as a passing test report.
