@@ -3177,7 +3177,7 @@ export function GraphView({ objects, variables = {}, state }: {
               const stroke = edge.status === 'added' || edge.status === 'traversed' ? 'var(--yv-accent, #65a9ff)'
                 : edge.status === 'removed' ? 'var(--yv-warning, #f59e0b)' : 'var(--yv-muted, #8b9bb4)';
               if (edge.from === edge.to) {
-                return <path key={edge.key} className={`yv-graph-edge yv-graph-edge-${edge.status}`}
+                return <path key={edge.key + (edge.status !== 'steady' ? ':' + selectedIndex : '')} className={`yv-graph-edge yv-graph-edge-${edge.status}`}
                   data-graph-edge-from={edge.from} data-graph-edge-to={edge.to}
                   data-graph-edge-status={edge.status}
                   d={`M ${from.x + 20} ${from.y - 12} C ${from.x + 70} ${from.y - 65}, ${from.x - 45} ${from.y - 65}, ${from.x - 20} ${from.y - 12}`}
@@ -3186,7 +3186,7 @@ export function GraphView({ objects, variables = {}, state }: {
               }
               const dx = to.x - from.x, dy = to.y - from.y;
               const length = Math.max(1, Math.hypot(dx, dy));
-              return <line key={edge.key} className={`yv-graph-edge yv-graph-edge-${edge.status}`}
+              return <line key={edge.key + (edge.status !== 'steady' ? ':' + selectedIndex : '')} className={`yv-graph-edge yv-graph-edge-${edge.status}`}
                 data-graph-edge-from={edge.from} data-graph-edge-to={edge.to}
                 data-graph-edge-status={edge.status}
                 x1={from.x + dx / length * 43} y1={from.y + dy / length * 25}
@@ -3200,7 +3200,7 @@ export function GraphView({ objects, variables = {}, state }: {
             const pointers = pointerNames.get(node.id) ?? [];
             const changed = changedNodeIds.has(node.id);
             const entered = enteredNodeIds.has(node.id);
-            return <div key={node.id} className={'yv-graph-node' + (changed ? ' yv-graph-node-changed' : '') + (entered ? ' yv-graph-node-entered' : '') + (createdNodeIds.has(node.id) ? ' yv-graph-node-created' : '')}
+            return <div key={node.id + ((changed || entered || createdNodeIds.has(node.id)) ? ':' + selectedIndex : '')} className={'yv-graph-node' + (changed ? ' yv-graph-node-changed' : '') + (entered ? ' yv-graph-node-entered' : '') + (createdNodeIds.has(node.id) ? ' yv-graph-node-created' : '')}
               data-graph-node-id={node.id} data-graph-changed={changed ? 'true' : undefined} data-graph-entered={entered ? 'true' : undefined}
               data-graph-created={createdNodeIds.has(node.id) ? 'true' : undefined}
               style={{ position: 'absolute', left: point.x - 47, top: point.y - 23, width: 94, minHeight: 46,
@@ -3621,7 +3621,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     <div className={'yv-tree-node' + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '')}
       data-tree-node-id={id} data-tree-changed={changed ? 'true' : undefined} data-tree-entered={entered ? 'true' : undefined}
       data-tree-created={created ? 'true' : undefined}>
-      <div className="yv-node" style={changed ? { background: 'var(--yv-highlight, #203b5b)' } : undefined}>
+      <div key={(changed || entered || created) ? id + ':' + selectedIndex : id} className="yv-node" style={changed ? { background: 'var(--yv-highlight, #203b5b)' } : undefined}>
         <span>{displayValue(nodeValue(resolved))}</span>
         {pointerNames.length > 0 && <span className="yv-tree-pointer-labels">
           {pointerNames.map(pointerName => <span className="yv-tree-pointer-label" key={pointerName}>{pointerName}</span>)}
@@ -3629,7 +3629,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
       </div>
       {hasChildren && (
         <div className="yv-tree-children">
-          <div data-tree-edge="left" className={[leftEdgeChanged ? 'yv-tree-edge-changed' : '', leftTraversal ? 'yv-tree-edge-traversed' : ''].filter(Boolean).join(' ')}
+          <div key={(leftEdgeChanged || leftTraversal) ? 'left:' + id + ':' + selectedIndex : 'left:' + id} data-tree-edge="left" className={[leftEdgeChanged ? 'yv-tree-edge-changed' : '', leftTraversal ? 'yv-tree-edge-traversed' : ''].filter(Boolean).join(' ')}
             data-tree-edge-status={leftEdgeChanged ? edgeStatus(leftBefore, leftAfter) : undefined}
             data-tree-edge-traversed={leftTraversal ? 'true' : undefined}>
             <div className="yv-tree-edge-label">LEFT</div>
@@ -3637,7 +3637,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
               ? <TreeNodeView value={fields.left} objects={objects} depth={depth + 1} seen={nextSeen} state={state} />
               : <span className="yv-null">null</span>}
           </div>
-          <div data-tree-edge="right" className={[rightEdgeChanged ? 'yv-tree-edge-changed' : '', rightTraversal ? 'yv-tree-edge-traversed' : ''].filter(Boolean).join(' ')}
+          <div key={(rightEdgeChanged || rightTraversal) ? 'right:' + id + ':' + selectedIndex : 'right:' + id} data-tree-edge="right" className={[rightEdgeChanged ? 'yv-tree-edge-changed' : '', rightTraversal ? 'yv-tree-edge-traversed' : ''].filter(Boolean).join(' ')}
             data-tree-edge-status={rightEdgeChanged ? edgeStatus(rightBefore, rightAfter) : undefined}
             data-tree-edge-traversed={rightTraversal ? 'true' : undefined}>
             <div className="yv-tree-edge-label">RIGHT</div>
