@@ -1503,7 +1503,7 @@ function CollectionView({
           {!value.values.length && <div className="yv-empty">Empty list</div>}
           {listPointers.some(pointer => pointer.index === value.values.length) && <div className="yv-list-slot yv-list-end-slot" aria-label="List boundary, not an element">
             <div className="yv-list-pointer-row" aria-hidden="true">{pointersAt(value.values.length).map(pointer => <span key={pointer.name} className="yv-list-pointer yv-list-pointer-end">{pointer.name}</span>)}</div>
-            <div className="yv-list-end-marker" title="One past the last item">×</div>
+            <div className="yv-list-cell" title="One past the last item" aria-label="List boundary, not an item">×</div>
             <div className="yv-cell-index">{value.values.length}</div>
           </div>}
         </div>
@@ -2568,7 +2568,7 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
       ))}
       {targets.some(target => target.index === value.length) && (
         <div className="yv-cell yv-array-end-slot" key="array-end" ref={element => { cellRefs.current[value.length] = element; }}>
-          <div className="yv-array-end-marker" title="One past the last element" aria-label="Array boundary, not an element">×</div>
+          <div className="yv-cell-value yv-array-end-marker" title="One past the last element" aria-label="Array boundary, not an element">×</div>
           <div className="yv-cell-index">{value.length}</div>
         </div>
       )}
@@ -4202,7 +4202,7 @@ export function StringView({ value, state, name, source = '' }: { value: string;
         {!characters.length && <div className="yv-empty">Empty string</div>}
         {[...pointers.entries()].some(([, index]) => index === value.length) &&
           <div className="yv-string-cell-wrap yv-string-end-pointer">
-            <div className="yv-string-end-marker" aria-label="String boundary, not a character" title="One past the last character">×</div>
+            <div className="yv-string-cell" aria-label="String boundary, not a character" title="One past the last character"><div className="yv-string-character">×</div></div>
             <div className="yv-string-index">{value.length}</div>
           </div>}
       </div>
