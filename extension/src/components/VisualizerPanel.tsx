@@ -3233,8 +3233,17 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const fields = objectFields(resolved);
   const hasChildren = fields.left != null || fields.right != null;
   const previousNode = id ? previousObjects[id] : undefined;
-  const changed = Boolean(state && previous && session.states.includes(state) && previousNode !== undefined &&
-    stableStringify(previousNode) !== stableStringify(resolved));
+  const previousFields = isPlainObject(previousNode) ? objectFields(previousNode) : {};
+  const hasPreviousSnapshot = Boolean(state && previous && session.states.includes(state) && previousNode !== undefined);
+  const changed = Boolean(hasPreviousSnapshot && stableStringify(previousNode) !== stableStringify(resolved));
+  const leftBefore = hasPreviousSnapshot ? graphReferenceId(previousFields.left, previousObjects) : undefined;
+  const leftAfter = graphReferenceId(fields.left, objects);
+  const rightBefore = hasPreviousSnapshot ? graphReferenceId(previousFields.right, previousObjects) : undefined;
+  const rightAfter = graphReferenceId(fields.right, objects);
+  const leftEdgeChanged = Boolean(hasPreviousSnapshot && leftBefore !== leftAfter);
+  const rightEdgeChanged = Boolean(hasPreviousSnapshot && rightBefore !== rightAfter);
+  const edgeStatus = (before: string | null | undefined, after: string | null | undefined) =>
+    before == null ? 'added' : after == null ? 'removed' : 'rewired';
   const entered = Boolean(state && previous && id && session.states.includes(state) &&
     Object.entries(state.variables).some(([name, currentValue]) =>
       graphReferenceId(currentValue, objects) === id &&
@@ -3245,13 +3254,15 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
       <div className="yv-node" style={changed ? { background: 'var(--yv-highlight, #203b5b)' } : undefined}>{displayValue(nodeValue(resolved))}</div>
       {hasChildren && (
         <div className="yv-tree-children">
-          <div data-tree-edge="left">
+          <div data-tree-edge="left" className={leftEdgeChanged ? 'yv-tree-edge-changed' : undefined}
+            data-tree-edge-status={leftEdgeChanged ? edgeStatus(leftBefore, leftAfter) : undefined}>
             <div className="yv-tree-edge-label">LEFT</div>
             {fields.left != null
               ? <TreeNodeView value={fields.left} objects={objects} depth={depth + 1} seen={nextSeen} state={state} />
               : <span className="yv-null">null</span>}
           </div>
-          <div data-tree-edge="right">
+          <div data-tree-edge="right" className={rightEdgeChanged ? 'yv-tree-edge-changed' : undefined}
+            data-tree-edge-status={rightEdgeChanged ? edgeStatus(rightBefore, rightAfter) : undefined}>
             <div className="yv-tree-edge-label">RIGHT</div>
             {fields.right != null
               ? <TreeNodeView value={fields.right} objects={objects} depth={depth + 1} seen={nextSeen} state={state} />
