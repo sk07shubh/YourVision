@@ -291,7 +291,7 @@ export async function runJava(
             stdout: "",
             stderr: "",
             message:
-                "Provide a method testcase or a valid design testcase with className and operations."
+                designMode ? "Provide a valid design testcase with className and operations." : "testcase.method is required"
         };
     }
 
