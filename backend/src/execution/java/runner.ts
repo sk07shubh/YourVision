@@ -389,7 +389,8 @@ await fs.writeFile(
                     tracerPath
                 ],
                 {
-                    timeout: 10000,
+                    // CI runners can be slower when several Java corpus cases compile in sequence.
+                    timeout: 20000,
                     maxBuffer:
                         1024 * 1024
                 }
