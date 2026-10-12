@@ -1750,7 +1750,9 @@ describe('semantic roles in rendered visualization', () => {
     const current = state({
       variables: { row: 0, col: 0 },
       lastEvent: { type: 'STEP', line: 4, data: {
-        executionEvents: [],
+        executionEvents: [
+          { type: 'ARRAY_ACCESS', data: { name: 'matrix', indices: [0, 0], value: null, kind: 'read' } },
+        ],
         semanticRoles: [
           { name: 'row', role: 'pointer', confidence: 0.99, evidence: 'first index in matrix access', structureName: 'matrix' },
           { name: 'col', role: 'pointer', confidence: 0.99, evidence: 'second index in matrix access', structureName: 'matrix' },
@@ -1761,6 +1763,7 @@ describe('semantic roles in rendered visualization', () => {
       <ArrayView value={[[], [7]]} state={current} source="matrix[row][col]" arrayName="matrix" />,
     );
     expect(html).toContain('data-matrix-pointer="row"');
+    expect(html).not.toContain('yv-matrix-cell-active');
     expect(html).not.toContain('data-matrix-intersection="row,col"');
   });
 
