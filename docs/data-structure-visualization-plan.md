@@ -543,3 +543,11 @@ This section records code that has been implemented after the design audit. It d
 - Generic object fields animate only when an `OBJECT_FIELD_WRITE` change matches the exact object identity. Tree views show pointer labels and highlight child edges when a runtime-observed variable pointer moves into that child. Trie edge labels and graph edges similarly highlight pointer-observed traversal.
 - Graph vertex positions persist across trace steps; adding a vertex does not cause existing vertices to be redistributed.
 - **Verification status:** these follow-up edits have not been regression-tested or typechecked yet, per the requested plan to run one consolidated check after the implementation pass. Do not treat this log as a passing test report.
+
+
+## Implementation log — endpoint and object-field cues
+
+- Stack top replacement is distinguished from a new push when the captured stack length is unchanged and the top value changes; this is a bounded in-place cue, not a detached removal animation.
+- Queue/deque endpoint changes are highlighted on the new front/rear cells when adjacent snapshots show a genuine endpoint identity change. Layout movement remains handled by stable-item FLIP transitions.
+- Generic object fields now distinguish trace-snapshot-confirmed newly added fields from ordinary field writes. When an observed field write targets a field absent from the current object snapshot, the containing object receives a brief in-place removal cue; no removed-field card or overlay is fabricated.
+- These additions remain unverified until the consolidated regression/typecheck/build pass at the end of the implementation priorities.
