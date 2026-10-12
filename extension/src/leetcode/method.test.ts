@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { inferMethod, orderArguments } from './method';
+import { inferMethod, matchEntryMethod, orderArguments } from './method';
 
 describe('Java method inference', () => {
   it('finds the solution method and generic parameters', () => {
@@ -37,6 +37,36 @@ describe('Java method inference', () => {
     }`);
     expect(m.name).toBe('numIslands');
     expect(m.parameterNames).toEqual(['grid']);
+  });
+
+  it('uses the original LeetCode starter signature when a public recursive helper appears first', () => {
+    const starter = `class Solution {
+      public int numIslands(char[][] grid) { return 0; }
+    }`;
+    const edited = `class Solution {
+      public void dfs(char[][] grid, int r, int c) { dfs(grid, r + 1, c); }
+      public int numIslands(char[][] grid) { dfs(grid, 0, 0); return 0; }
+    }`;
+    expect(matchEntryMethod(edited, starter)).toMatchObject({
+      name: 'numIslands',
+      parameterNames: ['grid'],
+      parameterTypes: ['char[][]'],
+    });
+  });
+
+  it('rejects a solution whose entry signature no longer matches LeetCode starter code', () => {
+    const starter = `class Solution { public int numIslands(char[][] grid) { return 0; } }`;
+    const edited = `class Solution {
+      public int dfs(char[][] grid, int r, int c) { return 0; }
+    }`;
+    expect(() => matchEntryMethod(edited, starter)).toThrow(/numIslands/);
+  });
+
+  it('fails closed if the starter source does not identify exactly one entry method', () => {
+    expect(() => matchEntryMethod(
+      'class Solution { public int helper() { return 0; } }',
+      'class Solution { public int first() { return 0; } public int second() { return 0; } }'
+    )).toThrow(/uniquely read/);
   });
 
 });
