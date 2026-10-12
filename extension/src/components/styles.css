@@ -64,8 +64,8 @@
 .yv-array-end-slot,.yv-list-end-slot{flex:0 0 auto;min-width:36px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start}
 .yv-array-end-marker{display:flex;align-items:center;justify-content:center;color:var(--yv-warning,#f59e0b)}
 .yv-pointer-out-of-bounds{z-index:2;border:1px solid var(--yv-border)!important;border-radius:0!important;background:var(--yv-elevated)!important;color:var(--yv-accent)!important}
-.yv-string-end-pointer{display:flex;flex-direction:column;align-items:center;flex:0 0 40px;width:40px}
-.yv-string-end-pointer .yv-string-end-marker{width:30px;min-width:30px;height:30px}
+.yv-string-end-pointer{display:flex;flex-direction:column;align-items:center;flex:0 0 36px;width:36px;min-width:36px}
+
 
 @media(prefers-reduced-motion:reduce){.yv-list-cell.yv-collection-item-enter{animation:none}}
 
