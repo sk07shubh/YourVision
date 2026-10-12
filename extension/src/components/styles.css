@@ -638,13 +638,13 @@
 .yv-linked-components .yv-linked[data-linked-component]:not(:first-child){padding-top:8px;border-top:1px dashed var(--yv-border)}
 .yv-linked-piece .yv-edge-external{color:var(--yv-warning,var(--yv-accent))}
 
-.yv-node-link-changed{animation:yv-linked-node-rewire 420ms ease-out}.yv-node-value-changed{animation:yv-linked-value-change 480ms ease-out}@keyframes yv-linked-value-change{0%{background:color-mix(in srgb,var(--yv-accent),var(--yv-panel) 55%);box-shadow:0 0 0 3px color-mix(in srgb,var(--yv-accent),transparent 45%)}100%{background:var(--yv-panel);box-shadow:0 0 0 0 transparent}}
+.yv-node-link-changed{animation:yv-linked-node-rewire 420ms ease-out}.yv-node-value-changed{animation:yv-linked-value-change 480ms ease-out}.yv-linked-node-created{animation:yv-graph-node-created 360ms cubic-bezier(.2,.8,.2,1) both}@keyframes yv-linked-value-change{0%{background:color-mix(in srgb,var(--yv-accent),var(--yv-panel) 55%);box-shadow:0 0 0 3px color-mix(in srgb,var(--yv-accent),transparent 45%)}100%{background:var(--yv-panel);box-shadow:0 0 0 0 transparent}}
 .yv-edge-rewired{animation:yv-linked-edge-rewire 520ms ease-out;transform-origin:center}
 .yv-node-pointer-moved{animation:yv-linked-pointer-move 260ms ease-out}
 @keyframes yv-linked-node-rewire{0%{box-shadow:0 0 0 2px color-mix(in srgb,var(--yv-accent),transparent 10%)}100%{box-shadow:0 0 0 0 transparent}}
 @keyframes yv-linked-edge-rewire{0%{color:var(--yv-success,var(--yv-accent));transform:scale(1.2)}100%{color:var(--yv-accent);transform:scale(1)}}
 @keyframes yv-linked-pointer-move{0%{opacity:.25;transform:translateY(7px) scale(.94)}100%{opacity:1;transform:translateY(0) scale(1)}}
-@media(prefers-reduced-motion:reduce){.yv-node-link-changed,.yv-node-value-changed,.yv-edge-rewired,.yv-node-pointer-moved{animation:none}}
+@media(prefers-reduced-motion:reduce){.yv-node-link-changed,.yv-node-value-changed,.yv-linked-node-created,.yv-edge-rewired,.yv-node-pointer-moved{animation:none}}
 
 
 .yv-linked-graph{position:relative;isolation:isolate}
