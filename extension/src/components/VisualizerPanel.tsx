@@ -2527,7 +2527,7 @@ function mapChanges(state?: TraceState, mapId?: string): Array<{
   // payload. Derive only the concrete map delta between adjacent captured states.
   const session = sessionStore.get();
   const currentIndex = session.states.findIndex(candidate =>
-    candidate === state || candidate.sequence === state.sequence
+    candidate === state || (state.sequence !== undefined && candidate.sequence === state.sequence)
   );
   if (currentIndex <= 0) return [];
   const previousState = session.states[currentIndex - 1];
@@ -2558,7 +2558,7 @@ function mapReorderedKeys(
   if (!state) return new Set<string>();
   const session = sessionStore.get();
   const currentIndex = session.states.findIndex(candidate =>
-    candidate === state || candidate.sequence === state.sequence
+    candidate === state || (state.sequence !== undefined && candidate.sequence === state.sequence)
   );
   if (currentIndex <= 0) return new Set<string>();
   const previousState = session.states[currentIndex - 1];
