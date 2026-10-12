@@ -30,28 +30,25 @@ export function inferMethod(source: string): JavaMethod {
   if (!methods.length) throw new Error('Could not find a Java solution method.');
 
   const withoutComments = source
-    .replace(/\\/\\*[\\s\\S]*?\\*\\//g, ' ')
-    .replace(/\\/\\/.*$/gm, ' ');
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\/\/.*$/gm, ' ');
   const publicNames = new Set<string>();
-  const publicMethodRx = /\\bpublic\\s+(?:(?:static|final|synchronized|native|abstract|strictfp)\\s+)*[\\w$<>\\[\\].?,\\s]+?\\s+(\\w+)\\s*\\(/g;
+  const publicMethodRx = /\bpublic\s+(?:(?:static|final|synchronized|native|abstract|strictfp)\s+)*[\w$<>\[\].?,\s]+?\s+(\w+)\s*\(/g;
   for (const match of withoutComments.matchAll(publicMethodRx)) {
     if (match[1] !== 'main') publicNames.add(match[1]);
   }
 
   const publicMethods = methods.filter(method => publicNames.has(method.name));
   const candidates = publicMethods.length ? publicMethods : methods;
-
-  // The LeetCode-provided method is the entry point; helper methods are
-  // typically invoked by it, and recursive helpers also invoke themselves.
-  // Prefer a candidate whose name occurs only in its declaration, rather
-  // than guessing from visibility or parameter count.
+  // The entry method supplied by LeetCode is generally not called by another
+  // method in the class. Helpers are called by the entry method and recursive
+  // helpers call themselves, so prefer the candidate referenced only once
+  // (its declaration).
   const uncalled = candidates.filter(method => {
-    const callRx = new RegExp('\\\\b' + method.name + '\\\\s*\\\\(', 'g');
+    const callRx = new RegExp('\\b' + method.name + '\\s*\\(', 'g');
     return [...withoutComments.matchAll(callRx)].length <= 1;
   });
-
-  if (uncalled.length) return uncalled[0];
-  return candidates[0];
+  return uncalled[0] ?? candidates[0];
 }
 
 function splitParams(text: string): Array<{ type: string; name: string }> {
