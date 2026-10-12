@@ -3687,11 +3687,9 @@ export function StringView({ value, state, name, source = '' }: { value: string;
           const shiftsLeft = Boolean(transition?.kind === 'mutation' && transition.index !== undefined &&
             (transition.operation === 'delete' || transition.operation === 'deleteCharAt' || (transition.operation === 'replace' && transition.after.length < transition.before.length)) &&
             index >= transition.index);
-          const removedHere = transition?.kind === 'mutation' && transition.removed && transition.index === index ? transition.removed : undefined;
           return (
             <div className="yv-string-cell-wrap" key={index} data-string-cell-index={index} style={enhancedBinding?.index === index ? { position: "relative" } : undefined}>
               {enhancedBinding?.index === index && <EnhancedForValueCard binding={enhancedBinding} />}
-              {removedHere && <div className="yv-string-removed-overlay" aria-hidden="true">{removedHere}</div>}
               <div className={`yv-string-cell ${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-string-cell-compared ' : ''}${inRange ? 'yv-cell-range ' : ''}${changed ? 'yv-string-cell-changed ' : ''}${added ? 'yv-string-cell-added ' : ''}${swapFromRight ? 'yv-string-cell-swap-right ' : ''}${swapFromLeft ? 'yv-string-cell-swap-left ' : ''}${shiftsRight ? 'yv-string-cell-shift-right ' : ''}${shiftsLeft ? 'yv-string-cell-shift-left' : ''}`} data-string-index={index}>
                 <div className={`yv-string-character ${isSurrogateUnit ? 'yv-string-code-unit' : ''}`} title={isSurrogateUnit ? `UTF-16 code unit U+${codeUnit.toString(16).toUpperCase().padStart(4, '0')}` : undefined}>{characterLabel}</div>
               </div>
@@ -3699,8 +3697,6 @@ export function StringView({ value, state, name, source = '' }: { value: string;
             </div>
           );
         })}
-        {transition?.kind === 'mutation' && transition.removed && transition.index !== undefined && transition.index >= value.length &&
-          <div className="yv-string-cell-wrap yv-string-removal-tail"><div className="yv-string-removed-overlay" aria-hidden="true">{transition.removed}</div></div>}
         {!characters.length && <div className="yv-empty">Empty string</div>}
         {[...pointers.entries()].some(([, index]) => index === value.length) &&
           <div className="yv-string-cell-wrap yv-string-end-pointer">
