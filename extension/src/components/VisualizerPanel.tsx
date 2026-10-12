@@ -712,7 +712,6 @@ export function collectionOperation(kind: string, method: string | undefined, de
           ))}
           {!value.values.length && <div className="yv-empty">Empty list</div>}
         </div>
-        <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
       </div>
     );
   }
