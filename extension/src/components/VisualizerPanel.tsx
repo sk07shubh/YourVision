@@ -2783,7 +2783,9 @@ export function TrieView({ objects, variables = {}, source = '', state }: {
         data-trie-entered={enteredNodeIds.has(id) ? 'true' : undefined}
         data-trie-created={createdNodeIds.has(id) ? 'true' : undefined}
         style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: 6 }}>
-        {edgeLabel && <span data-trie-edge-label={edgeLabel} style={{ color: 'var(--yv-muted, #8b9bb4)', fontSize: 11 }}>{edgeLabel}</span>}
+        {edgeLabel && <span data-trie-edge-label={edgeLabel}
+    className={enteredNodeIds.has(id) ? 'yv-trie-edge-traversed' : undefined}
+    style={{ color: 'var(--yv-muted, #8b9bb4)', fontSize: 11 }}>{edgeLabel}</span>}
         <div className="yv-trie-node" style={{ minWidth: 54, padding: '7px 10px', border: '1px solid var(--yv-accent, #65a9ff)',
           borderRadius: 9, background: changedNodeIds.has(id) ? 'var(--yv-highlight, #203b5b)' : 'var(--yv-panel, #101b2d)', color: 'var(--yv-text, #f3f6ff)', textAlign: 'center', fontSize: 12 }}>
           <div>{node.terminal ? '● WORD END' : '○ PREFIX'}</div>
