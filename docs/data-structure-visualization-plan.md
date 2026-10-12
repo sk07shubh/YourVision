@@ -553,3 +553,4 @@ This section records code that has been implemented after the design audit. It d
 - These additions remain unverified until the consolidated regression/typecheck/build pass at the end of the implementation priorities.
 
 - Empty PriorityQueue and Map snapshots now show explicit empty-state content rather than a blank visual container. The map empty state spans both key/value columns.
+- If a trace-confirmed object-field deletion removes the final field, the object now retains its in-place removal cue for that step and labels the resulting empty object; it no longer falls back to a plain code label that hides the mutation cue.
