@@ -26,7 +26,7 @@ import {
 } from './code-source';
 
 import {
-  inferMethod,
+  matchEntryMethod,
 } from './method';
 
 import {
@@ -727,8 +727,20 @@ async function visualize(region?: HTMLElement) {
     const source =
       await readUserSource();
 
-    const method =
-      inferMethod(source);
+    // Read the method signature from LeetCode's canonical Java starter code.
+    // This is independent of the user's current method order and helper methods.
+    const starterResponse = await chrome.runtime.sendMessage({
+      type: 'READ_ENTRY_METHOD',
+    }) as { ok?: boolean; source?: string; error?: string };
+
+    if (!starterResponse?.ok || !starterResponse.source) {
+      throw new Error(
+        starterResponse?.error ??
+        'Could not retrieve LeetCode’s original Java starter signature.'
+      );
+    }
+
+    const method = matchEntryMethod(source, starterResponse.source);
 
     const testcase =
       readSelectedTestcase(
