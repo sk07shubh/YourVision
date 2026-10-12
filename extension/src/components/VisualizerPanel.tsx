@@ -1480,6 +1480,9 @@ function CollectionView({
   }
 
   if (kind === 'list' || kind === 'arrayList' || /^(ArrayList|Vector|CopyOnWriteArrayList)$/.test(type)) {
+    const listIndexNames = collectionIndexVariableNames(source, name);
+    const listPointers = pointerTargets(state, value.values.length, listIndexNames, name, source);
+    const pointersAt = (index: number) => listPointers.filter(pointer => pointer.index === index);
     return (
       <div className="yv-collection" ref={collectionRootRef} data-collection-emptied={emptiedThisStep ? 'true' : undefined}>
         <div className="yv-collection-meta">
@@ -1490,6 +1493,7 @@ function CollectionView({
           {value.values.map((item, index) => (
             <div className="yv-list-slot" key={collectionItemReactKey(item, index, value.values)}
               data-collection-item-key={collectionItemReactKey(item, index, value.values)}>
+              <div className="yv-list-pointer-row" aria-hidden="true">{pointersAt(index).map(pointer => <span key={pointer.name} className="yv-list-pointer">{pointer.name}</span>)}</div>
               <div className={"yv-list-cell " + collectionItemMotionClass(value, item, index, state)}>
                 <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
               </div>
@@ -1498,6 +1502,7 @@ function CollectionView({
           ))}
           {!value.values.length && <div className="yv-empty">Empty list</div>}
           {value.values.length > 0 && <div className="yv-list-slot yv-list-end-slot" aria-label="List boundary, not an element">
+            <div className="yv-list-pointer-row" aria-hidden="true">{pointersAt(value.values.length).map(pointer => <span key={pointer.name} className="yv-list-pointer yv-list-pointer-end">{pointer.name}</span>)}</div>
             <div className="yv-list-end-marker" title="One past the last item">×</div>
             <div className="yv-cell-index">{value.values.length}</div>
           </div>}
@@ -1707,6 +1712,19 @@ function EnhancedForValueCard({ binding, alignStart = false }: { binding: Enhanc
         width: 6, height: 6, borderRadius: '50%', background: 'var(--yv-accent, #65a9ff)' }} />
     </div>
   );
+}
+
+function collectionIndexVariableNames(source: string, collectionName?: string): Set<string> {
+  const names = new Set<string>();
+  if (!collectionName) return names;
+  for (const candidate of collectionName.split('/').map(part => part.trim()).filter(Boolean)) {
+    const escaped = candidate.replace(/[$]/g, '\\function arrayIndexVariableNames(source: string, arrayName?: string): Set<string> {');
+    const pattern = new RegExp('\\b' + escaped + '\\s*\\.\\s*(?:get|set|remove)\\s*\\(\\s*([^,)]+)', 'g');
+    for (const match of source.matchAll(pattern)) {
+      for (const identifier of (match[1] ?? '').matchAll(/\\b[A-Za-z_$][\\w$]*\\b/g)) names.add(identifier[0]);
+    }
+  }
+  return names;
 }
 
 function arrayIndexVariableNames(source: string, arrayName?: string): Set<string> {
