@@ -960,21 +960,17 @@ if (isTreeNodeType(type)) {
         String text
     ) {
         String value;
-
-        if (
+        boolean singleQuoted =
             text.length() >= 2 &&
             text.charAt(0) == '\'' &&
-            text.charAt(
-                text.length() - 1
-            ) == '\''
-        ) {
-            value =
-                unescape(
-                    text.substring(
-                        1,
-                        text.length() - 1
-                    )
-                );
+            text.charAt(text.length() - 1) == '\'';
+        boolean doubleQuoted =
+            text.length() >= 2 &&
+            text.charAt(0) == '"' &&
+            text.charAt(text.length() - 1) == '"';
+
+        if (singleQuoted || doubleQuoted) {
+            value = unescape(text.substring(1, text.length() - 1));
         } else {
             value = unescape(text);
         }
