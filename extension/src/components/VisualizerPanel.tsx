@@ -2832,7 +2832,8 @@ export function GraphView({ objects, variables = {}, state }: {
               const stroke = edge.status === 'added' ? 'var(--yv-accent, #65a9ff)'
                 : edge.status === 'removed' ? 'var(--yv-warning, #f59e0b)' : 'var(--yv-muted, #8b9bb4)';
               if (edge.from === edge.to) {
-                return <path key={edge.key} data-graph-edge-from={edge.from} data-graph-edge-to={edge.to}
+                return <path key={edge.key} className={`yv-graph-edge yv-graph-edge-${edge.status}`}
+                  data-graph-edge-from={edge.from} data-graph-edge-to={edge.to}
                   data-graph-edge-status={edge.status}
                   d={`M ${from.x + 20} ${from.y - 12} C ${from.x + 70} ${from.y - 65}, ${from.x - 45} ${from.y - 65}, ${from.x - 20} ${from.y - 12}`}
                   fill="none" stroke={stroke} strokeDasharray={edge.status === 'removed' ? '4 3' : undefined}
@@ -2840,7 +2841,8 @@ export function GraphView({ objects, variables = {}, state }: {
               }
               const dx = to.x - from.x, dy = to.y - from.y;
               const length = Math.max(1, Math.hypot(dx, dy));
-              return <line key={edge.key} data-graph-edge-from={edge.from} data-graph-edge-to={edge.to}
+              return <line key={edge.key} className={`yv-graph-edge yv-graph-edge-${edge.status}`}
+                data-graph-edge-from={edge.from} data-graph-edge-to={edge.to}
                 data-graph-edge-status={edge.status}
                 x1={from.x + dx / length * 43} y1={from.y + dy / length * 25}
                 x2={to.x - dx / length * 50} y2={to.y - dy / length * 30}
