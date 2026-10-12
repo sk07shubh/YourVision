@@ -66,7 +66,7 @@ chrome.runtime.onMessage.addListener((msg: ExtensionRequest | {type:'REVEAL_LINE
     try {
       if (msg.type === 'READ_ENTRY_METHOD') {
         if (!sender.tab?.id) throw new Error('No active LeetCode tab.');
-        const source = await readLeetCodeJavaStarter(sender.tab.id);
+        const source = await readLeetCodeJavaStarter(sender.tab.id, sender.tab.url ?? '');
         sendResponse({ok:true,source} satisfies ExtensionResponse); return;
       }
       if (msg.type === 'READ_SOURCE') {
