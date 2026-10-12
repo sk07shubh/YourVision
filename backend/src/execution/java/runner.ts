@@ -168,9 +168,20 @@ function runJavaTracer(
     });
 }
 
-export interface JavaTestcase {
+export interface JavaDesignOperation {
     method: string;
     arguments?: string[];
+}
+
+export interface JavaTestcase {
+    /** Single-method execution (existing LeetCode format). */
+    method?: string;
+    arguments?: string[];
+    /** Design-class execution: instantiate once, then invoke operations in order. */
+    mode?: "method" | "design";
+    className?: string;
+    constructorArguments?: string[];
+    operations?: JavaDesignOperation[];
 }
 
 export interface JavaExecutionResult {
@@ -260,18 +271,27 @@ export async function runJava(
     testcase?: JavaTestcase
 ): Promise<JavaExecutionResult> {
 
-    if (
-        !testcase ||
-        typeof testcase.method !== "string" ||
-        testcase.method.trim() === ""
-    ) {
+    const designMode = testcase?.mode === "design";
+    if (!testcase || (!designMode &&
+        (typeof testcase.method !== "string" || testcase.method.trim() === "")) ||
+        (designMode && (
+            typeof testcase.className !== "string" ||
+            !/^[A-Za-z_$][\w$]*$/.test(testcase.className) ||
+            !Array.isArray(testcase.operations) ||
+            testcase.operations.length === 0 ||
+            testcase.operations.some(operation =>
+                !operation || typeof operation.method !== "string" ||
+                !/^[A-Za-z_$][\w$]*$/.test(operation.method) ||
+                (operation.arguments !== undefined && !Array.isArray(operation.arguments))
+            )
+        ))) {
         return {
             success: false,
             kind: "VALIDATION_ERROR",
             stdout: "",
             stderr: "",
             message:
-                "testcase.method is required"
+                "Provide a method testcase or a valid design testcase with className and operations."
         };
     }
 
@@ -289,8 +309,37 @@ export async function runJava(
         };
     }
 
-    const rawArguments =
-        testcase.arguments ?? [];
+    const rawArguments = designMode
+        ? [
+            ...(testcase.constructorArguments ?? []),
+            ...(testcase.operations ?? []).flatMap(operation => operation.arguments ?? [])
+        ]
+        : (testcase.arguments ?? []);
+
+    if (designMode && (
+        (testcase.constructorArguments !== undefined && !Array.isArray(testcase.constructorArguments)) ||
+        (testcase.constructorArguments ?? []).some(value => typeof value !== "string")
+    )) {
+        return {
+            success: false,
+            kind: "VALIDATION_ERROR",
+            stdout: "",
+            stderr: "",
+            message: "testcase.constructorArguments must be an array of strings"
+        };
+    }
+
+    if (designMode && (testcase.operations ?? []).some(operation =>
+        (operation.arguments ?? []).some(value => typeof value !== "string")
+    )) {
+        return {
+            success: false,
+            kind: "VALIDATION_ERROR",
+            stdout: "",
+            stderr: "",
+            message: "every design operation argument must be a string"
+        };
+    }
 
     if (
         rawArguments.some(
@@ -415,6 +464,28 @@ await fs.writeFile(
             };
         }
 
+        const encodeArgument = (value: string) =>
+            "__YV_B64__" + Buffer.from(value, "utf8").toString("base64");
+        const encodedArguments = (values: string[]) =>
+            values.length === 0 ? [NO_ARGS] : values.map(encodeArgument);
+
+        const invocationArguments = designMode
+            ? [
+                "__YV_DESIGN__",
+                String((testcase.constructorArguments ?? []).length),
+                ...encodedArguments(testcase.constructorArguments ?? []),
+                String((testcase.operations ?? []).length),
+                ...(testcase.operations ?? []).flatMap(operation => [
+                    operation.method,
+                    String((operation.arguments ?? []).length),
+                    ...encodedArguments(operation.arguments ?? [])
+                ])
+            ]
+            : [
+                testcase.method!,
+                ...encodedArguments(testcase.arguments ?? [])
+            ];
+
         const childArguments = [
             "--add-modules",
             "jdk.jdi",
@@ -423,20 +494,8 @@ await fs.writeFile(
             "YourVisionTracer",
             tempDir,
             "YourVisionRuntime",
-            "Solution",
-            testcase.method,
-            ...(
-                rawArguments.length === 0
-                    ? [NO_ARGS]
-                    : rawArguments.map(
-                        (value) =>
-                            "__YV_B64__" +
-                            Buffer.from(
-                                value,
-                                "utf8"
-                            ).toString("base64")
-                    )
-            )
+            designMode ? (testcase.className ?? "Solution") : "Solution",
+            ...invocationArguments
         ];
 
         try {
