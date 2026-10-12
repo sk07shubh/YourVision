@@ -1779,7 +1779,7 @@ export function pointerTargets(
       typeof value !== 'number' ||
       !Number.isInteger(value) ||
       value < 0 ||
-      value >= length
+      value > length
     ) continue;
     targets.push({ name, index: value });
   }
@@ -2466,7 +2466,11 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
       // side. This avoids hiding one index behind another (e.g. left/right).
       const groups = new Map<number, typeof targets>();
       for (const target of targets) {
-        const cell = cellRefs.current[target.index];
+        // Index == length is a legitimate one-past-the-end cursor (e.g. j
+        // after the final j++). It has no cell, so position it just beyond
+        // the final cell instead of silently dropping it.
+        const isPastEnd = target.index === value.length && value.length > 0;
+        const cell = cellRefs.current[target.index] ?? (isPastEnd ? cellRefs.current[value.length - 1] : null);
         if (!cell) continue;
         const group = groups.get(target.index) ?? [];
         group.push(target);
@@ -2477,9 +2481,12 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
       }
 
       for (const [index, group] of groups) {
-        const cell = cellRefs.current[index];
+        const isPastEnd = index === value.length && value.length > 0;
+        const cell = cellRefs.current[index] ?? (isPastEnd ? cellRefs.current[value.length - 1] : null);
         if (!cell) continue;
-        const center = cell.offsetLeft + cell.offsetWidth / 2;
+        const center = isPastEnd
+          ? cell.offsetLeft + cell.offsetWidth + 18
+          : cell.offsetLeft + cell.offsetWidth / 2;
         const gap = 5;
         const widths = group.map(target => labels.get(target.name)?.offsetWidth ?? Math.max(24, target.name.length * 7 + 10));
         const totalWidth = widths.reduce((sum, width) => sum + width, 0) + gap * Math.max(0, group.length - 1);
@@ -2524,7 +2531,7 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
           <div
             key={target.name}
             data-array-pointer={target.name}
-            className={`yv-pointer ${pointerLayout.moving.has(target.name) ? 'yv-pointer-moving' : ''}`}
+            className={`yv-pointer ${target.index === value.length ? 'yv-pointer-out-of-bounds' : ''} ${pointerLayout.moving.has(target.name) ? 'yv-pointer-moving' : ''}`}
             style={{ transform: `translate3d(${pointerLayout.offsets[target.name] ?? 0}px, 0, 0) translateX(-50%)` }}
           >{target.name}</div>
         ))}
