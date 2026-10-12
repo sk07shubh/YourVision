@@ -25,5 +25,18 @@ describe('Java method inference', () => {
     expect(m.name).toBe('numIslands');
     expect(m.parameterNames).toEqual(['grid']);
   });
+  it('selects the uncalled public LeetCode entry even when a public helper appears first', () => {
+    const m = inferMethod(`class Solution {
+      public void dfs(char[][] grid, int r, int c) {
+        dfs(grid, r + 1, c);
+      }
+      public int numIslands(char[][] grid) {
+        dfs(grid, 0, 0);
+        return 0;
+      }
+    }`);
+    expect(m.name).toBe('numIslands');
+    expect(m.parameterNames).toEqual(['grid']);
+  });
 
 });
