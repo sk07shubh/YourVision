@@ -358,7 +358,25 @@
   color: var(--yv-accent);
   font-weight: 800;
 }
-.yv-matrix-grid .yv-matrix-cell-active .yv-cell-value {
+.yv-matrix-grid /* Trace-backed cell exchanges in a matrix. Only cells whose before/after
+   values prove a swap receive this cue; unrelated cells stay still. */
+.yv-matrix-grid .yv-matrix-cell-swapped .yv-cell-value {
+  border-color: color-mix(in srgb, var(--yv-success), var(--yv-border) 22%);
+  background: color-mix(in srgb, var(--yv-success), var(--yv-elevated) 86%);
+  animation: yv-matrix-swap-content 420ms cubic-bezier(.2, .75, .25, 1);
+}
+@keyframes yv-matrix-swap-content {
+  0% { opacity: .45; transform: scale(.94); }
+  65% { opacity: 1; transform: scale(1.035); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-matrix-grid .yv-matrix-cell-swapped .yv-cell-value {
+    animation: none;
+  }
+}
+
+.yv-matrix-cell-active .yv-cell-value {
   position: relative;
   z-index: 1;
   border-color: var(--yv-accent);
