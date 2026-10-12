@@ -1501,7 +1501,7 @@ function CollectionView({
             </div>
           ))}
           {!value.values.length && <div className="yv-empty">Empty list</div>}
-          {value.values.length > 0 && <div className="yv-list-slot yv-list-end-slot" aria-label="List boundary, not an element">
+          {listPointers.some(pointer => pointer.index === value.values.length) && <div className="yv-list-slot yv-list-end-slot" aria-label="List boundary, not an element">
             <div className="yv-list-pointer-row" aria-hidden="true">{pointersAt(value.values.length).map(pointer => <span key={pointer.name} className="yv-list-pointer yv-list-pointer-end">{pointer.name}</span>)}</div>
             <div className="yv-list-end-marker" title="One past the last item">×</div>
             <div className="yv-cell-index">{value.values.length}</div>
@@ -2575,7 +2575,7 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
           <div className="yv-cell-index">{index}</div>
         </div>
       ))}
-      {value.length > 0 && (
+      {targets.some(target => target.index === value.length) && (
         <div className="yv-cell yv-array-end-slot" key="array-end" ref={element => { cellRefs.current[value.length] = element; }}>
           <div className="yv-array-end-marker" title="One past the last element" aria-label="Array boundary, not an element">×</div>
           <div className="yv-cell-index">{value.length}</div>
