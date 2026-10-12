@@ -2012,6 +2012,55 @@ function shiftedArrayIndices(state?: TraceState, arrayName?: string): Map<number
   return directions;
 }
 
+function swappedMatrixPaths(state: TraceState | undefined, arrayName?: string): Set<string> {
+  const paths = new Set<string>();
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data)) return paths;
+
+  const writes: Obj[] = [];
+  if (state?.lastEvent?.type === 'ARRAY_WRITE') writes.push(data);
+  if (Array.isArray(data.executionEvents)) {
+    for (const event of data.executionEvents) {
+      if (isPlainObject(event) && event.type === 'ARRAY_WRITE' && isPlainObject(event.data)) {
+        writes.push(event.data);
+      }
+    }
+  }
+
+  for (const write of writes) {
+    if (arrayName && (typeof write.name !== 'string' || !arrayNameMatches(write.name, arrayName))) continue;
+    if (!Array.isArray(write.changes)) continue;
+    const changes = write.changes.filter((change): change is Obj =>
+      isPlainObject(change) &&
+      Array.isArray(change.indices) &&
+      change.indices.length === 2 &&
+      change.indices.every(index => typeof index === 'number' && Number.isInteger(index)) &&
+      'before' in change &&
+      'after' in change &&
+      valueChanged(change.before, change.after)
+    ).map(change => ({
+      path: (change.indices as number[]).join(','),
+      before: change.before,
+      after: change.after,
+    }));
+
+    // Only mark cells when the trace proves an actual two-cell exchange.
+    // This also covers row swaps: each changed column is paired independently.
+    for (let i = 0; i < changes.length; i++) {
+      const first = changes[i]!;
+      for (let j = i + 1; j < changes.length; j++) {
+        const second = changes[j]!;
+        if (first.path === second.path) continue;
+        if (!valueChanged(first.before, second.after) && !valueChanged(first.after, second.before)) {
+          paths.add(first.path);
+          paths.add(second.path);
+        }
+      }
+    }
+  }
+  return paths;
+}
+
 function MatrixView({ value, state, source, arrayName, depth, seen }: {
   value: unknown[][];
   state?: TraceState;
@@ -2025,6 +2074,7 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
   const columnCount = Math.max(0, ...rows.map(row => row.length));
   const readPaths = accessedArrayPaths(state, arrayName);
   const writtenPaths = changedArrayPaths(state, arrayName);
+  const swappedPaths = swappedMatrixPaths(state, arrayName);
   const comparedPaths = isComparisonStatement(source, state) && readPaths.size >= 2 ? readPaths : new Set<string>();
   const indexNames = matrixIndexVariableNames(source, arrayName);
   const targets = matrixPointerTargets(state, rowCount, columnCount, indexNames);
@@ -2174,7 +2224,7 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
               >
                 <div
                   key={`${path}-${state?.sequence ?? state?.line ?? 'initial'}`}
-                  className={`yv-cell-value ${comparedPaths.has(path) ? 'yv-cell-compared ' : ''}${readPaths.has(path) ? 'yv-cell-read ' : ''}${writtenPaths.has(path) ? 'yv-cell-written' : ''}`}
+                  className={`yv-cell-value ${comparedPaths.has(path) ? 'yv-cell-compared ' : ''}${readPaths.has(path) ? 'yv-cell-read ' : ''}${writtenPaths.has(path) ? 'yv-cell-written ' : ''}${swappedPaths.has(path) ? 'yv-matrix-cell-swapped' : ''}`}
                 >
                   {exists
                     ? <DataValue value={row[column]} state={state} source={source} depth={depth + 1} seen={seen}/>
