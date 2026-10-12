@@ -2423,7 +2423,11 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
 }) {
   // A Java 2D array may arrive as raw nested arrays or as row-level array
   // snapshots. Normalize both shapes into a single grid without flattening it.
-  const matrixLike = value.length > 0 && value.every(row => Array.isArray(row) || isArraySnapshot(row));
+  const matrixAccess = /\b[A-Za-z_$][\w$]*\s*\[[^\]]+\]\s*\[[^\]]+\]/.test(source) &&
+    (!arrayName || source.includes(arrayName));
+  const matrixLike = value.length > 0
+    ? value.every(row => Array.isArray(row) || isArraySnapshot(row))
+    : matrixAccess;
   if (matrixLike) {
     const rows = value.map(row => Array.isArray(row) ? row : isArraySnapshot(row) ? row.values : []);
     return <MatrixView value={rows} state={state} source={source} arrayName={arrayName} depth={depth} seen={seen}/>;
