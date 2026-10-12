@@ -3848,9 +3848,43 @@ export function StringView({ value, state, name, source = '' }: { value: string;
   // mapping. Render a space as a blank cell, never as a visible abbreviation.
   const enhancedBinding = enhancedForBinding(source, state, name, value.split(''));
   const characters = value.split('');
+  const usesStableCharacterKeys = Boolean(transition?.kind === 'mutation' &&
+    (['insert', 'delete', 'deleteCharAt', 'reverse'].includes(transition.operation) ||
+      transition.before.length !== transition.after.length));
+  const stringRootRef = useRef<HTMLDivElement | null>(null);
+  const previousCharacterPositions = useRef<Map<string, { left: number; top: number }>>(new Map());
+  const characterAnimations = useRef<WeakMap<HTMLElement, Animation>>(new WeakMap());
+  useLayoutEffect(() => {
+    const root = stringRootRef.current;
+    if (!root) return;
+    const reduceMotion = typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const cells = Array.from(root.querySelectorAll<HTMLElement>('[data-string-cell-key]'));
+    const nextPositions = new Map<string, { left: number; top: number }>();
+    for (const cell of cells) {
+      const key = cell.dataset.stringCellKey;
+      if (!key) continue;
+      characterAnimations.current.get(cell)?.cancel();
+      const position = { left: cell.offsetLeft, top: cell.offsetTop };
+      nextPositions.set(key, position);
+      const previousPosition = previousCharacterPositions.current.get(key);
+      if (!reduceMotion && usesStableCharacterKeys && previousPosition) {
+        const dx = previousPosition.left - position.left;
+        const dy = previousPosition.top - position.top;
+        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+          characterAnimations.current.set(cell, cell.animate(
+            [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }],
+            { duration: 240, easing: 'cubic-bezier(.2,.75,.25,1)' }
+          ));
+        }
+      }
+    }
+    previousCharacterPositions.current = nextPositions;
+  });
   const hasPointers = [...pointers.values()].some(index => index >= 0 && index <= value.length);
   return (
-    <div className={`yv-string-view ${hasPointers ? 'has-pointers' : ''}`} data-string-structure={name} data-string-length={value.length}>
+    <div ref={stringRootRef} className={`yv-string-view ${hasPointers ? 'has-pointers' : ''}`} data-string-structure={name} data-string-length={value.length}>
       {(transition || operationResult) && <div className="yv-string-operation">
         {transition && <span>{transition.operation} · {transition.kind === 'mutation' ? 'mutated' : 'result'}</span>}
         {operationResult && <span>{operationResult.operation} → {String(operationResult.result)}</span>}
@@ -3888,16 +3922,13 @@ export function StringView({ value, state, name, source = '' }: { value: string;
           const inserted = Boolean(transition?.kind === 'mutation' && transition.inserted && transition.index !== undefined && index >= transition.index && index < transition.index + transition.inserted.length);
           const added = Boolean((transition?.kind === 'result' && transition.before.length === 0 && index < transition.after.length) ||
             (simpleAppend && transition && index >= transition.before.length && index < transition.after.length) || inserted);
-          const shiftsRight = Boolean(transition?.kind === 'mutation' && transition.index !== undefined &&
-            (transition.operation === 'insert' || (transition.operation === 'replace' && transition.after.length > transition.before.length)) &&
-            index >= transition.index + (transition.inserted?.length ?? 1));
-          const shiftsLeft = Boolean(transition?.kind === 'mutation' && transition.index !== undefined &&
-            (transition.operation === 'delete' || transition.operation === 'deleteCharAt' || (transition.operation === 'replace' && transition.after.length < transition.before.length)) &&
-            index >= transition.index);
           return (
-            <div className="yv-string-cell-wrap" key={index} data-string-cell-index={index} style={enhancedBinding?.index === index ? { position: "relative" } : undefined}>
+            <div className="yv-string-cell-wrap" key={usesStableCharacterKeys ? String(codeUnit) + '#' + characters.slice(0, index).filter(candidate => candidate === character).length : index}
+              data-string-cell-index={index}
+              data-string-cell-key={usesStableCharacterKeys ? String(codeUnit) + '#' + characters.slice(0, index).filter(candidate => candidate === character).length : String(index)}
+              style={enhancedBinding?.index === index ? { position: "relative" } : undefined}>
               {enhancedBinding?.index === index && <EnhancedForValueCard binding={enhancedBinding} />}
-              <div className={`yv-string-cell ${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-string-cell-compared ' : ''}${inRange ? 'yv-cell-range ' : ''}${changed ? 'yv-string-cell-changed ' : ''}${added ? 'yv-string-cell-added ' : ''}${swapFromRight ? 'yv-string-cell-swap-right ' : ''}${swapFromLeft ? 'yv-string-cell-swap-left ' : ''}${shiftsRight ? 'yv-string-cell-shift-right ' : ''}${shiftsLeft ? 'yv-string-cell-shift-left' : ''}`} data-string-index={index}>
+              <div className={`yv-string-cell ${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-string-cell-compared ' : ''}${inRange ? 'yv-cell-range ' : ''}${changed ? 'yv-string-cell-changed ' : ''}${added ? 'yv-string-cell-added ' : ''}${swapFromRight ? 'yv-string-cell-swap-right ' : ''}${swapFromLeft ? 'yv-string-cell-swap-left ' : ''}`} data-string-index={index}>
                 <div className={`yv-string-character ${isSurrogateUnit ? 'yv-string-code-unit' : ''}`} title={isSurrogateUnit ? `UTF-16 code unit U+${codeUnit.toString(16).toUpperCase().padStart(4, '0')}` : undefined}>{characterLabel}</div>
               </div>
               <div className="yv-string-index">{index}</div>
