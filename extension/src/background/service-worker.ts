@@ -1,6 +1,35 @@
 import type { ExtensionRequest, ExtensionResponse } from '../types/messages';
 import type { VisualizationResponse } from '../types/trace';
 
+async function readLeetCodeJavaStarter(tabId: number): Promise<string> {
+  const tabs = await chrome.tabs.get(tabId);
+  const url = new URL(tabs.url ?? '');
+  const match = url.pathname.match(/\\/problems\\/([^/]+)/);
+  const titleSlug = match?.[1];
+  if (!titleSlug) throw new Error('Could not identify the LeetCode problem from the page URL.');
+
+  const query = `
+    query getQuestion($titleSlug: String!) {
+      question(titleSlug: $titleSlug) {
+        codeSnippets { langSlug code }
+      }
+    }`;
+  const response = await fetch('https://leetcode.com/graphql', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ query, variables: { titleSlug } })
+  });
+  if (!response.ok) throw new Error(`Could not load the original LeetCode starter signature (HTTP ${response.status}).`);
+  const payload = await response.json() as {
+    errors?: Array<{ message?: string }>;
+    data?: { question?: { codeSnippets?: Array<{ langSlug: string; code: string }> } | null };
+  };
+  if (payload.errors?.length) throw new Error(payload.errors[0]?.message ?? 'LeetCode GraphQL request failed.');
+  const java = payload.data?.question?.codeSnippets?.find(snippet => snippet.langSlug === 'java');
+  if (!java?.code?.trim()) throw new Error('LeetCode did not provide a Java starter method for this problem.');
+  return java.code;
+}
+
 async function readMonaco(tabId: number): Promise<string> {
   const results = await chrome.scripting.executeScript({
     target: { tabId }, world: 'MAIN',
@@ -35,6 +64,11 @@ async function revealLine(tabId: number, line: number, source: string): Promise<
 chrome.runtime.onMessage.addListener((msg: ExtensionRequest | {type:'REVEAL_LINE';line:number;source?:string}, sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown)=>void) => {
   void (async () => {
     try {
+      if (msg.type === 'READ_ENTRY_METHOD') {
+        if (!sender.tab?.id) throw new Error('No active LeetCode tab.');
+        const source = await readLeetCodeJavaStarter(sender.tab.id);
+        sendResponse({ok:true,source} satisfies ExtensionResponse); return;
+      }
       if (msg.type === 'READ_SOURCE') {
         if (!sender.tab?.id) throw new Error('No active LeetCode tab.');
         const source = await readMonaco(sender.tab.id);
