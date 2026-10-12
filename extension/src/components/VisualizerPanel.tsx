@@ -3986,10 +3986,15 @@ export function StringView({ value, state, name, source = '' }: { value: string;
       }
     }
     if (event.type === 'STRING_RANGE_ACCESS' && matchesName(effect.name) &&
-        typeof effect.start === 'number' && typeof effect.end === 'number') {
+        typeof effect.start === 'number' && Number.isInteger(effect.start) &&
+        typeof effect.end === 'number' && Number.isInteger(effect.end) &&
+        effect.start >= 0 && effect.end > effect.start && effect.end <= value.length) {
+      // Trace ranges are half-open UTF-16 offsets. Ignore malformed/out-of-range
+      // events rather than highlighting beyond the captured string or placing
+      // pointer labels at impossible positions.
       ranges.push({ start: effect.start, end: effect.end });
       if (typeof effect.startVariable === 'string') pointers.set(effect.startVariable, effect.start);
-      if (typeof effect.endVariable === 'string' && effect.end <= value.length) pointers.set(effect.endVariable, effect.end);
+      if (typeof effect.endVariable === 'string') pointers.set(effect.endVariable, effect.end);
       if (typeof effect.endExpression === 'string' && /\.length\s*\(\s*\)\s*$/.test(effect.endExpression) && effect.end === value.length) pointers.set('end', value.length);
     }
     if (event.type === 'STRING_RESULT' && (matchesName(effect.resultName) || matchesName(effect.name)) &&
