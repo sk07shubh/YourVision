@@ -1,9 +1,8 @@
 import type { ExtensionRequest, ExtensionResponse } from '../types/messages';
 import type { VisualizationResponse } from '../types/trace';
 
-async function readLeetCodeJavaStarter(tabId: number): Promise<string> {
-  const tabs = await chrome.tabs.get(tabId);
-  const url = new URL(tabs.url ?? '');
+async function readLeetCodeJavaStarter(pageUrl: string): Promise<string> {
+  const url = new URL(pageUrl);
   const match = url.pathname.match(/\\/problems\\/([^/]+)/);
   const titleSlug = match?.[1];
   if (!titleSlug) throw new Error('Could not identify the LeetCode problem from the page URL.');
@@ -67,6 +66,11 @@ chrome.runtime.onMessage.addListener((msg: ExtensionRequest | {type:'REVEAL_LINE
       if (msg.type === 'READ_ENTRY_METHOD') {
         if (!sender.tab?.id) throw new Error('No active LeetCode tab.');
         const source = await readLeetCodeJavaStarter(sender.tab.id, sender.tab.url ?? '');
+        sendResponse({ok:true,source} satisfies ExtensionResponse); return;
+      }
+      if (msg.type === 'READ_ENTRY_METHOD') {
+        if (!sender.tab?.url) throw new Error('Could not identify the current LeetCode problem URL.');
+        const source = await readLeetCodeJavaStarter(sender.tab.url);
         sendResponse({ok:true,source} satisfies ExtensionResponse); return;
       }
       if (msg.type === 'READ_SOURCE') {
