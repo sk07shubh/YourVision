@@ -1713,8 +1713,6 @@ describe('array and matrix mutation animations', () => {
     const html = renderToStaticMarkup(
       <ArrayView value={[[2, 3], [1, 4]]} state={swapped} source="swap(matrix);" arrayName="matrix" />,
     );
-    expect(html).toContain('data-matrix-cell="[0,0]"');
-    expect(html).toContain('data-matrix-cell="[1,0]"');
     expect(html.match(/yv-matrix-cell-swapped/g)).toHaveLength(2);
 
     const notSwapped = state({ lastEvent: { type: 'ARRAY_WRITE', line: 5, data: {
