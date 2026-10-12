@@ -1237,6 +1237,95 @@ function collectionItemMotionClass(
   return occurrenceBefore > occurrencePreviously ? 'yv-collection-item-enter' : '';
 }
 
+function HeapTreeView({
+  value,
+  state,
+  source,
+  depth,
+  seen
+}: {
+  value: Obj & { $collectionId: string; values: unknown[] };
+  state?: TraceState;
+  source: string;
+  depth: number;
+  seen: Set<string>;
+}) {
+  const treeRef = useRef<HTMLDivElement | null>(null);
+  const [geometry, setGeometry] = useState<{ width: number; height: number; paths: string; signature: string }>({
+    width: 0, height: 0, paths: '', signature: ''
+  });
+
+  // Measure the actual rendered node centers instead of guessing connector
+  // positions from values or equal-width levels. This keeps edges attached
+  // when labels have different widths or the heap is horizontally scrolled.
+  useLayoutEffect(() => {
+    const tree = treeRef.current;
+    if (!tree) return;
+    const bounds = tree.getBoundingClientRect();
+    const width = Math.max(tree.clientWidth, tree.scrollWidth);
+    const height = Math.max(tree.clientHeight, tree.scrollHeight);
+    const nodes = Array.from(tree.querySelectorAll<HTMLElement>('.yv-heap-node[data-heap-index]'));
+    const centers = new Map<number, { x: number; top: number; bottom: number }>();
+    for (const node of nodes) {
+      const index = Number(node.dataset.heapIndex);
+      if (!Number.isInteger(index) || index < 0) continue;
+      const rect = node.getBoundingClientRect();
+      centers.set(index, {
+        x: rect.left - bounds.left + tree.scrollLeft + rect.width / 2,
+        top: rect.top - bounds.top + tree.scrollTop,
+        bottom: rect.bottom - bounds.top + tree.scrollTop
+      });
+    }
+    const paths: string[] = [];
+    for (const [index, child] of centers) {
+      if (index === 0) continue;
+      const parent = centers.get(Math.floor((index - 1) / 2));
+      if (!parent) continue;
+      paths.push(`M ${parent.x.toFixed(2)} ${parent.bottom.toFixed(2)} L ${child.x.toFixed(2)} ${child.top.toFixed(2)}`);
+    }
+    const pathData = paths.join(' ');
+    const signature = width + ':' + height + ':' + pathData;
+    setGeometry(previous => previous.signature === signature
+      ? previous
+      : { width, height, paths: pathData, signature });
+  });
+
+  const levels: unknown[][] = [];
+  value.values.forEach((item, index) => {
+    const level = Math.floor(Math.log2(index + 1));
+    (levels[level] ??= []).push(item);
+  });
+
+  return (
+    <div className="yv-heap-tree" ref={treeRef}>
+      {geometry.paths && geometry.width > 0 && geometry.height > 0 && (
+        <svg className="yv-heap-links" width={geometry.width} height={geometry.height}
+          viewBox={`0 0 ${geometry.width} ${geometry.height}`} aria-hidden="true" focusable="false">
+          <path d={geometry.paths} />
+        </svg>
+      )}
+      {levels.map((items, level) => (
+        <div className="yv-heap-level" key={level}>
+          {items.map((item, index) => {
+            const heapIndex = (2 ** level) - 1 + index;
+            const key = collectionItemReactKey(item, heapIndex, value.values);
+            return (
+              <div className="yv-heap-node-wrap" key={key}>
+                <div data-heap-index={heapIndex} data-collection-item-key={key}
+                  className={"yv-heap-node " + collectionItemMotionClass(value, item, heapIndex, state)}>
+                  <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
+                </div>
+                <div className="yv-cell-index">[{heapIndex}]</div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+      {!value.values.length && <div className="yv-empty">Empty priority queue</div>}
+    </div>
+  );
+}
+
 function CollectionView({
   value,
   state,
@@ -1391,28 +1480,7 @@ function CollectionView({
           <span>{type}</span>
           <span>HEAP · {itemCount} items</span>
         </div>
-        <div className="yv-heap-tree">
-          {(() => {
-            const levels: unknown[][] = [];
-            value.values.forEach((item, index) => {
-              const level = Math.floor(Math.log2(index + 1));
-              (levels[level] ??= []).push(item);
-            });
-            return <>
-              {levels.map((items, level) => (
-              <div className="yv-heap-level" key={level}>
-                {items.map((item, index) => (
-                  <div className="yv-heap-node-wrap" key={collectionItemReactKey(item, (2 ** level) - 1 + index, value.values)}>
-                    <div data-collection-item-key={collectionItemReactKey(item, (2 ** level) - 1 + index, value.values)} className={"yv-heap-node " + collectionItemMotionClass(value, item, (2 ** level) - 1 + index, state)}><DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/></div>
-                    <div className="yv-cell-index">[{(2 ** level) - 1 + index}]</div>
-                  </div>
-                ))}
-              </div>
-              ))}
-              {!value.values.length && <div className="yv-empty">Empty priority queue</div>}
-            </>;
-          })()}
-        </div>
+        <HeapTreeView value={value} state={state} source={source} depth={depth} seen={seen}/>
         <div className="yv-code yv-heap-note">Heap tree · root is index 0</div>
       </div>
     );
