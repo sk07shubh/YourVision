@@ -608,7 +608,7 @@ describe('string data structure visualization', () => {
       { type: 'STRING_SEARCH_RESULT', data: { name: 's', operation: 'indexOf', result: 1, index: 1.5, end: 3.5, matched: true } },
     ] } } });
     const html = renderToStaticMarkup(<StringView value="hello" state={current} name="s" />);
-    expect(html).not.toContain('yv-string-cell-range');
+    expect(html).not.toContain('yv-cell-range');
     expect(html).not.toContain('data-string-range');
   });
 
