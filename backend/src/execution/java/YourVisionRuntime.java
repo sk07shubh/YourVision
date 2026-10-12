@@ -133,7 +133,9 @@ public class YourVisionRuntime {
             return;
         }
 
+        // LeetCode's design-class expected output includes null for construction.
         List<Object> results = new ArrayList<>();
+        results.add(null);
         for (int operationIndex = 0; operationIndex < operationCount; operationIndex++) {
             if (cursor + 1 >= args.length) {
                 throw new IllegalArgumentException("Malformed operation " + operationIndex);
