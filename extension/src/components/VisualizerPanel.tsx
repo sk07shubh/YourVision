@@ -1248,10 +1248,46 @@ function CollectionView({
       : 'collection';
 
   const itemCount = value.size ?? value.values.length;
+  const collectionRootRef = useRef<HTMLDivElement | null>(null);
+  const previousItemRects = useRef<Map<string, DOMRect>>(new Map());
+
+  // FLIP only the surviving logical items when insertions/removals change layout.
+  // Removed items disappear in place; no detached "pop-out" element is rendered.
+  useLayoutEffect(() => {
+    const root = collectionRootRef.current;
+    if (!root) return;
+    const reduceMotion = typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const items = Array.from(root.querySelectorAll<HTMLElement>(
+      ':scope > .yv-stack-view > [data-collection-item-key], ' +
+      ':scope > .yv-queue-view > [data-collection-item-key], ' +
+      ':scope > .yv-set-view > [data-collection-item-key]'
+    ));
+    const nextRects = new Map<string, DOMRect>();
+    for (const element of items) {
+      const key = element.dataset.collectionItemKey;
+      if (!key) continue;
+      const rect = element.getBoundingClientRect();
+      nextRects.set(key, rect);
+      const before = previousItemRects.current.get(key);
+      if (!reduceMotion && before && !element.classList.contains('yv-collection-item-enter')) {
+        const dx = before.left - rect.left;
+        const dy = before.top - rect.top;
+        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+          element.animate(
+            [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }],
+            { duration: 220, easing: 'cubic-bezier(.2,.75,.25,1)' }
+          );
+        }
+      }
+    }
+    previousItemRects.current = nextRects;
+  });
 
   if (kind === 'stack') {
     return (
-      <div className="yv-collection">
+      <div className="yv-collection" ref={collectionRootRef}>
         <div className="yv-collection-meta">
           <span>{type}</span>
           <span>TOP · {itemCount} items</span>
