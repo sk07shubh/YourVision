@@ -1479,6 +1479,29 @@ function CollectionView({
     );
   }
 
+  if (kind === 'list' || kind === 'arrayList' || /^(ArrayList|Vector|CopyOnWriteArrayList)$/.test(type)) {
+    return (
+      <div className="yv-collection" ref={collectionRootRef} data-collection-emptied={emptiedThisStep ? 'true' : undefined}>
+        <div className="yv-collection-meta">
+          <span>{type}</span>
+          <span>INDEXED ORDER · {itemCount} items</span>
+        </div>
+        <div className="yv-list-view">
+          {value.values.map((item, index) => (
+            <div className="yv-list-slot" key={collectionItemReactKey(item, index, value.values)}
+              data-collection-item-key={collectionItemReactKey(item, index, value.values)}>
+              <div className={"yv-list-cell " + collectionItemMotionClass(value, item, index, state)}>
+                <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
+              </div>
+              <div className="yv-cell-index">{index}</div>
+            </div>
+          ))}
+          {!value.values.length && <div className="yv-empty">Empty list</div>}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="yv-collection" ref={collectionRootRef} data-collection-emptied={emptiedThisStep ? 'true' : undefined}>
       <div className="yv-collection-meta">
