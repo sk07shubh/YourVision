@@ -2628,12 +2628,14 @@ export function TrieView({ objects, variables = {}, source = '', state }: {
   const previousObjects = previous?.objects ?? {};
   const changedNodeIds = new Set<string>();
   const enteredNodeIds = new Set<string>();
+  const createdNodeIds = new Set<string>();
   if (state && previous && session.states.includes(state)) {
     for (const [key, value] of Object.entries(objects)) {
       if (!isPlainObject(value) || !looksTrieNode(value)) continue;
       const id = typeof value.$objectId === 'string' ? value.$objectId : key;
       const before = previousObjects[id];
-      if (before !== undefined && stableStringify(before) !== stableStringify(value)) changedNodeIds.add(id);
+      if (before === undefined) createdNodeIds.add(id);
+      else if (stableStringify(before) !== stableStringify(value)) changedNodeIds.add(id);
     }
     for (const [name, value] of Object.entries(variables)) {
       const currentId = graphReferenceId(value, objects);
@@ -2681,9 +2683,10 @@ export function TrieView({ objects, variables = {}, source = '', state }: {
     nextPath.add(id);
     const pointers = pointerNames.get(id) ?? [];
     return (
-      <div className={'yv-trie-branch' + (changedNodeIds.has(id) ? ' yv-trie-node-changed' : '') + (enteredNodeIds.has(id) ? ' yv-trie-node-entered' : '')}
+      <div className={'yv-trie-branch' + (changedNodeIds.has(id) ? ' yv-trie-node-changed' : '') + (enteredNodeIds.has(id) ? ' yv-trie-node-entered' : '') + (createdNodeIds.has(id) ? ' yv-trie-node-created' : '')}
         key={id + ':' + edgeLabel} data-trie-node-id={id} data-trie-changed={changedNodeIds.has(id) ? 'true' : undefined}
         data-trie-entered={enteredNodeIds.has(id) ? 'true' : undefined}
+        data-trie-created={createdNodeIds.has(id) ? 'true' : undefined}
         style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: 6 }}>
         {edgeLabel && <span data-trie-edge-label={edgeLabel} style={{ color: 'var(--yv-muted, #8b9bb4)', fontSize: 11 }}>{edgeLabel}</span>}
         <div className="yv-trie-node" style={{ minWidth: 54, padding: '7px 10px', border: '1px solid var(--yv-accent, #65a9ff)',
@@ -2731,12 +2734,14 @@ export function GraphView({ objects, variables = {}, state }: {
   const previousObjects = previous?.objects ?? {};
   const changedNodeIds = new Set<string>();
   const enteredNodeIds = new Set<string>();
+  const createdNodeIds = new Set<string>();
   if (state && previous && session.states.includes(state)) {
     for (const [key, value] of Object.entries(objects)) {
       if (!isPlainObject(value) || !looksGraphNode(value)) continue;
       const id = typeof value.$objectId === 'string' ? value.$objectId : key;
       const before = previousObjects[id];
-      if (before !== undefined && stableStringify(before) !== stableStringify(value)) changedNodeIds.add(id);
+      if (before === undefined) createdNodeIds.add(id);
+      else if (stableStringify(before) !== stableStringify(value)) changedNodeIds.add(id);
     }
     for (const [name, value] of Object.entries(variables)) {
       const currentId = graphReferenceId(value, objects);
@@ -2834,8 +2839,9 @@ export function GraphView({ objects, variables = {}, state }: {
             const pointers = pointerNames.get(node.id) ?? [];
             const changed = changedNodeIds.has(node.id);
             const entered = enteredNodeIds.has(node.id);
-            return <div key={node.id} className={'yv-graph-node' + (changed ? ' yv-graph-node-changed' : '') + (entered ? ' yv-graph-node-entered' : '')}
+            return <div key={node.id} className={'yv-graph-node' + (changed ? ' yv-graph-node-changed' : '') + (entered ? ' yv-graph-node-entered' : '') + (createdNodeIds.has(node.id) ? ' yv-graph-node-created' : '')}
               data-graph-node-id={node.id} data-graph-changed={changed ? 'true' : undefined} data-graph-entered={entered ? 'true' : undefined}
+              data-graph-created={createdNodeIds.has(node.id) ? 'true' : undefined}
               style={{ position: 'absolute', left: point.x - 47, top: point.y - 23, width: 94, minHeight: 46,
                 boxSizing: 'border-box', display: 'flex', flexDirection: 'column', alignItems: 'center',
                 justifyContent: 'center', gap: 2, padding: '5px 6px', border: '1px solid var(--yv-accent, #65a9ff)',
@@ -3217,6 +3223,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const previousFields = isPlainObject(previousNode) ? objectFields(previousNode) : {};
   const hasPreviousSnapshot = Boolean(state && previous && session.states.includes(state) && previousNode !== undefined);
   const changed = Boolean(hasPreviousSnapshot && stableStringify(previousNode) !== stableStringify(resolved));
+  const created = Boolean(hasPreviousSnapshot && previousNode === undefined);
   const leftBefore = hasPreviousSnapshot ? graphReferenceId(previousFields.left, previousObjects) : undefined;
   const leftAfter = graphReferenceId(fields.left, objects);
   const rightBefore = hasPreviousSnapshot ? graphReferenceId(previousFields.right, previousObjects) : undefined;
@@ -3230,8 +3237,9 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
       graphReferenceId(currentValue, objects) === id &&
       graphReferenceId(previous.variables[name], previousObjects) !== id));
   return (
-    <div className={'yv-tree-node' + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '')}
-      data-tree-node-id={id} data-tree-changed={changed ? 'true' : undefined} data-tree-entered={entered ? 'true' : undefined}>
+    <div className={'yv-tree-node' + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '')}
+      data-tree-node-id={id} data-tree-changed={changed ? 'true' : undefined} data-tree-entered={entered ? 'true' : undefined}
+      data-tree-created={created ? 'true' : undefined}>
       <div className="yv-node" style={changed ? { background: 'var(--yv-highlight, #203b5b)' } : undefined}>{displayValue(nodeValue(resolved))}</div>
       {hasChildren && (
         <div className="yv-tree-children">
