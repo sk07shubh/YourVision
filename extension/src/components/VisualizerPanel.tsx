@@ -3642,6 +3642,7 @@ function ObjectView({
     }
   }
 
+  const removedFieldNames = [...changedFields].filter(field => !(field in fields));
   if (!entries.length) {
     return (
       <div className="yv-code">
@@ -3652,7 +3653,8 @@ function ObjectView({
   }
 
   return (
-    <div className={"yv-object" + (createdFields.size ? ' yv-object-has-created-fields' : '')}>
+    <div className={"yv-object" + (createdFields.size ? ' yv-object-has-created-fields' : '') + (removedFieldNames.length ? ' yv-object-has-removed-fields' : '')}
+      data-object-removed-fields={removedFieldNames.length ? removedFieldNames.join(',') : undefined}>
       {entries.map(([key, fieldValue]) => (
         <div className={"yv-object-field" + (changedFields.has(key) ? ' yv-object-field-changed' : '') + (createdFields.has(key) ? ' yv-object-field-created' : '')} key={key}
           data-object-field={key} data-object-field-changed={changedFields.has(key) ? 'true' : undefined}
