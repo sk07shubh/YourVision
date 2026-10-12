@@ -743,8 +743,8 @@ async function visualize(region?: HTMLElement) {
     }
 
     let response;
-    if (!/\\bclass\\s+Solution\\b/.test(starterResponse.source)) {
-      const classMatch = starterResponse.source.match(/\\bclass\\s+([A-Za-z_$][\\w$]*)/);
+    if (!/\bclass\s+Solution\b/.test(starterResponse.source)) {
+      const classMatch = starterResponse.source.match(/\bclass\s+([A-Za-z_$][\w$]*)/);
       if (!classMatch?.[1]) throw new Error('Could not identify the LeetCode design class.');
       const design = readDesignTestcaseArrays(region);
       if (design.names[0] !== classMatch[1]) {
@@ -755,10 +755,10 @@ async function visualize(region?: HTMLElement) {
         : value === null ? 'null'
         : typeof value === 'number' || typeof value === 'boolean' ? String(value)
         : JSON.stringify(value);
-      const constructorArguments = design.values[0].map(serialize);
+      const constructorArguments = (design.values[0] ?? []).map(serialize);
       const operations = design.names.slice(1).map((name, index) => ({
         method: name,
-        arguments: design.values[index + 1].map(serialize),
+        arguments: (design.values[index + 1] ?? []).map(serialize),
       }));
       if (!operations.length) throw new Error('The design testcase has no operations to visualize.');
       sessionStore.begin(source, {
