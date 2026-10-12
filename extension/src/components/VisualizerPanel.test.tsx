@@ -603,6 +603,15 @@ describe('string data structure visualization', () => {
     expect(html).not.toContain('data-string-pointer="right"');
   });
 
+  it('ignores fractional string search range coordinates', () => {
+    const current = state({ lastEvent: { type: 'STEP', line: 4, data: { executionEvents: [
+      { type: 'STRING_SEARCH_RESULT', data: { name: 's', operation: 'indexOf', result: 1, index: 1.5, end: 3.5, matched: true } },
+    ] } } });
+    const html = renderToStaticMarkup(<StringView value="hello" state={current} name="s" />);
+    expect(html).not.toContain('yv-string-cell-range');
+    expect(html).not.toContain('data-string-range');
+  });
+
   it('preserves Java UTF-16 indexing for supplementary Unicode characters', () => {
     const html = renderToStaticMarkup(<StringView value="😀" state={state()} name="s" />);
     expect(html).toContain('data-string-length="2"');
@@ -1735,6 +1744,24 @@ describe('semantic roles in rendered visualization', () => {
     );
     expect(html).toContain('row · col');
     expect(html).toContain('[1,2]');
+  });
+
+  it('anchors row pointers to empty rows without inventing a matrix-cell intersection', () => {
+    const current = state({
+      variables: { row: 0, col: 0 },
+      lastEvent: { type: 'STEP', line: 4, data: {
+        executionEvents: [],
+        semanticRoles: [
+          { name: 'row', role: 'pointer', confidence: 0.99, evidence: 'first index in matrix access', structureName: 'matrix' },
+          { name: 'col', role: 'pointer', confidence: 0.99, evidence: 'second index in matrix access', structureName: 'matrix' },
+        ],
+      } },
+    });
+    const html = renderToStaticMarkup(
+      <ArrayView value={[[], [7]]} state={current} source="matrix[row][col]" arrayName="matrix" />,
+    );
+    expect(html).toContain('data-matrix-pointer="row"');
+    expect(html).not.toContain('data-matrix-intersection="row,col"');
   });
 
   it('does not invent an active matrix cell while row and column assignments are between checkpoints', () => {
