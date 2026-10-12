@@ -1871,6 +1871,14 @@ describe('array and matrix mutation animations', () => {
     expect(plainHtml).not.toContain('yv-matrix-cell-swapped');
   });
 
+  it('renders an explicit empty state for a zero-row matrix', () => {
+    const html = renderToStaticMarkup(
+      <ArrayView value={[]} state={state()} source="" arrayName="matrix" />,
+    );
+    expect(html).toContain('data-matrix-empty="true"');
+    expect(html).toContain('Empty matrix · 0 rows');
+  });
+
   it('preserves jagged matrix rows instead of inventing missing values', () => {
     const html = renderToStaticMarkup(
       <ArrayView value={[[1, 2, 3], [4], []]} state={state()} source="" arrayName="matrix" />,
