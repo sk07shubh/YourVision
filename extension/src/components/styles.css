@@ -850,6 +850,11 @@
 /* Binary-tree node changes and pointer arrivals are trace-derived. */
 .yv-tree-node-entered>.yv-node{animation:yv-graph-node-entered 420ms ease-out both;box-shadow:0 0 0 2px color-mix(in srgb,var(--yv-accent,#65a9ff),transparent 45%)}
 .yv-tree-node-changed>.yv-node{animation:yv-graph-node-changed 420ms ease-out both}
+.yv-tree-edge-changed{animation:yv-tree-edge-change 460ms ease-out both;border-radius:6px}
+.yv-tree-edge-changed>.yv-tree-edge-label{color:var(--yv-accent,#65a9ff)}
+.yv-tree-edge-changed[data-tree-edge-status="removed"]>.yv-tree-edge-label{text-decoration:line-through;text-decoration-color:var(--yv-warning,#f59e0b)}
+@keyframes yv-tree-edge-change{0%{background:color-mix(in srgb,var(--yv-accent,#65a9ff),transparent 76%);box-shadow:0 0 0 2px color-mix(in srgb,var(--yv-accent,#65a9ff),transparent 65%)}100%{background:transparent;box-shadow:0 0 0 0 transparent}}
+
 /* Disjoint-set parent, rank, and size writes share a short, local mutation cue. */
 .yv-dsu-changed>.yv-dsu-node{animation:yv-dsu-mutation 440ms ease-out both}
 .yv-dsu-field-changed{animation:yv-dsu-field-mutation 440ms ease-out both;border-radius:3px}
@@ -857,4 +862,4 @@
 @keyframes yv-dsu-field-mutation{0%{color:var(--yv-accent,#65a9ff);background:color-mix(in srgb,var(--yv-accent,#65a9ff),transparent 82%)}100%{color:inherit;background:transparent}}
 @media(prefers-reduced-motion:reduce){.yv-dsu-changed>.yv-dsu-node,.yv-dsu-field-changed{animation:none}}
 
-@media(prefers-reduced-motion:reduce){.yv-tree-node-entered>.yv-node,.yv-tree-node-changed>.yv-node{animation:none}}
+@media(prefers-reduced-motion:reduce){.yv-tree-node-entered>.yv-node,.yv-tree-node-changed>.yv-node,.yv-tree-edge-changed{animation:none}}
