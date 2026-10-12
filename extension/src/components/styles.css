@@ -876,6 +876,10 @@
    adjacent captured snapshots, never inferred from method names. */
 .yv-trie-node-entered .yv-trie-node{animation:yv-graph-node-entered 420ms ease-out both;box-shadow:0 0 0 2px color-mix(in srgb,var(--yv-accent,#65a9ff),transparent 45%)}
 .yv-trie-edge-traversed{animation:yv-trie-edge-traverse 420ms ease-out both;color:var(--yv-accent,#65a9ff)!important;font-weight:700}
+.yv-trie-edge-removed{display:inline-flex;align-items:center;padding:4px 7px;border:1px dashed var(--yv-warning,#f59e0b);border-radius:5px;color:var(--yv-warning,#f59e0b);font:10px ui-monospace,SFMono-Regular,Menlo,monospace;animation:yv-trie-edge-remove 440ms ease-out both}
+@keyframes yv-trie-edge-remove{0%{background:color-mix(in srgb,var(--yv-warning,#f59e0b),transparent 78%);opacity:.55}100%{background:transparent;opacity:1}}
+@media(prefers-reduced-motion:reduce){.yv-trie-edge-removed{animation:none}}
+
 @keyframes yv-trie-edge-traverse{0%{opacity:.35;text-shadow:0 0 0 transparent}45%{opacity:1;text-shadow:0 0 5px color-mix(in srgb,var(--yv-accent,#65a9ff),transparent 35%)}100%{opacity:1;text-shadow:none}}
 @media(prefers-reduced-motion:reduce){.yv-trie-edge-traversed{animation:none}}
 
