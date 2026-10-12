@@ -2899,6 +2899,14 @@ export function GraphView({ objects, variables = {}, state }: {
     const position = stablePositions.get(node.id);
     if (position) positions.set(node.id, position);
   }
+  const traversedEdgePairs = new Set<string>();
+  if (previous) {
+    for (const [name, currentValue] of Object.entries(variables)) {
+      const from = graphReferenceId(previous.variables[name], previousObjects);
+      const to = graphReferenceId(currentValue, objects);
+      if (from && to && from !== to) traversedEdgePairs.add(from + ':' + to);
+    }
+  }
   const edges = nodes.flatMap(node => node.neighbors.flatMap((neighbor, index) => {
     const target = graphReferenceId(neighbor, objects);
     if (!target || !ids.has(target)) return [];
@@ -2909,7 +2917,8 @@ export function GraphView({ objects, variables = {}, state }: {
       return from === node.id && (graphNeighborValues(previousValue) ?? []).some(previousNeighbor =>
         graphReferenceId(previousNeighbor, previousObjects) === target);
     });
-    return [{ key, from: node.id, to: target, status: previous && !previousHadEdge ? 'added' as const : 'steady' as const }];
+    return [{ key, from: node.id, to: target, status: previous && !previousHadEdge ? 'added' as const :
+      traversedEdgePairs.has(node.id + ':' + target) ? 'traversed' as const : 'steady' as const }];
   }));
   const currentEdgePairs = new Set(edges.map(edge => edge.from + ':' + edge.to));
   const removedEdges = previous ? Object.entries(previousObjects).flatMap(([key, value]) => {
@@ -2949,7 +2958,7 @@ export function GraphView({ objects, variables = {}, state }: {
             {[...edges, ...removedEdges].map(edge => {
               const from = positions.get(edge.from)!;
               const to = positions.get(edge.to)!;
-              const stroke = edge.status === 'added' ? 'var(--yv-accent, #65a9ff)'
+              const stroke = edge.status === 'added' || edge.status === 'traversed' ? 'var(--yv-accent, #65a9ff)'
                 : edge.status === 'removed' ? 'var(--yv-warning, #f59e0b)' : 'var(--yv-muted, #8b9bb4)';
               if (edge.from === edge.to) {
                 return <path key={edge.key} className={`yv-graph-edge yv-graph-edge-${edge.status}`}
@@ -2957,7 +2966,7 @@ export function GraphView({ objects, variables = {}, state }: {
                   data-graph-edge-status={edge.status}
                   d={`M ${from.x + 20} ${from.y - 12} C ${from.x + 70} ${from.y - 65}, ${from.x - 45} ${from.y - 65}, ${from.x - 20} ${from.y - 12}`}
                   fill="none" stroke={stroke} strokeDasharray={edge.status === 'removed' ? '4 3' : undefined}
-                  opacity={edge.status === 'removed' ? 0.65 : 1} strokeWidth="1.5" markerEnd="url(#yv-graph-arrow)" />;
+                  opacity={edge.status === 'removed' ? 0.65 : 1} strokeWidth={edge.status === 'traversed' ? 2.5 : 1.5} markerEnd="url(#yv-graph-arrow)" />;
               }
               const dx = to.x - from.x, dy = to.y - from.y;
               const length = Math.max(1, Math.hypot(dx, dy));
@@ -2967,7 +2976,7 @@ export function GraphView({ objects, variables = {}, state }: {
                 x1={from.x + dx / length * 43} y1={from.y + dy / length * 25}
                 x2={to.x - dx / length * 50} y2={to.y - dy / length * 30}
                 stroke={stroke} strokeDasharray={edge.status === 'removed' ? '4 3' : undefined}
-                opacity={edge.status === 'removed' ? 0.65 : 1} strokeWidth="1.5" markerEnd="url(#yv-graph-arrow)" />;
+                opacity={edge.status === 'removed' ? 0.65 : 1} strokeWidth={edge.status === 'traversed' ? 2.5 : 1.5} markerEnd="url(#yv-graph-arrow)" />;
             })}
           </svg>
           {nodes.map(node => {
