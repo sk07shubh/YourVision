@@ -688,6 +688,15 @@ describe('string data structure visualization', () => {
     const insertedHtml = renderToStaticMarkup(<StringView value="cba" state={insertedState} name="builder" />);
     expect(insertedHtml).toContain('yv-string-cell-added');
     expect(insertedHtml).toContain('data-string-index="1"');
+
+    const appendedState = state({ lastEvent: { type: 'STEP', line: 8, data: { executionEvents: [
+      { type: 'STRING_MUTATION', data: {
+        name: 'builder', operation: 'append', before: 'abc', after: 'abcd', inserted: 'd', kind: 'mutation',
+      } },
+    ] } } });
+    const appendedHtml = renderToStaticMarkup(<StringView value="abcd" state={appendedState} name="builder" />);
+    expect(appendedHtml).toContain('yv-string-cell-added');
+    expect(appendedHtml).toContain('data-string-index="3"');
   });
 
   it('renders StringBuilder snapshots as an indexed mutable character sequence', () => {
