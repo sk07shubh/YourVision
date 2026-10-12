@@ -340,6 +340,35 @@ describe('trie data structure visualization', () => {
     }
   });
 
+  it('keeps the final removed trie edge visible for the mutation step', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 119,
+      variables: { trie: { $objectId: 't1' } },
+      objects: {
+        t1: { $objectId: 't1', $type: 'TrieNode', fields: { isEnd: false, children: { entries: [{ key: 'a', value: { $ref: 't2' } }] } } },
+        t2: { $objectId: 't2', $type: 'TrieNode', fields: { isEnd: true, children: { entries: [] } } },
+      },
+    });
+    const current = state({
+      sequence: 120,
+      variables: { trie: { $objectId: 't1' } },
+      objects: {
+        t1: { $objectId: 't1', $type: 'TrieNode', fields: { isEnd: false, children: { entries: [] } } },
+        t2: { $objectId: 't2', $type: 'TrieNode', fields: { isEnd: true, children: { entries: [] } } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'node.children.remove(\'a\');', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TrieView objects={current.objects} variables={current.variables} source="" state={current} />);
+      expect(html).toContain('data-trie-edge-label="a"');
+      expect(html).toContain('data-trie-edge-status="removed"');
+      expect(html).toContain('a · removed');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
   it('renders child edges and terminal-word state from captured trie nodes', () => {
     const current = state({
       variables: { trie: { $objectId: 'container' } },
