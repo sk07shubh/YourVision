@@ -3457,6 +3457,27 @@ function ObjectView({
 
   const fields = objectFields(value);
   const entries = Object.entries(fields);
+  const changedFields = new Set<string>();
+  const eventData = state?.lastEvent?.data;
+  const collectChangedFields = (candidate: unknown, eventObjectId?: unknown) => {
+    if (eventObjectId !== objectId || !isPlainObject(candidate) || !Array.isArray(candidate.changes)) return;
+    for (const change of candidate.changes) {
+      if (!isPlainObject(change)) continue;
+      const path = Array.isArray(change.fields) ? change.fields : Array.isArray(change.path) ? change.path : [];
+      const field = path.find((part): part is string => typeof part === 'string');
+      if (field) changedFields.add(field);
+    }
+  };
+  if (objectId && isPlainObject(eventData)) {
+    collectChangedFields(eventData, eventData.objectId);
+    if (Array.isArray(eventData.executionEvents)) {
+      for (const event of eventData.executionEvents) {
+        if (isPlainObject(event) && event.type === 'OBJECT_FIELD_WRITE' && isPlainObject(event.data)) {
+          collectChangedFields(event.data, event.data.objectId);
+        }
+      }
+    }
+  }
 
   if (!entries.length) {
     return (
@@ -3470,7 +3491,8 @@ function ObjectView({
   return (
     <div className="yv-object">
       {entries.map(([key, fieldValue]) => (
-        <div className="yv-object-field" key={key}>
+        <div className={"yv-object-field" + (changedFields.has(key) ? ' yv-object-field-changed' : '')} key={key}
+          data-object-field={key} data-object-field-changed={changedFields.has(key) ? 'true' : undefined}>
           <div className="yv-code yv-object-key">{key}</div>
           <div className="yv-object-value">
             <DataValue
