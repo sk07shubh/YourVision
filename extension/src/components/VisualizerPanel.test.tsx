@@ -811,13 +811,14 @@ describe('string data structure visualization', () => {
     expect(html).not.toContain('yv-cell-range');
   });
 
-  it('animates StringBuilder insertions and deletion ghosts without moving index labels', () => {
+  it('animates StringBuilder insertions without detached deletion ghosts or moving index labels', () => {
     const deletedState = state({ lastEvent: { type: 'STEP', line: 6, data: { executionEvents: [
       { type: 'STRING_MUTATION', data: { name: 'builder', operation: 'deleteCharAt', before: 'cba', after: 'ca', index: 1, removed: 'b', kind: 'mutation' } },
     ] } } });
     const deletedHtml = renderToStaticMarkup(<StringView value="ca" state={deletedState} name="builder" />);
-    expect(deletedHtml).toContain('yv-string-removed-overlay');
-    expect(deletedHtml).toContain('>b</div>');
+    // Deletions update the string in place; do not render a detached pop-out box.
+    expect(deletedHtml).not.toContain('yv-string-removed-overlay');
+    expect(deletedHtml).not.toContain('>b</div>');
 
     const insertedState = state({ lastEvent: { type: 'STEP', line: 7, data: { executionEvents: [
       { type: 'STRING_MUTATION', data: { name: 'builder', operation: 'insert', before: 'ca', after: 'cba', index: 1, inserted: 'b', kind: 'mutation' } },
