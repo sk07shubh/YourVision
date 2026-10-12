@@ -1497,6 +1497,10 @@ function CollectionView({
             </div>
           ))}
           {!value.values.length && <div className="yv-empty">Empty list</div>}
+          {value.values.length > 0 && <div className="yv-list-slot yv-list-end-slot" aria-label="List boundary, not an element">
+            <div className="yv-list-end-marker" title="One past the last item">×</div>
+            <div className="yv-cell-index">{value.values.length}</div>
+          </div>}
         </div>
       </div>
     );
@@ -2466,11 +2470,8 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
       // side. This avoids hiding one index behind another (e.g. left/right).
       const groups = new Map<number, typeof targets>();
       for (const target of targets) {
-        // Index == length is a legitimate one-past-the-end cursor (e.g. j
-        // after the final j++). It has no cell, so position it just beyond
-        // the final cell instead of silently dropping it.
-        const isPastEnd = target.index === value.length && value.length > 0;
-        const cell = cellRefs.current[target.index] ?? (isPastEnd ? cellRefs.current[value.length - 1] : null);
+        // One-past-end cursors use a dedicated sentinel cell, not a real element.
+        const cell = cellRefs.current[target.index] ?? null;
         if (!cell) continue;
         const group = groups.get(target.index) ?? [];
         group.push(target);
@@ -2481,12 +2482,9 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
       }
 
       for (const [index, group] of groups) {
-        const isPastEnd = index === value.length && value.length > 0;
-        const cell = cellRefs.current[index] ?? (isPastEnd ? cellRefs.current[value.length - 1] : null);
+        const cell = cellRefs.current[index];
         if (!cell) continue;
-        const center = isPastEnd
-          ? cell.offsetLeft + cell.offsetWidth + 18
-          : cell.offsetLeft + cell.offsetWidth / 2;
+        const center = cell.offsetLeft + cell.offsetWidth / 2;
         const gap = 5;
         const widths = group.map(target => labels.get(target.name)?.offsetWidth ?? Math.max(24, target.name.length * 7 + 10));
         const totalWidth = widths.reduce((sum, width) => sum + width, 0) + gap * Math.max(0, group.length - 1);
@@ -2550,6 +2548,12 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
           <div className="yv-cell-index">{index}</div>
         </div>
       ))}
+      {value.length > 0 && (
+        <div className="yv-cell yv-array-end-slot" key="array-end" ref={element => { cellRefs.current[value.length] = element; }}>
+          <div className="yv-array-end-marker" title="One past the last element" aria-label="Array boundary, not an element">×</div>
+          <div className="yv-cell-index">{value.length}</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -4180,7 +4184,7 @@ export function StringView({ value, state, name, source = '' }: { value: string;
         {!characters.length && <div className="yv-empty">Empty string</div>}
         {[...pointers.entries()].some(([, index]) => index === value.length) &&
           <div className="yv-string-cell-wrap yv-string-end-pointer">
-            <div className="yv-string-end-marker" aria-label="String end">∅</div>
+            <div className="yv-string-end-marker" aria-label="String boundary, not a character" title="One past the last character">×</div>
             <div className="yv-string-index">{value.length}</div>
           </div>}
       </div>
