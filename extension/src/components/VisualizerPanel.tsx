@@ -3652,7 +3652,7 @@ export function StringView({ value, state, name, source = '' }: { value: string;
         {hasPointers && <div className="yv-string-pointer-layer" aria-hidden="true">
           {[...new Set(pointers.values())].map(pointerIndex => (
             <span className="yv-string-pointer-group" key={pointerIndex} data-string-pointer-index={pointerIndex}
-              style={{ left: pointerIndex * 40 + 18 }}>
+              style={{ left: pointerIndex * 40 + 18 + (enhancedBinding ? 44 : 0) }}>
               {[...pointers.entries()].filter(([, index]) => index === pointerIndex).map(([pointer]) => (
                 <span className="yv-string-pointer" key={pointer} data-string-pointer={pointer}>{pointer}</span>
               ))}
