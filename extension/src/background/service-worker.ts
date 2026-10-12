@@ -3,7 +3,7 @@ import type { VisualizationResponse } from '../types/trace';
 
 async function readLeetCodeJavaStarter(pageUrl: string): Promise<string> {
   const url = new URL(pageUrl);
-  const match = url.pathname.match(/\\/problems\\/([^/]+)/);
+  const match = url.pathname.match(/\/problems\/([^/]+)/);
   const titleSlug = match?.[1];
   if (!titleSlug) throw new Error('Could not identify the LeetCode problem from the page URL.');
 
