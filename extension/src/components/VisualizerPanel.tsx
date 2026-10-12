@@ -2612,6 +2612,37 @@ function MapView({
   const deleted = changes.filter(
     change => change.kind === 'delete'
   );
+  const mapTableRef = useRef<HTMLDivElement | null>(null);
+  const previousMapRowRects = useRef<Map<string, DOMRect>>(new Map());
+  const mapRowAnimations = useRef<WeakMap<HTMLElement, Animation>>(new WeakMap());
+  useLayoutEffect(() => {
+    const table = mapTableRef.current;
+    if (!table) return;
+    const reduceMotion = typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const rows = Array.from(table.querySelectorAll<HTMLElement>(':scope > .yv-map-row[data-map-key-identity]'));
+    const nextRects = new Map<string, DOMRect>();
+    for (const row of rows) {
+      const key = row.dataset.mapKeyIdentity;
+      if (!key) continue;
+      mapRowAnimations.current.get(row)?.cancel();
+      const rect = row.getBoundingClientRect();
+      nextRects.set(key, rect);
+      const before = previousMapRowRects.current.get(key);
+      if (!reduceMotion && before && !row.classList.contains('yv-map-insert')) {
+        const dx = before.left - rect.left;
+        const dy = before.top - rect.top;
+        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+          mapRowAnimations.current.set(row, row.animate(
+            [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }],
+            { duration: 230, easing: 'cubic-bezier(.2,.75,.25,1)' }
+          ));
+        }
+      }
+    }
+    previousMapRowRects.current = nextRects;
+  });
 
   return (
     <div className="yv-hashmap" data-map-id={value.$mapId}>
@@ -2628,7 +2659,7 @@ function MapView({
             : value.entries.length + ' entries'}</span>
       </div>
 
-      <div className={"yv-map-table" + (deleted.length ? ' yv-map-delete-pulse' : '')}
+      <div ref={mapTableRef} className={"yv-map-table" + (deleted.length ? ' yv-map-delete-pulse' : '')}
         data-map-delete-count={deleted.length || undefined}>
         <div className="yv-map-header">
           <div>Key</div>
