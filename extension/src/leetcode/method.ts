@@ -41,7 +41,18 @@ export function inferMethod(source: string): JavaMethod {
     if (match[1] !== 'main') publicNames.add(match[1]);
   }
 
-  return methods.find(method => publicNames.has(method.name)) ?? methods[0];
+  // A helper can also be public (for example, users may change a recursive
+  // DFS helper from private to public while debugging). In that case, prefer
+  // the public candidate with the fewest parameters: LeetCode entry methods
+  // generally take the testcase inputs, while helpers add traversal/state args.
+  const publicMethods = methods.filter(method => publicNames.has(method.name));
+  if (publicMethods.length) {
+    return publicMethods.reduce((best, method) =>
+      method.parameterNames.length < best.parameterNames.length ? method : best
+    );
+  }
+
+  return methods[0];
 }
 
 function splitParams(text: string): Array<{ type: string; name: string }> {
