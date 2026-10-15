@@ -752,12 +752,6 @@ public class YourVisionTracer {
                     StandardCharsets.UTF_8
                 );
 
-            int limit =
-                Math.min(
-                    Math.max(fallback - 1, 0),
-                    lines.size()
-                );
-
             String methodName = method.isConstructor()
                 ? method.declaringType().name().substring(
                     method.declaringType().name().lastIndexOf('.') + 1
@@ -768,11 +762,45 @@ public class YourVisionTracer {
                 java.util.regex.Pattern.quote(methodName) +
                 "\\s*\\(";
 
-            for (int index = limit - 1; index >= 0; index--) {
-                if (lines.get(index).matches(".*" + pattern + ".*")) {
-                    return index + 1;
+            // JDI's method-entry Location can point at the first bytecode
+            // line rather than the declaration (and can be line 1 for a
+            // method declared later in the source). Search the whole source
+            // for declaration-shaped lines, then choose the closest match to
+            // the runtime location. This handles constructors and overloads
+            // without pretending the declaration itself was executed.
+            int bestLine = fallback;
+            int bestDistance = Integer.MAX_VALUE;
+
+            for (int index = 0; index < lines.size(); index++) {
+                String sourceLine = lines.get(index);
+                if (!sourceLine.matches(".*" + pattern + ".*")) {
+                    continue;
+                }
+
+                String trimmed = sourceLine.trim();
+                boolean declarationLike =
+                    trimmed.matches("^(public|protected|private|static|final|abstract|synchronized|native|\\s)*.*") &&
+                    (trimmed.contains("{") ||
+                     trimmed.endsWith(")") ||
+                     trimmed.endsWith("throws") ||
+                     trimmed.matches(".*\\)\\s*throws\\s+.*"));
+
+                if (!declarationLike) {
+                    continue;
+                }
+
+                int candidateLine = index + 1;
+                int distance = fallback > 0
+                    ? Math.abs(candidateLine - fallback)
+                    : candidateLine;
+
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestLine = candidateLine;
                 }
             }
+
+            return bestLine;
         } catch (Exception ignored) {
         }
 
