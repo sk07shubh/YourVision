@@ -146,3 +146,5 @@ Playwright E2E uses a deterministic LeetCode-shaped fixture and mocked `/visuali
 - 2026-10-15: First PR CI run exposed backend TS2375 under `exactOptionalPropertyTypes`: replay intentionally clears optional invocation metadata with `undefined`. Updated backend and extension trace contracts to permit explicit undefined for the new optional fields (commits `185c4281986834fff78891aefcdded5ac42baa63`, `61d92080c83b8ee89424dc3b312409781dd8e3fe`). This is a CI-driven correction; rerun status must be checked on the newest PR head. The earlier run failed at typecheck before executing backend tests.
 
 - 2026-10-15: Added backend trace-state regression coverage for identical repeated method invocations, entry identity preservation, typed return values/status, and clearing the previous return value on the next invocation (commit `b3cfe78f38f4bf683680715239db0bbd667534f8`). CI results for the newer head remain pending at this point.
+
+- 2026-10-15: Replaced imperative DOM-only sidebar toggling with React state so `aria-expanded` and the workspace reflow remain synchronized across playback rerenders (`cf97c36735b2c6a09422d901dcba223672457746`).
