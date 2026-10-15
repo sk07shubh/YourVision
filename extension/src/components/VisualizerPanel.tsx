@@ -3277,20 +3277,7 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
       const method = typeof event.method === 'string' && event.method ? event.method : 'method';
       // Only read parameter names from a method declaration, never a call site such as
       // helper(this). The old substring search could mistake that call for the declaration.
-      const escapedMethod = method.replace(/[.*+?^${}()|[\]\\]/g, '\\      const rawParams = Array.isArray(data.parameterTypes) ? data.parameterTypes.filter((item): item is string => typeof item === 'string') : [];
-      const method = typeof event.method === 'string' && event.method ? event.method : 'method';
-      const declaration = source.split(/\r?\n/).map(line => line.trim()).find(line => line.includes(method + '('));
-      const parameterText = declaration ? declaration.slice(declaration.indexOf('(') + 1, declaration.lastIndexOf(')')) : '';
-      const parameterNames = parameterText
-        ? parameterText.split(',').map(parameter => parameter.trim().replace(/\s*=.*$/, '').split(/\s+/).pop() ?? '').slice(0, rawParams.length)
-        : [];
-      const displayType = (type: string): string => type
-        .replace(/^java\.lang\./, '')
-        .replace(/^java\.util\./, '')
-        .replace(/\bboolean\b/g, 'bool');
-      const signatureParams = rawParams.map((type, index) =>
-        `${displayType(type)} ${parameterNames[index] ?? `arg${index + 1}`}`
-      );');
+      const escapedMethod = method.replace(/[.*+?^\${}()|[\]\\]/g, '\\$&');
       const declarationPattern = new RegExp('\\b(?:public|private|protected)\\s+(?:(?:static|final|synchronized)\\s+)*[\\w.$<>?,\\[\\] ]+?\\s+' + escapedMethod + '\\s*\\(([^)]*)\\)');
       const declarationMatch = source.match(declarationPattern);
       const parameterText = declarationMatch?.[1] ?? '';
@@ -3306,7 +3293,7 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
         .replace(/\\bboolean\\b/g, 'bool');
       const signatureParams = rawParams.map((type, index) => {
         const name = parameterNames[index];
-        return `${displayType(type)} ${name && name !== 'this' ? name : `arg${index + 1}`}`;
+        return \`\${displayType(type)} \${name && name !== 'this' ? name : \`arg\${index + 1}\`}\`;
       });
       const signature = `${method}(${signatureParams.join(', ')})`;
       const returnType = typeof data.returnType === 'string' ? displayType(data.returnType) : undefined;
