@@ -2740,7 +2740,7 @@ function MapView({
   const changes = mapChanges(state, value.$mapId);
   const typeName = typeof value.$type === 'string' ? value.$type.split('.').pop() : '';
   const accessOrdered = typeName === 'LinkedHashMap' &&
-    /new\\s+LinkedHashMap\\s*<[^>]*>\\s*\\(\\s*[^,]+,\\s*[^,]+,\\s*true\\s*\\)/s.test(source);
+    /new\s+LinkedHashMap\s*<[^>]*>\s*\(\s*[^,]+,\s*[^,]+,\s*true\s*\)/s.test(source);
   const reorderedKeys = typeName === 'LinkedHashMap'
     ? mapReorderedKeys(state, value.$mapId, value.entries)
     : new Set<string>();
