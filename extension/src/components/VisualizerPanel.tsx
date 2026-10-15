@@ -2576,6 +2576,24 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
   );
 }
 
+function mapSnapshotCandidates(state?: TraceState): unknown[] {
+  const candidates: unknown[] = [
+    ...Object.values(state?.variables ?? {}),
+    ...Object.values(state?.dataStructures ?? {})
+  ];
+  const thisValue = state?.variables?.this;
+  if (isPlainObject(thisValue) && isPlainObject(thisValue.fields)) {
+    candidates.push(...Object.values(thisValue.fields));
+  }
+  const thisId = isPlainObject(thisValue)
+    ? (typeof thisValue.$objectId === 'string' ? thisValue.$objectId
+      : typeof thisValue.$ref === 'string' ? thisValue.$ref : undefined)
+    : undefined;
+  const thisObject = thisId ? state?.objects?.[thisId] : undefined;
+  if (isPlainObject(thisObject)) candidates.push(...Object.values(objectFields(thisObject)));
+  return candidates;
+}
+
 function mapChanges(state?: TraceState, mapId?: string): Array<{
   kind: 'insert' | 'update' | 'delete';
   key: unknown;
@@ -2667,16 +2685,10 @@ function mapChanges(state?: TraceState, mapId?: string): Array<{
   );
   if (currentIndex <= 0) return [];
   const previousState = session.states[currentIndex - 1];
-  const previousMap = [
-    ...Object.values(previousState?.variables ?? {}),
-    ...Object.values(previousState?.dataStructures ?? {}),
-  ].find(candidate =>
+  const previousMap = mapSnapshotCandidates(previousState).find(candidate =>
     isPlainObject(candidate) && candidate.$mapId === mapId && Array.isArray(candidate.entries)
   );
-  const currentMap = [
-    ...Object.values(state.variables ?? {}),
-    ...Object.values(state.dataStructures ?? {}),
-  ].find(candidate =>
+  const currentMap = mapSnapshotCandidates(state).find(candidate =>
     isPlainObject(candidate) && candidate.$mapId === mapId && Array.isArray(candidate.entries)
   );
   if (!isPlainObject(previousMap) || !isPlainObject(currentMap)) return [];
@@ -2698,10 +2710,7 @@ function mapReorderedKeys(
   );
   if (currentIndex <= 0) return new Set<string>();
   const previousState = session.states[currentIndex - 1];
-  const previousMap = [
-    ...Object.values(previousState?.variables ?? {}),
-    ...Object.values(previousState?.dataStructures ?? {}),
-  ].find(candidate =>
+  const previousMap = mapSnapshotCandidates(previousState).find(candidate =>
     isPlainObject(candidate) && candidate.$mapId === mapId && Array.isArray(candidate.entries)
   );
   if (!isPlainObject(previousMap) || !Array.isArray(previousMap.entries) ||
