@@ -309,9 +309,7 @@ function applyEvent(
                 ? "exceptional"
                 : data.returnedVoid === true
                     ? "void"
-                    : Object.prototype.hasOwnProperty.call(data, "returnValue")
-                        ? "returned"
-                        : "returned";
+                    : "returned";
             // Preserve the callee's actual return location for this checkpoint.
             // A later caller STEP represents the caller resuming execution.
             next.line = event.line ?? previous.line;
