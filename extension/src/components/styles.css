@@ -798,7 +798,7 @@
 @media (max-width:680px) {
   .yv-workspace.tree-open { flex-direction:column; }
   .yv-workspace.tree-open .yv-workspace-tree { flex:0 0 auto; width:100%; min-width:0; margin:0 0 12px; }
-  .yv-function-tree { max-width:100% !important; resize:none; max-height:38vh; }
+  .yv-function-tree { max-width:100% !important; resize:vertical; max-height:70dvh; }
 }
 
 .yv-tree-frame { display:flex; flex-direction:column; gap:3px; width:100%; padding-top:2px; border-top:1px solid #2b3039; }
@@ -839,7 +839,9 @@
   max-width: 100%;
   height: clamp(240px, 54vh, 560px);
   max-height: calc(100dvh - 260px);
-  resize: none;
+  resize: vertical;
+  min-height: 240px;
+  max-height: calc(100dvh - 180px);
 }
 .yv-tree-viewport {
   box-sizing: border-box;
@@ -901,6 +903,6 @@
   }
   .yv-function-tree {
     height: clamp(220px, 42vh, 420px);
-    max-height: 42dvh;
+    max-height: 70dvh;
   }
 }
