@@ -251,11 +251,7 @@ public class YourVisionTracer {
                 } else if (event instanceof MethodEntryEvent entry) {
                     Method enteredMethod = entry.method();
 
-                    if (
-                        isTraceableUserMethod(enteredMethod) &&
-                        (!enteredMethod.isConstructor() ||
-                         hasExplicitConstructorDeclaration(enteredMethod))
-                    ) {
+                    if (isTraceableUserMethod(enteredMethod)) {
                         installSameLineLoopBreakpoints(
                             manager,
                             enteredMethod
@@ -283,12 +279,21 @@ public class YourVisionTracer {
                             declarationLine
                         );
 
-                        emit(
-                            "METHOD_ENTER",
-                            methodLocation,
-                            entry.thread(),
-                            data
-                        );
+                        // The compiler-generated default constructor is
+                        // not user-authored code. Keep its entry request as the
+                        // point where line stepping is armed, but do not expose a
+                        // synthetic constructor checkpoint in the user's trace.
+                        if (
+                            !enteredMethod.isConstructor() ||
+                            hasExplicitConstructorDeclaration(enteredMethod)
+                        ) {
+                            emit(
+                                "METHOD_ENTER",
+                                methodLocation,
+                                entry.thread(),
+                                data
+                            );
+                        }
 
                         // A method-entry location can point at the declaration
                         // line, which is not an executed statement. Do not emit
