@@ -76,6 +76,15 @@ function sameVisibleState(left: TraceState, right: TraceState): boolean {
         JSON.stringify(left.dataStructures) === JSON.stringify(right.dataStructures) &&
         JSON.stringify(left.objects) === JSON.stringify(right.objects) &&
         JSON.stringify(left.callStack) === JSON.stringify(right.callStack) &&
+        left.invocationId === right.invocationId &&
+        left.parentInvocationId === right.parentInvocationId &&
+        left.methodSignature === right.methodSignature &&
+        left.declaringType === right.declaringType &&
+        left.returnType === right.returnType &&
+        JSON.stringify(left.returnValue) === JSON.stringify(right.returnValue) &&
+        left.returnValueType === right.returnValueType &&
+        left.returnedVoid === right.returnedVoid &&
+        left.invocationStatus === right.invocationStatus &&
         JSON.stringify(left.error) === JSON.stringify(right.error)
     );
 }
@@ -98,7 +107,9 @@ function applyEvent(
         parentInvocationId:
             typeof event.data?.parentInvocationId === "string"
                 ? event.data.parentInvocationId
-                : previous.parentInvocationId,
+                : event.type === "METHOD_ENTER" || event.type === "METHOD_EXIT"
+                    ? undefined
+                    : previous.parentInvocationId,
         methodSignature:
             typeof event.data?.methodSignature === "string"
                 ? event.data.methodSignature
@@ -114,15 +125,21 @@ function applyEvent(
         returnValue:
             event.data && Object.prototype.hasOwnProperty.call(event.data, "returnValue")
                 ? event.data.returnValue
-                : previous.returnValue,
+                : event.type === "METHOD_ENTER"
+                    ? undefined
+                    : previous.returnValue,
         returnValueType:
             typeof event.data?.returnValueType === "string"
                 ? event.data.returnValueType
-                : previous.returnValueType,
+                : event.type === "METHOD_ENTER"
+                    ? undefined
+                    : previous.returnValueType,
         returnedVoid:
             typeof event.data?.returnedVoid === "boolean"
                 ? event.data.returnedVoid
-                : previous.returnedVoid,
+                : event.type === "METHOD_ENTER"
+                    ? undefined
+                    : previous.returnedVoid,
         invocationStatus: previous.invocationStatus
     };
 
