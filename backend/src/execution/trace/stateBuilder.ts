@@ -103,41 +103,51 @@ function applyEvent(
         invocationId:
             typeof event.data?.invocationId === "string"
                 ? event.data.invocationId
-                : previous.invocationId,
+                : event.type === "METHOD_EXIT"
+                    ? (typeof event.data?.parentInvocationId === "string" ? event.data.parentInvocationId : undefined)
+                    : previous.invocationId,
         parentInvocationId:
             typeof event.data?.parentInvocationId === "string"
                 ? event.data.parentInvocationId
-                : event.type === "METHOD_ENTER" || event.type === "METHOD_EXIT"
+                : event.type === "METHOD_EXIT"
                     ? undefined
-                    : previous.parentInvocationId,
+                    : event.type === "METHOD_ENTER"
+                        ? undefined
+                        : previous.parentInvocationId,
         methodSignature:
             typeof event.data?.methodSignature === "string"
                 ? event.data.methodSignature
-                : previous.methodSignature,
+                : event.type === "METHOD_EXIT"
+                    ? (typeof event.data?.parentMethodSignature === "string" ? event.data.parentMethodSignature : undefined)
+                    : previous.methodSignature,
         declaringType:
             typeof event.data?.declaringType === "string"
                 ? event.data.declaringType
-                : previous.declaringType,
+                : event.type === "METHOD_EXIT"
+                    ? (typeof event.data?.parentDeclaringType === "string" ? event.data.parentDeclaringType : undefined)
+                    : previous.declaringType,
         returnType:
             typeof event.data?.returnType === "string"
                 ? event.data.returnType
-                : previous.returnType,
+                : event.type === "METHOD_EXIT"
+                    ? (typeof event.data?.parentReturnType === "string" ? event.data.parentReturnType : undefined)
+                    : previous.returnType,
         returnValue:
             event.data && Object.prototype.hasOwnProperty.call(event.data, "returnValue")
                 ? event.data.returnValue
-                : event.type === "METHOD_ENTER"
+                : event.type === "METHOD_ENTER" || event.type === "STEP"
                     ? undefined
                     : previous.returnValue,
         returnValueType:
             typeof event.data?.returnValueType === "string"
                 ? event.data.returnValueType
-                : event.type === "METHOD_ENTER"
+                : event.type === "METHOD_ENTER" || event.type === "STEP"
                     ? undefined
                     : previous.returnValueType,
         returnedVoid:
             typeof event.data?.returnedVoid === "boolean"
                 ? event.data.returnedVoid
-                : event.type === "METHOD_ENTER"
+                : event.type === "METHOD_ENTER" || event.type === "STEP"
                     ? undefined
                     : previous.returnedVoid,
         invocationStatus: previous.invocationStatus
