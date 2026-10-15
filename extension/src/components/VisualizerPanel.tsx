@@ -2147,6 +2147,7 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
     return <MatrixView value={rows} state={state} source={source} arrayName={arrayName} depth={depth} seen={seen}/>;
   }
 
+  const containsNestedCollections = value.some(item => isCollectionSnapshot(item));
   const indexNames = arrayIndexVariableNames(source, arrayName);
   const targets = pointerTargets(state, value.length, indexNames, arrayName, source);
   const targetSignature = targets.map(target => target.name + ':' + target.index).sort().join('|');
@@ -2237,7 +2238,7 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
   const rangeEnd = targets.length >= 2 ? Math.max(...targets.map(target => target.index)) : -1;
 
   return (
-    <div className={`yv-array yv-array-pointer-host ${targets.length ? 'has-pointers' : ''}`} ref={arrayRef} style={enhancedBinding ? { paddingTop: 52, paddingLeft: 44, boxSizing: 'border-box' } : undefined}>
+    <div className={`yv-array yv-array-pointer-host ${targets.length ? 'has-pointers' : ''} ${containsNestedCollections ? 'yv-array-nested-collections' : ''}`} ref={arrayRef} style={enhancedBinding ? { paddingTop: 52, paddingLeft: 44, boxSizing: 'border-box' } : undefined}>
       <div className="yv-pointer-layer" aria-hidden="true">
         {targets.map(target => (
           <div

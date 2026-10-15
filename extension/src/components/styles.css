@@ -807,8 +807,8 @@
 .yv-tree-width-control input:focus-visible { outline:2px solid #f59e0b; outline-offset:2px; }
 
 
-/* Bound the invocation tree to its own viewport: deep recursion must never
-   widen or lengthen the entire visualizer panel. */
+/* The call tree should size to its content, not force a horizontal scrollbar.
+   Keep a bounded vertical viewport and let the surrounding workspace reflow. */
 .yv-workspace,
 .yv-workspace-content,
 .yv-workspace-tree {
@@ -819,12 +819,18 @@
 .yv-workspace.tree-open {
   width: 100%;
   overflow: hidden;
+  align-items: stretch;
+}
+.yv-workspace.tree-open .yv-workspace-content {
+  flex: 1 1 0;
+  min-width: 0;
 }
 .yv-workspace.tree-open .yv-workspace-tree {
-  flex: 0 1 min(var(--yv-tree-width, 320px), 45%);
-  width: min(var(--yv-tree-width, 320px), 45%);
-  min-width: 0;
-  max-width: 45%;
+  flex: 0 1 min(var(--yv-tree-width, 420px), 48%);
+  width: min(var(--yv-tree-width, 420px), 48%);
+  min-width: 280px;
+  max-width: 48%;
+  overflow: hidden;
 }
 .yv-function-tree {
   box-sizing: border-box;
@@ -832,47 +838,50 @@
   min-width: 0;
   max-width: 100%;
   height: clamp(240px, 54vh, 560px);
-  max-height: calc(100dvh - 260px);
-  resize: vertical;
-  min-height: 240px;
   max-height: calc(100dvh - 180px);
+  resize: horizontal;
+  min-height: 240px;
+  border: 1px solid #596575;
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, .16), inset 0 0 0 1px rgba(148, 163, 184, .08);
 }
 .yv-tree-viewport {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   overscroll-behavior: contain;
 }
-/* Recursive depth must not consume the width of each function box.
-   Keep invocation cards at a readable width and let the tree viewport scroll
-   horizontally when a deep call chain extends beyond the panel. */
 .yv-tree-branch {
   box-sizing: border-box;
-  width: max-content;
-  min-width: 100%;
-  max-width: none;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 .yv-tree-node {
   box-sizing: border-box;
   display: flex;
-  width: 300px;
-  min-width: 260px;
-  max-width: 340px;
-  overflow-wrap: normal;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  overflow-wrap: anywhere;
+  border-color: #596575;
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, .10);
 }
 .yv-tree-children {
   box-sizing: border-box;
-  width: max-content;
+  width: auto;
   min-width: 0;
   max-width: none;
   margin: 0 0 4px 13px;
   padding-left: 10px;
+  border-left: 2px solid #596575;
 }
 .yv-tree-children > .yv-tree-branch {
-  width: max-content;
+  width: 100%;
   min-width: 0;
+  max-width: 100%;
 }
 .yv-tree-method,
 .yv-tree-outcome,
@@ -883,9 +892,32 @@
   overflow-wrap: anywhere;
 }
 
-/* Chrome extension side panels and narrower windows cannot spare a second
-   column. Put the call tree beneath the state workspace instead of forcing
-   the whole visualizer off-screen horizontally. */
+/* Nested collections (e.g. List<List<Integer>>) are a compact grid rather
+   than one unbounded horizontal row of full-width collection cards. */
+.yv-array-nested-collections {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  align-items: start;
+  width: 100%;
+  min-width: 0 !important;
+  gap: 6px;
+}
+.yv-array-nested-collections > .yv-cell {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+}
+.yv-array-nested-collections .yv-collection {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+}
+.yv-array-nested-collections .yv-collection-backing {
+  display: none;
+}
+.yv-array-nested-collections .yv-cell-value {
+  overflow-wrap: anywhere;
+}
 @media (max-width: 900px) {
   .yv-workspace.tree-open {
     flex-direction: column;
