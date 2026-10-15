@@ -112,7 +112,9 @@ function applyEvent(
                 : event.type === "METHOD_ENTER"
                     ? undefined
                     : event.type === "STEP" && previous.lastEvent?.type === "METHOD_EXIT"
-                        ? undefined
+                        ? (typeof previous.lastEvent.data?.parentParentInvocationId === "string"
+                            ? previous.lastEvent.data.parentParentInvocationId
+                            : undefined)
                         : previous.parentInvocationId,
         methodSignature:
             typeof event.data?.methodSignature === "string"
