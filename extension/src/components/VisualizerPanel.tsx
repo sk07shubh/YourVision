@@ -3261,13 +3261,12 @@ type InvocationNode = {
   returnValue?: unknown;
   returnType?: string;
   frameVariables: Record<string, unknown>;
-  parameters: Record<string, unknown>;
   children: string[];
 };
 
 export function buildInvocationNodes(states: TraceState[]): { nodes: Map<string, InvocationNode>; currentId?: string } {
   const nodes = new Map<string, InvocationNode>();
-  nodes.set('root', { id: 'root', parentId: '', method: 'Solution', signature: 'Solution', entryIndex: 0, status: 'active', frameVariables: {}, parameters: {}, children: [] });
+  nodes.set('root', { id: 'root', parentId: '', method: 'Solution', signature: 'Solution', entryIndex: 0, status: 'active', frameVariables: {}, children: [] });
   for (let index = 0; index < states.length; index += 1) {
     const event = states[index]?.lastEvent;
     const data = isPlainObject(event?.data) ? event.data : {};
@@ -3277,7 +3276,6 @@ export function buildInvocationNodes(states: TraceState[]): { nodes: Map<string,
       const parentId = typeof data.parentInvocationId === 'string' && nodes.has(data.parentInvocationId) ? data.parentInvocationId : 'root';
       const rawParams = Array.isArray(data.parameterTypes) ? data.parameterTypes.filter((item): item is string => typeof item === 'string') : [];
       const method = typeof event.method === 'string' && event.method ? event.method : 'method';
-      const descriptor = typeof data.methodSignature === 'string' ? data.methodSignature : '';
       const entryVariables = isPlainObject(data.variables) ? data.variables : {};
       const parameterNames = Object.keys(entryVariables).filter(name => name !== 'this').slice(0, rawParams.length);
       const displayType = (type: string): string => type
@@ -3295,7 +3293,7 @@ export function buildInvocationNodes(states: TraceState[]): { nodes: Map<string,
         root.signature = data.declaringType;
       }
       const frameVariables = isPlainObject(data.variables) ? data.variables : {};
-      const node: InvocationNode = { id, parentId, method, signature: returnType ? `${returnType} ${signature}` : signature, entryIndex: index, status: 'active', returnType, frameVariables: {}, parameters: {}, children: [] };
+      const node: InvocationNode = { id, parentId, method, signature: returnType ? `${returnType} ${signature}` : signature, entryIndex: index, status: 'active', returnType, frameVariables: {}, children: [] };
       nodes.set(id, node);
       nodes.get(parentId)?.children.push(id);
     } else if (event?.type === 'METHOD_EXIT' && typeof data.invocationId === 'string') {
