@@ -117,20 +117,20 @@ function applyEvent(
         methodSignature:
             typeof event.data?.methodSignature === "string"
                 ? event.data.methodSignature
-                : event.type === "METHOD_EXIT"
-                    ? (typeof event.data?.parentMethodSignature === "string" ? event.data.parentMethodSignature : undefined)
+                : event.type === "STEP" && previous.lastEvent?.type === "METHOD_EXIT"
+                    ? (typeof previous.lastEvent.data?.parentMethodSignature === "string" ? previous.lastEvent.data.parentMethodSignature : undefined)
                     : previous.methodSignature,
         declaringType:
             typeof event.data?.declaringType === "string"
                 ? event.data.declaringType
-                : event.type === "METHOD_EXIT"
-                    ? (typeof event.data?.parentDeclaringType === "string" ? event.data.parentDeclaringType : undefined)
+                : event.type === "STEP" && previous.lastEvent?.type === "METHOD_EXIT"
+                    ? (typeof previous.lastEvent.data?.parentDeclaringType === "string" ? previous.lastEvent.data.parentDeclaringType : undefined)
                     : previous.declaringType,
         returnType:
             typeof event.data?.returnType === "string"
                 ? event.data.returnType
-                : event.type === "METHOD_EXIT"
-                    ? (typeof event.data?.parentReturnType === "string" ? event.data.parentReturnType : undefined)
+                : event.type === "STEP" && previous.lastEvent?.type === "METHOD_EXIT"
+                    ? (typeof previous.lastEvent.data?.parentReturnType === "string" ? previous.lastEvent.data.parentReturnType : undefined)
                     : previous.returnType,
         returnValue:
             event.data && Object.prototype.hasOwnProperty.call(event.data, "returnValue")
