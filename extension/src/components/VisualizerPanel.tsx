@@ -2739,6 +2739,8 @@ function MapView({
 }) {
   const changes = mapChanges(state, value.$mapId);
   const typeName = typeof value.$type === 'string' ? value.$type.split('.').pop() : '';
+  const accessOrdered = typeName === 'LinkedHashMap' &&
+    /new\\s+LinkedHashMap\\s*<[^>]*>\\s*\\(\\s*[^,]+,\\s*[^,]+,\\s*true\\s*\\)/s.test(source);
   const reorderedKeys = typeName === 'LinkedHashMap'
     ? mapReorderedKeys(state, value.$mapId, value.entries)
     : new Set<string>();
@@ -2796,7 +2798,7 @@ function MapView({
         <span>{typeof value.$type === 'string' && value.$type.endsWith('TreeMap')
           ? 'SORTED BY KEY · ' + value.entries.length + ' entries'
           : typeof value.$type === 'string' && value.$type.endsWith('LinkedHashMap')
-            ? 'INSERTION ORDER · ' + value.entries.length + ' entries'
+            ? (accessOrdered ? 'ACCESS ORDER · ' : 'INSERTION ORDER · ') + value.entries.length + ' entries'
             : value.entries.length + ' entries'}</span>
       </div>
 
