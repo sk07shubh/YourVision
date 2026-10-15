@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import type { TraceState } from '../types/trace';
 import { sessionStore } from '../state/store';
 import {
+  buildInvocationNodes,
   collectionDelta,
   collectionOperation,
   compareArrayValues,
@@ -42,6 +43,37 @@ function markup(nodes: ReactNode[]): string {
 }
 
 
+
+describe('synchronized function invocation tree', () => {
+  it('keeps recursive calls distinct and attaches each call to its actual parent', () => {
+    const states = [
+      state({ invocationId: 'call-1', lastEvent: { type: 'METHOD_ENTER', method: 'search', data: { invocationId: 'call-1', methodSignature: '(I)Z', parameterTypes: ['int'], returnType: 'boolean' } } }),
+      state({ invocationId: 'call-2', parentInvocationId: 'call-1', lastEvent: { type: 'METHOD_ENTER', method: 'search', data: { invocationId: 'call-2', parentInvocationId: 'call-1', methodSignature: '(I)Z', parameterTypes: ['int'], returnType: 'boolean' } } }),
+      state({ invocationId: 'call-2', parentInvocationId: 'call-1', lastEvent: { type: 'METHOD_EXIT', method: 'search', data: { invocationId: 'call-2', parentInvocationId: 'call-1', returnType: 'boolean', returnValue: true, returnValueType: 'boolean', returnedVoid: false } } }),
+      state({ invocationId: 'call-1', lastEvent: { type: 'METHOD_EXIT', method: 'search', data: { invocationId: 'call-1', returnType: 'boolean', returnValue: false, returnValueType: 'boolean', returnedVoid: false } } }),
+    ];
+    const { nodes } = buildInvocationNodes(states);
+    expect(nodes.get('root')?.children).toEqual(['call-1']);
+    expect(nodes.get('call-1')?.children).toEqual(['call-2']);
+    expect(nodes.get('call-2')?.status).toBe('returned');
+    expect(nodes.get('call-2')?.returnValue).toBe(true);
+    expect(nodes.get('call-1')?.status).toBe('returned');
+    expect(nodes.get('call-1')?.returnValue).toBe(false);
+  });
+
+  it('keeps repeated non-recursive invocations as separate siblings and represents void returns', () => {
+    const states = [
+      state({ lastEvent: { type: 'METHOD_ENTER', method: 'visit', data: { invocationId: 'call-1', methodSignature: '()V', parameterTypes: [], returnType: 'void' } } }),
+      state({ lastEvent: { type: 'METHOD_EXIT', method: 'visit', data: { invocationId: 'call-1', returnType: 'void', returnedVoid: true } } }),
+      state({ lastEvent: { type: 'METHOD_ENTER', method: 'visit', data: { invocationId: 'call-2', methodSignature: '()V', parameterTypes: [], returnType: 'void' } } }),
+      state({ lastEvent: { type: 'METHOD_EXIT', method: 'visit', data: { invocationId: 'call-2', returnType: 'void', returnedVoid: true } } }),
+    ];
+    const { nodes } = buildInvocationNodes(states);
+    expect(nodes.get('root')?.children).toEqual(['call-1', 'call-2']);
+    expect(nodes.get('call-1')?.status).toBe('void');
+    expect(nodes.get('call-2')?.status).toBe('void');
+  });
+});
 
 describe('linked-list graph visualization', () => {
   it('preserves node identity, aliases, and explicit null termination', () => {
