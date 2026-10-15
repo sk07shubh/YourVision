@@ -790,8 +790,16 @@ public class YourVisionTracer {
                 }
 
                 String trimmed = sourceLine.trim();
+                int methodNameStart = trimmed.indexOf(methodName);
+                String prefix = methodNameStart >= 0
+                    ? trimmed.substring(0, methodNameStart).trim()
+                    : "";
                 boolean declarationLike =
-                    trimmed.matches("^(public|protected|private|static|final|abstract|synchronized|native|\\s)*.*") &&
+                    methodNameStart >= 0 &&
+                    !prefix.isEmpty() &&
+                    !prefix.endsWith(".") &&
+                    !prefix.endsWith("return") &&
+                    !prefix.contains("=") &&
                     (trimmed.contains("{") ||
                      trimmed.endsWith(")") ||
                      trimmed.endsWith("throws") ||
@@ -824,8 +832,11 @@ public class YourVisionTracer {
         Method method
     ) {
         try {
+            // The JDI frame count can change at METHOD_EXIT, so it is
+            // not a stable identity for matching a method's most recent STEP.
+            // Keep thread + full method signature; recursion is resolved by
+            // the newest executed line for that signature.
             return thread.uniqueID() + ":" +
-                thread.frameCount() + ":" +
                 method.declaringType().name() + ":" +
                 method.name() + ":" +
                 method.signature();
