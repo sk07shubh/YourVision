@@ -1221,3 +1221,42 @@
     overflow: auto;
   }
 }
+
+
+/* Function Tree: only real invocation nodes, stacked vertically without phantom columns. */
+.yv-workspace.tree-open .yv-tree-viewport {
+  overflow-x: hidden;
+}
+.yv-workspace.tree-open .yv-tree-branch {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.yv-workspace.tree-open .yv-tree-children {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin: 8px 0 0;
+  padding: 8px 0 0 10px;
+  border-top: 1px solid color-mix(in srgb, var(--yv-depth-border, #818cf8), transparent 50%);
+  border-left: 2px solid color-mix(in srgb, var(--yv-depth-border, #818cf8), transparent 22%);
+}
+.yv-workspace.tree-open .yv-tree-children > .yv-tree-branch {
+  flex: 0 0 auto;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+}
+.yv-workspace.tree-open .yv-tree-branch > .yv-tree-children:empty {
+  display: none;
+}
