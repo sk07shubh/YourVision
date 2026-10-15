@@ -251,4 +251,70 @@ if (nums.objectId !== "41" || JSON.stringify(nums.values) !== JSON.stringify([2,
 }
 if (!stateAt(states, 4).objects["99"]) throw new Error("object identity snapshot was not hydrated");
 
+const nestedReturnTrace: ExecutionTrace = {
+    version: 1,
+    events: [
+        {
+            sequence: 1, type: "METHOD_ENTER", line: 2, method: "solve", depth: 0,
+            data: {
+                invocationId: "parent-call",
+                methodSignature: "(I)I",
+                declaringType: "Solution",
+                returnType: "int",
+                variables: { n: 3, board: { $arrayId: "board-1", $type: "char[][]", values: [["A"]] } }
+            }
+        },
+        {
+            sequence: 2, type: "METHOD_ENTER", line: 8, method: "dfs", depth: 1,
+            data: {
+                invocationId: "child-call",
+                parentInvocationId: "parent-call",
+                methodSignature: "(II)Z",
+                declaringType: "Solution",
+                returnType: "boolean",
+                variables: { row: 1, col: 2, board: { $arrayId: "board-1", $type: "char[][]", values: [["A"]] } }
+            }
+        },
+        {
+            sequence: 3, type: "METHOD_EXIT", line: 12, method: "dfs", depth: 1,
+            data: {
+                invocationId: "child-call",
+                parentInvocationId: "parent-call",
+                parentMethodSignature: "(I)I",
+                parentDeclaringType: "Solution",
+                parentReturnType: "int",
+                returnType: "boolean",
+                returnValue: true,
+                returnValueType: "boolean",
+                returnedVoid: false,
+                variables: { row: 1, col: 2 }
+            }
+        },
+        {
+            sequence: 4, type: "STEP", line: 9, method: "solve", depth: 0,
+            data: {
+                variables: { n: 3, board: { $arrayId: "board-1", $type: "char[][]", values: [["A"]] }, found: true }
+            }
+        }
+    ]
+};
+const nestedReturnStates = buildStates(nestedReturnTrace);
+if (nestedReturnStates.length !== 4) {
+    throw new Error("nested call entry, return, and caller resume checkpoints must all be replayable");
+}
+const childReturn = stateAt(nestedReturnStates, 2);
+const resumedParent = stateAt(nestedReturnStates, 3);
+if (childReturn.invocationId !== "child-call" || childReturn.invocationStatus !== "returned" || childReturn.returnValue !== true) {
+    throw new Error("callee return checkpoint lost the child invocation or typed return outcome");
+}
+if (resumedParent.invocationId !== "parent-call" || resumedParent.methodSignature !== "(I)I" || resumedParent.invocationStatus !== "active") {
+    throw new Error("caller invocation identity/signature/status were not restored after child return");
+}
+if (resumedParent.returnValue !== undefined || resumedParent.returnedVoid !== undefined) {
+    throw new Error("callee return metadata leaked into the resumed caller checkpoint");
+}
+if (resumedParent.variables.row !== undefined || resumedParent.variables.col !== undefined || resumedParent.variables.found !== true) {
+    throw new Error("caller locals were not restored independently from callee locals");
+}
+
 console.log("PASS: trace state builder");
