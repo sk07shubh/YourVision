@@ -3336,7 +3336,7 @@ function InvocationTree({ states, currentIndex, onSelect, width, onWidthChange }
       {node.children.length > 0 && <div className="yv-tree-children">{node.children.map(child => renderNode(child, depth + 1))}</div>}
     </div>;
   };
-  return <aside className="yv-function-tree" aria-label="Function call tree" style={{ width }}>
+  return <aside className="yv-function-tree" aria-label="Function call tree" style={{ width: '100%', maxWidth: width }}>
     <div className="yv-tree-heading"><strong>Function tree</strong><span>{Math.max(0, nodes.size - 1)} calls</span><label className="yv-tree-width-control"><span>Width</span><input aria-label="Function tree width" type="range" min={230} max={480} step={10} value={width} onChange={event => onWidthChange(Number(event.target.value))}/></label></div>
     <div className="yv-tree-viewport">{renderNode('root', 0)}</div>
   </aside>;
