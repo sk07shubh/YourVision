@@ -169,6 +169,9 @@ public class YourVisionTracer {
                 data.put("parentMethodSignature", parentContext.signature);
                 data.put("parentDeclaringType", parentContext.declaringType);
                 data.put("parentReturnType", parentContext.returnType);
+                if (parentContext.parentId != null) {
+                    data.put("parentParentInvocationId", parentContext.parentId);
+                }
             }
         } else {
             data.put("invocationId", "unmatched-" + (++invocationSequence));
