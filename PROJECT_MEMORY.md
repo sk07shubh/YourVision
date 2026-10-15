@@ -162,3 +162,5 @@ Playwright E2E uses a deterministic LeetCode-shaped fixture and mocked `/visuali
 - 2026-10-15: Responsive-layout correction for the tree width slider: the tree now fills its sidebar container with a controlled max width, the legacy CSS resize handle is disabled, and mobile styling can expand the tree to full width without the inline width clipping it (`593899e101de2fb184ac97a08ad79a1fa15ee6ff`, `cf198b26bdae7afee184b56329cb0ee4db52af9f`).
 
 - 2026-10-15: Signature fallback now uses JVM descriptor text when JDI parameter type names are unavailable, instead of falsely rendering a zero-argument method signature (`6cdaccccf3939d3c19281e2dca8f150cc3ccb947`).
+
+- 2026-10-15: Added assertions for runtime-derived class root and root static-field snapshot projection in the invocation-tree test suite (`ee8aaf8dcec98757f55696e51c1e687e45d96d24`).
