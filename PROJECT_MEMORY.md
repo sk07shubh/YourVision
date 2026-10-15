@@ -2,6 +2,12 @@
 
 Last audited: 2026-10-15. Repository: https://github.com/sk07shubh/YourVision. User's usual local checkout: `/Users/shubhamsmacpro/Desktop/YourVision`.
 
+## Non-negotiable memory-maintenance rule
+- For **every** YourVision repository change, update `PROJECT_MEMORY.md` in the same working session and include the update in the same commit/PR as the code or documentation change whenever practical. This applies to every code edit, bug fix, test, refactor, UI/animation adjustment, architectural decision, branch/PR change, and test result—no exceptions for “small” changes.
+- Before editing code, read this file and the project instructions; after editing, update the affected sections and append an entry to the update log with the date, branch/commit or PR, what changed, and exactly which checks were run (or explicitly state that checks were not run).
+- Before finishing a task, verify that the memory-file change is included in the resulting commit/PR and that the working tree/diff is consistent. Never say the memory was updated unless the repository write succeeded.
+- At the start of a future YourVision chat, open/read `PROJECT_MEMORY.md` from the live repository before acting, then refresh the live GitHub branch, PR, and CI state. If repository access is unavailable, ask for the file or state that the memory could not be refreshed; do not pretend to remember unverified current state.
+
 ## Mandatory for every future session
 - Read this file first, then `AGENTS.md`, `AUTOMATION.md`, and `docs/EXTERNAL_AI_HANDOFF.md`. Check live branches, PRs, and CI because this file can become stale.
 - **Update this file after every project change, even small edits**, including code, tests, decisions, branch/PR status, and verification. Make the memory update part of the same coherent commit where practical. Never claim it was updated unless the write succeeded.
@@ -113,3 +119,4 @@ Playwright E2E uses a deterministic LeetCode-shaped fixture and mocked `/visuali
 
 ## Update log
 - 2026-10-15: Initial project memory drafted from repository tree, key code entry points, package scripts, `AUTOMATION.md`, and PR #58 metadata/description. This was a first-pass audit, not a line-by-line review of every source file or every historical chat. Read relevant code/history as future tasks require.
+- 2026-10-15: Added a non-negotiable rule requiring every future project change to update this file, keep the update with the same coherent commit/PR, log actual checks, and reread live memory at the start of each future project chat. Documentation-only change; tests not run.
