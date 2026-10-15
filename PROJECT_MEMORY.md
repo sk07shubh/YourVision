@@ -166,3 +166,5 @@ Playwright E2E uses a deterministic LeetCode-shaped fixture and mocked `/visuali
 - 2026-10-15: Added assertions for runtime-derived class root and root static-field snapshot projection in the invocation-tree test suite (`ee8aaf8dcec98757f55696e51c1e687e45d96d24`).
 
 - 2026-10-15: Updated draft PR #60 description to reflect the expanded invocation tree scope, null/void semantics, per-frame snapshots, root fields, responsive sizing, and the explicit remaining verification checklist. PR remains open/draft; current head `7697b3ca8837a1f871ce5d8d8a74eb12f81c90e5`. Backend Regression and Full Regression Lab are both running on that head, with no conclusion available yet.
+
+- 2026-10-15: Added a backend trace-state regression fixture for parent → child → child return → caller resume. It asserts the return checkpoint stays on the child, the next checkpoint restores the parent invocation/signature/active status, child return metadata and locals do not leak, and caller locals are independently restored (`a606dc4e772c7b155b77f995265091a30154b938`). CI must validate this new fixture on the resulting head.
