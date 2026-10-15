@@ -90,7 +90,40 @@ function applyEvent(
         line: event.line ?? previous.line,
         method: event.method ?? previous.method,
         depth: event.depth ?? previous.depth,
-        lastEvent: event
+        lastEvent: event,
+        invocationId:
+            typeof event.data?.invocationId === "string"
+                ? event.data.invocationId
+                : previous.invocationId,
+        parentInvocationId:
+            typeof event.data?.parentInvocationId === "string"
+                ? event.data.parentInvocationId
+                : previous.parentInvocationId,
+        methodSignature:
+            typeof event.data?.methodSignature === "string"
+                ? event.data.methodSignature
+                : previous.methodSignature,
+        declaringType:
+            typeof event.data?.declaringType === "string"
+                ? event.data.declaringType
+                : previous.declaringType,
+        returnType:
+            typeof event.data?.returnType === "string"
+                ? event.data.returnType
+                : previous.returnType,
+        returnValue:
+            event.data && Object.prototype.hasOwnProperty.call(event.data, "returnValue")
+                ? event.data.returnValue
+                : previous.returnValue,
+        returnValueType:
+            typeof event.data?.returnValueType === "string"
+                ? event.data.returnValueType
+                : previous.returnValueType,
+        returnedVoid:
+            typeof event.data?.returnedVoid === "boolean"
+                ? event.data.returnedVoid
+                : previous.returnedVoid,
+        invocationStatus: previous.invocationStatus
     };
 
     const data = event.data ?? {};
@@ -222,6 +255,7 @@ function applyEvent(
             break;
 
         case "METHOD_ENTER":
+            next.invocationStatus = "active";
             if (typeof data.displayLine === "number") {
                 next.line = data.displayLine;
             }
@@ -237,6 +271,13 @@ function applyEvent(
             break;
 
         case "METHOD_EXIT":
+            next.invocationStatus = data.exceptional === true
+                ? "exceptional"
+                : data.returnedVoid === true
+                    ? "void"
+                    : Object.prototype.hasOwnProperty.call(data, "returnValue")
+                        ? "returned"
+                        : "returned";
             // Preserve the callee's actual return location for this checkpoint.
             // A later caller STEP represents the caller resuming execution.
             next.line = event.line ?? previous.line;
