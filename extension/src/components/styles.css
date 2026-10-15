@@ -800,3 +800,9 @@
   .yv-workspace.tree-open .yv-workspace-tree { flex:0 0 auto; width:100%; min-width:0; margin:0 0 12px; }
   .yv-function-tree { max-width:100%; resize:vertical; max-height:38vh; }
 }
+
+.yv-tree-frame { display:flex; flex-direction:column; gap:3px; width:100%; padding-top:2px; border-top:1px solid #2b3039; }
+.yv-tree-variable { display:flex; align-items:baseline; gap:7px; width:100%; min-width:0; font-size:10px; }
+.yv-tree-var-name { flex:0 0 auto; max-width:44%; color:#9aa6b5; overflow:hidden; text-overflow:ellipsis; }
+.yv-tree-var-value { flex:1 1 auto; min-width:0; color:#d5dae2; overflow-wrap:anywhere; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+.yv-tree-more { color:#7f8a99; font-size:10px; }
