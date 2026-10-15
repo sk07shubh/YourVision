@@ -529,14 +529,40 @@ await fs.writeFile(
                 };
             }
 
+            const resultMarker = stdout
+                .split(/\r?\n/)
+                .find(line => line.startsWith("__YV_RESULT__="));
+
+            // A zero exit from the tracer is not enough to call a design
+            // session successful: the debuggee can disconnect before the
+            // runtime serializes its final result. Returning OK with an
+            // undefined result makes the extension appear to fail silently.
+            if (resultMarker === undefined) {
+                const lastEvent = trace.events.at(-1);
+                const diagnostic = lastEvent
+                    ? `Last trace event: ${lastEvent.type} (sequence ${lastEvent.sequence}).`
+                    : "The tracer produced no structured trace events.";
+
+                return {
+                    success: false,
+                    kind: "HARNESS_ERROR",
+                    stdout,
+                    stderr,
+                    trace,
+                    states: buildStates(trace),
+                    message:
+                        "Java execution ended before the runtime emitted its final result marker. " +
+                        diagnostic +
+                        (stderr.trim()
+                            ? ` stderr: ${stderr.trim().split(/\\r?\\n/).slice(-4).join(" | ")}`
+                            : "")
+                };
+            }
+
             return {
                 success: true,
                 kind: "OK",
-                result:
-                    extractMarker(
-                        stdout,
-                        "__YV_RESULT__="
-                    ),
+                result: resultMarker.slice("__YV_RESULT__=".length),
                 stdout,
                 stderr,
                 trace,
@@ -565,7 +591,7 @@ await fs.writeFile(
                         type: "TIMEOUT",
                         data: {
                             message:
-                                `Java execution exceeded ${JAVA_EXECUTION_TIMEOUT_MS} ms`
+                                `Java execution exceeded ${designMode ? 15000 : JAVA_EXECUTION_TIMEOUT_MS} ms`
                         }
                     };
 
