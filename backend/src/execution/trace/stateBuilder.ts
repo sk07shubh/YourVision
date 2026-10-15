@@ -103,15 +103,15 @@ function applyEvent(
         invocationId:
             typeof event.data?.invocationId === "string"
                 ? event.data.invocationId
-                : event.type === "METHOD_EXIT"
-                    ? (typeof event.data?.parentInvocationId === "string" ? event.data.parentInvocationId : undefined)
+                : event.type === "STEP" && previous.lastEvent?.type === "METHOD_EXIT"
+                    ? previous.parentInvocationId
                     : previous.invocationId,
         parentInvocationId:
             typeof event.data?.parentInvocationId === "string"
                 ? event.data.parentInvocationId
-                : event.type === "METHOD_EXIT"
+                : event.type === "METHOD_ENTER"
                     ? undefined
-                    : event.type === "METHOD_ENTER"
+                    : event.type === "STEP" && previous.lastEvent?.type === "METHOD_EXIT"
                         ? undefined
                         : previous.parentInvocationId,
         methodSignature:
@@ -157,6 +157,9 @@ function applyEvent(
 
     switch (event.type) {
         case "STEP":
+            if (previous.lastEvent?.type === "METHOD_EXIT") {
+                next.invocationStatus = "active";
+            }
             // STEP is a pre-execution JDI checkpoint. For replay,
             // use the postVariables snapshot captured from the next runtime
             // checkpoint so the state shown with this highlighted line is
