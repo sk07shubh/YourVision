@@ -407,7 +407,7 @@ function annotateCondition(event: ExecutionEvent, sourceLines: string[]): Execut
     }
     // Library calls do not emit user-method METHOD_EXIT events; derive simple
     // return expressions from the runtime snapshots captured for this step.
-    const returnMatch = statement.match(/^return\\s+(.+?)\\s*;?$/);
+    const returnMatch = statement.match(/^return\s+(.+?)\s*;?$/);
     if (returnMatch?.[1] && !("returnValue" in data)) {
         const result = evaluateValue(returnMatch[1], variables as Record<string, unknown>);
         if (result !== undefined) data.returnValue = result;
