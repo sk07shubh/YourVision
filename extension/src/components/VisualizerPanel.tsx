@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { useSession } from '../state/session';
 import { sessionStore } from '../state/store';
 import { displayValue, stableStringify, isPlainObject } from '../utils/value';
@@ -3262,7 +3263,7 @@ type InvocationNode = {
   children: string[];
 };
 
-function buildInvocationNodes(states: TraceState[]): { nodes: Map<string, InvocationNode>; currentId?: string } {
+export function buildInvocationNodes(states: TraceState[]): { nodes: Map<string, InvocationNode>; currentId?: string } {
   const nodes = new Map<string, InvocationNode>();
   nodes.set('root', { id: 'root', parentId: '', method: 'Solution', signature: 'Solution', entryIndex: 0, status: 'active', children: [] });
   for (let index = 0; index < states.length; index += 1) {
@@ -3299,13 +3300,13 @@ function InvocationTree({ states, currentIndex, onSelect }: { states: TraceState
   const current = states[currentIndex];
   const currentData = isPlainObject(current?.lastEvent?.data) ? current.lastEvent.data : {};
   const selectedId = typeof current?.invocationId === 'string' ? current.invocationId : typeof currentData.invocationId === 'string' ? currentData.invocationId : undefined;
-  const renderNode = (id: string, depth: number): React.ReactNode => {
+  const renderNode = (id: string, depth: number): ReactNode => {
     const node = nodes.get(id);
     if (!node) return null;
     const selected = id === selectedId;
     const result = node.status === 'active' ? 'In progress' : node.status === 'void' ? 'void' : node.status === 'exceptional' ? 'Exception' : `${node.returnType ?? 'return'}: ${displayValue(node.returnValue)}`;
     return <div className="yv-tree-branch" key={id}>
-      <button type="button" className={`yv-tree-node ${selected ? 'selected' : ''} ${node.status}`} style={{ '--yv-tree-depth': depth } as React.CSSProperties} onClick={() => onSelect(node.entryIndex)} aria-current={selected ? 'step' : undefined}>
+      <button type="button" className={`yv-tree-node ${selected ? 'selected' : ''} ${node.status}`} style={{ '--yv-tree-depth': depth } as CSSProperties} onClick={() => onSelect(node.entryIndex)} aria-current={selected ? 'step' : undefined}>
         <span className="yv-tree-method">{node.signature}</span>
         <span className="yv-tree-outcome">{id === 'root' ? 'Class context' : result}</span>
       </button>
