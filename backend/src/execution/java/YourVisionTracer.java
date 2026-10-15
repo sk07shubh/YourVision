@@ -179,10 +179,12 @@ public class YourVisionTracer {
         }
         String returnType = safeReturnType(method);
         data.put("returnType", returnType);
+        boolean returnedVoid = returnType.equals("void");
+        data.put("returnedVoid", returnedVoid);
+        data.put("hasReturnValue", !returnedVoid);
         if (returnValue != null) {
             data.put("returnValueType", returnValue.type().name());
         }
-        data.put("returnedVoid", returnType.equals("void"));
         data.put("exceptional", false);
     }
     private static String tracedClass = "";
