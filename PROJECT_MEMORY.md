@@ -150,3 +150,5 @@ Playwright E2E uses a deterministic LeetCode-shaped fixture and mocked `/visuali
 - 2026-10-15: Replaced imperative DOM-only sidebar toggling with React state so `aria-expanded` and the workspace reflow remain synchronized across playback rerenders (`cf97c36735b2c6a09422d901dcba223672457746`).
 
 - 2026-10-15: Corrected the tree projection to consume only checkpoints up to the selected playback index, preventing future invocations/returns from leaking into a historical Prev state (`9e1259384d628ce11b6073c87239a77313dfe059`). Newest head requires fresh CI status; earlier extension matrix passed on the preceding code head, while backend regression was still running at last poll.
+
+- 2026-10-15: Extended the focused UI tests to assert that a tree projection at an earlier timeline prefix does not contain a future recursive child and leaves the parent in progress (`49034588b897d88c495e1b2c77540ed111aa6ff3`). CI is queued for the newer head.
