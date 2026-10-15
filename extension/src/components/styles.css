@@ -991,3 +991,64 @@
     max-width: 100%;
   }
 }
+
+
+/* Function Tree sizing: readable labels and intrinsic card width, bounded by
+   the available workspace. Deep nesting can scroll horizontally as needed. */
+.yv-workspace.tree-open .yv-workspace-tree {
+  flex: 0 1 auto;
+  width: max-content;
+  min-width: max-content;
+  max-width: min(44vw, 440px);
+}
+.yv-workspace.tree-open .yv-function-tree {
+  width: max-content;
+  min-width: max-content;
+  max-width: 100%;
+}
+.yv-workspace.tree-open .yv-tree-viewport {
+  width: max-content;
+  min-width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+}
+.yv-workspace.tree-open .yv-tree-branch,
+.yv-workspace.tree-open .yv-tree-children {
+  width: max-content;
+  min-width: max-content;
+  max-width: none;
+}
+.yv-workspace.tree-open .yv-tree-node {
+  width: max-content;
+  min-width: max-content;
+  max-width: none;
+  white-space: nowrap;
+}
+.yv-workspace.tree-open .yv-tree-method,
+.yv-workspace.tree-open .yv-tree-outcome {
+  width: max-content;
+  min-width: max-content;
+  max-width: none;
+  overflow-wrap: normal;
+  white-space: nowrap;
+}
+@media (max-width: 900px) {
+  .yv-workspace.tree-open .yv-workspace-tree {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .yv-workspace.tree-open .yv-function-tree,
+  .yv-workspace.tree-open .yv-tree-viewport,
+  .yv-workspace.tree-open .yv-tree-branch,
+  .yv-workspace.tree-open .yv-tree-children,
+  .yv-workspace.tree-open .yv-tree-node,
+  .yv-workspace.tree-open .yv-tree-method,
+  .yv-workspace.tree-open .yv-tree-outcome {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+  }
+}

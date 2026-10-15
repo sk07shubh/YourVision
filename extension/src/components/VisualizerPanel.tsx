@@ -3316,7 +3316,8 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
         root.signature = data.declaringType;
       }
       const frameVariables = isPlainObject(data.variables) ? data.variables : {};
-      const node: InvocationNode = { id, parentId, method, signature: returnType ? `${returnType} ${signature}` : signature, entryIndex: index, status: 'active', returnType, frameVariables: {}, children: [] };
+      const compactSignature = `${returnType ? `${returnType} ` : ''}${method}()`;
+      const node: InvocationNode = { id, parentId, method, signature: compactSignature, entryIndex: index, status: 'active', returnType, frameVariables: {}, children: [] };
       nodes.set(id, node);
       nodes.get(parentId)?.children.push(id);
     } else if (event?.type === 'METHOD_EXIT' && typeof data.invocationId === 'string') {
