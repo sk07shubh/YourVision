@@ -63,6 +63,8 @@ public class YourVisionTracer {
     private static long sequence = 0;
     private static String tracedClass = "";
     private static String solutionSourcePath = "";
+    private static final Map<String, Integer> lastExecutableLines =
+        new LinkedHashMap<>();
     private static final Set<Long> steppedThreads = new HashSet<>();
     private static final Set<String> installedLoopBreakpoints =
         new HashSet<>();
@@ -298,6 +300,16 @@ public class YourVisionTracer {
                                         new HashSet<>()
                                     )
                                 );
+                            }
+
+                            String lastLineKey = lastExecutableLineKey(
+                                exit.thread(),
+                                exit.method()
+                            );
+                            int executedLine =
+                                lastExecutableLines.getOrDefault(lastLineKey, 0);
+                            if (executedLine > 0) {
+                                data.put("displayLine", executedLine);
                             }
 
                             // Capture the final local-variable snapshot as
@@ -807,10 +819,33 @@ public class YourVisionTracer {
         return fallback;
     }
 
+    private static String lastExecutableLineKey(
+        ThreadReference thread,
+        Method method
+    ) {
+        try {
+            return thread.uniqueID() + ":" +
+                thread.frameCount() + ":" +
+                method.declaringType().name() + ":" +
+                method.name() + ":" +
+                method.signature();
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
     private static void recordStep(
         Location location,
         ThreadReference thread
     ) {
+        try {
+            lastExecutableLines.put(
+                lastExecutableLineKey(thread, location.method()),
+                location.lineNumber()
+            );
+        } catch (Exception ignored) {
+        }
+
         if (!isTraced(location)) {
             return;
         }
@@ -1851,7 +1886,8 @@ public class YourVisionTracer {
             // line rather than the source declaration. Keep the declaration
             // marker as metadata, and use it for METHOD_ENTER's displayed line.
             if (
-                "METHOD_ENTER".equals(type) &&
+                ("METHOD_ENTER".equals(type) ||
+                 "METHOD_EXIT".equals(type)) &&
                 data != null &&
                 data.get("displayLine") instanceof Number displayLine
             ) {
