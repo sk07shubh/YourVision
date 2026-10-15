@@ -3282,9 +3282,9 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
         ? parameterText.split(',').map(parameter => parameter.trim().replace(/\s*=.*$/, '').split(/\s+/).pop() ?? '').slice(0, rawParams.length)
         : [];
       const displayType = (type: string): string => type
-        .replace(/^java\\.lang\\./, '')
-        .replace(/^java\\.util\\./, '')
-        .replace(/\\bboolean\\b/g, 'bool');
+        .replace(/^java\.lang\./, '')
+        .replace(/^java\.util\./, '')
+        .replace(/\bboolean\b/g, 'bool');
       const signatureParams = rawParams.map((type, index) =>
         `${displayType(type)} ${parameterNames[index] ?? `arg${index + 1}`}`
       );
