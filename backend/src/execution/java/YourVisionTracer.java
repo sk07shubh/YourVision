@@ -251,7 +251,11 @@ public class YourVisionTracer {
                 } else if (event instanceof MethodEntryEvent entry) {
                     Method enteredMethod = entry.method();
 
-                    if (isTraceableUserMethod(enteredMethod)) {
+                    if (
+                        isTraceableUserMethod(enteredMethod) &&
+                        (!enteredMethod.isConstructor() ||
+                         hasExplicitConstructorDeclaration(enteredMethod))
+                    ) {
                         installSameLineLoopBreakpoints(
                             manager,
                             enteredMethod
@@ -298,7 +302,12 @@ public class YourVisionTracer {
                     }
 
                 } else if (event instanceof MethodExitEvent exit) {
-                    if (isTraceableUserMethod(exit.method()) && isTraced(exit.location())) {
+                    if (
+                        isTraceableUserMethod(exit.method()) &&
+                        (!exit.method().isConstructor() ||
+                         hasExplicitConstructorDeclaration(exit.method())) &&
+                        isTraced(exit.location())
+                    ) {
                         Map<String, Object> data =
                             new LinkedHashMap<>();
 
@@ -757,6 +766,46 @@ public class YourVisionTracer {
     ) {
         return thread.uniqueID() + ":" + location.method().name() +
             location.method().signature() + ":" + location.codeIndex();
+    }
+
+    private static boolean hasExplicitConstructorDeclaration(Method method) {
+        if (solutionSourcePath.isEmpty() || method == null || !method.isConstructor()) {
+            return false;
+        }
+
+        try {
+            String className = method.declaringType().name();
+            className = className.substring(className.lastIndexOf('.') + 1);
+            java.util.regex.Pattern constructorPattern =
+                java.util.regex.Pattern.compile(
+                    "\\b" + java.util.regex.Pattern.quote(className) + "\\s*\\("
+                );
+
+            for (String line : Files.readAllLines(
+                Path.of(solutionSourcePath),
+                StandardCharsets.UTF_8
+            )) {
+                String trimmed = line.trim();
+                if (trimmed.startsWith("class ") ||
+                    trimmed.startsWith("public class ") ||
+                    trimmed.startsWith("private class ") ||
+                    trimmed.startsWith("abstract class ")) {
+                    continue;
+                }
+
+                java.util.regex.Matcher matcher = constructorPattern.matcher(line);
+                if (matcher.find()) {
+                    String prefix = line.substring(0, matcher.start()).trim();
+                    if (prefix.isEmpty() ||
+                        prefix.matches("(public|protected|private)")) {
+                        return true;
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        return false;
     }
 
     private static int eventPriority(Event event) {
