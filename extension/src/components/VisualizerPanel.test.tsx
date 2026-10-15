@@ -67,6 +67,24 @@ describe('synchronized function invocation tree', () => {
     expect(historical.get('call-1')?.status).toBe('active');
   });
 
+  it('uses the checkpoint parent id when the event payload omits it', () => {
+    const states = [
+      state({
+        invocationId: 'outer',
+        lastEvent: { type: 'METHOD_ENTER', method: 'solve', data: { invocationId: 'outer' } },
+      }),
+      state({
+        invocationId: 'inner',
+        parentInvocationId: 'outer',
+        lastEvent: { type: 'METHOD_ENTER', method: 'dfs', data: { invocationId: 'inner' } },
+      }),
+    ];
+    const { nodes } = buildInvocationNodes(states);
+    expect(nodes.get('root')?.children).toEqual(['outer']);
+    expect(nodes.get('outer')?.children).toEqual(['inner']);
+    expect(nodes.get('inner')?.parentId).toBe('outer');
+  });
+
   it('tracks each active frame snapshot without leaking child locals into its parent', () => {
     const states = [
       state({ invocationId: 'call-1', lastEvent: { type: 'METHOD_ENTER', method: 'solve', data: { invocationId: 'call-1', declaringType: 'Solution', classFields: { counter: 1 }, variables: { board: 'shared-board', row: 0 } } } }),

@@ -3286,7 +3286,14 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
     if (event?.type === 'METHOD_ENTER' && typeof data.invocationId === 'string') {
       const id = data.invocationId;
       if (nodes.has(id)) continue;
-      const parentId = typeof data.parentInvocationId === 'string' && nodes.has(data.parentInvocationId) ? data.parentInvocationId : 'root';
+      // Parent identity may live on the checkpoint state rather than the event payload.
+      // Preserve the declared parent even if its node is encountered later; links are resolved
+      // after processing the visible trace prefix instead of incorrectly flattening calls to root.
+      const parentId = typeof data.parentInvocationId === 'string'
+        ? data.parentInvocationId
+        : typeof states[index]?.parentInvocationId === 'string'
+          ? states[index].parentInvocationId
+          : 'root';
       const method = typeof event.method === 'string' && event.method ? event.method : 'method';
       // Only read parameter names from a method declaration, never a call site such as
       // helper(this). The old substring search could mistake that call for the declaration.
@@ -3319,7 +3326,6 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
       const compactSignature = `${returnType ? `${returnType} ` : ''}${method}()`;
       const node: InvocationNode = { id, parentId, method, signature: compactSignature, entryIndex: index, status: 'active', returnType, frameVariables: {}, children: [] };
       nodes.set(id, node);
-      nodes.get(parentId)?.children.push(id);
     } else if (event?.type === 'METHOD_EXIT' && typeof data.invocationId === 'string') {
       const node = nodes.get(data.invocationId);
       if (!node) continue;
@@ -3342,6 +3348,16 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
       checkpointNode.frameVariables = data.variables;
     }
   }
+  // Resolve relationships only after every invocation in this checkpoint prefix is known.
+  // This handles trace producers that report parentInvocationId on the state, and avoids
+  // creating a long flat list when a parent node is registered later in the prefix.
+  for (const node of nodes.values()) node.children = [];
+  for (const node of nodes.values()) {
+    if (node.id === 'root') continue;
+    const parent = nodes.get(node.parentId) ?? nodes.get('root');
+    if (parent && !parent.children.includes(node.id)) parent.children.push(node.id);
+  }
+
   const last = states[states.length - 1];
   const lastData = isPlainObject(last?.lastEvent?.data) ? last.lastEvent.data : {};
   const currentId = typeof last?.invocationId === 'string' ? last.invocationId : typeof lastData.invocationId === 'string' ? lastData.invocationId : undefined;
