@@ -3294,6 +3294,7 @@ export function buildInvocationNodes(states: TraceState[]): { nodes: Map<string,
       if (!node) continue;
       node.status = data.exceptional === true ? 'exceptional' : data.returnedVoid === true ? 'void' : 'returned';
       if (Object.prototype.hasOwnProperty.call(data, 'returnValue')) node.returnValue = data.returnValue;
+      else if (data.hasReturnValue === true) node.returnValue = null;
       if (typeof data.returnType === 'string') node.returnType = data.returnType;
     }
 
