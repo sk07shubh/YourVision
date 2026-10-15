@@ -470,8 +470,10 @@ public class YourVisionTracer {
         Method method
     ) {
         try {
-            return !method.isConstructor() &&
-                !method.isStaticInitializer() &&
+            // Constructors are user code too. Excluding them made design-class
+            // traces jump straight to the first operation (e.g. cache.put),
+            // hiding initialization of fields and the constructor body.
+            return !method.isStaticInitializer() &&
                 !method.isNative() &&
                 !method.isAbstract() &&
                 method.declaringType().name().equals(tracedClass);
@@ -761,7 +763,11 @@ public class YourVisionTracer {
                     lines.size()
                 );
 
-            String methodName = method.name();
+            String methodName = method.isConstructor()
+                ? method.declaringType().name().substring(
+                    method.declaringType().name().lastIndexOf('.') + 1
+                )
+                : method.name();
             String pattern =
                 "\\b" +
                 java.util.regex.Pattern.quote(methodName) +
