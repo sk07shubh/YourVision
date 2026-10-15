@@ -148,3 +148,5 @@ Playwright E2E uses a deterministic LeetCode-shaped fixture and mocked `/visuali
 - 2026-10-15: Added backend trace-state regression coverage for identical repeated method invocations, entry identity preservation, typed return values/status, and clearing the previous return value on the next invocation (commit `b3cfe78f38f4bf683680715239db0bbd667534f8`). CI results for the newer head remain pending at this point.
 
 - 2026-10-15: Replaced imperative DOM-only sidebar toggling with React state so `aria-expanded` and the workspace reflow remain synchronized across playback rerenders (`cf97c36735b2c6a09422d901dcba223672457746`).
+
+- 2026-10-15: Corrected the tree projection to consume only checkpoints up to the selected playback index, preventing future invocations/returns from leaking into a historical Prev state (`9e1259384d628ce11b6073c87239a77313dfe059`). Newest head requires fresh CI status; earlier extension matrix passed on the preceding code head, while backend regression was still running at last poll.
