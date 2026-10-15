@@ -809,16 +809,11 @@ public class YourVisionTracer {
     }
 
     private static int eventPriority(Event event) {
-        if (event instanceof MethodEntryEvent) {
-            return 0;
-        }
-        if (event instanceof StepEvent || event instanceof BreakpointEvent) {
-            return 1;
-        }
-        if (event instanceof MethodExitEvent) {
-            return 2;
-        }
-        return 3;
+        // Preserve JDI order for entries, steps, breakpoints and exceptions:
+        // in particular, a caller's call-site STEP must remain before the
+        // callee's METHOD_ENTER. Only defer exits until same-set checkpoints
+        // have captured the final executed line.
+        return event instanceof MethodExitEvent ? 1 : 0;
     }
 
     private static int findMethodDeclarationLine(
