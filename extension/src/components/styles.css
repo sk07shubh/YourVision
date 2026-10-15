@@ -920,8 +920,20 @@
   min-width: 0;
   width: 100%;
 }
+/* Nested collections must expose their actual values, not just the item-count header. */
 .yv-array-nested-collections .yv-collection-backing {
-  display: none;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+}
+.yv-array-nested-collections .yv-collection-backing-title {
+  margin: 3px 0 5px;
+  white-space: normal;
+}
+.yv-array-nested-collections .yv-collection-backing .yv-array {
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
 }
 .yv-array-nested-collections .yv-cell-value {
   overflow-wrap: anywhere;
