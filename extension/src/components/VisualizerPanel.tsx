@@ -3278,7 +3278,13 @@ export function buildInvocationNodes(states: TraceState[]): { nodes: Map<string,
       const signature = typeof data.methodSignature === 'string' && data.methodSignature
         ? `${method}(${rawParams.join(', ')})`
         : method;
-      const node: InvocationNode = { id, parentId, method, signature, entryIndex: index, status: 'active', returnType: typeof data.returnType === 'string' ? data.returnType : undefined, children: [] };
+      const returnType = typeof data.returnType === 'string' ? data.returnType : undefined;
+      const root = nodes.get('root');
+      if (root && typeof data.declaringType === 'string' && data.declaringType) {
+        root.method = data.declaringType;
+        root.signature = data.declaringType;
+      }
+      const node: InvocationNode = { id, parentId, method, signature: returnType ? `${returnType} ${signature}` : signature, entryIndex: index, status: 'active', returnType, children: [] };
       nodes.set(id, node);
       nodes.get(parentId)?.children.push(id);
     } else if (event?.type === 'METHOD_EXIT' && typeof data.invocationId === 'string') {
