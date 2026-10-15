@@ -3302,7 +3302,7 @@ export function buildInvocationNodes(states: TraceState[]): { nodes: Map<string,
 }
 
 function InvocationTree({ states, currentIndex, onSelect }: { states: TraceState[]; currentIndex: number; onSelect: (index: number) => void }) {
-  const { nodes } = useMemo(() => buildInvocationNodes(states), [states]);
+  const { nodes } = useMemo(() => buildInvocationNodes(states.slice(0, currentIndex + 1)), [states, currentIndex]);
   const current = states[currentIndex];
   const currentData = isPlainObject(current?.lastEvent?.data) ? current.lastEvent.data : {};
   const selectedId = typeof current?.invocationId === 'string' ? current.invocationId : typeof currentData.invocationId === 'string' ? currentData.invocationId : undefined;
