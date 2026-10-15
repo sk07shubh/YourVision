@@ -120,3 +120,4 @@ Playwright E2E uses a deterministic LeetCode-shaped fixture and mocked `/visuali
 ## Update log
 - 2026-10-15: Initial project memory drafted from repository tree, key code entry points, package scripts, `AUTOMATION.md`, and PR #58 metadata/description. This was a first-pass audit, not a line-by-line review of every source file or every historical chat. Read relevant code/history as future tasks require.
 - 2026-10-15: Added a non-negotiable rule requiring every future project change to update this file, keep the update with the same coherent commit/PR, log actual checks, and reread live memory at the start of each future project chat. Documentation-only change; tests not run.
+- 2026-10-15: PR #59 merged into `main` as `92b294a8f081a25ea9088520158979bd91d14976`; `PROJECT_MEMORY.md` is now on main. This merge contains only the memory documentation/rule; tests not run.
