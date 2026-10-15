@@ -73,6 +73,7 @@ public class YourVisionTracer {
         final String method;
         final String signature;
         final String declaringType;
+        final String returnType;
 
         InvocationContext(String id, String parentId, Method method) {
             this.id = id;
@@ -80,6 +81,7 @@ public class YourVisionTracer {
             this.method = method.name();
             this.signature = method.signature();
             this.declaringType = method.declaringType().name();
+            this.returnType = safeReturnType(method);
         }
     }
 
@@ -135,6 +137,7 @@ public class YourVisionTracer {
     ) {
         List<InvocationContext> stack = invocationStacks.get(thread.uniqueID());
         InvocationContext context = null;
+        InvocationContext parentContext = null;
         if (stack != null) {
             for (int i = stack.size() - 1; i >= 0; i--) {
                 InvocationContext candidate = stack.get(i);
@@ -142,6 +145,7 @@ public class YourVisionTracer {
                     candidate.signature.equals(method.signature()) &&
                     candidate.declaringType.equals(method.declaringType().name())) {
                     context = candidate;
+                    parentContext = i > 0 ? stack.get(i - 1) : null;
                     while (stack.size() > i + 1) {
                         stack.remove(stack.size() - 1);
                     }
@@ -161,6 +165,11 @@ public class YourVisionTracer {
             }
             data.put("methodSignature", context.signature);
             data.put("declaringType", context.declaringType);
+            if (parentContext != null) {
+                data.put("parentMethodSignature", parentContext.signature);
+                data.put("parentDeclaringType", parentContext.declaringType);
+                data.put("parentReturnType", parentContext.returnType);
+            }
         } else {
             data.put("invocationId", "unmatched-" + (++invocationSequence));
             data.put("invocationMatch", "unmatched");
