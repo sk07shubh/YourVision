@@ -84,6 +84,7 @@ Trace a visible bug backwards through rendering, snapshots, enrichment, and runt
 - PR #58 describes animation work across linked lists, trees, tries, graphs, DSU, collections, strings, objects, maps, heaps, matrices and empty-state cues. Its description reported Full Regression Lab #665 passed (extension tests 106/106, typecheck/build/backend feature matrix) and Backend Regression #1181 passed, but says manual visual review against representative LeetCode traces had not yet happened. Keep it draft until visual review. A status query returned no entries, so current CI was not independently verified.
 - PR #51 is not the animation merge target.
 - Separate repo `sk07shubh/YourVision-Web` is the marketing/support site, not this extension/backend project. Website glass/background/particles context must not be confused with extension UI.
+- New feature branch created: `feat/synchronized-function-call-tree`, based on `main`. The specification is at `docs/FUNCTION_CALL_TREE_SPECIFICATION.md`. This is a docs-only planning milestone; no implementation has begun and no tests were run.
 
 ## Tests
 From `extension/`:
@@ -115,9 +116,11 @@ Playwright E2E uses a deterministic LeetCode-shaped fixture and mocked `/visuali
 2. Verify live branch/PR before modifying or merging.
 3. Manually inspect representative actual LeetCode traces when possible, especially pointers, long lists/reversal, maps/collections, strings, matrices and empty states.
 4. After animation work is complete, run backend and extension broad regression, typechecks, production build, E2E and inspect CI/diff.
-5. After every change, update this file and record exact branch/commit, changes and tests actually run.
+5. For the function-call-tree project, audit runtime and trace semantics before UI work; keep the test-case section and floating controller unchanged, and preserve one synchronized timeline.
+6. After every change, update this file and record exact branch/commit, changes and tests actually run.
 
 ## Update log
 - 2026-10-15: Initial project memory drafted from repository tree, key code entry points, package scripts, `AUTOMATION.md`, and PR #58 metadata/description. This was a first-pass audit, not a line-by-line review of every source file or every historical chat. Read relevant code/history as future tasks require.
 - 2026-10-15: Added a non-negotiable rule requiring every future project change to update this file, keep the update with the same coherent commit/PR, log actual checks, and reread live memory at the start of each future project chat. Documentation-only change; tests not run.
 - 2026-10-15: PR #59 merged into `main` as `92b294a8f081a25ea9088520158979bd91d14976`; `PROJECT_MEMORY.md` is now on main. This merge contains only the memory documentation/rule; tests not run.
+- 2026-10-15: Created `feat/synchronized-function-call-tree` from `main` and added `docs/FUNCTION_CALL_TREE_SPECIFICATION.md` describing generic function-call tree behavior, synchronized state/timeline, layout boundaries, interaction, trace requirements, visuals, acceptance criteria, and staged implementation. Documentation-only; tests not run. The branch/file write was verified through the GitHub connector; the full feature has not been implemented.
