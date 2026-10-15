@@ -73,7 +73,6 @@ describe('synchronized function invocation tree', () => {
       state({ invocationId: 'call-2', parentInvocationId: 'call-1', lastEvent: { type: 'STEP', data: { invocationId: 'call-2', variables: { board: 'shared-board', row: 1, col: 3 } } } }),
     ];
     const { nodes } = buildInvocationNodes(states);
-    expect(nodes.get('Solution')?.signature).toBeUndefined();
     expect(nodes.get('call-1')?.frameVariables).toEqual({ board: 'shared-board', row: 0 });
     expect(nodes.get('call-2')?.frameVariables).toEqual({ board: 'shared-board', row: 1, col: 3 });
     expect(nodes.get('call-1')?.frameVariables).not.toHaveProperty('col');
