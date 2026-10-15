@@ -89,6 +89,13 @@ describe('synchronized function invocation tree', () => {
     expect(nodes.get('root')?.children).toEqual(['call-1', 'call-2']);
     expect(nodes.get('call-1')?.status).toBe('void');
     expect(nodes.get('call-2')?.status).toBe('void');
+
+    const nullable = buildInvocationNodes([
+      state({ lastEvent: { type: 'METHOD_ENTER', method: 'find', data: { invocationId: 'call-null', returnType: 'Node' } } }),
+      state({ lastEvent: { type: 'METHOD_EXIT', method: 'find', data: { invocationId: 'call-null', returnType: 'Node', hasReturnValue: true, returnedVoid: false } } }),
+    ]).nodes;
+    expect(nullable.get('call-null')?.status).toBe('returned');
+    expect(nullable.get('call-null')?.returnValue).toBeNull();
   });
 });
 
