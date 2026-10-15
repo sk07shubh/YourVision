@@ -3250,6 +3250,74 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
   );
 }
 
+type InvocationNode = {
+  id: string;
+  parentId: string;
+  method: string;
+  signature: string;
+  entryIndex: number;
+  status: 'active' | 'returned' | 'void' | 'exceptional';
+  returnValue?: unknown;
+  returnType?: string;
+  children: string[];
+};
+
+function buildInvocationNodes(states: TraceState[]): { nodes: Map<string, InvocationNode>; currentId?: string } {
+  const nodes = new Map<string, InvocationNode>();
+  nodes.set('root', { id: 'root', parentId: '', method: 'Solution', signature: 'Solution', entryIndex: 0, status: 'active', children: [] });
+  for (let index = 0; index < states.length; index += 1) {
+    const event = states[index]?.lastEvent;
+    const data = isPlainObject(event?.data) ? event.data : {};
+    if (event?.type === 'METHOD_ENTER' && typeof data.invocationId === 'string') {
+      const id = data.invocationId;
+      if (nodes.has(id)) continue;
+      const parentId = typeof data.parentInvocationId === 'string' && nodes.has(data.parentInvocationId) ? data.parentInvocationId : 'root';
+      const rawParams = Array.isArray(data.parameterTypes) ? data.parameterTypes.filter((item): item is string => typeof item === 'string') : [];
+      const method = typeof event.method === 'string' && event.method ? event.method : 'method';
+      const signature = typeof data.methodSignature === 'string' && data.methodSignature
+        ? `${method}(${rawParams.join(', ')})`
+        : method;
+      const node: InvocationNode = { id, parentId, method, signature, entryIndex: index, status: 'active', returnType: typeof data.returnType === 'string' ? data.returnType : undefined, children: [] };
+      nodes.set(id, node);
+      nodes.get(parentId)?.children.push(id);
+    } else if (event?.type === 'METHOD_EXIT' && typeof data.invocationId === 'string') {
+      const node = nodes.get(data.invocationId);
+      if (!node) continue;
+      node.status = data.exceptional === true ? 'exceptional' : data.returnedVoid === true ? 'void' : 'returned';
+      if (Object.prototype.hasOwnProperty.call(data, 'returnValue')) node.returnValue = data.returnValue;
+      if (typeof data.returnType === 'string') node.returnType = data.returnType;
+    }
+  }
+  const last = states[states.length - 1];
+  const lastData = isPlainObject(last?.lastEvent?.data) ? last.lastEvent.data : {};
+  const currentId = typeof last?.invocationId === 'string' ? last.invocationId : typeof lastData.invocationId === 'string' ? lastData.invocationId : undefined;
+  return { nodes, currentId };
+}
+
+function InvocationTree({ states, currentIndex, onSelect }: { states: TraceState[]; currentIndex: number; onSelect: (index: number) => void }) {
+  const { nodes } = useMemo(() => buildInvocationNodes(states), [states]);
+  const current = states[currentIndex];
+  const currentData = isPlainObject(current?.lastEvent?.data) ? current.lastEvent.data : {};
+  const selectedId = typeof current?.invocationId === 'string' ? current.invocationId : typeof currentData.invocationId === 'string' ? currentData.invocationId : undefined;
+  const renderNode = (id: string, depth: number): React.ReactNode => {
+    const node = nodes.get(id);
+    if (!node) return null;
+    const selected = id === selectedId;
+    const result = node.status === 'active' ? 'In progress' : node.status === 'void' ? 'void' : node.status === 'exceptional' ? 'Exception' : `${node.returnType ?? 'return'}: ${displayValue(node.returnValue)}`;
+    return <div className="yv-tree-branch" key={id}>
+      <button type="button" className={`yv-tree-node ${selected ? 'selected' : ''} ${node.status}`} style={{ '--yv-tree-depth': depth } as React.CSSProperties} onClick={() => onSelect(node.entryIndex)} aria-current={selected ? 'step' : undefined}>
+        <span className="yv-tree-method">{node.signature}</span>
+        <span className="yv-tree-outcome">{id === 'root' ? 'Class context' : result}</span>
+      </button>
+      {node.children.length > 0 && <div className="yv-tree-children">{node.children.map(child => renderNode(child, depth + 1))}</div>}
+    </div>;
+  };
+  return <aside className="yv-function-tree" aria-label="Function call tree">
+    <div className="yv-tree-heading"><strong>Function tree</strong><span>{Math.max(0, nodes.size - 1)} calls</span></div>
+    <div className="yv-tree-viewport">{renderNode('root', 0)}</div>
+  </aside>;
+}
+
 export function VisualizerPanel(){
   const s=useSession(); const current=s.states[s.index]; const prev=s.index>0?s.states[s.index-1]:undefined;
   const line = current?.line;
@@ -3263,6 +3331,6 @@ export function VisualizerPanel(){
   return <div className="yv-root"><div className="yv-scroll">
     {tc&&<div className="yv-top"><div className="yv-title-row"><div className="yv-case">{tc.label}</div>{tc.source==='custom'&&<span className="yv-case-kind">Custom</span>}{tc.source==='failed'&&<span className="yv-case-kind">Failed testcase</span>}</div><div className="yv-inputs">{Object.keys(tc.inputs).length?Object.entries(tc.inputs).map(([k,v])=><div className="yv-input" key={k}><div className="yv-key">{k}</div><div className="yv-code">{v}</div></div>):<div className="yv-code">{tc.raw}</div>}</div><div className="yv-output-row"><div className={`yv-output ${finished&&s.response?.success?'good':''}`}><div className="yv-label">Output</div>{finished&&output!==undefined?<ReturnValueView text={displayValue(output)} value={lastEventData?.returnValue} state={current}/>:<div className="yv-code">—</div>}</div></div></div>}
     {s.loading&&<div className="yv-loading">Tracing your code…</div>}{s.error&&<div className="yv-error">{s.error}</div>}
-    {!s.loading&&<><Section title="Variables"><Variables state={current} previous={prev}/></Section><Section title="Call Stack">{current?.callStack?.length?<div className="yv-stack-wrap"><div className="yv-stack-label">TOP</div><div className="yv-stack">{current.callStack.map((f:string,i:number)=><div className="yv-frame" key={`${f}-${i}`}>{f}</div>)}</div><div className="yv-stack-label bottom">BOTTOM</div></div>:<div className="yv-empty">No active method calls.</div>}</Section><Section title="Data Structures"><DataStructures state={current} source={s.source}/></Section></>}
+    {!s.loading&&<div className="yv-workspace"><div className="yv-workspace-content"><div className="yv-tree-toggle-row"><button type="button" className="yv-tree-toggle" aria-expanded={false} onClick={e=>{const root=e.currentTarget.closest('.yv-workspace');root?.classList.toggle('tree-open');e.currentTarget.setAttribute('aria-expanded',String(root?.classList.contains('tree-open')===true));}}><span aria-hidden="true">⌘</span> Function tree <span className="yv-tree-toggle-hint">Recursion & calls</span></button></div><Section title="Variables"><Variables state={current} previous={prev}/></Section><Section title="Data Structures"><DataStructures state={current} source={s.source}/></Section></div><div className="yv-workspace-tree"><InvocationTree states={s.states} currentIndex={s.index} onSelect={index=>{sessionStore.set({index,playing:false});}}/></div></div>}
   </div><div className="yv-current"><ExecutionInspector state={current} previous={prev} statement={statement} index={s.index} total={s.states.length}/><div className="yv-controls"><div className="yv-buttons"><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.restart()} disabled={!s.states.length}>↺ Restart</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.prev()} disabled={s.index<=0}>← Prev</button><button className="yv-btn primary" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.togglePlay()} disabled={s.states.length<2}>{s.playing?'■ Stop':'▶ Play'}</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.next()} disabled={!s.states.length||s.index>=s.states.length-1}>Next →</button></div></div></div></div>;
 }
