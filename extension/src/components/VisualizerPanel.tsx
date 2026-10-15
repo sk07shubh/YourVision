@@ -2153,11 +2153,23 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
   const arrayRef = useRef<HTMLDivElement | null>(null);
   const cellRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const previousTargets = useRef<Map<string, number>>(new Map());
+  // A variable name such as "index" is reused by every recursive invocation.
+  // Do not animate a pointer from the caller's index to the callee's index as
+  // if it were one continuous pointer; each invocation owns its own frame.
+  const previousPointerInvocation = useRef<string | undefined>(state?.invocationId);
   const [pointerLayout, setPointerLayout] = useState<{ offsets: Record<string, number>; moving: Set<string> }>({ offsets: {}, moving: new Set() });
 
   useLayoutEffect(() => {
     const host = arrayRef.current;
     if (!host) return;
+
+    // Recursive frames commonly reuse the same local names with different
+    // values. Reset transition history on frame changes so labels snap to the
+    // current checkpoint rather than animating from a different stack frame.
+    if (previousPointerInvocation.current !== state?.invocationId) {
+      previousPointerInvocation.current = state?.invocationId;
+      previousTargets.current.clear();
+    }
 
     const layoutPointers = () => {
       const offsets: Record<string, number> = {};
@@ -2210,7 +2222,7 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
     Object.values(cellRefs.current).forEach(cell => { if (cell) observer.observe(cell); });
     host.querySelectorAll<HTMLElement>('[data-array-pointer]').forEach(label => observer.observe(label));
     return () => observer.disconnect();
-  }, [targetSignature, state?.sequence, value.length]);
+  }, [targetSignature, state?.sequence, state?.invocationId, value.length]);
 
   const enhancedBinding = enhancedForBinding(source, state, arrayName, value);
   const changed = changedArrayIndices(state, arrayName);
