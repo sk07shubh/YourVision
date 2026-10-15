@@ -317,4 +317,61 @@ if (resumedParent.variables.row !== undefined || resumedParent.variables.col !==
     throw new Error("caller locals were not restored independently from callee locals");
 }
 
+
+// Three-level return regression: each return must restore exactly its immediate
+// caller, not jump to the root or leave the grandchild identity active.
+const deepReturnTrace: ExecutionTrace = {
+    version: 1,
+    events: [
+        {
+            sequence: 1, type: "METHOD_ENTER", line: 2, method: "solve", depth: 0,
+            data: { invocationId: "root-call", methodSignature: "()I", declaringType: "Solution", returnType: "int", variables: { n: 2 } }
+        },
+        {
+            sequence: 2, type: "METHOD_ENTER", line: 6, method: "search", depth: 1,
+            data: { invocationId: "middle-call", parentInvocationId: "root-call", methodSignature: "(I)Z", declaringType: "Solution", returnType: "boolean", variables: { n: 2, index: 0 } }
+        },
+        {
+            sequence: 3, type: "METHOD_ENTER", line: 10, method: "matches", depth: 2,
+            data: { invocationId: "leaf-call", parentInvocationId: "middle-call", methodSignature: "(II)Z", declaringType: "Solution", returnType: "boolean", variables: { index: 0, target: 2 } }
+        },
+        {
+            sequence: 4, type: "METHOD_EXIT", line: 12, method: "matches", depth: 2,
+            data: { invocationId: "leaf-call", parentInvocationId: "middle-call", parentMethodSignature: "(I)Z", parentDeclaringType: "Solution", parentReturnType: "boolean", parentParentInvocationId: "root-call", returnType: "boolean", returnValue: true, returnValueType: "boolean", returnedVoid: false, variables: { index: 0, target: 2 } }
+        },
+        {
+            sequence: 5, type: "STEP", line: 7, method: "search", depth: 1,
+            data: { variables: { n: 2, index: 0, matched: true } }
+        },
+        {
+            sequence: 6, type: "METHOD_EXIT", line: 8, method: "search", depth: 1,
+            data: { invocationId: "middle-call", parentInvocationId: "root-call", parentMethodSignature: "()I", parentDeclaringType: "Solution", parentReturnType: "int", returnType: "boolean", returnValue: true, returnValueType: "boolean", returnedVoid: false, variables: { n: 2, index: 0, matched: true } }
+        },
+        {
+            sequence: 7, type: "STEP", line: 3, method: "solve", depth: 0,
+            data: { variables: { n: 2, answer: 1 } }
+        }
+    ]
+};
+const deepReturnStates = buildStates(deepReturnTrace);
+if (deepReturnStates.length !== 7) {
+    throw new Error("three-level invocation trace lost a return or resume checkpoint");
+}
+const resumedMiddle = stateAt(deepReturnStates, 4);
+const resumedRoot = stateAt(deepReturnStates, 6);
+if (resumedMiddle.invocationId !== "middle-call" || resumedMiddle.parentInvocationId !== "root-call" ||
+    resumedMiddle.methodSignature !== "(I)Z" || resumedMiddle.invocationStatus !== "active") {
+    throw new Error("grandchild return did not restore the exact middle caller frame");
+}
+if (resumedMiddle.variables.target !== undefined || resumedMiddle.variables.matched !== true) {
+    throw new Error("grandchild locals leaked into the resumed middle frame");
+}
+if (resumedRoot.invocationId !== "root-call" || resumedRoot.parentInvocationId !== undefined ||
+    resumedRoot.methodSignature !== "()I" || resumedRoot.invocationStatus !== "active") {
+    throw new Error("middle return did not restore the root invocation identity and ancestry");
+}
+if (resumedRoot.variables.index !== undefined || resumedRoot.variables.answer !== 1) {
+    throw new Error("middle-frame locals leaked into the resumed root frame");
+}
+
 console.log("PASS: trace state builder");
