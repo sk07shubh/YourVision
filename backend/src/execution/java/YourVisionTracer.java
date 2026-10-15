@@ -141,7 +141,22 @@ public class YourVisionTracer {
             }
 
             Set<String> recordedStepLocations = new HashSet<>();
+
+            // JDI may deliver a STEP and METHOD_EXIT for the same suspended
+            // thread in one EventSet. Process the executable checkpoint first,
+            // otherwise METHOD_EXIT can be emitted before the final body line
+            // and cannot associate its return/final locals with that line.
+            List<Event> orderedEvents = new java.util.ArrayList<>();
             for (Event event : events) {
+                orderedEvents.add(event);
+            }
+            orderedEvents.sort((left, right) -> {
+                int leftPriority = eventPriority(left);
+                int rightPriority = eventPriority(right);
+                return Integer.compare(leftPriority, rightPriority);
+            });
+
+            for (Event event : orderedEvents) {
                 if (event instanceof StepEvent step) {
                     if (isTraceableUserMethod(step.location().method())) {
                         if (recordedStepLocations.add(stepLocationKey(
@@ -744,6 +759,19 @@ public class YourVisionTracer {
             location.method().signature() + ":" + location.codeIndex();
     }
 
+    private static int eventPriority(Event event) {
+        if (event instanceof MethodEntryEvent) {
+            return 0;
+        }
+        if (event instanceof StepEvent || event instanceof BreakpointEvent) {
+            return 1;
+        }
+        if (event instanceof MethodExitEvent) {
+            return 2;
+        }
+        return 3;
+    }
+
     private static int findMethodDeclarationLine(
         Location location,
         Method method
@@ -769,10 +797,12 @@ public class YourVisionTracer {
                     method.declaringType().name().lastIndexOf('.') + 1
                 )
                 : method.name();
-            String pattern =
-                "\\b" +
-                java.util.regex.Pattern.quote(methodName) +
-                "\\s*\\(";
+            java.util.regex.Pattern declarationPattern =
+                java.util.regex.Pattern.compile(
+                    "\\b" +
+                    java.util.regex.Pattern.quote(methodName) +
+                    "\\s*\\("
+                );
 
             // JDI's method-entry Location can point at the first bytecode
             // line rather than the declaration (and can be line 1 for a
@@ -785,12 +815,19 @@ public class YourVisionTracer {
 
             for (int index = 0; index < lines.size(); index++) {
                 String sourceLine = lines.get(index);
-                if (!sourceLine.matches(".*" + pattern + ".*")) {
+                java.util.regex.Matcher declarationMatcher =
+                    declarationPattern.matcher(sourceLine);
+                if (!declarationMatcher.find()) {
                     continue;
                 }
 
                 String trimmed = sourceLine.trim();
-                int methodNameStart = trimmed.indexOf(methodName);
+                int methodNameStart = declarationMatcher.start();
+                // Matcher offsets are based on the untrimmed line; convert
+                // them before inspecting the return-type/modifier prefix.
+                int leadingWhitespace = sourceLine.length() -
+                    sourceLine.stripLeading().length();
+                methodNameStart = Math.max(0, methodNameStart - leadingWhitespace);
                 String prefix = methodNameStart >= 0
                     ? trimmed.substring(0, methodNameStart).trim()
                     : "";
