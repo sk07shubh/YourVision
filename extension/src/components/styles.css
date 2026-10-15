@@ -780,7 +780,7 @@
 .yv-tree-toggle-hint { color:#8c95a3; font-size:11px; }
 .yv-workspace-tree { flex:0 0 0; width:0; min-width:0; overflow:hidden; opacity:0; pointer-events:none; transition:flex-basis .22s ease,width .22s ease,opacity .16s ease; }
 .yv-workspace.tree-open .yv-workspace-content { flex:1 1 0; }
- .yv-workspace.tree-open .yv-workspace-tree { flex:0 0 min(var(--yv-tree-width, 320px), 48%); width:min(var(--yv-tree-width, 320px), 48%); min-width:230px; margin-left:12px; opacity:1; pointer-events:auto; }
+ .yv-workspace.tree-open .yv-workspace-tree { flex:0 0 min(var(--yv-tree-width, 320px), 48%); width:min(var(--yv-tree-width, 320px), 48%); min-width:230px; margin-right:12px; opacity:1; pointer-events:auto; }
 .yv-function-tree { display:flex; flex-direction:column; height:100%; min-height:220px; max-height:calc(100vh - 300px); border:1px solid #303640; border-radius:10px; background:#111419; overflow:hidden; resize:horizontal; min-width:230px; max-width:48vw; }
 .yv-tree-heading { flex:0 0 auto; display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 11px; border-bottom:1px solid #2b3039; color:#e5e7eb; font-size:12px; }
 .yv-tree-heading span { color:#8e98a7; font-size:11px; }
