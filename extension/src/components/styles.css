@@ -823,18 +823,18 @@
   min-width: 0;
 }
 .yv-workspace.tree-open .yv-workspace-tree {
-  /* Size to the widest function label, but never steal the visualization pane. */
-  flex: 0 1 auto;
-  width: max-content;
-  min-width: max-content;
-  max-width: min(48%, 520px);
+  /* A compact navigation rail; width stays stable as recursion grows. */
+  flex: 0 0 clamp(220px, 25vw, 285px);
+  width: clamp(220px, 25vw, 285px);
+  min-width: 220px;
+  max-width: 285px;
   min-height: calc(100dvh - 220px);
   overflow: hidden;
 }
 .yv-function-tree {
   box-sizing: border-box;
-  width: max-content;
-  min-width: max-content;
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
   height: calc(100dvh - 220px);
   min-height: 420px;
@@ -856,17 +856,17 @@
 }
 .yv-tree-branch {
   box-sizing: border-box;
-  width: max-content;
-  min-width: max-content;
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
 }
 .yv-tree-node {
   box-sizing: border-box;
   display: flex;
-  width: max-content;
-  min-width: max-content;
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
-  overflow-wrap: normal;
+  overflow-wrap: anywhere;
   white-space: normal;
   border-color: #596575;
   box-shadow: 0 0 0 1px rgba(148, 163, 184, .10);
@@ -892,6 +892,12 @@
   min-width: 0;
   max-width: 100%;
   overflow-wrap: anywhere;
+}
+.yv-tree-method {
+  width: 100%;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
 /* Nested collections (e.g. List<List<Integer>>) are a compact grid rather
@@ -943,5 +949,45 @@
     height: min(62dvh, 560px);
     min-height: 260px;
     max-height: 70dvh;
+  }
+}
+
+
+/* Compact Function Tree rail: keep the visualization visible beside it. */
+.yv-workspace.tree-open .yv-workspace-tree {
+  flex: 0 0 clamp(220px, 25vw, 285px);
+  width: clamp(220px, 25vw, 285px);
+  min-width: 220px;
+  max-width: 285px;
+}
+.yv-workspace.tree-open .yv-function-tree {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.yv-workspace.tree-open .yv-tree-viewport {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.yv-workspace.tree-open .yv-tree-branch,
+.yv-workspace.tree-open .yv-tree-node,
+.yv-workspace.tree-open .yv-tree-method,
+.yv-workspace.tree-open .yv-tree-outcome {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.yv-workspace.tree-open .yv-tree-method {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+@media (max-width: 900px) {
+  .yv-workspace.tree-open .yv-workspace-tree {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
   }
 }
