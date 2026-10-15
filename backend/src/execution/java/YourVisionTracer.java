@@ -913,6 +913,24 @@ public class YourVisionTracer {
         return fallback;
     }
 
+    private static void attachCurrentInvocation(
+        ThreadReference thread,
+        Map<String, Object> data
+    ) {
+        List<InvocationContext> stack = invocationStacks.get(thread.uniqueID());
+        if (stack == null || stack.isEmpty()) {
+            return;
+        }
+        InvocationContext current = stack.get(stack.size() - 1);
+        data.put("invocationId", current.id);
+        if (current.parentId != null) {
+            data.put("parentInvocationId", current.parentId);
+        }
+        data.put("methodSignature", current.signature);
+        data.put("declaringType", current.declaringType);
+        data.put("returnType", current.returnType);
+    }
+
     private static void recordStep(
         Location location,
         ThreadReference thread
@@ -923,6 +941,8 @@ public class YourVisionTracer {
 
         Map<String, Object> data =
             new LinkedHashMap<>();
+
+        attachCurrentInvocation(thread, data);
 
         try {
             StackFrame frame =
