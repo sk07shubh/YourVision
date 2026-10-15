@@ -68,8 +68,8 @@ describe('design-class instance state visualization', () => {
       <DataStructures state={current} source="cache.put(2, 20);" />,
     );
     expect(html).toContain('Map → this.cache');
-    expect(html).toContain('data-map-key="1"');
-    expect(html).toContain('data-map-key="2"');
+    expect(html).toContain('data-map-key-identity="number:1"');
+    expect(html).toContain('data-map-key-identity="number:2"');
     expect(html).toContain('10');
     expect(html).toContain('20');
   });
@@ -100,8 +100,8 @@ describe('design-class instance state visualization', () => {
       <DataStructures state={current} source="cache.put(2, 20);" />,
     );
     expect(html).toContain('Map → this.cache');
-    expect(html).toContain('data-map-key="1"');
-    expect(html).toContain('data-map-key="2"');
+    expect(html).toContain('data-map-key-identity="number:1"');
+    expect(html).toContain('data-map-key-identity="number:2"');
   });
 });
 
