@@ -3276,9 +3276,14 @@ export function buildInvocationNodes(states: TraceState[]): { nodes: Map<string,
       const parentId = typeof data.parentInvocationId === 'string' && nodes.has(data.parentInvocationId) ? data.parentInvocationId : 'root';
       const rawParams = Array.isArray(data.parameterTypes) ? data.parameterTypes.filter((item): item is string => typeof item === 'string') : [];
       const method = typeof event.method === 'string' && event.method ? event.method : 'method';
-      const signature = typeof data.methodSignature === 'string' && data.methodSignature
+      const descriptor = typeof data.methodSignature === 'string' ? data.methodSignature : '';
+      const signature = rawParams.length > 0
         ? `${method}(${rawParams.join(', ')})`
-        : method;
+        : descriptor.startsWith('()')
+          ? `${method}()`
+          : descriptor
+            ? `${method}${descriptor}`
+            : method;
       const returnType = typeof data.returnType === 'string' ? data.returnType : undefined;
       const root = nodes.get('root');
       if (root && typeof data.declaringType === 'string' && data.declaringType) {
