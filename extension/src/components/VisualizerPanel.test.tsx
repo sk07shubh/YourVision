@@ -68,10 +68,27 @@ describe('design-class instance state visualization', () => {
       <DataStructures state={current} source="cache.put(2, 20);" />,
     );
     expect(html).toContain('Map → this.cache');
-    expect(html).toContain('data-map-key-identity="number:1"');
-    expect(html).toContain('data-map-key-identity="number:2"');
+    expect(html).toContain('data-map-key-identity="1"');
+    expect(html).toContain('data-map-key-identity="2"');
     expect(html).toContain('10');
     expect(html).toContain('20');
+  });
+
+  it('labels access-ordered LinkedHashMap state accurately', () => {
+    const current = state({
+      variables: { this: { $objectId: 'lru-instance' } },
+      objects: {
+        'lru-instance': {
+          $objectId: 'lru-instance',
+          $type: 'LRUCache',
+          fields: { cache: { $mapId: 'cache-map', $type: 'LinkedHashMap', entries: [{ key: 2, value: 20 }, { key: 1, value: 10 }] } },
+        },
+      },
+    });
+    const html = renderToStaticMarkup(
+      <DataStructures state={current} source="this.cache = new LinkedHashMap<>(16, 0.75f, true);" />,
+    );
+    expect(html).toContain('ACCESS ORDER · 2 entries');
   });
 
   it('updates the same instance map in place across design-class steps', () => {
@@ -100,8 +117,8 @@ describe('design-class instance state visualization', () => {
       <DataStructures state={current} source="cache.put(2, 20);" />,
     );
     expect(html).toContain('Map → this.cache');
-    expect(html).toContain('data-map-key-identity="number:1"');
-    expect(html).toContain('data-map-key-identity="number:2"');
+    expect(html).toContain('data-map-key-identity="1"');
+    expect(html).toContain('data-map-key-identity="2"');
   });
 });
 
