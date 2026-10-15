@@ -203,6 +203,44 @@ if (
     throw new Error("repeated runtime checkpoints at the same source line were deduplicated");
 }
 
+const invocationTrace: ExecutionTrace = {
+    version: 1,
+    events: [
+        {
+            sequence: 1, type: "METHOD_ENTER", line: 10, method: "visit", depth: 1,
+            data: { invocationId: "call-1", methodSignature: "()I", declaringType: "Solution", returnType: "int", parameterTypes: [], variables: { value: 1 } }
+        },
+        {
+            sequence: 2, type: "METHOD_EXIT", line: 11, method: "visit", depth: 1,
+            data: { invocationId: "call-1", methodSignature: "()I", declaringType: "Solution", returnType: "int", returnValue: 1, returnValueType: "int", returnedVoid: false, variables: { value: 1 } }
+        },
+        {
+            sequence: 3, type: "METHOD_ENTER", line: 10, method: "visit", depth: 1,
+            data: { invocationId: "call-2", methodSignature: "()I", declaringType: "Solution", returnType: "int", parameterTypes: [], variables: { value: 1 } }
+        },
+        {
+            sequence: 4, type: "METHOD_EXIT", line: 11, method: "visit", depth: 1,
+            data: { invocationId: "call-2", methodSignature: "()I", declaringType: "Solution", returnType: "int", returnValue: 2, returnValueType: "int", returnedVoid: false, variables: { value: 1 } }
+        }
+    ]
+};
+const invocationStates = buildStates(invocationTrace);
+if (invocationStates.length !== 4) {
+    throw new Error("identical repeated invocation checkpoints were deduplicated");
+}
+if (stateAt(invocationStates, 0).invocationId !== "call-1" ||
+    stateAt(invocationStates, 2).invocationId !== "call-2") {
+    throw new Error("invocation identity was not retained on method-entry checkpoints");
+}
+if (stateAt(invocationStates, 1).returnValue !== 1 ||
+    stateAt(invocationStates, 1).invocationStatus !== "returned" ||
+    stateAt(invocationStates, 3).returnValue !== 2) {
+    throw new Error("typed invocation return outcomes were not retained in replay state");
+}
+if (stateAt(invocationStates, 2).returnValue !== undefined) {
+    throw new Error("new invocation inherited a previous invocation's return value");
+}
+
 if (stateAt(states, 3).variables.left !== 0) throw new Error("caller variables were not restored on caller resume");
 if (stateAt(states, 5).error?.type !== "IndexOutOfBoundsException") throw new Error("error state was not replayed");
 if (stateAt(states, 4).variables.left !== 1) throw new Error("STEP variables were not hydrated");
