@@ -3260,12 +3260,13 @@ type InvocationNode = {
   status: 'active' | 'returned' | 'void' | 'exceptional';
   returnValue?: unknown;
   returnType?: string;
+  frameVariables: Record<string, unknown>;
   children: string[];
 };
 
 export function buildInvocationNodes(states: TraceState[]): { nodes: Map<string, InvocationNode>; currentId?: string } {
   const nodes = new Map<string, InvocationNode>();
-  nodes.set('root', { id: 'root', parentId: '', method: 'Solution', signature: 'Solution', entryIndex: 0, status: 'active', children: [] });
+  nodes.set('root', { id: 'root', parentId: '', method: 'Solution', signature: 'Solution', entryIndex: 0, status: 'active', frameVariables: {}, children: [] });
   for (let index = 0; index < states.length; index += 1) {
     const event = states[index]?.lastEvent;
     const data = isPlainObject(event?.data) ? event.data : {};
@@ -3284,7 +3285,8 @@ export function buildInvocationNodes(states: TraceState[]): { nodes: Map<string,
         root.method = data.declaringType;
         root.signature = data.declaringType;
       }
-      const node: InvocationNode = { id, parentId, method, signature: returnType ? `${returnType} ${signature}` : signature, entryIndex: index, status: 'active', returnType, children: [] };
+      const frameVariables = isPlainObject(data.variables) ? data.variables : {};
+      const node: InvocationNode = { id, parentId, method, signature: returnType ? `${returnType} ${signature}` : signature, entryIndex: index, status: 'active', returnType, frameVariables, children: [] };
       nodes.set(id, node);
       nodes.get(parentId)?.children.push(id);
     } else if (event?.type === 'METHOD_EXIT' && typeof data.invocationId === 'string') {
@@ -3293,6 +3295,14 @@ export function buildInvocationNodes(states: TraceState[]): { nodes: Map<string,
       node.status = data.exceptional === true ? 'exceptional' : data.returnedVoid === true ? 'void' : 'returned';
       if (Object.prototype.hasOwnProperty.call(data, 'returnValue')) node.returnValue = data.returnValue;
       if (typeof data.returnType === 'string') node.returnType = data.returnType;
+    }
+
+    const checkpointId = typeof states[index]?.invocationId === 'string'
+      ? states[index].invocationId
+      : typeof data.invocationId === 'string' ? data.invocationId : undefined;
+    const checkpointNode = checkpointId ? nodes.get(checkpointId) : undefined;
+    if (checkpointNode && event?.type !== 'METHOD_EXIT' && isPlainObject(data.variables)) {
+      checkpointNode.frameVariables = data.variables;
     }
   }
   const last = states[states.length - 1];
@@ -3314,6 +3324,7 @@ function InvocationTree({ states, currentIndex, onSelect }: { states: TraceState
     return <div className="yv-tree-branch" key={id}>
       <button type="button" className={`yv-tree-node ${selected ? 'selected' : ''} ${node.status}`} style={{ '--yv-tree-depth': depth } as CSSProperties} onClick={() => onSelect(node.entryIndex)} aria-current={selected ? 'step' : undefined}>
         <span className="yv-tree-method">{node.signature}</span>
+        {id !== 'root' && Object.keys(node.frameVariables).length > 0 && <span className="yv-tree-frame">{Object.entries(node.frameVariables).slice(0, 4).map(([name, value]) => <span className="yv-tree-variable" key={name}><span className="yv-tree-var-name">{name}</span><span className="yv-tree-var-value">{displayValue(value)}</span></span>)}{Object.keys(node.frameVariables).length > 4 && <span className="yv-tree-more">+{Object.keys(node.frameVariables).length - 4} locals</span>}</span>}
         <span className="yv-tree-outcome">{id === 'root' ? 'Class context' : result}</span>
       </button>
       {node.children.length > 0 && <div className="yv-tree-children">{node.children.map(child => renderNode(child, depth + 1))}</div>}
