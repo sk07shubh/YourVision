@@ -4337,7 +4337,13 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
     ? (typeof thisValue.$objectId === 'string' ? thisValue.$objectId
       : typeof thisValue.$ref === 'string' ? thisValue.$ref : undefined)
     : undefined;
-  const thisObject = thisObjectId ? state?.objects?.[thisObjectId] : undefined;
+  // Object snapshots may be embedded directly in the `this` local (as in
+  // OBJECT_FIELD_WRITE events), or represented by an ID resolved through the
+  // trace's object table. Prefer the embedded snapshot because it is the exact
+  // state for this step.
+  const thisObject = isPlainObject(thisValue) && isPlainObject(thisValue.fields)
+    ? thisValue
+    : thisObjectId ? state?.objects?.[thisObjectId] : undefined;
   if (isPlainObject(thisObject)) {
     for (const [fieldName, fieldValue] of Object.entries(objectFields(thisObject))) {
       if (!isStructuralValue(fieldValue)) continue;
