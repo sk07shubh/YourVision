@@ -915,6 +915,23 @@ public class YourVisionTracer {
         return fallback;
     }
 
+    private static Map<String, Object> readStaticFields(ReferenceType type) {
+        Map<String, Object> fields = new LinkedHashMap<>();
+        try {
+            for (Field field : type.allFields()) {
+                if (!field.isStatic() || field.isSynthetic()) {
+                    continue;
+                }
+                try {
+                    fields.put(field.name(), snapshotValue(type.getValue(field), 0, new HashSet<>()));
+                } catch (Exception ignored) {
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return fields;
+    }
+
     private static void attachCurrentInvocation(
         ThreadReference thread,
         Map<String, Object> data
@@ -945,6 +962,7 @@ public class YourVisionTracer {
             new LinkedHashMap<>();
 
         attachCurrentInvocation(thread, data);
+        data.put("classFields", readStaticFields(location.declaringType()));
 
         try {
             StackFrame frame =
