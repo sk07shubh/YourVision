@@ -780,19 +780,19 @@
 .yv-tree-toggle-hint { color:#8c95a3; font-size:11px; }
 .yv-workspace-tree { flex:0 0 0; width:0; min-width:0; overflow:hidden; opacity:0; pointer-events:none; transition:flex-basis .22s ease,width .22s ease,opacity .16s ease; }
 .yv-workspace.tree-open .yv-workspace-content { flex:1 1 0; }
- .yv-workspace.tree-open .yv-workspace-tree { flex:0 0 min(var(--yv-tree-width, 320px), 48%); width:min(var(--yv-tree-width, 320px), 48%); min-width:230px; margin-right:12px; opacity:1; pointer-events:auto; }
-.yv-function-tree { display:flex; flex-direction:column; height:100%; min-height:220px; max-height:calc(100vh - 300px); border:1px solid #303640; border-radius:10px; background:#111419; overflow:hidden; resize:horizontal; min-width:230px; max-width:48vw; }
+ .yv-workspace.tree-open .yv-workspace-tree { flex:0 1 auto; width:max-content; min-width:max-content; max-width:min(48%, 520px); margin-right:12px; opacity:1; pointer-events:auto; }
+.yv-function-tree { display:flex; flex-direction:column; align-self:stretch; height:100%; min-height:calc(100dvh - 220px); max-height:calc(100dvh - 160px); border:1px solid #596575; border-radius:10px; background:#111419; overflow:hidden; resize:none; min-width:max-content; max-width:100%; box-shadow:0 0 0 1px rgba(148,163,184,.16),inset 0 0 0 1px rgba(148,163,184,.08); }
 .yv-tree-heading { flex:0 0 auto; display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 11px; border-bottom:1px solid #2b3039; color:#e5e7eb; font-size:12px; }
 .yv-tree-heading span { color:#8e98a7; font-size:11px; }
-.yv-tree-viewport { flex:1 1 auto; overflow:auto; padding:10px 8px 14px; overscroll-behavior:contain; }
+.yv-tree-viewport { flex:1 1 auto; min-height:0; overflow-x:hidden; overflow-y:auto; padding:10px 8px 14px; overscroll-behavior:contain; scroll-behavior:auto; }
 .yv-tree-branch { position:relative; min-width:max-content; }
-.yv-tree-node { display:flex; flex-direction:column; gap:5px; align-items:flex-start; width:100%; max-width:360px; min-width:190px; text-align:left; padding:9px 10px; margin:0 0 5px; border:1px solid #343b46; border-radius:8px; background:#1a1e25; color:#e8ebf0; cursor:pointer; }
+.yv-tree-node { display:flex; flex-direction:column; gap:5px; align-items:flex-start; width:max-content; max-width:100%; min-width:max-content; text-align:left; padding:9px 10px; margin:0 0 5px; border:1px solid #596575; border-radius:8px; background:#1a1e25; color:#e8ebf0; cursor:pointer; }
 .yv-tree-node:hover { border-color:#667386; background:#202630; }
 .yv-tree-node.selected { border-color:#f59e0b; box-shadow:inset 3px 0 #f59e0b; background:#282219; }
 .yv-tree-node.returned,.yv-tree-node.void { border-color:#2f6551; }
 .yv-tree-node.exceptional { border-color:#874343; }
-.yv-tree-method { display:block; width:100%; max-width:320px; overflow-wrap:anywhere; font-size:11px; font-weight:600; padding:2px 0 6px; border-bottom:1px solid #465160; }
-.yv-tree-outcome { display:block; width:100%; box-sizing:border-box; color:#a4adba; font-size:10px; overflow-wrap:anywhere; border-top:1px solid #465160; padding:6px 0 2px; }
+.yv-tree-method { display:block; width:max-content; max-width:100%; overflow-wrap:normal; white-space:normal; font-size:11px; font-weight:600; padding:2px 0 6px; border-bottom:1px solid #465160; }
+.yv-tree-outcome { display:block; width:max-content; max-width:100%; box-sizing:border-box; color:#a4adba; font-size:10px; overflow-wrap:anywhere; border-top:1px solid #465160; padding:6px 0 2px; }
 .yv-tree-children { margin:0 0 4px 13px; padding-left:10px; border-left:1px solid #48515e; }
 @media (prefers-reduced-motion: reduce) { .yv-workspace-tree { transition:none; } }
 @media (max-width:680px) {
@@ -802,9 +802,6 @@
 }
 
 
-.yv-tree-width-control { display:flex; flex-direction:column; gap:2px; align-items:flex-start; color:#9aa4b2; font-size:10px; }
-.yv-tree-width-control input { width:90px; height:14px; accent-color:#f59e0b; cursor:ew-resize; }
-.yv-tree-width-control input:focus-visible { outline:2px solid #f59e0b; outline-offset:2px; }
 
 
 /* The call tree should size to its content, not force a horizontal scrollbar.
@@ -831,6 +828,7 @@
   width: max-content;
   min-width: max-content;
   max-width: min(48%, 520px);
+  min-height: calc(100dvh - 220px);
   overflow: hidden;
 }
 .yv-function-tree {
@@ -838,8 +836,9 @@
   width: max-content;
   min-width: max-content;
   max-width: 100%;
-  height: clamp(240px, 54vh, 560px);
-  max-height: calc(100dvh - 180px);
+  height: calc(100dvh - 220px);
+  min-height: 420px;
+  max-height: calc(100dvh - 160px);
   resize: none;
   min-height: 240px;
   border: 1px solid #596575;
@@ -853,6 +852,7 @@
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scroll-padding-block: 12px;
 }
 .yv-tree-branch {
   box-sizing: border-box;
@@ -938,8 +938,10 @@
     max-width: 100%;
     margin: 0 0 12px;
   }
+  .yv-workspace.tree-open .yv-workspace-tree { min-height: 0; }
   .yv-function-tree {
-    height: clamp(220px, 42vh, 420px);
+    height: min(62dvh, 560px);
+    min-height: 260px;
     max-height: 70dvh;
   }
 }

@@ -3350,6 +3350,12 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
 function InvocationTree({ states, currentIndex, onSelect, source }: { states: TraceState[]; currentIndex: number; onSelect: (index: number) => void; source: string }) {
   const { nodes } = useMemo(() => buildInvocationNodes(states.slice(0, currentIndex + 1), source), [states, currentIndex, source]);
   const current = states[currentIndex];
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    const selected = viewport?.querySelector<HTMLElement>('.yv-tree-node.selected');
+    selected?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
+  }, [currentIndex, nodes.size]);
   const currentData = isPlainObject(current?.lastEvent?.data) ? current.lastEvent.data : {};
   const selectedId = typeof current?.invocationId === 'string' ? current.invocationId : typeof currentData.invocationId === 'string' ? currentData.invocationId : undefined;
   const renderNode = (id: string, depth: number): ReactNode => {
@@ -3367,7 +3373,7 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
   };
   return <aside className="yv-function-tree" aria-label="Function call tree">
     <div className="yv-tree-heading"><strong>Function tree</strong><span>{Math.max(0, nodes.size - 1)} calls</span></div>
-    <div className="yv-tree-viewport">{renderNode('root', 0)}</div>
+    <div className="yv-tree-viewport" ref={viewportRef}>{renderNode('root', 0)}</div>
   </aside>;
 }
 
