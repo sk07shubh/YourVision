@@ -21,7 +21,8 @@ const execFileAsync = promisify(execFile);
  * and bounded like execFile's stdout/stderr capture.
  */
 function runJavaTracer(
-    args: string[]
+    args: string[],
+    timeoutMs = JAVA_EXECUTION_TIMEOUT_MS
 ): Promise<{ stdout: string; stderr: string }> {
     return new Promise((resolve, reject) => {
         const child = spawn("java", args, {
@@ -63,7 +64,7 @@ function runJavaTracer(
         const timer = setTimeout(() => {
             timedOut = true;
             killProcessTree();
-        }, JAVA_EXECUTION_TIMEOUT_MS);
+        }, timeoutMs);
 
         const fail = (error: NodeJS.ErrnoException & {
             stdout?: string;
@@ -114,7 +115,7 @@ function runJavaTracer(
 
             if (timedOut) {
                 const error = Object.assign(
-                    new Error(`Java execution exceeded ${JAVA_EXECUTION_TIMEOUT_MS} ms`),
+                    new Error(`Java execution exceeded ${timeoutMs} ms`),
                     {
                         code: "ETIMEDOUT",
                         killed: true,
@@ -503,7 +504,7 @@ await fs.writeFile(
                 stdout,
                 stderr
             } =
-                await runJavaTracer(childArguments);
+                await runJavaTracer(childArguments, designMode ? 15000 : JAVA_EXECUTION_TIMEOUT_MS);
             const trace =
                 parseTrace(stdout, source);
 
@@ -582,7 +583,7 @@ await fs.writeFile(
                     stderr:
                         error.stderr ?? "",
                     message:
-                        `Java execution exceeded ${JAVA_EXECUTION_TIMEOUT_MS} ms`,
+                        `Java execution exceeded ${designMode ? 15000 : JAVA_EXECUTION_TIMEOUT_MS} ms`,
                     trace,
                     states:
                         buildStates(trace)
