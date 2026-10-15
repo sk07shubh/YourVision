@@ -791,10 +791,8 @@
 .yv-tree-node.selected { border-color:#f59e0b; box-shadow:inset 3px 0 #f59e0b; background:#282219; }
 .yv-tree-node.returned,.yv-tree-node.void { border-color:#2f6551; }
 .yv-tree-node.exceptional { border-color:#874343; }
-.yv-tree-method { display:block; width:100%; max-width:320px; overflow-wrap:anywhere; font-size:11px; font-weight:600; padding:2px 0 6px; }
-.yv-tree-parameters { display:flex; flex-direction:column; gap:3px; width:100%; padding:5px 0; border-top:1px solid #2b3039; }
-.yv-tree-parameter { display:flex; align-items:baseline; gap:7px; width:100%; min-width:0; font-size:10px; }
-.yv-tree-outcome { display:block; width:100%; box-sizing:border-box; color:#a4adba; font-size:10px; overflow-wrap:anywhere; border-top:1px solid #2b3039; padding:6px 0 2px; }
+.yv-tree-method { display:block; width:100%; max-width:320px; overflow-wrap:anywhere; font-size:11px; font-weight:600; padding:2px 0 6px; border-bottom:1px solid #465160; }
+.yv-tree-outcome { display:block; width:100%; box-sizing:border-box; color:#a4adba; font-size:10px; overflow-wrap:anywhere; border-top:1px solid #465160; padding:6px 0 2px; }
 .yv-tree-children { margin:0 0 4px 13px; padding-left:10px; border-left:1px solid #48515e; }
 @media (prefers-reduced-motion: reduce) { .yv-workspace-tree { transition:none; } }
 @media (max-width:680px) {
@@ -803,16 +801,10 @@
   .yv-function-tree { max-width:100% !important; resize:vertical; max-height:70dvh; }
 }
 
-.yv-tree-frame { display:flex; flex-direction:column; gap:3px; width:100%; padding-top:2px; border-top:1px solid #2b3039; }
-.yv-tree-variable { display:flex; align-items:baseline; gap:7px; width:100%; min-width:0; font-size:10px; }
-.yv-tree-var-name { flex:0 0 auto; max-width:44%; color:#9aa6b5; overflow:hidden; text-overflow:ellipsis; }
-.yv-tree-var-value { flex:1 1 auto; min-width:0; color:#d5dae2; overflow-wrap:anywhere; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
-.yv-tree-more { color:#7f8a99; font-size:10px; }
 
 .yv-tree-width-control { display:flex; flex-direction:column; gap:2px; align-items:flex-start; color:#9aa4b2; font-size:10px; }
 .yv-tree-width-control input { width:90px; height:14px; accent-color:#f59e0b; cursor:ew-resize; }
 .yv-tree-width-control input:focus-visible { outline:2px solid #f59e0b; outline-offset:2px; }
-.yv-tree-frame-label { color:#8792a2; font-size:9px; text-transform:uppercase; letter-spacing:.05em; }
 
 
 /* Bound the invocation tree to its own viewport: deep recursion must never
