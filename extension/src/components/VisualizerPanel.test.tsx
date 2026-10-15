@@ -47,6 +47,64 @@ function markup(nodes: ReactNode[]): string {
 
 
 
+describe('design-class instance state visualization', () => {
+  it('renders structural fields on this as first-class data structures', () => {
+    const cache = {
+      $mapId: 'cache-map',
+      $type: 'LinkedHashMap',
+      entries: [{ key: 1, value: 10 }, { key: 2, value: 20 }],
+    };
+    const current = state({
+      variables: { this: { $objectId: 'lru-instance' } },
+      objects: {
+        'lru-instance': {
+          $objectId: 'lru-instance',
+          $type: 'LRUCache',
+          fields: { capacity: 2, cache },
+        },
+      },
+    });
+    const html = renderToStaticMarkup(
+      <DataStructures state={current} source="cache.put(2, 20);" />,
+    );
+    expect(html).toContain('Map → this.cache');
+    expect(html).toContain('data-map-key="1"');
+    expect(html).toContain('data-map-key="2"');
+    expect(html).toContain('10');
+    expect(html).toContain('20');
+  });
+
+  it('updates the same instance map in place across design-class steps', () => {
+    const previous = state({
+      variables: { this: { $objectId: 'lru-instance' } },
+      objects: {
+        'lru-instance': {
+          $objectId: 'lru-instance',
+          $type: 'LRUCache',
+          fields: { cache: { $mapId: 'cache-map', $type: 'LinkedHashMap', entries: [{ key: 1, value: 10 }] } },
+        },
+      },
+    });
+    const current = state({
+      sequence: 2,
+      variables: { this: { $objectId: 'lru-instance' } },
+      objects: {
+        'lru-instance': {
+          $objectId: 'lru-instance',
+          $type: 'LRUCache',
+          fields: { cache: { $mapId: 'cache-map', $type: 'LinkedHashMap', entries: [{ key: 1, value: 10 }, { key: 2, value: 20 }] } },
+        },
+      },
+    });
+    const html = renderToStaticMarkup(
+      <DataStructures state={current} source="cache.put(2, 20);" />,
+    );
+    expect(html).toContain('Map → this.cache');
+    expect(html).toContain('data-map-key="1"');
+    expect(html).toContain('data-map-key="2"');
+  });
+});
+
 describe('linked-list graph visualization', () => {
   it('preserves node identity, aliases, and explicit null termination', () => {
     const current = state({
