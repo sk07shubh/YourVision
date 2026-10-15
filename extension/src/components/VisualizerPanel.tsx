@@ -3317,7 +3317,7 @@ export function buildInvocationNodes(states: TraceState[]): { nodes: Map<string,
   return { nodes, currentId };
 }
 
-function InvocationTree({ states, currentIndex, onSelect }: { states: TraceState[]; currentIndex: number; onSelect: (index: number) => void }) {
+function InvocationTree({ states, currentIndex, onSelect, width, onWidthChange }: { states: TraceState[]; currentIndex: number; onSelect: (index: number) => void; width: number; onWidthChange: (width: number) => void }) {
   const { nodes } = useMemo(() => buildInvocationNodes(states.slice(0, currentIndex + 1)), [states, currentIndex]);
   const current = states[currentIndex];
   const currentData = isPlainObject(current?.lastEvent?.data) ? current.lastEvent.data : {};
@@ -3336,14 +3336,15 @@ function InvocationTree({ states, currentIndex, onSelect }: { states: TraceState
       {node.children.length > 0 && <div className="yv-tree-children">{node.children.map(child => renderNode(child, depth + 1))}</div>}
     </div>;
   };
-  return <aside className="yv-function-tree" aria-label="Function call tree">
-    <div className="yv-tree-heading"><strong>Function tree</strong><span>{Math.max(0, nodes.size - 1)} calls</span></div>
+  return <aside className="yv-function-tree" aria-label="Function call tree" style={{ width }}>
+    <div className="yv-tree-heading"><strong>Function tree</strong><span>{Math.max(0, nodes.size - 1)} calls</span><label className="yv-tree-width-control"><span>Width</span><input aria-label="Function tree width" type="range" min={230} max={480} step={10} value={width} onChange={event => onWidthChange(Number(event.target.value))}/></label></div>
     <div className="yv-tree-viewport">{renderNode('root', 0)}</div>
   </aside>;
 }
 
 export function VisualizerPanel(){
   const [treeOpen,setTreeOpen]=useState(false);
+  const [treeWidth,setTreeWidth]=useState(320);
   const s=useSession(); const current=s.states[s.index]; const prev=s.index>0?s.states[s.index-1]:undefined;
   const line = current?.line;
   const lastEventData = isPlainObject(current?.lastEvent?.data) ? current.lastEvent.data : undefined;
@@ -3356,6 +3357,6 @@ export function VisualizerPanel(){
   return <div className="yv-root"><div className="yv-scroll">
     {tc&&<div className="yv-top"><div className="yv-title-row"><div className="yv-case">{tc.label}</div>{tc.source==='custom'&&<span className="yv-case-kind">Custom</span>}{tc.source==='failed'&&<span className="yv-case-kind">Failed testcase</span>}</div><div className="yv-inputs">{Object.keys(tc.inputs).length?Object.entries(tc.inputs).map(([k,v])=><div className="yv-input" key={k}><div className="yv-key">{k}</div><div className="yv-code">{v}</div></div>):<div className="yv-code">{tc.raw}</div>}</div><div className="yv-output-row"><div className={`yv-output ${finished&&s.response?.success?'good':''}`}><div className="yv-label">Output</div>{finished&&output!==undefined?<ReturnValueView text={displayValue(output)} value={lastEventData?.returnValue} state={current}/>:<div className="yv-code">—</div>}</div></div></div>}
     {s.loading&&<div className="yv-loading">Tracing your code…</div>}{s.error&&<div className="yv-error">{s.error}</div>}
-    {!s.loading&&!finished&&<div className={`yv-workspace ${treeOpen?'tree-open':''}`}><div className="yv-workspace-content"><div className="yv-tree-toggle-row"><button type="button" className="yv-tree-toggle" aria-expanded={treeOpen} onClick={()=>setTreeOpen(open=>!open)}><span aria-hidden="true">⌘</span> Function tree <span className="yv-tree-toggle-hint">Recursion & calls</span></button></div><Section title="Variables"><Variables state={current} previous={prev}/></Section><Section title="Data Structures"><DataStructures state={current} source={s.source}/></Section></div><div className="yv-workspace-tree"><InvocationTree states={s.states} currentIndex={s.index} onSelect={index=>{sessionStore.set({index,playing:false});}}/></div></div>}
+    {!s.loading&&!finished&&<div className={`yv-workspace ${treeOpen?'tree-open':''}`}><div className="yv-workspace-content"><div className="yv-tree-toggle-row"><button type="button" className="yv-tree-toggle" aria-expanded={treeOpen} onClick={()=>setTreeOpen(open=>!open)}><span aria-hidden="true">⌘</span> Function tree <span className="yv-tree-toggle-hint">Recursion & calls</span></button></div><Section title="Variables"><Variables state={current} previous={prev}/></Section><Section title="Data Structures"><DataStructures state={current} source={s.source}/></Section></div><div className="yv-workspace-tree" style={{ '--yv-tree-width': `${treeWidth}px` } as CSSProperties}><InvocationTree states={s.states} currentIndex={s.index} width={treeWidth} onWidthChange={setTreeWidth} onSelect={index=>{sessionStore.set({index,playing:false});}}/></div></div>}
   </div><div className="yv-current"><ExecutionInspector state={current} previous={prev} statement={statement} index={s.index} total={s.states.length}/><div className="yv-controls"><div className="yv-buttons"><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.restart()} disabled={!s.states.length}>↺ Restart</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.prev()} disabled={s.index<=0}>← Prev</button><button className="yv-btn primary" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.togglePlay()} disabled={s.states.length<2}>{s.playing?'■ Stop':'▶ Play'}</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.next()} disabled={!s.states.length||s.index>=s.states.length-1}>Next →</button></div></div></div></div>;
 }
