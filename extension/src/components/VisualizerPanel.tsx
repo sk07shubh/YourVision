@@ -3298,6 +3298,11 @@ export function buildInvocationNodes(states: TraceState[]): { nodes: Map<string,
       if (typeof data.returnType === 'string') node.returnType = data.returnType;
     }
 
+    if (isPlainObject(data.classFields)) {
+      const root = nodes.get('root');
+      if (root) root.frameVariables = data.classFields;
+    }
+
     const checkpointId = typeof states[index]?.invocationId === 'string'
       ? states[index].invocationId
       : typeof data.invocationId === 'string' ? data.invocationId : undefined;
@@ -3325,7 +3330,7 @@ function InvocationTree({ states, currentIndex, onSelect }: { states: TraceState
     return <div className="yv-tree-branch" key={id}>
       <button type="button" className={`yv-tree-node ${selected ? 'selected' : ''} ${node.status}`} style={{ '--yv-tree-depth': depth } as CSSProperties} onClick={() => onSelect(node.entryIndex)} aria-current={selected ? 'step' : undefined}>
         <span className="yv-tree-method">{node.signature}</span>
-        {id !== 'root' && Object.keys(node.frameVariables).length > 0 && <span className="yv-tree-frame">{Object.entries(node.frameVariables).slice(0, 4).map(([name, value]) => <span className="yv-tree-variable" key={name}><span className="yv-tree-var-name">{name}</span><span className="yv-tree-var-value">{displayValue(value)}</span></span>)}{Object.keys(node.frameVariables).length > 4 && <span className="yv-tree-more">+{Object.keys(node.frameVariables).length - 4} locals</span>}</span>}
+        {Object.keys(node.frameVariables).length > 0 && <span className="yv-tree-frame"><span className="yv-tree-frame-label">{id === 'root' ? 'Class fields' : 'Frame locals'}</span>{Object.entries(node.frameVariables).slice(0, 4).map(([name, value]) => <span className="yv-tree-variable" key={name}><span className="yv-tree-var-name">{name}</span><span className="yv-tree-var-value">{displayValue(value)}</span></span>)}{Object.keys(node.frameVariables).length > 4 && <span className="yv-tree-more">+{Object.keys(node.frameVariables).length - 4} {id === 'root' ? 'fields' : 'locals'}</span>}</span>}
         <span className="yv-tree-outcome">{id === 'root' ? 'Class context' : result}</span>
       </button>
       {node.children.length > 0 && <div className="yv-tree-children">{node.children.map(child => renderNode(child, depth + 1))}</div>}
