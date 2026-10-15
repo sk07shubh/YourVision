@@ -4325,6 +4325,31 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
     }
   }
 
+  // Design-class state is rooted at `this`, so fields such as
+  // `this.cache` are not named locals. Promote structural fields from the
+  // current instance into the same renderer used for ordinary local maps,
+  // collections and arrays. This keeps encapsulated state visible while
+  // avoiding a generic object dump of the whole instance.
+  const thisValue = state?.variables?.this;
+  const thisObjectId = isPlainObject(thisValue)
+    ? (typeof thisValue.$objectId === 'string' ? thisValue.$objectId
+      : typeof thisValue.$ref === 'string' ? thisValue.$ref : undefined)
+    : undefined;
+  const thisObject = thisObjectId ? state?.objects?.[thisObjectId] : undefined;
+  if (isPlainObject(thisObject)) {
+    for (const [fieldName, fieldValue] of Object.entries(objectFields(thisObject))) {
+      if (!isStructuralValue(fieldValue)) continue;
+      const displayName = 'this.' + fieldName;
+      if (isArraySnapshot(fieldValue)) {
+        grouped.set(`array:instance:${fieldValue.$arrayId}`, { names: [displayName], value: fieldValue });
+      } else if (isMapSnapshot(fieldValue)) {
+        grouped.set(`map:instance:${fieldValue.$mapId}`, { names: [displayName], value: fieldValue });
+      } else if (isCollectionSnapshot(fieldValue)) {
+        grouped.set(`collection:instance:${fieldValue.$collectionId}`, { names: [displayName], value: fieldValue });
+      }
+    }
+  }
+
   // Strings remain ordinary variables as well as being shown as indexed,
   // read-only character sequences in the Data Structures section.
   for (const [name, value] of Object.entries(state?.variables ?? {})) {
