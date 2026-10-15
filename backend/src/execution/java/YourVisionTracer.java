@@ -269,16 +269,11 @@ public class YourVisionTracer {
                             data
                         );
 
-                        // STEP_LINE resumes from MethodEntryEvent at the first
-                        // executable location and may report only the next
-                        // source line (skipping the first body statement).
-                        // Capture the suspended entry location itself as the
-                        // initial real STEP checkpoint before execution resumes.
-                        recordStep(
-                            methodLocation,
-                            entry.thread()
-                        );
-
+                        // A method-entry location can point at the declaration
+                        // line, which is not an executed statement. Do not emit
+                        // a STEP for that location: STEP_LINE supplies the first
+                        // executable body checkpoint and keeps effects aligned
+                        // with the line that actually ran.
                         enableLineStepping(
                             manager,
                             entry.thread()
@@ -1822,6 +1817,17 @@ public class YourVisionTracer {
 
                 method =
                     location.method().name();
+            }
+
+            // JDI may report the method-entry location at the first bytecode
+            // line rather than the source declaration. Keep the declaration
+            // marker as metadata, and use it for METHOD_ENTER's displayed line.
+            if (
+                "METHOD_ENTER".equals(type) &&
+                data != null &&
+                data.get("displayLine") instanceof Number displayLine
+            ) {
+                line = displayLine.intValue();
             }
 
             if (thread != null) {
