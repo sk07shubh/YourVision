@@ -59,6 +59,11 @@ describe('synchronized function invocation tree', () => {
     expect(nodes.get('call-2')?.returnValue).toBe(true);
     expect(nodes.get('call-1')?.status).toBe('returned');
     expect(nodes.get('call-1')?.returnValue).toBe(false);
+
+    const historical = buildInvocationNodes(states.slice(0, 1)).nodes;
+    expect(historical.has('call-1')).toBe(true);
+    expect(historical.has('call-2')).toBe(false);
+    expect(historical.get('call-1')?.status).toBe('active');
   });
 
   it('keeps repeated non-recursive invocations as separate siblings and represents void returns', () => {
