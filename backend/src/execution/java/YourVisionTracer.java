@@ -309,10 +309,13 @@ public class YourVisionTracer {
                                     Map<String, Object> unwindData =
                                         new LinkedHashMap<>();
 
-                                    unwindData.put(
-                                        "exceptional",
-                                        true
+                                    attachExitInvocation(
+                                        exception.thread(),
+                                        frame.location().method(),
+                                        unwindData,
+                                        null
                                     );
+                                    unwindData.put("exceptional", true);
 
                                     emit(
                                         "METHOD_EXIT",
