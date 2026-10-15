@@ -21,6 +21,15 @@ export interface TraceState {
   dataStructures: Record<string, unknown>;
   objects: Record<string, unknown>;
   callStack: string[];
+  invocationId?: string;
+  parentInvocationId?: string;
+  methodSignature?: string;
+  declaringType?: string;
+  returnType?: string;
+  returnValue?: unknown;
+  returnValueType?: string;
+  returnedVoid?: boolean;
+  invocationStatus?: 'active' | 'returned' | 'void' | 'exceptional';
   lastEvent?: TraceEvent;
   error?: { type?: string; message?: string } | string;
 }
