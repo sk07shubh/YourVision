@@ -3261,12 +3261,13 @@ type InvocationNode = {
   returnValue?: unknown;
   returnType?: string;
   frameVariables: Record<string, unknown>;
+  parameters: Record<string, unknown>;
   children: string[];
 };
 
 export function buildInvocationNodes(states: TraceState[]): { nodes: Map<string, InvocationNode>; currentId?: string } {
   const nodes = new Map<string, InvocationNode>();
-  nodes.set('root', { id: 'root', parentId: '', method: 'Solution', signature: 'Solution', entryIndex: 0, status: 'active', frameVariables: {}, children: [] });
+  nodes.set('root', { id: 'root', parentId: '', method: 'Solution', signature: 'Solution', entryIndex: 0, status: 'active', frameVariables: {}, parameters: {}, children: [] });
   for (let index = 0; index < states.length; index += 1) {
     const event = states[index]?.lastEvent;
     const data = isPlainObject(event?.data) ? event.data : {};
@@ -3291,7 +3292,7 @@ export function buildInvocationNodes(states: TraceState[]): { nodes: Map<string,
         root.signature = data.declaringType;
       }
       const frameVariables = isPlainObject(data.variables) ? data.variables : {};
-      const node: InvocationNode = { id, parentId, method, signature: returnType ? `${returnType} ${signature}` : signature, entryIndex: index, status: 'active', returnType, frameVariables, children: [] };
+      const node: InvocationNode = { id, parentId, method, signature: returnType ? `${returnType} ${signature}` : signature, entryIndex: index, status: 'active', returnType, frameVariables: {}, parameters: frameVariables, children: [] };
       nodes.set(id, node);
       nodes.get(parentId)?.children.push(id);
     } else if (event?.type === 'METHOD_EXIT' && typeof data.invocationId === 'string') {
@@ -3335,7 +3336,7 @@ function InvocationTree({ states, currentIndex, onSelect, width, onWidthChange }
     return <div className="yv-tree-branch" key={id}>
       <button type="button" className={`yv-tree-node ${selected ? 'selected' : ''} ${node.status}`} style={{ '--yv-tree-depth': depth } as CSSProperties} onClick={() => onSelect(node.entryIndex)} aria-current={selected ? 'step' : undefined}>
         <span className="yv-tree-method">{node.signature}</span>
-        {id !== 'root' && <span className="yv-tree-parameters" aria-label="Invocation parameters">{Object.entries(node.frameVariables).slice(0, 4).map(([name, value]) => <span className="yv-tree-parameter" key={name}><span className="yv-tree-var-name">{name}</span><span className="yv-tree-var-value" title={displayValue(value)}>{variableSummary(value)}</span></span>)}</span>}
+        {id !== 'root' && <span className="yv-tree-parameters" aria-label="Invocation parameters">{Object.entries(node.parameters).slice(0, 4).map(([name, value]) => <span className="yv-tree-parameter" key={name}><span className="yv-tree-var-name">{name}</span><span className="yv-tree-var-value" title={displayValue(value)}>{variableSummary(value)}</span></span>)}</span>}
         <span className="yv-tree-outcome">{id === 'root' ? 'Class context' : result}</span>
       </button>
       {node.children.length > 0 && <div className="yv-tree-children">{node.children.map(child => renderNode(child, depth + 1))}</div>}
