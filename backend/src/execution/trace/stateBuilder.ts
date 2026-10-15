@@ -137,9 +137,11 @@ function applyEvent(
         returnValue:
             event.data && Object.prototype.hasOwnProperty.call(event.data, "returnValue")
                 ? event.data.returnValue
-                : event.type === "METHOD_ENTER" || event.type === "STEP"
-                    ? undefined
-                    : previous.returnValue,
+                : event.data?.hasReturnValue === true
+                    ? null
+                    : event.type === "METHOD_ENTER" || event.type === "STEP"
+                        ? undefined
+                        : previous.returnValue,
         returnValueType:
             typeof event.data?.returnValueType === "string"
                 ? event.data.returnValueType
