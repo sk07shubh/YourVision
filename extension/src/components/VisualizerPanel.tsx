@@ -3289,10 +3289,11 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
       // Parent identity may live on the checkpoint state rather than the event payload.
       // Preserve the declared parent even if its node is encountered later; links are resolved
       // after processing the visible trace prefix instead of incorrectly flattening calls to root.
+      const checkpointParentId = states[index]?.parentInvocationId;
       const parentId = typeof data.parentInvocationId === 'string'
         ? data.parentInvocationId
-        : typeof states[index]?.parentInvocationId === 'string'
-          ? states[index].parentInvocationId
+        : typeof checkpointParentId === 'string'
+          ? checkpointParentId
           : 'root';
       const method = typeof event.method === 'string' && event.method ? event.method : 'method';
       // Only read parameter names from a method declaration, never a call site such as
