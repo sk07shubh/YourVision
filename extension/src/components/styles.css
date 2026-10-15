@@ -826,20 +826,21 @@
   min-width: 0;
 }
 .yv-workspace.tree-open .yv-workspace-tree {
-  flex: 0 1 min(var(--yv-tree-width, 420px), 48%);
-  width: min(var(--yv-tree-width, 420px), 48%);
-  min-width: 280px;
-  max-width: 48%;
+  /* Size to the widest function label, but never steal the visualization pane. */
+  flex: 0 1 auto;
+  width: max-content;
+  min-width: max-content;
+  max-width: min(48%, 520px);
   overflow: hidden;
 }
 .yv-function-tree {
   box-sizing: border-box;
-  width: 100%;
-  min-width: 0;
+  width: max-content;
+  min-width: max-content;
   max-width: 100%;
   height: clamp(240px, 54vh, 560px);
   max-height: calc(100dvh - 180px);
-  resize: horizontal;
+  resize: none;
   min-height: 240px;
   border: 1px solid #596575;
   box-shadow: 0 0 0 1px rgba(148, 163, 184, .16), inset 0 0 0 1px rgba(148, 163, 184, .08);
@@ -855,17 +856,18 @@
 }
 .yv-tree-branch {
   box-sizing: border-box;
-  width: 100%;
-  min-width: 0;
+  width: max-content;
+  min-width: max-content;
   max-width: 100%;
 }
 .yv-tree-node {
   box-sizing: border-box;
   display: flex;
-  width: 100%;
-  min-width: 0;
-  max-width: none;
-  overflow-wrap: anywhere;
+  width: max-content;
+  min-width: max-content;
+  max-width: 100%;
+  overflow-wrap: normal;
+  white-space: normal;
   border-color: #596575;
   box-shadow: 0 0 0 1px rgba(148, 163, 184, .10);
 }
@@ -879,8 +881,8 @@
   border-left: 2px solid #596575;
 }
 .yv-tree-children > .yv-tree-branch {
-  width: 100%;
-  min-width: 0;
+  width: max-content;
+  min-width: max-content;
   max-width: 100%;
 }
 .yv-tree-method,
