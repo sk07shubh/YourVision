@@ -164,3 +164,5 @@ Playwright E2E uses a deterministic LeetCode-shaped fixture and mocked `/visuali
 - 2026-10-15: Signature fallback now uses JVM descriptor text when JDI parameter type names are unavailable, instead of falsely rendering a zero-argument method signature (`6cdaccccf3939d3c19281e2dca8f150cc3ccb947`).
 
 - 2026-10-15: Added assertions for runtime-derived class root and root static-field snapshot projection in the invocation-tree test suite (`ee8aaf8dcec98757f55696e51c1e687e45d96d24`).
+
+- 2026-10-15: Updated draft PR #60 description to reflect the expanded invocation tree scope, null/void semantics, per-frame snapshots, root fields, responsive sizing, and the explicit remaining verification checklist. PR remains open/draft; current head `7697b3ca8837a1f871ce5d8d8a74eb12f81c90e5`. Backend Regression and Full Regression Lab are both running on that head, with no conclusion available yet.
