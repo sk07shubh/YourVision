@@ -107,8 +107,24 @@ public class YourVisionTracer {
         }
         data.put("methodSignature", context.signature);
         data.put("declaringType", context.declaringType);
-        data.put("returnType", method.returnTypeName());
-        data.put("parameterTypes", method.argumentTypeNames());
+        data.put("returnType", safeReturnType(method));
+        data.put("parameterTypes", safeArgumentTypeNames(method));
+    }
+
+    private static String safeReturnType(Method method) {
+        try {
+            return method.returnTypeName();
+        } catch (Exception ignored) {
+            return method.signature();
+        }
+    }
+
+    private static List<String> safeArgumentTypeNames(Method method) {
+        try {
+            return method.argumentTypeNames();
+        } catch (Exception ignored) {
+            return List.of();
+        }
     }
 
     private static void attachExitInvocation(
@@ -149,11 +165,12 @@ public class YourVisionTracer {
             data.put("invocationId", "unmatched-" + (++invocationSequence));
             data.put("invocationMatch", "unmatched");
         }
-        data.put("returnType", method.returnTypeName());
+        String returnType = safeReturnType(method);
+        data.put("returnType", returnType);
         if (returnValue != null) {
             data.put("returnValueType", returnValue.type().name());
         }
-        data.put("returnedVoid", method.returnTypeName().equals("void"));
+        data.put("returnedVoid", returnType.equals("void"));
         data.put("exceptional", false);
     }
     private static String tracedClass = "";
