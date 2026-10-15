@@ -47,6 +47,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,6 +63,99 @@ public class YourVisionTracer {
     private static final long MAX_EVENTS = 5000;
 
     private static long sequence = 0;
+    private static long invocationSequence = 0;
+    private static final Map<Long, List<InvocationContext>> invocationStacks =
+        new HashMap<>();
+
+    private static final class InvocationContext {
+        final String id;
+        final String parentId;
+        final String method;
+        final String signature;
+        final String declaringType;
+
+        InvocationContext(String id, String parentId, Method method) {
+            this.id = id;
+            this.parentId = parentId;
+            this.method = method.name();
+            this.signature = method.signature();
+            this.declaringType = method.declaringType().name();
+        }
+    }
+
+    private static void enterInvocation(
+        ThreadReference thread,
+        Method method,
+        Map<String, Object> data
+    ) {
+        List<InvocationContext> stack = invocationStacks.computeIfAbsent(
+            thread.uniqueID(),
+            ignored -> new ArrayList<>()
+        );
+        String parentId = stack.isEmpty()
+            ? null
+            : stack.get(stack.size() - 1).id;
+        InvocationContext context = new InvocationContext(
+            "call-" + (++invocationSequence),
+            parentId,
+            method
+        );
+        stack.add(context);
+        data.put("invocationId", context.id);
+        if (parentId != null) {
+            data.put("parentInvocationId", parentId);
+        }
+        data.put("methodSignature", context.signature);
+        data.put("declaringType", context.declaringType);
+        data.put("returnType", method.returnTypeName());
+        data.put("parameterTypes", method.argumentTypeNames());
+    }
+
+    private static void attachExitInvocation(
+        ThreadReference thread,
+        Method method,
+        Map<String, Object> data,
+        Value returnValue
+    ) {
+        List<InvocationContext> stack = invocationStacks.get(thread.uniqueID());
+        InvocationContext context = null;
+        if (stack != null) {
+            for (int i = stack.size() - 1; i >= 0; i--) {
+                InvocationContext candidate = stack.get(i);
+                if (candidate.method.equals(method.name()) &&
+                    candidate.signature.equals(method.signature()) &&
+                    candidate.declaringType.equals(method.declaringType().name())) {
+                    context = candidate;
+                    while (stack.size() > i + 1) {
+                        stack.remove(stack.size() - 1);
+                    }
+                    stack.remove(i);
+                    break;
+                }
+            }
+            if (stack.isEmpty()) {
+                invocationStacks.remove(thread.uniqueID());
+            }
+        }
+
+        if (context != null) {
+            data.put("invocationId", context.id);
+            if (context.parentId != null) {
+                data.put("parentInvocationId", context.parentId);
+            }
+            data.put("methodSignature", context.signature);
+            data.put("declaringType", context.declaringType);
+        } else {
+            data.put("invocationId", "unmatched-" + (++invocationSequence));
+            data.put("invocationMatch", "unmatched");
+        }
+        data.put("returnType", method.returnTypeName());
+        if (returnValue != null) {
+            data.put("returnValueType", returnValue.type().name());
+        }
+        data.put("returnedVoid", method.returnTypeName().equals("void"));
+        data.put("exceptional", false);
+    }
     private static String tracedClass = "";
     private static String solutionSourcePath = "";
     private static final Set<Long> steppedThreads = new HashSet<>();
@@ -261,6 +356,7 @@ public class YourVisionTracer {
                             "displayLine",
                             declarationLine
                         );
+                        enterInvocation(entry.thread(), enteredMethod, data);
 
                         emit(
                             "METHOD_ENTER",
@@ -293,6 +389,13 @@ public class YourVisionTracer {
                         try {
                             Value returnValue =
                                 exit.returnValue();
+
+                            attachExitInvocation(
+                                exit.thread(),
+                                exit.method(),
+                                data,
+                                returnValue
+                            );
 
                             if (returnValue != null) {
                                 data.put(
