@@ -876,6 +876,23 @@ if (lruResult.kind !== "OK" || lruResult.result !== "[null,null,null,1,null,-1,1
 }
 console.log("PASS: LRU cache design sequence");
 
+const minStackResult = await runJava(
+    "import java.util.*; class MinStack { Deque<Integer> v=new ArrayDeque<>(), m=new ArrayDeque<>(); public MinStack() {} public void push(int x) { v.push(x); if(m.isEmpty()||x<=m.peek()) m.push(x); } public void pop() { int x=v.pop(); if(x==m.peek()) m.pop(); } public int top() { return v.peek(); } public int getMin() { return m.peek(); } }",
+    { mode: "design", className: "MinStack", constructorArguments: [], operations: [
+        { method: "push", arguments: ["-2"] },
+        { method: "push", arguments: ["0"] },
+        { method: "push", arguments: ["-3"] },
+        { method: "getMin", arguments: [] },
+        { method: "pop", arguments: [] },
+        { method: "top", arguments: [] },
+        { method: "getMin", arguments: [] }
+    ] }
+);
+if (minStackResult.kind !== "OK" || minStackResult.result !== "[null,null,null,null,-3,null,0,-2]") {
+    throw new Error("MinStack design sequence failed: " + minStackResult.kind + " " + minStackResult.result + " " + minStackResult.message);
+}
+console.log("PASS: MinStack design sequence");
+
 console.log(
     "All Java runtime smoke tests passed."
 );
