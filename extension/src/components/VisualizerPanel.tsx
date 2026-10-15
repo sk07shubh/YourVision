@@ -3365,7 +3365,7 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
       {node.children.length > 0 && <div className="yv-tree-children">{node.children.map(child => renderNode(child, depth + 1))}</div>}
     </div>;
   };
-  return <aside className="yv-function-tree" aria-label="Function call tree" style={{ width: '100%', maxWidth: width }}>
+  return <aside className="yv-function-tree" aria-label="Function call tree">
     <div className="yv-tree-heading"><strong>Function tree</strong><span>{Math.max(0, nodes.size - 1)} calls</span></div>
     <div className="yv-tree-viewport">{renderNode('root', 0)}</div>
   </aside>;
