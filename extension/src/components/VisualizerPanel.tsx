@@ -3364,7 +3364,7 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
     if (!node) return null;
     const selected = id === selectedId;
     const result = node.status === 'active' ? '-' : node.status === 'void' ? 'void' : node.status === 'exceptional' ? 'Exception' : displayValue(node.returnValue);
-    return <div className="yv-tree-branch" key={id}>
+    return <div className={`yv-tree-branch depth-${Math.min(depth, 5)}`} key={id}>
       <button type="button" className={`yv-tree-node ${selected ? 'selected' : ''} ${node.status}`} style={{ '--yv-tree-depth': depth } as CSSProperties} onClick={() => onSelect(node.entryIndex)} aria-current={selected ? 'step' : undefined}>
         <span className="yv-tree-method">{node.signature}</span>
         <span className="yv-tree-outcome">{id === 'root' ? 'Class context' : result}</span>

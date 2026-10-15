@@ -1052,3 +1052,172 @@
     white-space: normal;
   }
 }
+
+
+/* Nested invocation cards: each child is physically contained by its parent
+   card. Depth colors are deliberately distinct but stay in the same cool,
+   high-contrast palette; active selection remains amber across every level. */
+.yv-workspace.tree-open .yv-workspace-tree {
+  flex: 0 1 auto;
+  width: max-content;
+  min-width: 238px;
+  max-width: min(44vw, 440px);
+  overflow: hidden;
+}
+.yv-workspace.tree-open .yv-function-tree {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: calc(100dvh - 220px);
+  min-height: 240px;
+  max-height: calc(100dvh - 160px);
+  border: 1px solid #46516a;
+  border-radius: 12px;
+  background: #0c1020;
+}
+.yv-workspace.tree-open .yv-tree-viewport {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: auto;
+  padding: 12px;
+  scrollbar-gutter: stable;
+}
+.yv-workspace.tree-open .yv-tree-branch {
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
+  padding: 8px;
+  margin: 0 0 9px;
+  border: 1px solid var(--yv-depth-border, #5965a8);
+  border-left-width: 3px;
+  border-radius: 11px;
+  background: var(--yv-depth-bg, #171c35);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 3px 10px rgba(0,0,0,.13);
+}
+.yv-workspace.tree-open .yv-tree-branch.depth-0 {
+  --yv-depth-bg: #171d3c;
+  --yv-depth-border: #818cf8;
+  --yv-depth-text: #eef2ff;
+  --yv-depth-muted: #c7d2fe;
+}
+.yv-workspace.tree-open .yv-tree-branch.depth-1 {
+  --yv-depth-bg: #142b3b;
+  --yv-depth-border: #38bdf8;
+  --yv-depth-text: #e0f2fe;
+  --yv-depth-muted: #bae6fd;
+}
+.yv-workspace.tree-open .yv-tree-branch.depth-2 {
+  --yv-depth-bg: #20213b;
+  --yv-depth-border: #a78bfa;
+  --yv-depth-text: #f3e8ff;
+  --yv-depth-muted: #ddd6fe;
+}
+.yv-workspace.tree-open .yv-tree-branch.depth-3 {
+  --yv-depth-bg: #12342f;
+  --yv-depth-border: #34d399;
+  --yv-depth-text: #d1fae5;
+  --yv-depth-muted: #a7f3d0;
+}
+.yv-workspace.tree-open .yv-tree-branch.depth-4 {
+  --yv-depth-bg: #39251c;
+  --yv-depth-border: #fb923c;
+  --yv-depth-text: #ffedd5;
+  --yv-depth-muted: #fed7aa;
+}
+.yv-workspace.tree-open .yv-tree-branch.depth-5 {
+  --yv-depth-bg: #382039;
+  --yv-depth-border: #e879f9;
+  --yv-depth-text: #fae8ff;
+  --yv-depth-muted: #f5d0fe;
+}
+.yv-workspace.tree-open .yv-tree-node {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  padding: 5px 6px 8px;
+  margin: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--yv-depth-text, #f1f5f9);
+  white-space: normal;
+  text-align: left;
+}
+.yv-workspace.tree-open .yv-tree-node:hover {
+  background: rgba(255,255,255,.055);
+}
+.yv-workspace.tree-open .yv-tree-node.selected {
+  background: rgba(251,191,36,.13);
+  box-shadow: inset 3px 0 #fbbf24, 0 0 0 1px rgba(251,191,36,.8);
+  color: #fff7d6;
+}
+.yv-workspace.tree-open .yv-tree-method {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  padding: 3px 2px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--yv-depth-border, #818cf8), transparent 45%);
+  color: var(--yv-depth-text, #f1f5f9);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.yv-workspace.tree-open .yv-tree-outcome {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  padding: 6px 2px 2px;
+  border: 0;
+  color: var(--yv-depth-muted, #cbd5e1);
+  font-size: 10px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.yv-workspace.tree-open .yv-tree-node.returned .yv-tree-outcome,
+.yv-workspace.tree-open .yv-tree-node.void .yv-tree-outcome { color: #86efac; }
+.yv-workspace.tree-open .yv-tree-node.exceptional .yv-tree-outcome { color: #fca5a5; }
+.yv-workspace.tree-open .yv-tree-children {
+  box-sizing: border-box;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  margin: 7px 0 0 5px;
+  padding: 8px 0 0 10px;
+  border-top: 1px solid color-mix(in srgb, var(--yv-depth-border, #818cf8), transparent 50%);
+  border-left: 2px solid color-mix(in srgb, var(--yv-depth-border, #818cf8), transparent 22%);
+}
+.yv-workspace.tree-open .yv-tree-children > .yv-tree-branch {
+  width: max-content;
+  min-width: 100%;
+}
+@media (max-width: 900px) {
+  .yv-workspace.tree-open .yv-workspace-tree {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .yv-workspace.tree-open .yv-function-tree {
+    height: min(62dvh, 560px);
+    min-height: 260px;
+    max-height: 70dvh;
+  }
+  .yv-workspace.tree-open .yv-tree-viewport {
+    overflow: auto;
+  }
+}
