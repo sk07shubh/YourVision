@@ -3276,10 +3276,11 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
       const parentId = typeof data.parentInvocationId === 'string' && nodes.has(data.parentInvocationId) ? data.parentInvocationId : 'root';
       const rawParams = Array.isArray(data.parameterTypes) ? data.parameterTypes.filter((item): item is string => typeof item === 'string') : [];
       const method = typeof event.method === 'string' && event.method ? event.method : 'method';
-      const declaration = source.split(/\\r?\\n/).map(line => line.trim()).find(line => new RegExp('\\\\b' + method.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\      const entryVariables = isPlainObject(data.variables) ? data.variables : {};
-      const parameterNames = Object.keys(entryVariables).filter(name => name !== 'this').slice(0, rawParams.length);') + '\\\\s*\\\\(').test(line));
-      const parameterText = declaration?.slice(declaration.indexOf('(') + 1, declaration.lastIndexOf(')')) ?? '';
-      const parameterNames = parameterText ? parameterText.split(',').map(parameter => parameter.trim().replace(/\\s*=.*$/, '').split(/\\s+/).pop() ?? '').slice(0, rawParams.length) : [];
+      const declaration = source.split(/\r?\n/).map(line => line.trim()).find(line => line.includes(method + '('));
+      const parameterText = declaration ? declaration.slice(declaration.indexOf('(') + 1, declaration.lastIndexOf(')')) : '';
+      const parameterNames = parameterText
+        ? parameterText.split(',').map(parameter => parameter.trim().replace(/\s*=.*$/, '').split(/\s+/).pop() ?? '').slice(0, rawParams.length)
+        : [];
       const displayType = (type: string): string => type
         .replace(/^java\\.lang\\./, '')
         .replace(/^java\\.util\\./, '')
