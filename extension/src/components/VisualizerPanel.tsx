@@ -3264,7 +3264,7 @@ type InvocationNode = {
   children: string[];
 };
 
-export function buildInvocationNodes(states: TraceState[]): { nodes: Map<string, InvocationNode>; currentId?: string } {
+export function buildInvocationNodes(states: TraceState[], source = ''): { nodes: Map<string, InvocationNode>; currentId?: string } {
   const nodes = new Map<string, InvocationNode>();
   nodes.set('root', { id: 'root', parentId: '', method: 'Solution', signature: 'Solution', entryIndex: 0, status: 'active', frameVariables: {}, children: [] });
   for (let index = 0; index < states.length; index += 1) {
@@ -3276,8 +3276,10 @@ export function buildInvocationNodes(states: TraceState[]): { nodes: Map<string,
       const parentId = typeof data.parentInvocationId === 'string' && nodes.has(data.parentInvocationId) ? data.parentInvocationId : 'root';
       const rawParams = Array.isArray(data.parameterTypes) ? data.parameterTypes.filter((item): item is string => typeof item === 'string') : [];
       const method = typeof event.method === 'string' && event.method ? event.method : 'method';
-      const entryVariables = isPlainObject(data.variables) ? data.variables : {};
-      const parameterNames = Object.keys(entryVariables).filter(name => name !== 'this').slice(0, rawParams.length);
+      const declaration = source.split(/\\r?\\n/).map(line => line.trim()).find(line => new RegExp('\\\\b' + method.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\      const entryVariables = isPlainObject(data.variables) ? data.variables : {};
+      const parameterNames = Object.keys(entryVariables).filter(name => name !== 'this').slice(0, rawParams.length);') + '\\\\s*\\\\(').test(line));
+      const parameterText = declaration?.slice(declaration.indexOf('(') + 1, declaration.lastIndexOf(')')) ?? '';
+      const parameterNames = parameterText ? parameterText.split(',').map(parameter => parameter.trim().replace(/\\s*=.*$/, '').split(/\\s+/).pop() ?? '').slice(0, rawParams.length) : [];
       const displayType = (type: string): string => type
         .replace(/^java\\.lang\\./, '')
         .replace(/^java\\.util\\./, '')
@@ -3324,8 +3326,8 @@ export function buildInvocationNodes(states: TraceState[]): { nodes: Map<string,
   return { nodes, currentId };
 }
 
-function InvocationTree({ states, currentIndex, onSelect, width, onWidthChange }: { states: TraceState[]; currentIndex: number; onSelect: (index: number) => void; width: number; onWidthChange: (width: number) => void }) {
-  const { nodes } = useMemo(() => buildInvocationNodes(states.slice(0, currentIndex + 1)), [states, currentIndex]);
+function InvocationTree({ states, currentIndex, onSelect, width, onWidthChange, source }: { states: TraceState[]; currentIndex: number; onSelect: (index: number) => void; width: number; onWidthChange: (width: number) => void; source: string }) {
+  const { nodes } = useMemo(() => buildInvocationNodes(states.slice(0, currentIndex + 1), source), [states, currentIndex, source]);
   const current = states[currentIndex];
   const currentData = isPlainObject(current?.lastEvent?.data) ? current.lastEvent.data : {};
   const selectedId = typeof current?.invocationId === 'string' ? current.invocationId : typeof currentData.invocationId === 'string' ? currentData.invocationId : undefined;
