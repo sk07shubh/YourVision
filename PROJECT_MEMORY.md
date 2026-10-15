@@ -119,6 +119,13 @@ Playwright E2E uses a deterministic LeetCode-shaped fixture and mocked `/visuali
 5. For the function-call-tree project, audit runtime and trace semantics before UI work; keep the test-case section and floating controller unchanged, and preserve one synchronized timeline.
 6. After every change, update this file and record exact branch/commit, changes and tests actually run.
 
+## Function-call-tree initial architecture audit (2026-10-15)
+- Inspected live `main` versions of `backend/src/execution/trace/schema.ts`, `stateBuilder.ts`, `enrichTrace.ts`, `backend/src/execution/java/YourVisionTracer.java`, `YourVisionRuntime.java`, and `extension/src/types/trace.ts` / `VisualizerPanel.tsx` at a first-pass level.
+- Current trace schema has `METHOD_ENTER` and `METHOD_EXIT`, plus method/depth and a string `callStack`, but no explicit stable invocation ID, parent invocation ID, or typed return payload in the top-level event contract. This is a likely foundational gap for reliable selectable per-invocation history; verify actual event payload generation and runtime call/return capture before implementation.
+- `stateBuilder.ts` creates timeline checkpoints for STEP, METHOD_ENTER, METHOD_EXIT, errors, timeout, and trace limit; its snapshots shallow-copy top-level state maps. Need audit nested snapshot/object-history behavior and event emission semantics before claiming entry checkpoints can be restored exactly.
+- `YourVisionTracer.java` uses JDI and already captures frame locals and object identities in snapshots, which is useful foundation. This does not yet prove that per-invocation return values and parent relationships are exposed in a UI-ready form.
+- Entry-point selection in `YourVisionRuntime.java` must be audited with the existing LeetCode integration contract and regression tests before changing it. No source files were edited during this audit; no tests were run.
+
 ## Update log
 - 2026-10-15: Initial project memory drafted from repository tree, key code entry points, package scripts, `AUTOMATION.md`, and PR #58 metadata/description. This was a first-pass audit, not a line-by-line review of every source file or every historical chat. Read relevant code/history as future tasks require.
 - 2026-10-15: Added a non-negotiable rule requiring every future project change to update this file, keep the update with the same coherent commit/PR, log actual checks, and reread live memory at the start of each future project chat. Documentation-only change; tests not run.
