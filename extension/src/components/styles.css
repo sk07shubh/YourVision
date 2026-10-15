@@ -767,3 +767,36 @@
 
 /* Keep the terminal null box level with the node itself, not the taller metadata column. */
 .yv-linked-piece > .yv-edge-null { align-self: flex-start; }
+
+
+/* Synchronized invocation-tree workspace. The testcase and floating controller
+   intentionally remain outside this reflow container. */
+.yv-workspace { display:flex; align-items:stretch; gap:0; min-width:0; width:100%; }
+.yv-workspace-content { flex:1 1 auto; min-width:0; }
+.yv-tree-toggle-row { display:flex; justify-content:flex-start; margin:2px 0 10px; }
+.yv-tree-toggle { display:inline-flex; align-items:center; gap:8px; border:1px solid #343943; border-radius:8px; background:#191c22; color:#e5e7eb; padding:7px 10px; font:inherit; font-size:12px; cursor:pointer; }
+.yv-tree-toggle:hover { border-color:#5b6472; background:#20242c; }
+.yv-tree-toggle:focus-visible,.yv-tree-node:focus-visible { outline:2px solid #f59e0b; outline-offset:2px; }
+.yv-tree-toggle-hint { color:#8c95a3; font-size:11px; }
+.yv-workspace-tree { flex:0 0 0; width:0; min-width:0; overflow:hidden; opacity:0; pointer-events:none; transition:flex-basis .22s ease,width .22s ease,opacity .16s ease; }
+.yv-workspace.tree-open .yv-workspace-content { flex:1 1 0; }
+.yv-workspace.tree-open .yv-workspace-tree { flex:0 0 clamp(230px,34%,390px); width:clamp(230px,34%,390px); min-width:230px; margin-left:12px; opacity:1; pointer-events:auto; }
+.yv-function-tree { display:flex; flex-direction:column; height:100%; min-height:220px; max-height:calc(100vh - 300px); border:1px solid #303640; border-radius:10px; background:#111419; overflow:hidden; resize:horizontal; min-width:230px; max-width:48vw; }
+.yv-tree-heading { flex:0 0 auto; display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 11px; border-bottom:1px solid #2b3039; color:#e5e7eb; font-size:12px; }
+.yv-tree-heading span { color:#8e98a7; font-size:11px; }
+.yv-tree-viewport { flex:1 1 auto; overflow:auto; padding:10px 8px 14px; overscroll-behavior:contain; }
+.yv-tree-branch { position:relative; min-width:max-content; }
+.yv-tree-node { display:flex; flex-direction:column; gap:5px; align-items:flex-start; width:100%; max-width:360px; min-width:190px; text-align:left; padding:9px 10px; margin:0 0 5px; border:1px solid #343b46; border-radius:8px; background:#1a1e25; color:#e8ebf0; cursor:pointer; }
+.yv-tree-node:hover { border-color:#667386; background:#202630; }
+.yv-tree-node.selected { border-color:#f59e0b; box-shadow:inset 3px 0 #f59e0b; background:#282219; }
+.yv-tree-node.returned,.yv-tree-node.void { border-color:#2f6551; }
+.yv-tree-node.exceptional { border-color:#874343; }
+.yv-tree-method { max-width:320px; overflow-wrap:anywhere; font-size:11px; font-weight:600; }
+.yv-tree-outcome { color:#a4adba; font-size:10px; overflow-wrap:anywhere; }
+.yv-tree-children { margin:0 0 4px 13px; padding-left:10px; border-left:1px solid #48515e; }
+@media (prefers-reduced-motion: reduce) { .yv-workspace-tree { transition:none; } }
+@media (max-width:680px) {
+  .yv-workspace.tree-open { flex-direction:column; }
+  .yv-workspace.tree-open .yv-workspace-tree { flex:0 0 auto; width:100%; min-width:0; margin:0 0 12px; }
+  .yv-function-tree { max-width:100%; resize:vertical; max-height:38vh; }
+}
