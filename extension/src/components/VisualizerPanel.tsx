@@ -3278,21 +3278,24 @@ export function buildInvocationNodes(states: TraceState[]): { nodes: Map<string,
       const rawParams = Array.isArray(data.parameterTypes) ? data.parameterTypes.filter((item): item is string => typeof item === 'string') : [];
       const method = typeof event.method === 'string' && event.method ? event.method : 'method';
       const descriptor = typeof data.methodSignature === 'string' ? data.methodSignature : '';
-      const signature = rawParams.length > 0
-        ? `${method}(${rawParams.join(', ')})`
-        : descriptor.startsWith('()')
-          ? `${method}()`
-          : descriptor
-            ? `${method}${descriptor}`
-            : method;
-      const returnType = typeof data.returnType === 'string' ? data.returnType : undefined;
+      const entryVariables = isPlainObject(data.variables) ? data.variables : {};
+      const parameterNames = Object.keys(entryVariables).filter(name => name !== 'this').slice(0, rawParams.length);
+      const displayType = (type: string): string => type
+        .replace(/^java\\.lang\\./, '')
+        .replace(/^java\\.util\\./, '')
+        .replace(/\\bboolean\\b/g, 'bool');
+      const signatureParams = rawParams.map((type, index) =>
+        `${displayType(type)} ${parameterNames[index] ?? `arg${index + 1}`}`
+      );
+      const signature = `${method}(${signatureParams.join(', ')})`;
+      const returnType = typeof data.returnType === 'string' ? displayType(data.returnType) : undefined;
       const root = nodes.get('root');
       if (root && typeof data.declaringType === 'string' && data.declaringType) {
         root.method = data.declaringType;
         root.signature = data.declaringType;
       }
       const frameVariables = isPlainObject(data.variables) ? data.variables : {};
-      const node: InvocationNode = { id, parentId, method, signature: returnType ? `${returnType} ${signature}` : signature, entryIndex: index, status: 'active', returnType, frameVariables: {}, parameters: frameVariables, children: [] };
+      const node: InvocationNode = { id, parentId, method, signature: returnType ? `${returnType} ${signature}` : signature, entryIndex: index, status: 'active', returnType, frameVariables: {}, parameters: {}, children: [] };
       nodes.set(id, node);
       nodes.get(parentId)?.children.push(id);
     } else if (event?.type === 'METHOD_EXIT' && typeof data.invocationId === 'string') {
@@ -3332,11 +3335,10 @@ function InvocationTree({ states, currentIndex, onSelect, width, onWidthChange }
     const node = nodes.get(id);
     if (!node) return null;
     const selected = id === selectedId;
-    const result = node.status === 'active' ? 'In progress' : node.status === 'void' ? 'void' : node.status === 'exceptional' ? 'Exception' : `${node.returnType ?? 'return'}: ${displayValue(node.returnValue)}`;
+    const result = node.status === 'active' ? '-' : node.status === 'void' ? 'void' : node.status === 'exceptional' ? 'Exception' : displayValue(node.returnValue);
     return <div className="yv-tree-branch" key={id}>
       <button type="button" className={`yv-tree-node ${selected ? 'selected' : ''} ${node.status}`} style={{ '--yv-tree-depth': depth } as CSSProperties} onClick={() => onSelect(node.entryIndex)} aria-current={selected ? 'step' : undefined}>
         <span className="yv-tree-method">{node.signature}</span>
-        {id !== 'root' && <span className="yv-tree-parameters" aria-label="Invocation parameters">{Object.entries(node.parameters).slice(0, 4).map(([name, value]) => <span className="yv-tree-parameter" key={name}><span className="yv-tree-var-name">{name}</span><span className="yv-tree-var-value" title={displayValue(value)}>{variableSummary(value)}</span></span>)}</span>}
         <span className="yv-tree-outcome">{id === 'root' ? 'Class context' : result}</span>
       </button>
       {node.children.length > 0 && <div className="yv-tree-children">{node.children.map(child => renderNode(child, depth + 1))}</div>}
