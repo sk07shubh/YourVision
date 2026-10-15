@@ -811,3 +811,96 @@
 .yv-tree-width-control input { width:90px; height:14px; accent-color:#f59e0b; cursor:ew-resize; }
 .yv-tree-width-control input:focus-visible { outline:2px solid #f59e0b; outline-offset:2px; }
 .yv-tree-frame-label { color:#8792a2; font-size:9px; text-transform:uppercase; letter-spacing:.05em; }
+
+
+/* Bound the invocation tree to its own viewport: deep recursion must never
+   widen or lengthen the entire visualizer panel. */
+.yv-workspace,
+.yv-workspace-content,
+.yv-workspace-tree {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+.yv-workspace.tree-open {
+  width: 100%;
+  overflow: hidden;
+}
+.yv-workspace.tree-open .yv-workspace-tree {
+  flex: 0 1 min(var(--yv-tree-width, 320px), 45%);
+  width: min(var(--yv-tree-width, 320px), 45%);
+  min-width: 0;
+  max-width: 45%;
+}
+.yv-function-tree {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: clamp(240px, 54vh, 560px);
+  max-height: calc(100dvh - 260px);
+  resize: none;
+}
+.yv-tree-viewport {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.yv-tree-branch {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.yv-tree-node {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.yv-tree-children {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: calc(100% - 12px);
+  margin-left: 8px;
+  padding-left: 7px;
+}
+.yv-tree-method,
+.yv-tree-outcome,
+.yv-tree-frame,
+.yv-tree-variable {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+/* Chrome extension side panels and narrower windows cannot spare a second
+   column. Put the call tree beneath the state workspace instead of forcing
+   the whole visualizer off-screen horizontally. */
+@media (max-width: 900px) {
+  .yv-workspace.tree-open {
+    flex-direction: column;
+    overflow: visible;
+  }
+  .yv-workspace.tree-open .yv-workspace-content {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+  }
+  .yv-workspace.tree-open .yv-workspace-tree {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    margin: 0 0 12px;
+  }
+  .yv-function-tree {
+    height: clamp(220px, 42vh, 420px);
+    max-height: 42dvh;
+  }
+}
