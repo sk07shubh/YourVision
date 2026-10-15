@@ -1732,50 +1732,47 @@ function deriveMapChanges(
 ): ExecutionEvent[] {
     const before = getVariables(previous);
     const after = getVariables(current);
-
     const derived: ExecutionEvent[] = [];
+    const compared = new Set<string>();
 
-    for (const [name, currentValue] of Object.entries(after)) {
-        if (!(name in before)) {
-            continue;
-        }
-
-        const previousValue = before[name];
-
+    const compareNamedMap = (
+        name: string,
+        previousValue: unknown,
+        currentValue: unknown
+    ): void => {
         const beforeMap = asMapSnapshot(previousValue);
         const afterMap = asMapSnapshot(currentValue);
-
-        if (
-            !beforeMap ||
-            !afterMap ||
-            beforeMap.$mapId !== afterMap.$mapId
-        ) {
-            continue;
-        }
-
-        const changes = compareMapEntries(
-            beforeMap.entries,
-            afterMap.entries
-        );
-
-        if (changes.length === 0) {
-            continue;
-        }
-
+        if (!beforeMap || !afterMap || beforeMap.$mapId !== afterMap.$mapId) return;
+        const identity = name + ":" + afterMap.$mapId;
+        if (compared.has(identity)) return;
+        compared.add(identity);
+        const changes = compareMapEntries(beforeMap.entries, afterMap.entries);
+        if (changes.length === 0) return;
         derived.push({
             sequence: 0,
             type: "MAP_WRITE",
             line: previous.line,
             method: previous.method,
             depth: previous.depth,
-            data: {
-                name,
-                mapId: afterMap.$mapId,
-                changes,
-                entries: afterMap.entries,
-                size: afterMap.size
-            }
+            data: { name, mapId: afterMap.$mapId, changes, entries: afterMap.entries, size: afterMap.size }
         });
+    };
+
+    // Compare ordinary local maps.
+    for (const [name, currentValue] of Object.entries(after)) {
+        if (name in before) compareNamedMap(name, before[name], currentValue);
+    }
+
+    // Design-class fields live inside the captured this.fields snapshot.
+    // Emit key-level deltas for this.cache just as for a local map.
+    const beforeThis = before.this;
+    const afterThis = after.this;
+    const beforeFields = isPlainObject(beforeThis) && isPlainObject(beforeThis.fields) ? beforeThis.fields : undefined;
+    const afterFields = isPlainObject(afterThis) && isPlainObject(afterThis.fields) ? afterThis.fields : undefined;
+    if (beforeFields && afterFields) {
+        for (const [fieldName, currentValue] of Object.entries(afterFields)) {
+            if (fieldName in beforeFields) compareNamedMap("this." + fieldName, beforeFields[fieldName], currentValue);
+        }
     }
 
     return derived;
