@@ -4595,29 +4595,30 @@ function parseClassFieldDeclarations(source: string): ClassFieldDeclaration[] {
 function splitCallArguments(source: string, method: string, line: number): string[] {
   const lines = source.split(/\r?\n/);
   if (!Number.isFinite(line) || line < 1 || line > lines.length) return [];
-  // Call expressions can wrap across lines. Start at the caller's recorded line and
-  // inspect a small surrounding window, preferring the closest matching invocation.
-  const candidates: Array<{ startLine: number; distance: number; text: string }> = [];
-  for (let start = Math.max(0, line - 3); start < Math.min(lines.length, line + 2); start += 1) {
-    const text = lines.slice(start, Math.min(lines.length, start + 6)).join('\n');
-    // Java method names are identifiers, so no regex metacharacter escaping is needed.
-    const pattern = new RegExp('\\b' + method + '\\s*\\(');
-    const match = pattern.exec(text);
-    if (!match) continue;
-    const open = text.indexOf('(', match.index);
+
+  // Search every occurrence in the source rather than only the first match in a
+  // small window. A declaration may precede the real call in that same window,
+  // and multiline calls can extend beyond an arbitrary window boundary.
+  const candidates: Array<{ distance: number; span: number; args: string[] }> = [];
+  const pattern = new RegExp('\\b' + method + '\\s*\\(', 'g');
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(source)) !== null) {
+    const open = source.indexOf('(', match.index);
     let depth = 0;
     let quote = '';
     let escaped = false;
     let close = -1;
-    for (let i = open; i < text.length; i += 1) {
-      const ch = text[i];
+
+    for (let i = open; i < source.length; i += 1) {
+      const ch = source[i]!;
       if (quote) {
         if (escaped) escaped = false;
         else if (ch === '\\') escaped = true;
         else if (ch === quote) quote = '';
         continue;
       }
-      if (ch === '"' || ch === "'" || ch === '`') { quote = ch; continue; }
+      if (ch === '"' || ch === "'") { quote = ch; continue; }
       if (ch === '(') depth += 1;
       else if (ch === ')') {
         depth -= 1;
@@ -4625,23 +4626,28 @@ function splitCallArguments(source: string, method: string, line: number): strin
       }
     }
     if (close < 0) continue;
-    const after = text.slice(close + 1).trimStart();
-    // Avoid mistaking a declaration for a call when the nearby text is its body.
-    if (after.startsWith('{')) continue;
-    const raw = text.slice(open + 1, close);
+
+    const after = source.slice(close + 1);
+    // Exclude method declarations, including declarations with a throws clause.
+    if (/^\s*(?:throws\b[^{};]*)?\s*\{/.test(after)) continue;
+
+    const before = source.slice(0, match.index);
+    const callLine = before.split(/\r?\n/).length;
+    const raw = source.slice(open + 1, close);
     const args: string[] = [];
     let startArg = 0;
     let parens = 0, brackets = 0, braces = 0;
     quote = ''; escaped = false;
+
     for (let i = 0; i < raw.length; i += 1) {
-      const ch = raw[i];
+      const ch = raw[i]!;
       if (quote) {
         if (escaped) escaped = false;
         else if (ch === '\\') escaped = true;
         else if (ch === quote) quote = '';
         continue;
       }
-      if (ch === '"' || ch === "'" || ch === '`') { quote = ch; continue; }
+      if (ch === '"' || ch === "'") { quote = ch; continue; }
       if (ch === '(') parens += 1;
       else if (ch === ')') parens -= 1;
       else if (ch === '[') brackets += 1;
@@ -4654,14 +4660,14 @@ function splitCallArguments(source: string, method: string, line: number): strin
       }
     }
     if (raw.trim()) args.push(raw.slice(startArg).trim());
-    else return [];
-    candidates.push({ startLine: start, distance: Math.abs(start + 1 - line), text: JSON.stringify(args) });
+    candidates.push({ distance: Math.abs(callLine - line), span: close - open, args });
   }
-  candidates.sort((a, b) => a.distance - b.distance);
-  if (!candidates.length) return [];
-  try { return JSON.parse(candidates[0].text) as string[]; } catch { return []; }
-}
 
+  // Exact-line matches win. If nested calls of the same method share a line,
+  // the innermost expression is entered first by Java, so prefer its shorter span.
+  candidates.sort((a, b) => a.distance - b.distance || a.span - b.span);
+  return candidates[0]?.args ?? [];
+}
 type InvocationNode = {
   id: string;
   parentId: string;
@@ -4777,8 +4783,30 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
       ? states[index].invocationId
       : typeof data.invocationId === 'string' ? data.invocationId : undefined;
     const checkpointNode = checkpointId ? nodes.get(checkpointId) : undefined;
-    if (checkpointNode && event?.type !== 'METHOD_EXIT' && isPlainObject(data.variables)) {
-      checkpointNode.frameVariables = data.variables;
+    if (checkpointNode && event?.type !== 'METHOD_EXIT') {
+      // State snapshots and event payloads are not always populated at the same
+      // checkpoint. Prefer event frame variables when present, while also
+      // accepting the normalized state snapshot as a fallback.
+      const snapshot = {
+        ...(isPlainObject(states[index]?.variables) ? states[index].variables : {}),
+        ...(isPlainObject(data.variables) ? data.variables : {}),
+      };
+      if (Object.keys(snapshot).length > 0) {
+        checkpointNode.frameVariables = snapshot;
+
+        // METHOD_ENTER can arrive before JDI exposes every parameter in the
+        // local-variable table. Fill only missing values from the earliest later
+        // snapshot for this exact invocation. Never replace captured values
+        // (including null, 0, false, or empty collections) with later mutations.
+        checkpointNode.arguments = checkpointNode.arguments.map(argument => {
+          if (argument.value !== undefined ||
+              !Object.prototype.hasOwnProperty.call(snapshot, argument.name) ||
+              snapshot[argument.name] === undefined) {
+            return argument;
+          }
+          return { ...argument, value: snapshot[argument.name] };
+        });
+      }
     }
   }
   // Resolve relationships only after every invocation in this checkpoint prefix is known.
