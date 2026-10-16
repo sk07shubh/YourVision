@@ -904,7 +904,7 @@ if (designTraceResult.kind !== "OK" || designTraceResult.result !== "[null,null,
 }
 const designEvents = designTraceResult.trace?.events ?? [];
 const classEntry = designEvents.find(event =>
-    event.type === "STEP" && event.data?.classSetup === true && event.line === 1
+    event.type === "STEP" && event.data?.classSetup === true && event.data?.displayLine === 1
 );
 if (!classEntry) {
     throw new Error("Design trace must begin with the class declaration checkpoint.");
