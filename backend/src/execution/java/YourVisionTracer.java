@@ -424,6 +424,12 @@ public class YourVisionTracer {
                                 entry.thread(),
                                 data
                             );
+                        } else {
+                            // Keep the constructor's declaration as a visible
+                            // source checkpoint without treating it as a function
+                            // invocation in the tree.
+                            data.put("classSetup", true);
+                            emit("STEP", methodLocation, entry.thread(), data);
                         }
 
                         // A method-entry location can point at the declaration
@@ -440,8 +446,6 @@ public class YourVisionTracer {
                 } else if (event instanceof MethodExitEvent exit) {
                     if (
                         isTraceableUserMethod(exit.method()) &&
-                        (!exit.method().isConstructor() ||
-                         hasExplicitConstructorDeclaration(exit.method())) &&
                         isTraced(exit.location())
                     ) {
                         Map<String, Object> data =
@@ -513,12 +517,14 @@ public class YourVisionTracer {
                         } catch (Exception ignored) {
                         }
 
-                        emit(
-                            "METHOD_EXIT",
-                            exit.location(),
-                            exit.thread(),
-                            data
-                        );
+                        if (!exit.method().isConstructor()) {
+                            emit(
+                                "METHOD_EXIT",
+                                exit.location(),
+                                exit.thread(),
+                                data
+                            );
+                        }
                     }
 
                 } else if (
