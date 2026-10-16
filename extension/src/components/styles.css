@@ -1725,3 +1725,14 @@
 @media(prefers-reduced-motion:reduce){.yv-dsu-changed>.yv-dsu-node,.yv-dsu-created>.yv-dsu-node,.yv-dsu-field-changed{animation:none}}
 
 @media(prefers-reduced-motion:reduce){.yv-tree-node-entered>.yv-node,.yv-tree-node-created>.yv-node,.yv-tree-node-changed>.yv-node,.yv-tree-edge-changed,.yv-tree-edge-traversed{animation:none}}
+
+/* Return values use the same compact hover/focus preview as arguments. */
+.yv-tree-return-value {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+.yv-tree-return-trigger {
+  color: var(--yv-accent, #93c5fd);
+}
