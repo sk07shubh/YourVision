@@ -4603,6 +4603,7 @@ type InvocationNode = {
   frameVariables: Record<string, unknown>;
   arguments: Array<{ name: string; value: unknown }>;
   entryState?: TraceState;
+  exitState?: TraceState;
   children: string[];
 };
 
@@ -4673,6 +4674,7 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
       node.status = data.exceptional === true ? 'exceptional' : data.returnedVoid === true ? 'void' : 'returned';
       if (Object.prototype.hasOwnProperty.call(data, 'returnValue')) node.returnValue = data.returnValue;
       else if (data.hasReturnValue === true) node.returnValue = null;
+      node.exitState = states[index];
       if (typeof data.returnType === 'string') node.returnType = data.returnType;
     }
 
@@ -4799,7 +4801,29 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
               onKeyDown={event => event.stopPropagation()}
             >Class context</button>
           </span>
-        ) : <span className="yv-tree-outcome">{result}</span>}
+        ) : (
+          <span className="yv-tree-outcome">
+            {node.status === 'returned' ? (
+              <span className="yv-tree-return-value">
+                <button
+                  type="button"
+                  className="yv-tree-arguments-trigger yv-tree-return-trigger"
+                  aria-label={`Preview return value from ${node.method}`}
+                  onClick={event => event.stopPropagation()}
+                  onKeyDown={event => event.stopPropagation()}
+                >return</button>
+                <span className="yv-tree-arguments-popover yv-tree-return-popover" role="region" aria-label={`Return value from ${node.method}`}>
+                  <span className="yv-tree-argument-preview">
+                    <strong className="yv-tree-argument-label">return</strong>
+                    <span className="yv-tree-argument-value">
+                      <DataValue value={node.returnValue} state={node.exitState ?? node.entryState} source={source} name="return" />
+                    </span>
+                  </span>
+                </span>
+              </span>
+            ) : result}
+          </span>
+        )}
         {id === 'root' && (
           <span className="yv-class-context-popover" role="region" aria-label={`Class fields for ${node.method}`}>
             {classDeclarations.length > 0 || Object.entries(node.frameVariables).length > 0 ? (
