@@ -3451,7 +3451,7 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
       <div
         role="button"
         tabIndex={0}
-        className={`yv-tree-node ${selected ? 'selected' : ''} ${node.status}`}
+        className={`yv-tree-node ${selected ? 'selected' : ''} ${node.status} ${id === 'root' ? 'class-context-node' : ''}`}
         style={{ '--yv-tree-depth': depth } as CSSProperties}
         onClick={() => onSelect(node.entryIndex)}
         onKeyDown={event => {
@@ -3507,34 +3507,36 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
               onClick={event => event.stopPropagation()}
               onKeyDown={event => event.stopPropagation()}
             >Class context</button>
-            <span className="yv-class-context-popover" role="region" aria-label={`Class fields for ${node.method}`}>
-              {classDeclarations.length > 0 || Object.entries(node.frameVariables).length > 0 ? (
-                <>
-                  {classDeclarations.map(field => {
-                    const captured = Object.prototype.hasOwnProperty.call(node.frameVariables, field.name);
-                    return (
-                      <span className="yv-tree-argument-preview" key={field.name}>
-                        <strong className="yv-tree-argument-label">{field.name}</strong>
-                        <span className="yv-class-field-declaration">{field.declaration}</span>
-                        <span className="yv-tree-argument-value">
-                          {captured
-                            ? <DataValue value={node.frameVariables[field.name]} state={current} source={source} name={field.name} />
-                            : <span className="yv-class-field-pending">Not captured yet</span>}
-                        </span>
-                      </span>
-                    );
-                  })}
-                  {Object.entries(node.frameVariables).filter(([name]) => !classDeclarations.some(field => field.name === name)).map(([name, value]) => (
-                    <span className="yv-tree-argument-preview" key={name}>
-                      <strong className="yv-tree-argument-label">{name}</strong>
-                      <span className="yv-tree-argument-value"><DataValue value={value} state={current} source={source} name={name} /></span>
-                    </span>
-                  ))}
-                </>
-              ) : <span className="yv-class-context-empty">No class fields are declared in this solution.</span>}
-            </span>
           </span>
         ) : <span className="yv-tree-outcome">{result}</span>}
+        {id === 'root' && (
+          <span className="yv-class-context-popover" role="region" aria-label={`Class fields for ${node.method}`}>
+            {classDeclarations.length > 0 || Object.entries(node.frameVariables).length > 0 ? (
+              <>
+                {classDeclarations.map(field => {
+                  const captured = Object.prototype.hasOwnProperty.call(node.frameVariables, field.name);
+                  return (
+                    <span className="yv-tree-argument-preview" key={field.name}>
+                      <strong className="yv-tree-argument-label">{field.name}</strong>
+                      <span className="yv-class-field-declaration">{field.declaration}</span>
+                      <span className="yv-tree-argument-value">
+                        {captured
+                          ? <DataValue value={node.frameVariables[field.name]} state={current} source={source} name={field.name} />
+                          : <span className="yv-class-field-pending">Not captured yet</span>}
+                      </span>
+                    </span>
+                  );
+                })}
+                {Object.entries(node.frameVariables).filter(([name]) => !classDeclarations.some(field => field.name === name)).map(([name, value]) => (
+                  <span className="yv-tree-argument-preview" key={name}>
+                    <strong className="yv-tree-argument-label">{name}</strong>
+                    <span className="yv-tree-argument-value"><DataValue value={value} state={current} source={source} name={name} /></span>
+                  </span>
+                ))}
+              </>
+            ) : <span className="yv-class-context-empty">No class fields are declared in this solution.</span>}
+          </span>
+        )}
       </div>
       {node.children.length > 0 && <div className="yv-tree-children">{node.children.map(child => renderNode(child, depth + 1))}</div>}
     </div>;
