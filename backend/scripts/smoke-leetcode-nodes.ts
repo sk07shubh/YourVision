@@ -27,13 +27,19 @@ const middle = await runJava(
 
 assert(middle.success && middle.kind === "OK", "middleNode execution failed");
 assert(middle.result?.startsWith('"ListNode@') === true, "middleNode must return the Java node reference");
-assert(middle.states?.[0]?.line === 3, "method entry must highlight the declaration line");
 assert(
-    Object.keys(middle.states?.[0]?.objects ?? {}).some(id => {
-        const object = middle.states?.[0]?.objects[id] as Record<string, unknown> | undefined;
-        return object?.$type === "ListNode";
-    }),
-    "ListNode argument was not captured as an object graph"
+    middle.states?.some(state =>
+        state.lastEvent?.type === "METHOD_ENTER" && state.line === 3
+    ) === true,
+    "method entry must highlight the declaration line after the class checkpoint"
+);
+assert(
+    middle.states?.some(state =>
+        Object.values(state.objects ?? {}).some(value =>
+            (value as Record<string, unknown> | undefined)?.$type === "ListNode"
+        )
+    ) === true,
+    "ListNode argument was not captured as an object graph after the class checkpoint"
 );
 
 const middleExit = middle.states?.find(
@@ -88,7 +94,12 @@ const tree = await runJava(
 
 assert(tree.success && tree.kind === "OK", "TreeNode execution failed");
 assert(tree.result === "10", "TreeNode level-order parsing produced the wrong result");
-assert(tree.states?.[0]?.line === 3, "TreeNode method entry line is incorrect");
+assert(
+    tree.states?.some(state =>
+        state.lastEvent?.type === "METHOD_ENTER" && state.line === 3
+    ) === true,
+    "TreeNode method entry line is incorrect after the class checkpoint"
+);
 
 const commentedDefinitionSource = [
     "/**",

@@ -1468,10 +1468,8 @@
   white-space: nowrap;
   transition: background-color .12s ease, border-color .12s ease;
 }
-.yv-class-context-trigger:hover,
-.yv-class-context-trigger:focus-visible,
-.yv-tree-node.class-context-node:hover .yv-class-context-trigger,
-.yv-class-context:focus-within .yv-class-context-trigger {
+ .yv-class-context-trigger:hover,
+.yv-class-context-trigger:focus-visible {
   outline: none;
   border-color: color-mix(in srgb, var(--yv-depth-border, #60a5fa), transparent 42%);
   background: color-mix(in srgb, var(--yv-depth-border, #60a5fa), transparent 88%);
@@ -1486,7 +1484,7 @@
   box-sizing: border-box;
   width: max-content;
   min-width: min(210px, calc(100vw - 32px));
-  max-width: min(340px, calc(100vw - 32px));
+  max-width: min(680px, calc(100vw - 16px));
   max-height: min(45dvh, 380px);
   padding: 9px;
   overflow: auto;
@@ -1502,11 +1500,19 @@
   text-align: left;
   cursor: default;
 }
-.yv-tree-node.class-context-node:hover .yv-class-context-popover,
-.yv-tree-node.class-context-node:focus-within .yv-class-context-popover {
-  display: flex;
+.yv-class-context-popover-portal {
+  position: fixed;
+  z-index: 2147483000;
+  display: flex !important;
   flex-direction: column;
   gap: 9px;
+  width: max-content;
+  min-width: min(210px, calc(100vw - 16px));
+  max-width: min(680px, calc(100vw - 16px));
+  margin: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
 }
 .yv-class-field-declaration {
   color: #cbd5e1;
@@ -1531,7 +1537,7 @@
   box-sizing: border-box;
   width: max-content;
   min-width: min(190px, calc(100vw - 32px));
-  max-width: min(320px, calc(100vw - 32px));
+  max-width: min(680px, calc(100vw - 16px));
   max-height: min(42dvh, 360px);
   margin-top: 0;
   padding: 8px;
@@ -1552,6 +1558,24 @@
   display: flex;
   flex-direction: column;
   gap: 9px;
+}
+
+/* Portal preview escapes both the scrolling viewport and the rounded panel. */
+.yv-tree-arguments-popover-portal {
+  position: fixed;
+  z-index: 2147483000;
+  /* The base popover rule is hidden for the legacy inline version. Keep the
+     portal visible independently of its now-non-ancestor hover trigger. */
+  display: flex !important;
+  flex-direction: column;
+  gap: 9px;
+  width: max-content;
+  min-width: min(190px, calc(100vw - 16px));
+  max-width: min(680px, calc(100vw - 16px));
+  margin: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
 }
 .yv-tree-argument-preview {
   display: flex;

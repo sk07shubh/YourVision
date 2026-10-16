@@ -168,9 +168,20 @@ function applyEvent(
             // use the postVariables snapshot captured from the next runtime
             // checkpoint so the state shown with this highlighted line is
             // the state produced by this line.
+            // Class fields are captured independently of method locals so
+            // static initializers and instance-field initialization remain
+            // visible before the selected question method begins.
+            const classFields = data.classFields && typeof data.classFields === "object" && !Array.isArray(data.classFields)
+                ? data.classFields as Record<string, unknown>
+                : {};
+            const visibleVariables = data.postVariables && typeof data.postVariables === "object" && !Array.isArray(data.postVariables)
+                ? data.postVariables as Record<string, unknown>
+                : data.variables && typeof data.variables === "object" && !Array.isArray(data.variables)
+                    ? data.variables as Record<string, unknown>
+                    : {};
             applyVariableSnapshot(
                 next,
-                data.postVariables ?? data.variables
+                { ...classFields, ...visibleVariables }
             );
 
             if (typeof data.displayLine === "number") {

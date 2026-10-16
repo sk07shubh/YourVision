@@ -49,6 +49,26 @@ function markup(nodes: ReactNode[]): string {
 
 
 describe('synchronized function invocation tree', () => {
+  it('keeps the class as the only tree node during class and constructor setup', () => {
+    const states = [
+      state({
+        line: 1,
+        lastEvent: { type: 'STEP', method: '', data: { classSetup: true, declaringType: 'LRUCache', classFields: {} } },
+      }),
+      state({
+        line: 6,
+        method: '<init>',
+        invocationId: 'constructor-call',
+        lastEvent: { type: 'STEP', method: '<init>', data: { classSetup: true, declaringType: 'LRUCache', invocationId: 'constructor-call', classFields: { capacity: 2 } } },
+      }),
+    ];
+    const { nodes } = buildInvocationNodes(states);
+    expect(nodes.get('root')?.signature).toBe('LRUCache');
+    expect(nodes.get('root')?.frameVariables).toEqual({ capacity: 2 });
+    expect(nodes.get('root')?.children).toEqual([]);
+    expect(nodes.has('constructor-call')).toBe(false);
+  });
+
   it('keeps recursive calls distinct and attaches each call to its actual parent', () => {
     const states = [
       state({ invocationId: 'call-1', lastEvent: { type: 'METHOD_ENTER', method: 'search', data: { invocationId: 'call-1', methodSignature: '(I)Z', parameterTypes: ['int'], returnType: 'boolean' } } }),

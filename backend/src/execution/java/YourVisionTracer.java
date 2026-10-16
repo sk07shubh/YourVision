@@ -22,6 +22,7 @@ import com.sun.jdi.Value;
 import com.sun.jdi.VirtualMachine;
 import com.sun.jdi.connect.LaunchingConnector;
 import com.sun.jdi.event.BreakpointEvent;
+import com.sun.jdi.event.ClassPrepareEvent;
 import com.sun.jdi.event.Event;
 import com.sun.jdi.event.EventSet;
 import com.sun.jdi.event.ExceptionEvent;
@@ -31,6 +32,7 @@ import com.sun.jdi.event.StepEvent;
 import com.sun.jdi.event.VMDeathEvent;
 import com.sun.jdi.event.VMDisconnectEvent;
 import com.sun.jdi.request.BreakpointRequest;
+import com.sun.jdi.request.ClassPrepareRequest;
 import com.sun.jdi.request.EventRequest;
 import com.sun.jdi.request.EventRequestManager;
 import com.sun.jdi.request.ExceptionRequest;
@@ -255,6 +257,7 @@ public class YourVisionTracer {
             null,
             Map.of()
         );
+        emitClassDeclarationCheckpoint();
 
         boolean finished = false;
 
@@ -296,7 +299,18 @@ public class YourVisionTracer {
                         }
                     }
 
+                } else if (event instanceof ClassPrepareEvent prepared) {
+                    if (tracedClass.equals(prepared.referenceType().name())) {
+                        installStaticInitializerBreakpoints(manager, prepared.referenceType());
+                    }
+
                 } else if (event instanceof BreakpointEvent breakpoint) {
+                    if (isTraceableClassSetupMethod(breakpoint.location().method()) &&
+                        breakpoint.location().method().isStaticInitializer()) {
+                        // Class-prepare breakpoints stop before <clinit> advances;
+                        // begin line stepping now so every real initializer line is captured.
+                        enableLineStepping(manager, breakpoint.thread());
+                    }
                     if (
                         (isTraceableClassSetupMethod(breakpoint.location().method()) || isTraceableUserMethod(breakpoint.location().method())) &&
                         recordedStepLocations.add(stepLocationKey(
@@ -381,14 +395,9 @@ public class YourVisionTracer {
                     Method enteredMethod = entry.method();
 
                     if (isTraceableClassSetupMethod(enteredMethod) && !isTraceableUserMethod(enteredMethod)) {
-                        // JVM setup methods (including the implicit default
-                        // constructor) run before the selected user method.
-                        // Do not emit their source locations as user STEP
-                        // checkpoints: they point at the class declaration and
-                        // shift the first visible checkpoint away from the
-                        // selected method's first executable line. The selected
-                        // method's METHOD_ENTER snapshot captures the initialized
-                        // fields, so line stepping starts when that method enters.
+                        // Static initializers are class setup, not a user function.
+                        // Trace their real source lines without adding a tree node.
+                        enableLineStepping(manager, entry.thread());
                     } else if (isTraceableUserMethod(enteredMethod)) {
                         installSameLineLoopBreakpoints(
                             manager,
@@ -407,6 +416,10 @@ public class YourVisionTracer {
                         }
 
                         Location methodLocation = entry.location();
+                        data.put(
+                            "classFields",
+                            readClassFields(methodLocation.declaringType(), entry.thread())
+                        );
                         int declarationLine =
                             findMethodDeclarationLine(
                                 methodLocation,
@@ -418,20 +431,22 @@ public class YourVisionTracer {
                         );
                         enterInvocation(entry.thread(), enteredMethod, data);
 
-                        // The compiler-generated default constructor is
-                        // not user-authored code. Keep its entry request as the
-                        // point where line stepping is armed, but do not expose a
-                        // synthetic constructor checkpoint in the user's trace.
-                        if (
-                            !enteredMethod.isConstructor() ||
-                            hasExplicitConstructorDeclaration(enteredMethod)
-                        ) {
+                        // Constructors and instance-field initialization are class setup.
+                        // Trace their executable lines, but keep the function tree at
+                        // the class cell until the selected question method enters.
+                        if (!enteredMethod.isConstructor()) {
                             emit(
                                 "METHOD_ENTER",
                                 methodLocation,
                                 entry.thread(),
                                 data
                             );
+                        } else {
+                            // Keep the constructor's declaration as a visible
+                            // source checkpoint without treating it as a function
+                            // invocation in the tree.
+                            data.put("classSetup", true);
+                            emit("STEP", methodLocation, entry.thread(), data);
                         }
 
                         // A method-entry location can point at the declaration
@@ -448,8 +463,6 @@ public class YourVisionTracer {
                 } else if (event instanceof MethodExitEvent exit) {
                     if (
                         isTraceableUserMethod(exit.method()) &&
-                        (!exit.method().isConstructor() ||
-                         hasExplicitConstructorDeclaration(exit.method())) &&
                         isTraced(exit.location())
                     ) {
                         Map<String, Object> data =
@@ -521,12 +534,14 @@ public class YourVisionTracer {
                         } catch (Exception ignored) {
                         }
 
-                        emit(
-                            "METHOD_EXIT",
-                            exit.location(),
-                            exit.thread(),
-                            data
-                        );
+                        if (!exit.method().isConstructor()) {
+                            emit(
+                                "METHOD_EXIT",
+                                exit.location(),
+                                exit.thread(),
+                                data
+                            );
+                        }
                     }
 
                 } else if (
@@ -626,6 +641,11 @@ public class YourVisionTracer {
         );
         exit.enable();
 
+        ClassPrepareRequest prepared = manager.createClassPrepareRequest();
+        prepared.addClassFilter(tracedClass);
+        prepared.setSuspendPolicy(EventRequest.SUSPEND_ALL);
+        prepared.enable();
+
         ExceptionRequest exception =
             manager.createExceptionRequest(
                 null,
@@ -646,6 +666,29 @@ public class YourVisionTracer {
             EventRequest.SUSPEND_ALL
         );
         death.enable();
+    }
+
+    private static void installStaticInitializerBreakpoints(
+        EventRequestManager manager,
+        ReferenceType type
+    ) {
+        try {
+            for (Method method : type.methods()) {
+                if (!method.isStaticInitializer()) {
+                    continue;
+                }
+                for (Location location : method.allLineLocations()) {
+                    if (location.lineNumber() <= 0) {
+                        continue;
+                    }
+                    BreakpointRequest breakpoint = manager.createBreakpointRequest(location);
+                    breakpoint.setSuspendPolicy(EventRequest.SUSPEND_EVENT_THREAD);
+                    breakpoint.enable();
+                }
+            }
+        } catch (Exception ignored) {
+            // Static-initializer capture is best-effort if the VM has no line table.
+        }
     }
 
     private static boolean isTraceableClassSetupMethod(Method method) {
@@ -2162,6 +2205,32 @@ public class YourVisionTracer {
         }
     }
 
+    private static void emitClassDeclarationCheckpoint() {
+        if (solutionSourcePath == null || solutionSourcePath.isEmpty()) return;
+        try {
+            List<String> lines = Files.readAllLines(Path.of(solutionSourcePath));
+            for (int index = 0; index < lines.size(); index++) {
+                String code = lines.get(index)
+                    .replaceAll("//.*$", "")
+                    // prepareJavaSource may prepend imports on the same physical
+                    // line to preserve the user's source-line mapping. Strip
+                    // package/import declarations before matching the class token.
+                    .replaceAll("\\b(?:package|import)\\s+[^;]+;\\s*", "")
+                    .trim();
+                if (code.matches("(?:(?:public|protected|private|abstract|final|static|strictfp)\\s+)*class\\s+[A-Za-z_$][\\w$]*(?:\\s+extends\\s+[^{]+)?(?:\\s+implements\\s+[^{]+)?\\s*\\{?")) {
+                    Map<String, Object> data = new LinkedHashMap<>();
+                    data.put("displayLine", index + 1);
+                    data.put("classSetup", true);
+                    data.put("declaringType", tracedClass);
+                    emit("STEP", null, null, data);
+                    return;
+                }
+            }
+        } catch (Exception ignored) {
+            // Source lookup is only for the initial class marker; never fail execution.
+        }
+    }
+
     private static boolean isTraced(
         Location location
     ) {
@@ -2201,7 +2270,8 @@ public class YourVisionTracer {
             // marker as metadata, and use it for METHOD_ENTER's displayed line.
             if (
                 ("METHOD_ENTER".equals(type) ||
-                 "METHOD_EXIT".equals(type)) &&
+                 "METHOD_EXIT".equals(type) ||
+                 "STEP".equals(type)) &&
                 data != null &&
                 data.get("displayLine") instanceof Number displayLine
             ) {

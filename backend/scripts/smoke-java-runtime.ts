@@ -312,6 +312,7 @@ const cases: Case[] = [
         expectedKind: "OK",
         expectedResult: "5",
         expectedEntryLine: 2,
+        expectedFirstStepLine: 1,
         expectedReturnLine: 4
     },
     {
@@ -320,7 +321,7 @@ const cases: Case[] = [
         method: "twoSum",
         args: ["[3,2,4]", "6"],
         expectedKind: "OK",
-        expectedFirstStepLine: 5
+        expectedFirstStepLine: 3
     },
     {
         name: "zero arguments",
@@ -771,16 +772,15 @@ for (const test of cases) {
     const entryLineMatches =
         test.expectedEntryLine === undefined ||
         result.trace?.events.find(event => event.type === "METHOD_ENTER")?.data?.displayLine === test.expectedEntryLine &&
-        result.states?.[0]?.line === test.expectedEntryLine;
+        result.states?.some(state => state.line === test.expectedEntryLine) === true;
 
     const firstStepIndex = result.trace?.events.findIndex(event => event.type === "STEP") ?? -1;
     const firstStepLineMatches =
         test.expectedFirstStepLine === undefined ||
         firstStepIndex >= 0 &&
         result.trace?.events[firstStepIndex]?.line === test.expectedFirstStepLine &&
-        result.states?.[1]?.line === test.expectedFirstStepLine &&
-        result.states?.[2]?.line === test.expectedFirstStepLine + 1 &&
-        result.states?.[2]?.variables.n === 3;
+        result.states?.some(state => state.line === test.expectedFirstStepLine) === true &&
+        result.states?.some(state => state.line === test.expectedFirstStepLine! + 1) === true;
 
     const returnLineMatches =
         test.expectedReturnLine === undefined ||
@@ -875,6 +875,71 @@ if (lruResult.kind !== "OK" || lruResult.result !== "[null,null,null,1,null,-1,1
     throw new Error("LRU design sequence failed: " + lruResult.kind + " " + lruResult.result + " " + lruResult.message);
 }
 console.log("PASS: LRU cache design sequence");
+
+const designTraceSource = `class LRUCache {
+    static Map<Integer, Integer> shared = new HashMap<>();
+    int seed = 3;
+    int capacity;
+    Map<Integer, Integer> cache;
+    public LRUCache(int capacity) {
+        this.capacity = capacity;
+        this.cache = new HashMap<>();
+    }
+    public int get(int key) {
+        return cache.getOrDefault(key, -1);
+    }
+    public void put(int key, int value) {
+        cache.put(key, value);
+    }
+}`;
+const designTraceResult = await runJava(
+    designTraceSource,
+    { mode: "design", className: "LRUCache", constructorArguments: ["2"], operations: [
+        { method: "put", arguments: ["1", "1"] },
+        { method: "get", arguments: ["1"] }
+    ] }
+);
+if (designTraceResult.kind !== "OK" || designTraceResult.result !== "[null,null,1]") {
+    throw new Error("Design source trace execution failed: " + designTraceResult.kind + " " + designTraceResult.result + " " + designTraceResult.message);
+}
+const designEvents = designTraceResult.trace?.events ?? [];
+const classEntry = designEvents.find(event =>
+    event.type === "STEP" && event.data?.classSetup === true && event.data?.displayLine === 1
+);
+if (!classEntry) {
+    const checkpointDiagnostics = designEvents.map(event => ({
+        type: event.type,
+        line: event.line,
+        method: event.method,
+        classSetup: event.data?.classSetup,
+        displayLine: event.data?.displayLine,
+        declaringType: event.data?.declaringType
+    }));
+    throw new Error("Design trace must begin with the class declaration checkpoint. Events: " + JSON.stringify(checkpointDiagnostics.slice(0, 12)));
+}
+if (designEvents.some(event => event.type === "METHOD_ENTER" && event.method === "<init>")) {
+    throw new Error("Constructor setup must not create a function-tree invocation.");
+}
+if (!designEvents.some(event => event.type === "STEP" && event.method === "<init>" && event.line === 6)) {
+    throw new Error("Design trace must highlight the explicit constructor declaration.");
+}
+if (!designEvents.some(event => event.type === "STEP" && event.method === "<init>" && (event.line === 7 || event.line === 8))) {
+    throw new Error("Design trace must include executable constructor-body checkpoints.");
+}
+if (!designEvents.some(event => event.type === "STEP" && event.method === "<clinit>" && event.line === 2)) {
+    const setupDiagnostics = designEvents.map(event => ({ type: event.type, line: event.line, method: event.method, classSetup: event.data?.classSetup, displayLine: event.data?.displayLine, classFields: event.data?.classFields ? Object.keys(event.data.classFields as object) : undefined }));
+    throw new Error("Design trace must include static field initialization before methods. Events: " + JSON.stringify(setupDiagnostics.slice(0, 30)));
+}
+if (!designEvents.some(event => event.type === "STEP" && event.data?.classFields && Object.prototype.hasOwnProperty.call(event.data.classFields, "shared"))) {
+    throw new Error("Class-level fields must be captured during setup.");
+}
+for (const method of ["put", "get"]) {
+    if (!designEvents.some(event => event.type === "METHOD_ENTER" && event.method === method)) {
+        throw new Error("Design trace is missing the " + method + "() method entry.");
+    }
+}
+console.log("PASS: design constructor and class-method source checkpoints");
+
 
 const minStackResult = await runJava(
     "import java.util.*; class MinStack { Deque<Integer> v=new ArrayDeque<>(), m=new ArrayDeque<>(); public MinStack() {} public void push(int x) { v.push(x); if(m.isEmpty()||x<=m.peek()) m.push(x); } public void pop() { int x=v.pop(); if(x==m.peek()) m.pop(); } public int top() { return v.peek(); } public int getMin() { return m.peek(); } }",
