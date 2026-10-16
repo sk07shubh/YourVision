@@ -4600,6 +4600,7 @@ type InvocationNode = {
   entryIndex: number;
   status: 'active' | 'returned' | 'void' | 'exceptional';
   returnValue?: unknown;
+  returnValueName?: string;
   returnType?: string;
   frameVariables: Record<string, unknown>;
   arguments: Array<{ name: string; value: unknown }>;
@@ -4675,6 +4676,10 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
       node.status = data.exceptional === true ? 'exceptional' : data.returnedVoid === true ? 'void' : 'returned';
       node.exitState = states[index];
       if (Object.prototype.hasOwnProperty.call(data, 'returnValue')) node.returnValue = data.returnValue;
+      const exitLine = states[index]?.line;
+      const returnStatement = typeof exitLine === 'number' ? source.split(/\\r?\\n/)[exitLine - 1] : undefined;
+      const returnedVariable = returnStatement?.match(/\\breturn\\s+(?:this\\.)?([A-Za-z_$][\\w$]*)\\s*;/);
+      if (returnedVariable?.[1]) node.returnValueName = returnedVariable[1];
       else if (data.hasReturnValue === true) node.returnValue = null;
       if (typeof data.returnType === 'string') node.returnType = data.returnType;
     }
@@ -4888,7 +4893,7 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
                   onBlur={scheduleArgumentPreviewClose}
                   onClick={event => { event.stopPropagation(); if (openArguments?.node.id === node.id && openArguments.kind === 'return') setOpenArguments(null); else openArgumentPreview(node, event.currentTarget, 'return'); }}
                   onKeyDown={event => { event.stopPropagation(); if (event.key === "Escape") setOpenArguments(null); }}
-                >return</button>
+                >{openArguments.node.returnValueName ?? 'return'}</button>
               </span>
             ) : result}
           </span>
