@@ -429,6 +429,14 @@ public class YourVisionTracer {
                             "displayLine",
                             declarationLine
                         );
+                        // Capture argument values directly from the JVM frame. The
+                        // visible-local-variable table can omit parameters when
+                        // debug metadata is incomplete or the entry location is
+                        // before their local-variable scope becomes visible.
+                        data.put(
+                            "argumentValues",
+                            readArgumentValues(entry.thread().frame(0))
+                        );
                         enterInvocation(entry.thread(), enteredMethod, data);
 
                         // Constructors and instance-field initialization are class setup.
@@ -1365,6 +1373,28 @@ public class YourVisionTracer {
         }
 
         return variables;
+    }
+
+    private static List<Object> readArgumentValues(
+        StackFrame frame
+    ) {
+        List<Object> arguments = new ArrayList<>();
+        try {
+            // StackFrame argument values are ordered by the JVM method
+            // descriptor and do not depend on LocalVariableTable names.
+            for (Value value : frame.getArgumentValues()) {
+                arguments.add(
+                    snapshotValue(
+                        value,
+                        0,
+                        new HashSet<>()
+                    )
+                );
+            }
+        } catch (Exception ignored) {
+            // Keep an empty list so the frontend can use frame-snapshot fallback.
+        }
+        return arguments;
     }
 
     private static Object snapshotValue(
