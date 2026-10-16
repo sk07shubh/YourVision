@@ -4676,11 +4676,11 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
       node.status = data.exceptional === true ? 'exceptional' : data.returnedVoid === true ? 'void' : 'returned';
       node.exitState = states[index];
       if (Object.prototype.hasOwnProperty.call(data, 'returnValue')) node.returnValue = data.returnValue;
-      const exitLine = states[index]?.line;
-      const returnStatement = typeof exitLine === 'number' ? source.split(/\\r?\\n/)[exitLine - 1] : undefined;
-      const returnedVariable = returnStatement?.match(/\\breturn\\s+(?:this\\.)?([A-Za-z_$][\\w$]*)\\s*;/);
-      if (returnedVariable?.[1]) node.returnValueName = returnedVariable[1];
       else if (data.hasReturnValue === true) node.returnValue = null;
+      const exitLine = states[index]?.line;
+      const returnStatement = typeof exitLine === 'number' ? source.split(/\r?\n/)[exitLine - 1] : undefined;
+      const returnedVariable = returnStatement?.match(/\breturn\s+(?:this\.)?([A-Za-z_$][\w$]*)\s*;/);
+      if (returnedVariable?.[1]) node.returnValueName = returnedVariable[1];
       if (typeof data.returnType === 'string') node.returnType = data.returnType;
     }
 
