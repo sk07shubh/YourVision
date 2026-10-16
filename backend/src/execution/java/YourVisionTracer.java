@@ -2174,6 +2174,7 @@ public class YourVisionTracer {
                     Map<String, Object> data = new LinkedHashMap<>();
                     data.put("displayLine", index + 1);
                     data.put("classSetup", true);
+                    data.put("declaringType", tracedClass);
                     emit("STEP", null, null, data);
                     return;
                 }
