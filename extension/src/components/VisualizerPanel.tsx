@@ -4724,7 +4724,7 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
     if (!anchor || !anchor.isConnected) { setClassContextPosition(null); return; }
     const rect = anchor.getBoundingClientRect();
     const margin = 8;
-    const width = Math.min(340, window.innerWidth - margin * 2);
+    const width = Math.min(680, window.innerWidth - margin * 2);
     const gap = 8;
     // Keep the class-context preview beside its trigger, matching the function dropdown.
     // Prefer the right side; flip left only when there is not enough room on the right.
@@ -4763,7 +4763,7 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
     if (!anchor || !anchor.isConnected) { setArgumentPopoverPosition(null); return; }
     const rect = anchor.getBoundingClientRect();
     const margin = 8;
-    const width = Math.min(320, window.innerWidth - margin * 2);
+    const width = Math.min(680, window.innerWidth - margin * 2);
     const left = Math.max(margin, Math.min(rect.left, window.innerWidth - width - margin));
     const below = window.innerHeight - rect.bottom - 14;
     const above = rect.top - 14;
