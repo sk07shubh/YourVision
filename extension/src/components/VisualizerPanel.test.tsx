@@ -113,6 +113,20 @@ describe('synchronized function invocation tree', () => {
     expect(html).not.toContain('class="yv-tree-arguments-popover"');
   });
 
+  it('keeps the source variable name for a returned collection', () => {
+    const source = 'class Solution { int[] solve(int[] nums) { return nums; } }';
+    const states = [
+      state({ invocationId: 'solve-call', line: 1, lastEvent: { type: 'METHOD_ENTER', method: 'solve', data: {
+        invocationId: 'solve-call', declaringType: 'Solution', parameterTypes: ['int[]'], returnType: 'int[]', variables: { nums: [2, 7, 11] },
+      } } }),
+      state({ invocationId: 'solve-call', line: 1, lastEvent: { type: 'METHOD_EXIT', method: 'solve', data: {
+        invocationId: 'solve-call', returnType: 'int[]', returnValue: [2, 7, 11], returnedVoid: false,
+      } } }),
+    ];
+    const { nodes } = buildInvocationNodes(states, source);
+    expect(nodes.get('solve-call')?.returnValueName).toBe('nums');
+  });
+
   it('uses the checkpoint parent id when the event payload omits it', () => {
     const states = [
       state({
