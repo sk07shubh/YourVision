@@ -76,8 +76,16 @@ function serializeJavaArgument(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function detectDesignClass(inputs: Record<string, string>): LeetCodeTestcase['designClass'] {
-  const parsed = Object.values(inputs).map(parseJsonValue);
+function detectDesignClass(inputs: Record<string, string>, raw: string): LeetCodeTestcase['designClass'] {
+  const rawLines = raw
+    .replace(/\bInput:\s*/i, '')
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean);
+  const parsed = [
+    ...Object.values(inputs).map(parseJsonValue),
+    ...rawLines.map(parseJsonValue),
+  ];
   const operations = parsed.find((value): value is string[] =>
     Array.isArray(value) &&
     value.length > 0 &&
@@ -108,7 +116,7 @@ function detectDesignClass(inputs: Record<string, string>): LeetCodeTestcase['de
 
 export function makeTestcase(raw: string, label: string, source: TestcaseSource, method: JavaMethod): LeetCodeTestcase {
   const inputs = parseAssignments(raw);
-  const designClass = detectDesignClass(inputs);
+  const designClass = detectDesignClass(inputs, raw);
   return {
     id: `${source}:${label}:${raw}`,
     label: label || 'Selected testcase',
