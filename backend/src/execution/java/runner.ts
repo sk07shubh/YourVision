@@ -21,7 +21,8 @@ const execFileAsync = promisify(execFile);
  * and bounded like execFile's stdout/stderr capture.
  */
 function runJavaTracer(
-    args: string[]
+    args: string[],
+    timeoutMs = JAVA_EXECUTION_TIMEOUT_MS
 ): Promise<{ stdout: string; stderr: string }> {
     return new Promise((resolve, reject) => {
         const child = spawn("java", args, {
@@ -63,7 +64,7 @@ function runJavaTracer(
         const timer = setTimeout(() => {
             timedOut = true;
             killProcessTree();
-        }, JAVA_EXECUTION_TIMEOUT_MS);
+        }, timeoutMs);
 
         const fail = (error: NodeJS.ErrnoException & {
             stdout?: string;
@@ -114,7 +115,7 @@ function runJavaTracer(
 
             if (timedOut) {
                 const error = Object.assign(
-                    new Error(`Java execution exceeded ${JAVA_EXECUTION_TIMEOUT_MS} ms`),
+                    new Error(`Java execution exceeded ${timeoutMs} ms`),
                     {
                         code: "ETIMEDOUT",
                         killed: true,
@@ -168,9 +169,20 @@ function runJavaTracer(
     });
 }
 
-export interface JavaTestcase {
+export interface JavaDesignOperation {
     method: string;
     arguments?: string[];
+}
+
+export interface JavaTestcase {
+    /** Single-method execution (existing LeetCode format). */
+    method?: string;
+    arguments?: string[];
+    /** Design-class execution: instantiate once, then invoke operations in order. */
+    mode?: "method" | "design";
+    className?: string;
+    constructorArguments?: string[];
+    operations?: JavaDesignOperation[];
 }
 
 export interface JavaExecutionResult {
@@ -260,18 +272,27 @@ export async function runJava(
     testcase?: JavaTestcase
 ): Promise<JavaExecutionResult> {
 
-    if (
-        !testcase ||
-        typeof testcase.method !== "string" ||
-        testcase.method.trim() === ""
-    ) {
+    const designMode = testcase?.mode === "design";
+    if (!testcase || (!designMode &&
+        (typeof testcase.method !== "string" || testcase.method.trim() === "")) ||
+        (designMode && (
+            typeof testcase.className !== "string" ||
+            !/^[A-Za-z_$][\w$]*$/.test(testcase.className) ||
+            !Array.isArray(testcase.operations) ||
+            testcase.operations.length === 0 ||
+            testcase.operations.some(operation =>
+                !operation || typeof operation.method !== "string" ||
+                !/^[A-Za-z_$][\w$]*$/.test(operation.method) ||
+                (operation.arguments !== undefined && !Array.isArray(operation.arguments))
+            )
+        ))) {
         return {
             success: false,
             kind: "VALIDATION_ERROR",
             stdout: "",
             stderr: "",
             message:
-                "testcase.method is required"
+                designMode ? "Provide a valid design testcase with className and operations." : "testcase.method is required"
         };
     }
 
@@ -289,8 +310,37 @@ export async function runJava(
         };
     }
 
-    const rawArguments =
-        testcase.arguments ?? [];
+    const rawArguments = designMode
+        ? [
+            ...(testcase.constructorArguments ?? []),
+            ...(testcase.operations ?? []).flatMap(operation => operation.arguments ?? [])
+        ]
+        : (testcase.arguments ?? []);
+
+    if (designMode && (
+        (testcase.constructorArguments !== undefined && !Array.isArray(testcase.constructorArguments)) ||
+        (testcase.constructorArguments ?? []).some(value => typeof value !== "string")
+    )) {
+        return {
+            success: false,
+            kind: "VALIDATION_ERROR",
+            stdout: "",
+            stderr: "",
+            message: "testcase.constructorArguments must be an array of strings"
+        };
+    }
+
+    if (designMode && (testcase.operations ?? []).some(operation =>
+        (operation.arguments ?? []).some(value => typeof value !== "string")
+    )) {
+        return {
+            success: false,
+            kind: "VALIDATION_ERROR",
+            stdout: "",
+            stderr: "",
+            message: "every design operation argument must be a string"
+        };
+    }
 
     if (
         rawArguments.some(
@@ -389,7 +439,8 @@ await fs.writeFile(
                     tracerPath
                 ],
                 {
-                    timeout: 10000,
+                    // CI runners can be slower when several Java corpus cases compile in sequence.
+                    timeout: 20000,
                     maxBuffer:
                         1024 * 1024
                 }
@@ -414,6 +465,28 @@ await fs.writeFile(
             };
         }
 
+        const encodeArgument = (value: string) =>
+            "__YV_B64__" + Buffer.from(value, "utf8").toString("base64");
+        const encodedArguments = (values: string[]) =>
+            values.length === 0 ? [NO_ARGS] : values.map(encodeArgument);
+
+        const invocationArguments = designMode
+            ? [
+                "__YV_DESIGN__",
+                String((testcase.constructorArguments ?? []).length),
+                ...encodedArguments(testcase.constructorArguments ?? []),
+                String((testcase.operations ?? []).length),
+                ...(testcase.operations ?? []).flatMap(operation => [
+                    operation.method,
+                    String((operation.arguments ?? []).length),
+                    ...encodedArguments(operation.arguments ?? [])
+                ])
+            ]
+            : [
+                testcase.method!,
+                ...encodedArguments(testcase.arguments ?? [])
+            ];
+
         const childArguments = [
             "--add-modules",
             "jdk.jdi",
@@ -422,20 +495,8 @@ await fs.writeFile(
             "YourVisionTracer",
             tempDir,
             "YourVisionRuntime",
-            "Solution",
-            testcase.method,
-            ...(
-                rawArguments.length === 0
-                    ? [NO_ARGS]
-                    : rawArguments.map(
-                        (value) =>
-                            "__YV_B64__" +
-                            Buffer.from(
-                                value,
-                                "utf8"
-                            ).toString("base64")
-                    )
-            )
+            designMode ? (testcase.className ?? "Solution") : "Solution",
+            ...invocationArguments
         ];
 
         try {
@@ -443,7 +504,7 @@ await fs.writeFile(
                 stdout,
                 stderr
             } =
-                await runJavaTracer(childArguments);
+                await runJavaTracer(childArguments, designMode ? 15000 : JAVA_EXECUTION_TIMEOUT_MS);
             const trace =
                 parseTrace(stdout, source);
 
@@ -468,14 +529,40 @@ await fs.writeFile(
                 };
             }
 
+            const resultMarker = stdout
+                .split(/\r?\n/)
+                .find(line => line.startsWith("__YV_RESULT__="));
+
+            // A zero exit from the tracer is not enough to call a design
+            // session successful: the debuggee can disconnect before the
+            // runtime serializes its final result. Returning OK with an
+            // undefined result makes the extension appear to fail silently.
+            if (resultMarker === undefined) {
+                const lastEvent = trace.events.at(-1);
+                const diagnostic = lastEvent
+                    ? `Last trace event: ${lastEvent.type} (sequence ${lastEvent.sequence}).`
+                    : "The tracer produced no structured trace events.";
+
+                return {
+                    success: false,
+                    kind: "HARNESS_ERROR",
+                    stdout,
+                    stderr,
+                    trace,
+                    states: buildStates(trace),
+                    message:
+                        "Java execution ended before the runtime emitted its final result marker. " +
+                        diagnostic +
+                        (stderr.trim()
+                            ? ` stderr: ${stderr.trim().split(/\\r?\\n/).slice(-4).join(" | ")}`
+                            : "")
+                };
+            }
+
             return {
                 success: true,
                 kind: "OK",
-                result:
-                    extractMarker(
-                        stdout,
-                        "__YV_RESULT__="
-                    ),
+                result: resultMarker.slice("__YV_RESULT__=".length),
                 stdout,
                 stderr,
                 trace,
@@ -504,7 +591,7 @@ await fs.writeFile(
                         type: "TIMEOUT",
                         data: {
                             message:
-                                `Java execution exceeded ${JAVA_EXECUTION_TIMEOUT_MS} ms`
+                                `Java execution exceeded ${designMode ? 15000 : JAVA_EXECUTION_TIMEOUT_MS} ms`
                         }
                     };
 
@@ -522,7 +609,7 @@ await fs.writeFile(
                     stderr:
                         error.stderr ?? "",
                     message:
-                        `Java execution exceeded ${JAVA_EXECUTION_TIMEOUT_MS} ms`,
+                        `Java execution exceeded ${designMode ? 15000 : JAVA_EXECUTION_TIMEOUT_MS} ms`,
                     trace,
                     states:
                         buildStates(trace)
@@ -566,9 +653,14 @@ await fs.writeFile(
                 ...(errorType
                     ? { errorType }
                     : {}),
+                // Keep the actual tracer failure visible. A generic
+                // message hides JDI/harness crashes and makes Java snippets
+                // fail without actionable diagnostics in the UI.
                 message:
                     message ||
-                    "Java execution failed"
+                    (stderr.trim()
+                        ? `Java tracer failed: ${stderr.trim().split(/\\r?\\n/).slice(-8).join(" | ")}`
+                        : "Java execution failed (the tracer exited without diagnostic output)")
             };
         }
 

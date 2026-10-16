@@ -109,6 +109,27 @@ function pickRawInput(
   return assignments.join('\n');
 }
 
+
+export function readDesignTestcaseArrays(region?: HTMLElement): { names: string[]; values: unknown[][]; label: string; raw: string } {
+  const root = region ?? findTestcaseRegion();
+  if (!root) throw new Error('Could not find the LeetCode testcase tabs.');
+  const panel = root.dataset.yourvisionResultRegion === 'true'
+    ? findResultPanel(root) ?? findTestcasePanel(root)
+    : findTestcasePanel(root) ?? findResultPanel(root);
+  if (!panel) throw new Error('Could not find the design testcase panel.');
+  const inputs = [...panel.querySelectorAll<HTMLElement>('[data-e2e-locator="console-testcase-input"]')]
+    .map(readInputValue).filter(Boolean);
+  if (inputs.length < 2) throw new Error('Design testcase must include operation names and argument arrays.');
+  let names: unknown, values: unknown;
+  try { names = JSON.parse(inputs[0]); values = JSON.parse(inputs[1]); }
+  catch { throw new Error('Could not parse design testcase arrays.'); }
+  if (!Array.isArray(names) || !names.every(v => typeof v === 'string') ||
+      !Array.isArray(values) || values.length !== names.length ||
+      !values.every(Array.isArray)) throw new Error('Invalid design testcase operation arrays.');
+  const activeLabel = textOf(findActiveTestcaseTab(root));
+  return { names, values, label: /^default$/i.test(activeLabel) ? 'Testcase' : activeLabel || 'Selected testcase', raw: JSON.stringify({names, values}) };
+}
+
 export function readSelectedTestcase(
   method: JavaMethod,
   preferredRegion?: HTMLElement

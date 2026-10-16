@@ -7,6 +7,15 @@ import type { TraceState } from '../types/trace';
 
 type Obj = Record<string, unknown>;
 
+function mapKeySignature(key: unknown): string {
+  if (isPlainObject(key)) {
+    for (const identityField of ['$objectId', '$ref', '$arrayId', '$mapId', '$collectionId']) {
+      if (typeof key[identityField] === 'string') return identityField + ':' + key[identityField];
+    }
+  }
+  return stableStringify(key);
+}
+
 const LINK_PALETTE = ['#60a5fa', '#34d399', '#fbbf24', '#c084fc', '#fb7185', '#22d3ee', '#a3e635', '#f97316'];
 function linkedConnectionColor(id: string): string {
   let hash = 0;
@@ -615,14 +624,14 @@ export function collectionDelta(
 ): { added?: unknown; removed?: unknown; index?: number } | undefined {
   if (before.length === after.length) {
     for (let i = 0; i < before.length; i++) {
-      if (valueChanged(before[i], after[i])) return { added: after[i], removed: before[i], index: i };
+      if (collectionItemIdentity(before[i]) !== collectionItemIdentity(after[i])) return { added: after[i], removed: before[i], index: i };
     }
     return undefined;
   }
   if (after.length === before.length + 1) {
     for (let i = 0; i < after.length; i++) {
       const matches = before.every((value, j) =>
-        valueChanged(value, after[j + (j >= i ? 1 : 0)]) === false
+        collectionItemIdentity(value) === collectionItemIdentity(after[j + (j >= i ? 1 : 0)])
       );
       if (matches) return { added: after[i], index: i };
     }
@@ -630,7 +639,7 @@ export function collectionDelta(
   if (before.length === after.length + 1) {
     for (let i = 0; i < before.length; i++) {
       const matches = after.every((value, j) =>
-        valueChanged(value, before[j + (j >= i ? 1 : 0)]) === false
+        collectionItemIdentity(value) === collectionItemIdentity(before[j + (j >= i ? 1 : 0)])
       );
       if (matches) return { removed: before[i], index: i };
     }
@@ -642,10 +651,10 @@ export function unorderedCollectionDelta(
   before: unknown[],
   after: unknown[]
 ): { added?: unknown; removed?: unknown } | undefined {
-  const remaining = before.map(value => ({ key: stableStringify(value), value }));
+  const remaining = before.map(value => ({ key: collectionItemIdentity(value), value }));
   const added: unknown[] = [];
   for (const value of after) {
-    const key = stableStringify(value);
+    const key = collectionItemIdentity(value);
     const index = remaining.findIndex(entry => entry.key === key);
     if (index >= 0) remaining.splice(index, 1);
     else added.push(value);
@@ -688,15 +697,15 @@ export function collectionOperation(kind: string, method: string | undefined, de
     if (['add','offer'].includes(m)) return {operation:'Offer',value:delta.added,position:'Queue'};
     if (['poll','remove'].includes(m)) return {operation:'Poll',value:delta.removed,position:'Priority'};
   }
-  if (kind === 'list') {
+  if (kind === 'list' || kind === 'arrayList' || /^(ArrayList|Vector|CopyOnWriteArrayList)$/.test(kind)) {
     if (m === 'add') return argCount >= 2
       ? {operation:'Insert',value:delta.added,position:'Index: ' + (delta.index ?? '?')}
       : {operation:'Add',value:delta.added,position:'End'};
-    if (['addlast','offer'].includes(m)) return {operation:'Add',value:delta.added,position:'End'};
-    if (['remove','removelast','poll'].includes(m)) return {operation:'Remove',value:delta.removed,position:typeof delta.index === 'number' ? 'Index: ' + delta.index : 'End'};
+    if (['addlast','offer','append'].includes(m)) return {operation:'Add',value:delta.added,position:'End'};
+    if (['remove','removelast','poll','removeat'].includes(m)) return {operation:'Remove',value:delta.removed,position:typeof delta.index === 'number' ? 'Index: ' + delta.index : 'End'};
     if (m === 'set') return {operation:'Set',value:delta.added,oldValue:delta.removed,position:'Index: ' + (delta.index ?? '?'),showOld:true};
   }
-  if (kind === 'set') {
+  if (kind === 'set' || kind === 'sortedSet' || kind === 'insertionOrderedSet') {
     if (m === 'add') return {operation:'Add',value:delta.added,position:'Element'};
     if (m === 'remove') return {operation:'Remove',value:delta.removed,position:'Element'};
   }
@@ -778,11 +787,11 @@ export function compareMapEntries(
   const afterMap = new Map<string, { key: unknown; value: unknown }>();
 
   for (const entry of before) {
-    beforeMap.set(stableStringify(entry.key), entry);
+    beforeMap.set(mapKeySignature(entry.key), entry);
   }
 
   for (const entry of after) {
-    afterMap.set(stableStringify(entry.key), entry);
+    afterMap.set(mapKeySignature(entry.key), entry);
   }
 
   for (const [key, entry] of afterMap) {
@@ -859,10 +868,12 @@ export function dataStructureResults(current?: TraceState, previous?: TraceState
     if(bc && ac && bc.$collectionId===ac.$collectionId){
       const method=sourceCall(statement,name);
       const args=sourceCallArgs(statement,name);
-      let delta=collectionDelta(bc.values,ac.values);
-      if (!delta && ac.$kind === 'priorityQueue') delta=unorderedCollectionDelta(bc.values,ac.values);
+      const isUnordered = ac.$kind === 'priorityQueue' || ac.$kind === 'set';
+      const delta = isUnordered
+        ? unorderedCollectionDelta(bc.values, ac.values)
+        : collectionDelta(bc.values, ac.values);
       const op=delta ? collectionOperation(ac.$kind ?? '',method,delta,args.length) : undefined;
-      if(delta && op) add('col-'+name+'-'+stableStringify([delta.added,delta.removed,delta.index]),name,op.operation,op.value,op.position,op.oldValue,op.showOld);
+      if(delta && op) add('col-'+name+'-'+stableStringify([delta.added,delta.removed]),name,op.operation,op.value,op.position,op.oldValue,op.showOld);
       continue;
     }
 
@@ -1143,6 +1154,170 @@ function CollectionBackingArray({
   );
 }
 
+function previousCollectionSnapshot(
+  state: TraceState | undefined,
+  collectionId: string
+): { $collectionId: string; values: unknown[] } | undefined {
+  if (!state) return undefined;
+  const session = sessionStore.get();
+  const stateIndex = session.states.indexOf(state);
+  const selectedIndex = stateIndex >= 0
+    ? stateIndex
+    : Math.max(0, Math.min(session.index, session.states.length - 1));
+  const current = session.states[selectedIndex];
+  const previous = selectedIndex > 0 ? session.states[selectedIndex - 1] : undefined;
+  if (!current || !previous || current.sequence !== state.sequence) return undefined;
+
+  // A variable can be renamed or an alias can become the visible collection
+  // name between steps. Resolve by runtime identity, not by the current label.
+  const candidates = [
+    ...Object.values(previous.variables),
+    ...Object.values(previous.dataStructures),
+  ];
+  return candidates.find(candidate =>
+    isCollectionSnapshot(candidate) && candidate.$collectionId === collectionId
+  ) as { $collectionId: string; values: unknown[] } | undefined;
+}
+
+function collectionItemIdentity(item: unknown): string {
+  if (isPlainObject(item)) {
+    for (const key of ['$objectId', '$ref', '$arrayId', '$mapId', '$collectionId']) {
+      if (typeof item[key] === 'string') return key + ':' + item[key];
+    }
+  }
+  return stableStringify(item);
+}
+
+function collectionItemReactKey(item: unknown, index: number, values: unknown[]): string {
+  const identity = collectionItemIdentity(item);
+  const occurrence = values.slice(0, index).filter(candidate => collectionItemIdentity(candidate) === identity).length;
+  return identity + '#' + occurrence;
+}
+
+function collectionItemMotionClass(
+  value: { $collectionId: string; values: unknown[] },
+  item: unknown,
+  occurrenceIndex: number,
+  state: TraceState | undefined
+): string {
+  const prior = previousCollectionSnapshot(state, value.$collectionId);
+  if (!prior) return '';
+
+  // Count equal values rather than using a Set: collections may legally hold
+  // duplicate values (queues, deques and priority queues), and each occurrence
+  // must be treated independently.
+  const signature = collectionItemIdentity(item);
+  const occurrenceBefore = value.values.slice(0, occurrenceIndex + 1)
+    .filter(candidate => collectionItemIdentity(candidate) === signature).length;
+  const occurrencePreviously = prior.values
+    .filter(candidate => collectionItemIdentity(candidate) === signature).length;
+  return occurrenceBefore > occurrencePreviously ? 'yv-collection-item-enter' : '';
+}
+
+function HeapTreeView({
+  value,
+  state,
+  source,
+  depth,
+  seen
+}: {
+  value: Obj & { $collectionId: string; values: unknown[] };
+  state?: TraceState;
+  source: string;
+  depth: number;
+  seen: Set<string>;
+}) {
+  const treeRef = useRef<HTMLDivElement | null>(null);
+  const [geometry, setGeometry] = useState<{ width: number; height: number; paths: string; signature: string }>({
+    width: 0, height: 0, paths: '', signature: ''
+  });
+
+  // Measure the actual rendered node centers instead of guessing connector
+  // positions from values or equal-width levels. This keeps edges attached
+  // when labels have different widths or the heap is horizontally scrolled.
+  useLayoutEffect(() => {
+    const tree = treeRef.current;
+    if (!tree) return;
+    const measure = () => {
+      const currentTree = treeRef.current;
+      if (!currentTree) return;
+      const currentBounds = currentTree.getBoundingClientRect();
+      const currentWidth = Math.max(currentTree.clientWidth, currentTree.scrollWidth);
+      const currentHeight = Math.max(currentTree.clientHeight, currentTree.scrollHeight);
+      const nodes = Array.from(currentTree.querySelectorAll<HTMLElement>('.yv-heap-node[data-heap-index]'));
+      const centers = new Map<number, { x: number; top: number; bottom: number }>();
+      for (const node of nodes) {
+        const index = Number(node.dataset.heapIndex);
+        if (!Number.isInteger(index) || index < 0) continue;
+        const rect = node.getBoundingClientRect();
+        centers.set(index, {
+          x: rect.left - currentBounds.left + currentTree.scrollLeft + rect.width / 2,
+          top: rect.top - currentBounds.top + currentTree.scrollTop,
+          bottom: rect.bottom - currentBounds.top + currentTree.scrollTop
+        });
+      }
+      const paths: string[] = [];
+      for (const [index, child] of centers) {
+        if (index === 0) continue;
+        const parent = centers.get(Math.floor((index - 1) / 2));
+        if (!parent) continue;
+        paths.push(`M ${parent.x.toFixed(2)} ${parent.bottom.toFixed(2)} L ${child.x.toFixed(2)} ${child.top.toFixed(2)}`);
+      }
+      const pathData = paths.join(' ');
+      const signature = currentWidth + ':' + currentHeight + ':' + pathData;
+      setGeometry(previous => previous.signature === signature
+        ? previous
+        : { width: currentWidth, height: currentHeight, paths: pathData, signature });
+    };
+    measure();
+    const observer = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(measure)
+      : undefined;
+    observer?.observe(tree);
+    tree.querySelectorAll<HTMLElement>('.yv-heap-node[data-heap-index]').forEach(node => observer?.observe(node));
+    tree.addEventListener('scroll', measure, { passive: true });
+    return () => {
+      observer?.disconnect();
+      tree.removeEventListener('scroll', measure);
+    };
+  });
+
+  const levels: unknown[][] = [];
+  value.values.forEach((item, index) => {
+    const level = Math.floor(Math.log2(index + 1));
+    (levels[level] ??= []).push(item);
+  });
+
+  return (
+    <div className="yv-heap-tree" ref={treeRef}>
+      {geometry.paths && geometry.width > 0 && geometry.height > 0 && (
+        <svg className="yv-heap-links" width={geometry.width} height={geometry.height}
+          viewBox={`0 0 ${geometry.width} ${geometry.height}`} aria-hidden="true" focusable="false">
+          <path d={geometry.paths} />
+        </svg>
+      )}
+      {levels.map((items, level) => (
+        <div className="yv-heap-level" key={level}>
+          {items.map((item, index) => {
+            const heapIndex = (2 ** level) - 1 + index;
+            const key = collectionItemReactKey(item, heapIndex, value.values);
+            return (
+              <div className="yv-heap-node-wrap" key={key}>
+                <div data-heap-index={heapIndex} data-collection-item-key={key}
+                  className={"yv-heap-node " + collectionItemMotionClass(value, item, heapIndex, state)}>
+                  <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
+                </div>
+                <div className="yv-cell-index">[{heapIndex}]</div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+      {!value.values.length && <div className="yv-empty">Empty priority queue</div>}
+    </div>
+  );
+}
+
 function CollectionView({
   value,
   state,
@@ -1175,31 +1350,85 @@ function CollectionView({
       : 'collection';
 
   const itemCount = value.size ?? value.values.length;
+  const previousSnapshot = previousCollectionSnapshot(state, value.$collectionId);
+  const emptiedThisStep = Boolean(previousSnapshot && previousSnapshot.values.length > 0 && value.values.length === 0);
+  const sameLengthTopReplacement = kind === 'stack' && Boolean(previousSnapshot &&
+    previousSnapshot.values.length === value.values.length && value.values.length > 0 &&
+    collectionItemIdentity(previousSnapshot.values[previousSnapshot.values.length - 1]) !==
+      collectionItemIdentity(value.values[value.values.length - 1]));
+  const queueFrontChanged = (kind === 'queue' || kind === 'deque') && Boolean(previousSnapshot &&
+    previousSnapshot.values.length > 0 && value.values.length > 0 &&
+    collectionItemIdentity(previousSnapshot.values[0]) !== collectionItemIdentity(value.values[0]));
+  const queueRearChanged = (kind === 'queue' || kind === 'deque') && Boolean(previousSnapshot &&
+    previousSnapshot.values.length > 0 && value.values.length > 0 &&
+    collectionItemIdentity(previousSnapshot.values[previousSnapshot.values.length - 1]) !==
+      collectionItemIdentity(value.values[value.values.length - 1]));
+  const collectionRootRef = useRef<HTMLDivElement | null>(null);
+  const previousItemRects = useRef<Map<string, DOMRect>>(new Map());
+  const itemAnimations = useRef<WeakMap<HTMLElement, Animation>>(new WeakMap());
+
+  // FLIP only the surviving logical items when insertions/removals change layout.
+  // Removed items disappear in place; no detached "pop-out" element is rendered.
+  useLayoutEffect(() => {
+    const root = collectionRootRef.current;
+    if (!root) return;
+    const reduceMotion = typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const items = Array.from(root.querySelectorAll<HTMLElement>(
+      ':scope > .yv-stack-view > [data-collection-item-key], ' +
+      ':scope > .yv-queue-view > [data-collection-item-key], ' +
+      ':scope > .yv-set-view > [data-collection-item-key], ' +
+      ':scope > .yv-list-view > [data-collection-item-key], ' +
+      ':scope > .yv-heap-tree .yv-heap-node[data-collection-item-key]'
+    ));
+    const nextRects = new Map<string, DOMRect>();
+    for (const element of items) {
+      const key = element.dataset.collectionItemKey;
+      if (!key) continue;
+      // Rapid Next/Prev playback must not stack competing transforms.
+      itemAnimations.current.get(element)?.cancel();
+      const rect = element.getBoundingClientRect();
+      nextRects.set(key, rect);
+      const before = previousItemRects.current.get(key);
+      if (!reduceMotion && before && !element.classList.contains('yv-collection-item-enter')) {
+        const dx = before.left - rect.left;
+        const dy = before.top - rect.top;
+        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+          const animation = element.animate(
+            [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }],
+            { duration: 220, easing: 'cubic-bezier(.2,.75,.25,1)' }
+          );
+          itemAnimations.current.set(element, animation);
+        }
+      }
+    }
+    previousItemRects.current = nextRects;
+  });
 
   if (kind === 'stack') {
     return (
-      <div className="yv-collection">
+      <div className="yv-collection" ref={collectionRootRef} data-collection-emptied={emptiedThisStep ? 'true' : undefined}>
         <div className="yv-collection-meta">
           <span>{type}</span>
           <span>TOP · {itemCount} items</span>
         </div>
         <div className="yv-stack-view">
           {[...value.values].reverse().map((item, index) => (
-            <div className="yv-stack-cell" key={index}>
+            <div className={"yv-stack-cell " + collectionItemMotionClass(value, item, value.values.length - 1 - index, state) + (sameLengthTopReplacement && index === 0 ? ' yv-stack-top-updated' : '')} key={collectionItemReactKey(item, value.values.length - 1 - index, value.values)} data-collection-item-key={collectionItemReactKey(item, value.values.length - 1 - index, value.values)}>
               <span className="yv-stack-position">{index === 0 ? 'TOP' : ''}</span>
               <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
             </div>
           ))}
           {!value.values.length && <div className="yv-empty">Empty stack</div>}
         </div>
-        <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
       </div>
     );
   }
 
   if (kind === 'queue' || kind === 'deque') {
     return (
-      <div className="yv-collection">
+      <div className="yv-collection" ref={collectionRootRef} data-collection-emptied={emptiedThisStep ? 'true' : undefined}>
         <div className="yv-collection-meta">
           <span>{type}</span>
           <span>{kind === 'deque' ? 'FRONT ↔ REAR' : 'FRONT → REAR'} · {itemCount} items</span>
@@ -1207,72 +1436,83 @@ function CollectionView({
         <div className="yv-queue-view">
           <div className="yv-queue-end">FRONT</div>
           {value.values.map((item, index) => (
-            <div className="yv-queue-cell" key={index}>
+            <div className={"yv-queue-cell " + collectionItemMotionClass(value, item, index, state) + (queueFrontChanged && index === 0 ? ' yv-queue-front-changed' : '') + (queueRearChanged && index === value.values.length - 1 ? ' yv-queue-rear-changed' : '')} key={collectionItemReactKey(item, index, value.values)} data-collection-item-key={collectionItemReactKey(item, index, value.values)}>
               <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
             </div>
           ))}
           <div className="yv-queue-end">REAR</div>
           {!value.values.length && <div className="yv-empty">Empty queue</div>}
         </div>
-        <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
       </div>
     );
   }
 
-  if (kind === 'set') {
+  if (kind === 'set' || kind === 'sortedSet' || kind === 'insertionOrderedSet') {
     return (
-      <div className="yv-collection">
+      <div className="yv-collection" ref={collectionRootRef} data-collection-emptied={emptiedThisStep ? 'true' : undefined}>
         <div className="yv-collection-meta">
           <span>{type}</span>
-          <span>UNORDERED · {itemCount} elements</span>
+          <span>{kind === 'sortedSet' ? 'SORTED · ' : kind === 'insertionOrderedSet' ? 'INSERTION ORDER · ' : 'UNORDERED · '}{itemCount} elements</span>
         </div>
         <div className="yv-set-view">
           {value.values.map((item, index) => (
-            <div className="yv-set-element" key={index}>
+            <div className={"yv-set-element " + collectionItemMotionClass(value, item, index, state)} key={collectionItemReactKey(item, index, value.values)} data-collection-item-key={collectionItemReactKey(item, index, value.values)}>
               <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
             </div>
           ))}
           {!value.values.length && <div className="yv-empty">Empty set</div>}
         </div>
-        <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
       </div>
     );
   }
 
   if (kind === 'priorityQueue') {
     return (
-      <div className="yv-collection">
+      <div className="yv-collection" ref={collectionRootRef} data-collection-emptied={emptiedThisStep ? 'true' : undefined}>
         <div className="yv-collection-meta">
           <span>{type}</span>
-          <span>MIN-HEAP · {itemCount} items</span>
+          <span>HEAP · {itemCount} items</span>
         </div>
-        <div className="yv-heap-tree">
-          {(() => {
-            const levels: unknown[][] = [];
-            value.values.forEach((item, index) => {
-              const level = Math.floor(Math.log2(index + 1));
-              (levels[level] ??= []).push(item);
-            });
-            return levels.map((items, level) => (
-              <div className="yv-heap-level" key={level}>
-                {items.map((item, index) => (
-                  <div className="yv-heap-node-wrap" key={`${level}-${index}`}>
-                    <div className="yv-heap-node"><DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/></div>
-                    <div className="yv-cell-index">[{(2 ** level) - 1 + index}]</div>
-                  </div>
-                ))}
-              </div>
-            ));
-          })()}
-        </div>
+        <HeapTreeView value={value} state={state} source={source} depth={depth} seen={seen}/>
         <div className="yv-code yv-heap-note">Heap tree · root is index 0</div>
-        <CollectionBackingArray value={value} state={state} source={source} name={name} depth={depth} seen={seen}/>
+      </div>
+    );
+  }
+
+  if (kind === 'list' || kind === 'arrayList' || /^(ArrayList|Vector|CopyOnWriteArrayList)$/.test(type)) {
+    const listIndexNames = collectionIndexVariableNames(source, name);
+    const listPointers = pointerTargets(state, value.values.length, listIndexNames, name, source);
+    const pointersAt = (index: number) => listPointers.filter(pointer => pointer.index === index);
+    return (
+      <div className="yv-collection" ref={collectionRootRef} data-collection-emptied={emptiedThisStep ? 'true' : undefined}>
+        <div className="yv-collection-meta">
+          <span>{type}</span>
+          <span>INDEXED ORDER · {itemCount} items</span>
+        </div>
+        <div className="yv-list-view">
+          {value.values.map((item, index) => (
+            <div className="yv-list-slot" key={collectionItemReactKey(item, index, value.values)}
+              data-collection-item-key={collectionItemReactKey(item, index, value.values)}>
+              <div className="yv-list-pointer-row" aria-hidden="true">{pointersAt(index).map(pointer => <span key={pointer.name} className="yv-list-pointer">{pointer.name}</span>)}</div>
+              <div className={"yv-list-cell " + collectionItemMotionClass(value, item, index, state)}>
+                <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
+              </div>
+              <div className="yv-cell-index">{index}</div>
+            </div>
+          ))}
+          {!value.values.length && <div className="yv-empty">Empty list</div>}
+          {listPointers.some(pointer => pointer.index === value.values.length) && <div className="yv-list-slot yv-list-end-slot" aria-label="List boundary, not an element">
+            <div className="yv-list-pointer-row" aria-hidden="true">{pointersAt(value.values.length).map(pointer => <span key={pointer.name} className="yv-list-pointer yv-list-pointer-end">{pointer.name}</span>)}</div>
+            <div className="yv-list-cell" title="One past the last item" aria-label="List boundary, not an item">×</div>
+            <div className="yv-cell-index">{value.values.length}</div>
+          </div>}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="yv-collection">
+    <div className="yv-collection" ref={collectionRootRef} data-collection-emptied={emptiedThisStep ? 'true' : undefined}>
       <div className="yv-collection-meta">
         <span>{type}</span>
         <span>{kind} · {itemCount} items</span>
@@ -1472,6 +1712,19 @@ function EnhancedForValueCard({ binding, alignStart = false }: { binding: Enhanc
         width: 6, height: 6, borderRadius: '50%', background: 'var(--yv-accent, #65a9ff)' }} />
     </div>
   );
+}
+
+function collectionIndexVariableNames(source: string, collectionName?: string): Set<string> {
+  const names = new Set<string>();
+  if (!collectionName) return names;
+  for (const candidate of collectionName.split('/').map(part => part.trim()).filter(Boolean)) {
+    const escaped = candidate.replace(/[$]/g, '\\$&');
+    const pattern = new RegExp('\\b' + escaped + '\\s*\\.\\s*(?:get|set|remove)\\s*\\(\\s*([^,)]+)', 'g');
+    for (const match of source.matchAll(pattern)) {
+      for (const identifier of (match[1] ?? '').matchAll(/\b[A-Za-z_$][\w$]*\b/g)) names.add(identifier[0]);
+    }
+  }
+  return names;
 }
 
 function arrayIndexVariableNames(source: string, arrayName?: string): Set<string> {
@@ -1918,6 +2171,55 @@ function shiftedArrayIndices(state?: TraceState, arrayName?: string): Map<number
   return directions;
 }
 
+function swappedMatrixPaths(state: TraceState | undefined, arrayName?: string): Set<string> {
+  const paths = new Set<string>();
+  const data = state?.lastEvent?.data;
+  if (!isPlainObject(data)) return paths;
+
+  const writes: Obj[] = [];
+  if (state?.lastEvent?.type === 'ARRAY_WRITE') writes.push(data);
+  if (Array.isArray(data.executionEvents)) {
+    for (const event of data.executionEvents) {
+      if (isPlainObject(event) && event.type === 'ARRAY_WRITE' && isPlainObject(event.data)) {
+        writes.push(event.data);
+      }
+    }
+  }
+
+  for (const write of writes) {
+    if (arrayName && (typeof write.name !== 'string' || !arrayNameMatches(write.name, arrayName))) continue;
+    if (!Array.isArray(write.changes)) continue;
+    const changes = write.changes.filter((change): change is Obj =>
+      isPlainObject(change) &&
+      Array.isArray(change.indices) &&
+      change.indices.length === 2 &&
+      change.indices.every(index => typeof index === 'number' && Number.isInteger(index)) &&
+      'before' in change &&
+      'after' in change &&
+      valueChanged(change.before, change.after)
+    ).map(change => ({
+      path: (change.indices as number[]).join(','),
+      before: change.before,
+      after: change.after,
+    }));
+
+    // Only mark cells when the trace proves an actual two-cell exchange.
+    // This also covers row swaps: each changed column is paired independently.
+    for (let i = 0; i < changes.length; i++) {
+      const first = changes[i]!;
+      for (let j = i + 1; j < changes.length; j++) {
+        const second = changes[j]!;
+        if (first.path === second.path) continue;
+        if (!valueChanged(first.before, second.after) && !valueChanged(first.after, second.before)) {
+          paths.add(first.path);
+          paths.add(second.path);
+        }
+      }
+    }
+  }
+  return paths;
+}
+
 function MatrixView({ value, state, source, arrayName, depth, seen }: {
   value: unknown[][];
   state?: TraceState;
@@ -1931,6 +2233,7 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
   const columnCount = Math.max(0, ...rows.map(row => row.length));
   const readPaths = accessedArrayPaths(state, arrayName);
   const writtenPaths = changedArrayPaths(state, arrayName);
+  const swappedPaths = swappedMatrixPaths(state, arrayName);
   const comparedPaths = isComparisonStatement(source, state) && readPaths.size >= 2 ? readPaths : new Set<string>();
   const indexNames = matrixIndexVariableNames(source, arrayName);
   const targets = matrixPointerTargets(state, rowCount, columnCount, indexNames);
@@ -2015,7 +2318,9 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
       }
 
       for (const target of targets.rows) {
-        const cell = matrixCellRefs.current[target.index + ',0'];
+        // Anchor to the row fragment, not column zero: jagged matrices may
+        // contain an empty row with no [row, 0] cell to measure.
+        const cell = matrixCellRefs.current['__row,' + target.index];
         if (!cell) continue;
         const group = rowGroups.get(target.index) ?? [];
         group.push(target);
@@ -2026,7 +2331,7 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
         next.set(key, target.index);
       }
       for (const [index, group] of rowGroups) {
-        const cell = matrixCellRefs.current[index + ',0'];
+        const cell = matrixCellRefs.current['__row,' + index];
         if (!cell) continue;
         const center = cell.offsetTop + cell.offsetHeight / 2;
         const gap = 3;
@@ -2055,9 +2360,11 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
     <div
       className="yv-matrix yv-matrix-grid"
       ref={matrixRef}
+      data-matrix-empty={rowCount === 0 ? 'true' : undefined}
       style={{ gridTemplateColumns: `62px repeat(${columnCount}, minmax(36px, max-content))` }}
     >
       <div className="yv-matrix-corner" />
+      {rowCount === 0 && <div className="yv-empty yv-matrix-empty-state">Empty matrix · 0 rows</div>}
       {Array.from({ length: columnCount }, (_, column) => (
         <div
           className={`yv-matrix-column-index ${activeColumns.has(column) ? 'yv-matrix-axis-active' : ''}`}
@@ -2067,7 +2374,10 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
       ))}
       {rows.map((row, r) => (
         <div className="yv-matrix-row-fragment" key={'row-' + r}>
-          <div className={`yv-matrix-row-index ${activeRows.has(r) ? 'yv-matrix-axis-active' : ''}`}>{r}</div>
+          <div
+            className={`yv-matrix-row-index ${activeRows.has(r) ? 'yv-matrix-axis-active' : ''}`}
+            ref={element => { matrixCellRefs.current['__row,' + r] = element; }}
+          >{r}</div>
           {Array.from({ length: columnCount }, (_, column) => {
             const path = r + ',' + column;
             const exists = column < row.length;
@@ -2080,7 +2390,7 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
               >
                 <div
                   key={`${path}-${state?.sequence ?? state?.line ?? 'initial'}`}
-                  className={`yv-cell-value ${comparedPaths.has(path) ? 'yv-cell-compared ' : ''}${readPaths.has(path) ? 'yv-cell-read ' : ''}${writtenPaths.has(path) ? 'yv-cell-written' : ''}`}
+                  className={`yv-cell-value ${comparedPaths.has(path) ? 'yv-cell-compared ' : ''}${readPaths.has(path) ? 'yv-cell-read ' : ''}${writtenPaths.has(path) ? 'yv-cell-written ' : ''}${swappedPaths.has(path) ? 'yv-matrix-cell-swapped' : ''}`}
                 >
                   {exists
                     ? <DataValue value={row[column]} state={state} source={source} depth={depth + 1} seen={seen}/>
@@ -2110,9 +2420,11 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
         ))}
         {targets.rows.flatMap(rowTarget =>
           targets.columns
-            .filter(columnTarget =>
-              !hasAuthoritativeAccessEvents || readPaths.has(rowTarget.index + ',' + columnTarget.index)
-            )
+            .filter(columnTarget => {
+              const path = rowTarget.index + ',' + columnTarget.index;
+              const cellExists = columnTarget.index < (rows[rowTarget.index]?.length ?? 0);
+              return cellExists && (!hasAuthoritativeAccessEvents || readPaths.has(path));
+            })
             .map(columnTarget => (
               <div
                 key={`intersection:${rowTarget.name}:${columnTarget.name}`}
@@ -2140,7 +2452,11 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
 }) {
   // A Java 2D array may arrive as raw nested arrays or as row-level array
   // snapshots. Normalize both shapes into a single grid without flattening it.
-  const matrixLike = value.length > 0 && value.every(row => Array.isArray(row) || isArraySnapshot(row));
+  const matrixAccess = /\b[A-Za-z_$][\w$]*\s*\[[^\]]+\]\s*\[[^\]]+\]/.test(source) &&
+    (!arrayName || source.includes(arrayName));
+  const matrixLike = value.length > 0
+    ? value.every(row => Array.isArray(row) || isArraySnapshot(row))
+    : matrixAccess;
   if (matrixLike) {
     const rows = value.map(row => Array.isArray(row) ? row : isArraySnapshot(row) ? row.values : []);
     return <MatrixView value={rows} state={state} source={source} arrayName={arrayName} depth={depth} seen={seen}/>;
@@ -2172,7 +2488,8 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
       // side. This avoids hiding one index behind another (e.g. left/right).
       const groups = new Map<number, typeof targets>();
       for (const target of targets) {
-        const cell = cellRefs.current[target.index];
+        // One-past-end cursors use a dedicated sentinel cell, not a real element.
+        const cell = cellRefs.current[target.index] ?? null;
         if (!cell) continue;
         const group = groups.get(target.index) ?? [];
         group.push(target);
@@ -2230,7 +2547,7 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
           <div
             key={target.name}
             data-array-pointer={target.name}
-            className={`yv-pointer ${pointerLayout.moving.has(target.name) ? 'yv-pointer-moving' : ''}`}
+            className={`yv-pointer ${target.index === value.length ? 'yv-pointer-out-of-bounds' : ''} ${pointerLayout.moving.has(target.name) ? 'yv-pointer-moving' : ''}`}
             style={{ transform: `translate3d(${pointerLayout.offsets[target.name] ?? 0}px, 0, 0) translateX(-50%)` }}
           >{target.name}</div>
         ))}
@@ -2249,29 +2566,59 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
           <div className="yv-cell-index">{index}</div>
         </div>
       ))}
+      {targets.some(target => target.index === value.length) && (
+        <div className="yv-cell yv-array-end-slot" key="array-end" ref={element => { cellRefs.current[value.length] = element; }}>
+          <div className="yv-cell-value yv-array-end-marker" title="One past the last element" aria-label="Array boundary, not an element">×</div>
+          <div className="yv-cell-index">{value.length}</div>
+        </div>
+      )}
     </div>
   );
 }
 
-function mapChanges(state?: TraceState): Array<{
+function mapSnapshotCandidates(state?: TraceState): unknown[] {
+  const candidates: unknown[] = [
+    ...Object.values(state?.variables ?? {}),
+    ...Object.values(state?.dataStructures ?? {})
+  ];
+  const thisValue = state?.variables?.this;
+  if (isPlainObject(thisValue) && isPlainObject(thisValue.fields)) {
+    candidates.push(...Object.values(thisValue.fields));
+  }
+  const thisId = isPlainObject(thisValue)
+    ? (typeof thisValue.$objectId === 'string' ? thisValue.$objectId
+      : typeof thisValue.$ref === 'string' ? thisValue.$ref : undefined)
+    : undefined;
+  const thisObject = thisId ? state?.objects?.[thisId] : undefined;
+  if (isPlainObject(thisObject)) candidates.push(...Object.values(objectFields(thisObject)));
+  return candidates;
+}
+
+function mapChanges(state?: TraceState, mapId?: string): Array<{
   kind: 'insert' | 'update' | 'delete';
   key: unknown;
   before?: unknown;
   after?: unknown;
 }> {
   const data = state?.lastEvent?.data;
-  if (!isPlainObject(data)) return [];
-
   const changes: unknown[] = [];
-  if (Array.isArray(data.changes)) changes.push(...data.changes);
-  if (Array.isArray(data.executionEvents)) {
-    for (const event of data.executionEvents) {
-      if (!isPlainObject(event) || event.type !== 'MAP_WRITE' || !isPlainObject(event.data)) continue;
-      if (Array.isArray(event.data.changes)) changes.push(...event.data.changes);
+  if (isPlainObject(data)) {
+    // A trace step may carry writes for several maps. Never apply a write to
+    // a different map just because its key happens to compare equal.
+    if (Array.isArray(data.changes) &&
+        (typeof data.mapId !== 'string' || data.mapId === mapId)) {
+      changes.push(...data.changes);
+    }
+    if (Array.isArray(data.executionEvents)) {
+      for (const event of data.executionEvents) {
+        if (!isPlainObject(event) || event.type !== 'MAP_WRITE' || !isPlainObject(event.data)) continue;
+        if (typeof event.data.mapId === 'string' && event.data.mapId !== mapId) continue;
+        if (Array.isArray(event.data.changes)) changes.push(...event.data.changes);
+      }
     }
   }
 
-  return changes.filter(
+  const authoritative = changes.filter(
     (change): change is {
       kind: 'insert' | 'update' | 'delete';
       key: unknown;
@@ -2283,6 +2630,104 @@ function mapChanges(state?: TraceState): Array<{
         change.kind === 'update' ||
         change.kind === 'delete')
   );
+  const collapseSameKeyWrites = (input: typeof authoritative) => {
+    const grouped = new Map<string, {
+      key: unknown;
+      firstKind: 'insert' | 'update' | 'delete';
+      lastKind: 'insert' | 'update' | 'delete';
+      before?: unknown;
+      after?: unknown;
+    }>();
+    for (const change of input) {
+      const signature = mapKeySignature(change.key);
+      const previous = grouped.get(signature);
+      if (!previous) {
+        grouped.set(signature, {
+          key: change.key,
+          firstKind: change.kind,
+          lastKind: change.kind,
+          before: change.before,
+          after: change.kind === 'delete' ? undefined : change.after
+        });
+      } else {
+        previous.lastKind = change.kind;
+        if (previous.before === undefined && change.kind !== 'insert' && change.before !== undefined) {
+          previous.before = change.before;
+        }
+        previous.after = change.kind === 'delete' ? undefined : change.after;
+      }
+    }
+    const collapsed: typeof authoritative = [];
+    for (const change of grouped.values()) {
+      // A transient insert followed by delete has no visible final-state delta.
+      if (change.firstKind === 'insert' && change.lastKind === 'delete') continue;
+      const kind = change.firstKind === 'insert' ? 'insert' :
+        change.lastKind === 'delete' ? 'delete' :
+        change.firstKind === 'delete' && change.lastKind === 'insert' ? 'update' :
+        change.firstKind === 'delete' ? 'delete' : 'update';
+      collapsed.push({
+        kind,
+        key: change.key,
+        ...(kind === 'insert' ? {} : change.before !== undefined ? { before: change.before } : {}),
+        ...(kind === 'delete' ? {} : change.after !== undefined ? { after: change.after } : {})
+      });
+    }
+    return collapsed;
+  };
+  if (authoritative.length) return collapseSameKeyWrites(authoritative);
+  if (!state || !mapId) return [];
+
+  // Some runtime checkpoints contain exact before/after snapshots but no MAP_WRITE
+  // payload. Derive only the concrete map delta between adjacent captured states.
+  const session = sessionStore.get();
+  const currentIndex = session.states.findIndex(candidate =>
+    candidate === state || (state.sequence !== undefined && candidate.sequence === state.sequence)
+  );
+  if (currentIndex <= 0) return [];
+  const previousState = session.states[currentIndex - 1];
+  const previousMap = mapSnapshotCandidates(previousState).find(candidate =>
+    isPlainObject(candidate) && candidate.$mapId === mapId && Array.isArray(candidate.entries)
+  );
+  const currentMap = mapSnapshotCandidates(state).find(candidate =>
+    isPlainObject(candidate) && candidate.$mapId === mapId && Array.isArray(candidate.entries)
+  );
+  if (!isPlainObject(previousMap) || !isPlainObject(currentMap)) return [];
+  return compareMapEntries(
+    previousMap.entries as Array<{ key: unknown; value: unknown }>,
+    currentMap.entries as Array<{ key: unknown; value: unknown }>
+  );
+}
+
+function mapReorderedKeys(
+  state: TraceState | undefined,
+  mapId: string,
+  currentEntries: Array<{ key: unknown; value: unknown }>
+): Set<string> {
+  if (!state) return new Set<string>();
+  const session = sessionStore.get();
+  const currentIndex = session.states.findIndex(candidate =>
+    candidate === state || (state.sequence !== undefined && candidate.sequence === state.sequence)
+  );
+  if (currentIndex <= 0) return new Set<string>();
+  const previousState = session.states[currentIndex - 1];
+  const previousMap = mapSnapshotCandidates(previousState).find(candidate =>
+    isPlainObject(candidate) && candidate.$mapId === mapId && Array.isArray(candidate.entries)
+  );
+  if (!isPlainObject(previousMap) || !Array.isArray(previousMap.entries) ||
+      previousMap.entries.length !== currentEntries.length) return new Set<string>();
+  const previousIndices = new Map<string, number>();
+  (previousMap.entries as Array<{ key: unknown }>).forEach((entry, index) =>
+    previousIndices.set(mapKeySignature(entry.key), index)
+  );
+  const currentIndices = new Map<string, number>();
+  currentEntries.forEach((entry, index) => currentIndices.set(mapKeySignature(entry.key), index));
+  if (previousIndices.size !== currentIndices.size ||
+      [...previousIndices.keys()].some(key => !currentIndices.has(key))) return new Set<string>();
+  const moved = new Set<string>();
+  for (const [key, index] of currentIndices) {
+    if (previousIndices.get(key) !== index) moved.add(key);
+  }
+  return moved;
 }
 
 function MapView({
@@ -2301,43 +2746,87 @@ function MapView({
   depth?: number;
   seen?: Set<string>;
 }) {
-  const changes = mapChanges(state);
+  const changes = mapChanges(state, value.$mapId);
+  const typeName = typeof value.$type === 'string' ? value.$type.split('.').pop() : '';
+  const accessOrdered = typeName === 'LinkedHashMap' &&
+    /new\s+LinkedHashMap\s*<[^>]*>\s*\(\s*[^,]+,\s*[^,]+,\s*true\s*\)/s.test(source);
+  const reorderedKeys = typeName === 'LinkedHashMap'
+    ? mapReorderedKeys(state, value.$mapId, value.entries)
+    : new Set<string>();
 
   const findChange = (key: unknown) =>
     changes.find(
       change =>
-        stableStringify(change.key) ===
-        stableStringify(key)
+        mapKeySignature(change.key) ===
+        mapKeySignature(key)
     );
 
   const deleted = changes.filter(
     change => change.kind === 'delete'
   );
+  const mapTableRef = useRef<HTMLDivElement | null>(null);
+  const previousMapRowRects = useRef<Map<string, DOMRect>>(new Map());
+  const mapRowAnimations = useRef<WeakMap<HTMLElement, Animation>>(new WeakMap());
+  useLayoutEffect(() => {
+    const table = mapTableRef.current;
+    if (!table) return;
+    const reduceMotion = typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const rows = Array.from(table.querySelectorAll<HTMLElement>(':scope > .yv-map-row[data-map-key-identity]'));
+    const nextRects = new Map<string, DOMRect>();
+    for (const row of rows) {
+      const key = row.dataset.mapKeyIdentity;
+      if (!key) continue;
+      mapRowAnimations.current.get(row)?.cancel();
+      const rect = row.getBoundingClientRect();
+      nextRects.set(key, rect);
+      const before = previousMapRowRects.current.get(key);
+      if (!reduceMotion && before && !row.classList.contains('yv-map-insert')) {
+        const dx = before.left - rect.left;
+        const dy = before.top - rect.top;
+        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+          mapRowAnimations.current.set(row, row.animate(
+            [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }],
+            { duration: 230, easing: 'cubic-bezier(.2,.75,.25,1)' }
+          ));
+        }
+      }
+    }
+    previousMapRowRects.current = nextRects;
+  });
 
   return (
-    <div className="yv-hashmap">
+    <div className="yv-hashmap" data-map-id={value.$mapId}>
       <div className="yv-map-meta">
         <span>
           {typeof value.$type === 'string'
             ? value.$type.split('.').pop()
             : 'Map'}
         </span>
-        <span>{value.entries.length} entries</span>
+        <span>{typeof value.$type === 'string' && value.$type.endsWith('TreeMap')
+          ? 'SORTED BY KEY · ' + value.entries.length + ' entries'
+          : typeof value.$type === 'string' && value.$type.endsWith('LinkedHashMap')
+            ? (accessOrdered ? 'ACCESS ORDER · ' : 'INSERTION ORDER · ') + value.entries.length + ' entries'
+            : value.entries.length + ' entries'}</span>
       </div>
 
-      <div className="yv-map-table">
+      <div ref={mapTableRef} className={"yv-map-table" + (deleted.length ? ' yv-map-delete-pulse' : '')}
+        data-map-delete-count={deleted.length || undefined}>
         <div className="yv-map-header">
           <div>Key</div>
           <div>Value</div>
         </div>
 
+        {!value.entries.length && <div className="yv-empty yv-map-empty">Empty map</div>}
         {value.entries.map((entry, index) => {
           const change = findChange(entry.key);
 
           return (
             <div
-              className={`yv-map-row ${change ? `yv-map-${change.kind}` : ''}`}
-              key={stableStringify(entry.key) || index}
+              className={`yv-map-row ${change ? `yv-map-${change.kind}` : ''}${reorderedKeys.has(mapKeySignature(entry.key)) ? ' yv-map-reordered' : ''}`}
+              key={mapKeySignature(entry.key)} data-map-key-identity={mapKeySignature(entry.key)}
+              data-map-reordered={reorderedKeys.has(mapKeySignature(entry.key)) ? 'true' : undefined}
             >
               <div className="yv-map-key">
                 <DataValue value={entry.key} state={state} source={source} depth={depth + 1} seen={seen}/>
@@ -2363,19 +2852,14 @@ function MapView({
             </div>
           );
         })}
-
         {deleted.map((change, index) => (
-          <div
-            className="yv-map-row yv-map-delete"
-            key={`deleted-${stableStringify(change.key)}-${index}`}
-          >
+          <div className="yv-map-row yv-map-delete" key={`deleted-${mapKeySignature(change.key)}-${index}`}
+            data-map-key-identity={mapKeySignature(change.key)} data-map-deleted="true">
             <div className="yv-map-key">
-              <DataValue value={change.key} state={state} source={source} depth={depth + 1} seen={seen}/>
+              <DataValue value={change.key} state={state} source={source} depth={depth + 1} seen={seen} resolveObjects={false}/>
             </div>
             <div className="yv-map-value">
-              <span className="yv-old-value">
-                <DataValue value={change.before} state={state} source={source} depth={depth + 1} seen={seen} resolveObjects={false}/>
-              </span>
+              <DataValue value={change.before} state={state} source={source} depth={depth + 1} seen={seen} resolveObjects={false}/>
               <span className="yv-map-tag">REMOVED</span>
             </div>
           </div>
@@ -2399,15 +2883,407 @@ function resolveRef(value: unknown, objects: Record<string,unknown>): unknown {
 }
 function nodeValue(value: Obj): unknown { const f=objectFields(value); return f.val ?? f.value ?? f.data ?? '?'; }
 
+function looksGraphNode(value: Obj): boolean {
+  return 'neighbors' in objectFields(value);
+}
+
+function graphNeighborValues(value: Obj): unknown[] | undefined {
+  const fields = objectFields(value);
+  if (!('neighbors' in fields)) return undefined;
+  const neighbors = fields.neighbors;
+  if (Array.isArray(neighbors)) return neighbors;
+  if (isPlainObject(neighbors) && Array.isArray(neighbors.values)) return neighbors.values;
+  return neighbors == null ? [] : undefined;
+}
+
+function graphReferenceId(value: unknown, objects: Record<string, unknown>): string | undefined {
+  if (!isPlainObject(value)) return undefined;
+  if (typeof value.$objectId === 'string') return value.$objectId;
+  if (typeof value.$ref === 'string') return value.$ref;
+  const resolved = resolveRef(value, objects);
+  if (isPlainObject(resolved) && typeof resolved.$objectId === 'string') return resolved.$objectId;
+  return undefined;
+}
+
+function looksTrieNode(value: Obj): boolean {
+  const fields = objectFields(value);
+  return /TrieNode/i.test(objectType(value)) ||
+    ('children' in fields && ['isEnd', 'isWord', 'endOfWord', 'isEndOfWord', 'terminal', 'isTerminal'].some(name => name in fields));
+}
+
+function trieChildEntries(value: Obj, source: string): Array<{ label: string; target: unknown }> {
+  const children = objectFields(value).children;
+  const characterIndexed = /children\s*\[\s*[A-Za-z_$][\w$]*\s*-\s*['"]a['"]\s*\]/.test(source);
+  if (isPlainObject(children) && Array.isArray(children.entries)) {
+    return children.entries.flatMap((entry: unknown) => {
+      if (!isPlainObject(entry) || entry.value == null) return [];
+      return [{ label: typeof entry.key === 'string' ? entry.key : displayValue(entry.key), target: entry.value }];
+    });
+  }
+  const values = Array.isArray(children) ? children :
+    isPlainObject(children) && Array.isArray(children.values) ? children.values : undefined;
+  if (values) {
+    return values.flatMap((target, index) => target == null ? [] : [{
+      label: characterIndexed && index < 26 ? String.fromCharCode(97 + index) : '[' + index + ']',
+      target,
+    }]);
+  }
+  if (isPlainObject(children)) {
+    return Object.entries(children).flatMap(([label, target]) => target == null ? [] : [{ label, target }]);
+  }
+  return [];
+}
+
+function trieTerminal(value: Obj): boolean {
+  const fields = objectFields(value);
+  return ['isEnd', 'isWord', 'endOfWord', 'isEndOfWord', 'terminal', 'isTerminal']
+    .some(name => fields[name] === true);
+}
+
+export function TrieView({ objects, variables = {}, source = '', state }: {
+  objects: Record<string, unknown>;
+  variables?: Record<string, unknown>;
+  source?: string;
+  state?: TraceState;
+}) {
+  const session = sessionStore.get();
+  const selectedIndex = state ? session.states.indexOf(state) : -1;
+  const previous = selectedIndex > 0 ? session.states[selectedIndex - 1] : undefined;
+  const previousObjects = previous?.objects ?? {};
+  const changedNodeIds = new Set<string>();
+  const enteredNodeIds = new Set<string>();
+  const createdNodeIds = new Set<string>();
+  if (state && previous && session.states.includes(state)) {
+    for (const [key, value] of Object.entries(objects)) {
+      if (!isPlainObject(value) || !looksTrieNode(value)) continue;
+      const id = typeof value.$objectId === 'string' ? value.$objectId : key;
+      const before = previousObjects[id];
+      if (before === undefined) createdNodeIds.add(id);
+      else if (stableStringify(before) !== stableStringify(value)) changedNodeIds.add(id);
+    }
+    for (const [name, value] of Object.entries(variables)) {
+      const currentId = graphReferenceId(value, objects);
+      const previousId = graphReferenceId(previous.variables[name], previousObjects);
+      if (currentId && currentId !== previousId) enteredNodeIds.add(currentId);
+    }
+  }
+  const nodes = Object.entries(objects).flatMap(([key, value]) => {
+    if (!isPlainObject(value) || !looksTrieNode(value)) return [];
+    const id = typeof value.$objectId === 'string' ? value.$objectId : key;
+    return [{ id, value, children: trieChildEntries(value, source), terminal: trieTerminal(value) }];
+  }).slice(0, 500);
+  const byId = new Map(nodes.map(node => [node.id, node]));
+  const childIds = new Set(nodes.flatMap(node => node.children.flatMap(child => {
+    const id = graphReferenceId(child.target, objects);
+    return id && byId.has(id) ? [id] : [];
+  })));
+  const roots = nodes.filter(node => !childIds.has(node.id));
+  const rootNodes = roots.length ? roots : nodes.slice(0, 1);
+  const pointerNames = new Map<string, string[]>();
+  for (const [name, value] of Object.entries(variables)) {
+    const directId = graphReferenceId(value, objects);
+    if (directId && byId.has(directId)) {
+      pointerNames.set(directId, [...(pointerNames.get(directId) ?? []), name]);
+      continue;
+    }
+    const resolved = directId ? objects[directId] : undefined;
+    if (isPlainObject(resolved)) {
+      const rootId = graphReferenceId(objectFields(resolved).root, objects);
+      if (rootId && byId.has(rootId)) pointerNames.set(rootId, [...(pointerNames.get(rootId) ?? []), name]);
+    }
+  }
+
+  if (!nodes.length) return <div className="yv-empty">No trie nodes captured.</div>;
+
+  const renderedNodes = new Set<string>();
+  const renderNode = (id: string, edgeLabel: string, depth: number, path: Set<string>): React.ReactNode => {
+    const node = byId.get(id);
+    if (!node) return <span className="yv-code">unresolved</span>;
+    if (depth > 12) return <span className="yv-code">…</span>;
+    if (path.has(id)) return <span className="yv-code" data-trie-cycle={id}>↻ {id}</span>;
+    if (renderedNodes.has(id)) return <span className="yv-code" data-trie-reference={id}>↗ {id}</span>;
+    renderedNodes.add(id);
+    const nextPath = new Set(path);
+    nextPath.add(id);
+    const pointers = pointerNames.get(id) ?? [];
+    const previousTrieNode = previousObjects[id];
+    const previousChildren = isPlainObject(previousTrieNode) && looksTrieNode(previousTrieNode)
+      ? trieChildEntries(previousTrieNode, source)
+      : [];
+    const childSignature = (child: { label: string; target: unknown }, objectMap: Record<string, unknown>) =>
+      JSON.stringify([child.label, graphReferenceId(child.target, objectMap) ?? stableStringify(child.target)]);
+    const currentChildCounts = new Map<string, number>();
+    for (const child of node.children) {
+      const signature = childSignature(child, objects);
+      currentChildCounts.set(signature, (currentChildCounts.get(signature) ?? 0) + 1);
+    }
+    const previousChildCounts = new Map<string, number>();
+    const removedChildren = previousChildren.flatMap(child => {
+      const signature = childSignature(child, previousObjects);
+      const occurrence = previousChildCounts.get(signature) ?? 0;
+      previousChildCounts.set(signature, occurrence + 1);
+      return occurrence < (currentChildCounts.get(signature) ?? 0) ? [] : [{ label: child.label, signature }];
+    });
+    return (
+      <div className={'yv-trie-branch' + (changedNodeIds.has(id) ? ' yv-trie-node-changed' : '') + (enteredNodeIds.has(id) ? ' yv-trie-node-entered' : '') + (createdNodeIds.has(id) ? ' yv-trie-node-created' : '')}
+        key={id + ':' + edgeLabel} data-trie-node-id={id} data-trie-changed={changedNodeIds.has(id) ? 'true' : undefined}
+        data-trie-entered={enteredNodeIds.has(id) ? 'true' : undefined}
+        data-trie-created={createdNodeIds.has(id) ? 'true' : undefined}
+        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: 6 }}>
+        {edgeLabel && <span data-trie-edge-label={edgeLabel}
+    className={enteredNodeIds.has(id) ? 'yv-trie-edge-traversed' : undefined}
+    style={{ color: 'var(--yv-muted, #8b9bb4)', fontSize: 11 }}>{edgeLabel}</span>}
+        <div className="yv-trie-node" style={{ minWidth: 54, padding: '7px 10px', border: '1px solid var(--yv-accent, #65a9ff)',
+          borderRadius: 9, background: changedNodeIds.has(id) ? 'var(--yv-highlight, #203b5b)' : 'var(--yv-panel, #101b2d)', color: 'var(--yv-text, #f3f6ff)', textAlign: 'center', fontSize: 12 }}>
+          <div>{node.terminal ? '● WORD END' : '○ PREFIX'}</div>
+          <div style={{ color: 'var(--yv-muted, #8b9bb4)', fontSize: 10 }}>{id}</div>
+          {pointers.map(pointer => <div key={pointer} style={{ color: 'var(--yv-accent, #65a9ff)', fontSize: 10 }}>{pointer}</div>)}
+        </div>
+        {(node.children.length > 0 || removedChildren.length > 0) && (
+          <div className="yv-trie-children" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 10, flexWrap: 'wrap',
+            borderTop: '1px solid var(--yv-border, #334155)', paddingTop: 8 }}>
+            {node.children.map((child, index) => {
+              const childId = graphReferenceId(child.target, objects);
+              if (!childId || !byId.has(childId)) return <span key={child.label + ':' + index} className="yv-code">[{child.label}] unresolved</span>;
+              return <div key={child.label + ':' + childId + ':' + index} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                {renderNode(childId, child.label, depth + 1, nextPath)}
+              </div>;
+            })}
+            {removedChildren.map((child, index) => (
+              <span key={'removed:' + child.signature + ':' + index} className="yv-trie-edge-removed"
+                data-trie-edge-label={child.label} data-trie-edge-status="removed">{child.label} · removed</span>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="yv-trie" data-trie-node-count={nodes.length}>
+      <div className="yv-collection-meta"><span>Trie</span><span>{nodes.length} nodes · {nodes.filter(node => node.terminal).length} word ends{nodes.length === 500 ? ' · display limit reached' : ''}</span></div>
+      <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
+        <div className="yv-trie-roots" style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', gap: 14, minWidth: 'max-content' }}>
+          {rootNodes.map(root => renderNode(root.id, 'root', 0, new Set<string>()))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function GraphView({ objects, variables = {}, state }: {
+  objects: Record<string, unknown>;
+  variables?: Record<string, unknown>;
+  state?: TraceState;
+}) {
+  const session = sessionStore.get();
+  const selectedIndex = state ? session.states.indexOf(state) : -1;
+  const previous = selectedIndex > 0 ? session.states[selectedIndex - 1] : undefined;
+  const previousObjects = previous?.objects ?? {};
+  const changedNodeIds = new Set<string>();
+  const enteredNodeIds = new Set<string>();
+  const createdNodeIds = new Set<string>();
+  if (state && previous && session.states.includes(state)) {
+    for (const [key, value] of Object.entries(objects)) {
+      if (!isPlainObject(value) || !looksGraphNode(value)) continue;
+      const id = typeof value.$objectId === 'string' ? value.$objectId : key;
+      const before = previousObjects[id];
+      if (before === undefined) createdNodeIds.add(id);
+      else if (stableStringify(before) !== stableStringify(value)) changedNodeIds.add(id);
+    }
+    for (const [name, value] of Object.entries(variables)) {
+      const currentId = graphReferenceId(value, objects);
+      const previousId = graphReferenceId(previous.variables[name], previousObjects);
+      if (currentId && currentId !== previousId) enteredNodeIds.add(currentId);
+    }
+  }
+  const nodes = Object.entries(objects).flatMap(([key, value]) => {
+    if (!isPlainObject(value) || !looksGraphNode(value)) return [];
+    const id = typeof value.$objectId === 'string' ? value.$objectId : key;
+    return [{ id, value, label: nodeValue(value), neighbors: graphNeighborValues(value) ?? [] }];
+  }).slice(0, 80);
+  const ids = new Set(nodes.map(node => node.id));
+  const positionSession = useRef(session.states[0]);
+  const stableGraphPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
+  if (positionSession.current !== session.states[0]) {
+    stableGraphPositions.current.clear();
+    positionSession.current = session.states[0];
+  }
+  const stablePositions = stableGraphPositions.current;
+  // Lay out the first observed snapshot once. Later vertices take an unused
+  // slot; existing vertices never orbit/reflow merely because another is added.
+  if (stablePositions.size === 0 && nodes.length) {
+    nodes.forEach((node, index) => {
+      const angle = -Math.PI / 2 + (2 * Math.PI * index) / Math.max(1, nodes.length);
+      stablePositions.set(node.id, {
+        x: 300 + (nodes.length <= 1 ? 0 : 205 * Math.cos(angle)),
+        y: 160 + (nodes.length <= 1 ? 0 : 112 * Math.sin(angle)),
+      });
+    });
+  } else {
+    const slots = Array.from({ length: 80 }, (_, index) => ({
+      x: 30 + (index % 10) * 60,
+      y: 20 + Math.floor(index / 10) * 40,
+    }));
+    for (const node of nodes) {
+      if (stablePositions.has(node.id)) continue;
+      let hash = 0;
+      for (let index = 0; index < node.id.length; index++) hash = (hash * 31 + node.id.charCodeAt(index)) >>> 0;
+      let chosen: { x: number; y: number } | undefined;
+      let bestDistance = -1;
+      for (let offset = 0; offset < slots.length; offset++) {
+        const candidate = slots[(hash + offset) % slots.length]!;
+        const minDistance = stablePositions.size
+          ? Math.min(...[...stablePositions.values()].map(point => Math.hypot(point.x - candidate.x, point.y - candidate.y)))
+          : Infinity;
+        if (minDistance > bestDistance) {
+          bestDistance = minDistance;
+          chosen = candidate;
+        }
+        if (minDistance >= 50) break;
+      }
+      stablePositions.set(node.id, chosen ?? { x: 300, y: 160 });
+    }
+  }
+  const positions = new Map<string, { x: number; y: number }>();
+  for (const node of nodes) {
+    const position = stablePositions.get(node.id);
+    if (position) positions.set(node.id, position);
+  }
+  const traversedEdgePairs = new Set<string>();
+  if (previous) {
+    for (const [name, currentValue] of Object.entries(variables)) {
+      const from = graphReferenceId(previous.variables[name], previousObjects);
+      const to = graphReferenceId(currentValue, objects);
+      if (from && to && from !== to) traversedEdgePairs.add(from + ':' + to);
+    }
+  }
+  // Compare edge multiplicities, not just endpoint pairs. Adjacency lists can
+  // contain parallel edges, so adding/removing one occurrence must not make all
+  // edges between the same two nodes look unchanged.
+  const edgePairKey = (from: string, to: string) => JSON.stringify([from, to]);
+  const previousEdgeCounts = new Map<string, number>();
+  const previousEdgeOccurrences: Array<{ key: string; from: string; to: string }> = [];
+  if (previous) {
+    for (const [objectKey, value] of Object.entries(previousObjects)) {
+      if (!isPlainObject(value) || !looksGraphNode(value)) continue;
+      const from = typeof value.$objectId === 'string' ? value.$objectId : objectKey;
+      if (!ids.has(from)) continue;
+      (graphNeighborValues(value) ?? []).forEach((neighbor, index) => {
+        const to = graphReferenceId(neighbor, previousObjects);
+        if (!to || !ids.has(to)) return;
+        const pair = edgePairKey(from, to);
+        previousEdgeCounts.set(pair, (previousEdgeCounts.get(pair) ?? 0) + 1);
+        previousEdgeOccurrences.push({ key: pair + ':' + index, from, to });
+      });
+    }
+  }
+  const currentEdgeCounts = new Map<string, number>();
+  const edges = nodes.flatMap(node => node.neighbors.flatMap((neighbor, index) => {
+    const target = graphReferenceId(neighbor, objects);
+    if (!target || !ids.has(target)) return [];
+    const pair = edgePairKey(node.id, target);
+    const occurrence = currentEdgeCounts.get(pair) ?? 0;
+    currentEdgeCounts.set(pair, occurrence + 1);
+    const added = Boolean(previous && occurrence >= (previousEdgeCounts.get(pair) ?? 0));
+    return [{ key: pair + ':' + index, from: node.id, to: target, status: added ? 'added' as const :
+      traversedEdgePairs.has(node.id + ':' + target) ? 'traversed' as const : 'steady' as const }];
+  }));
+  const removedCounts = new Map<string, number>();
+  const removedEdges = previousEdgeOccurrences.flatMap(edge => {
+    const pair = edgePairKey(edge.from, edge.to);
+    const occurrence = removedCounts.get(pair) ?? 0;
+    removedCounts.set(pair, occurrence + 1);
+    if (occurrence < (currentEdgeCounts.get(pair) ?? 0)) return [];
+    return [{ key: 'removed:' + edge.key, from: edge.from, to: edge.to, status: 'removed' as const }];
+  });
+  const pointerNames = new Map<string, string[]>();
+  for (const [name, value] of Object.entries(variables)) {
+    const id = graphReferenceId(value, objects);
+    if (!id || !ids.has(id)) continue;
+    pointerNames.set(id, [...(pointerNames.get(id) ?? []), name]);
+  }
+
+  if (!nodes.length) return <div className="yv-empty">No graph nodes captured.</div>;
+
+  return (
+    <div className="yv-graph" data-graph-node-count={nodes.length} data-graph-edge-count={edges.length}>
+      <div className="yv-collection-meta">
+        <span>Adjacency graph</span>
+        <span>{nodes.length} nodes · {edges.length} links{nodes.length === 80 ? ' · display limit reached' : ''}</span>
+      </div>
+      <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
+        <div style={{ position: 'relative', width: 600, height: 320, minWidth: 600, margin: '0 auto' }}>
+          <svg width="600" height="320" viewBox="0 0 600 320" aria-label="Graph links"
+            style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}>
+            <defs>
+              <marker id="yv-graph-arrow" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+                <path d="M0,0 L7,3.5 L0,7 z" fill="var(--yv-muted, #8b9bb4)" />
+              </marker>
+            </defs>
+            {[...edges, ...removedEdges].map(edge => {
+              const from = positions.get(edge.from)!;
+              const to = positions.get(edge.to)!;
+              const stroke = edge.status === 'added' || edge.status === 'traversed' ? 'var(--yv-accent, #65a9ff)'
+                : edge.status === 'removed' ? 'var(--yv-warning, #f59e0b)' : 'var(--yv-muted, #8b9bb4)';
+              if (edge.from === edge.to) {
+                return <path key={edge.key + (edge.status !== 'steady' ? ':' + selectedIndex : '')} className={`yv-graph-edge yv-graph-edge-${edge.status}`}
+                  data-graph-edge-from={edge.from} data-graph-edge-to={edge.to}
+                  data-graph-edge-status={edge.status}
+                  d={`M ${from.x + 20} ${from.y - 12} C ${from.x + 70} ${from.y - 65}, ${from.x - 45} ${from.y - 65}, ${from.x - 20} ${from.y - 12}`}
+                  fill="none" stroke={stroke} strokeDasharray={edge.status === 'removed' ? '4 3' : undefined}
+                  opacity={edge.status === 'removed' ? 0.65 : 1} strokeWidth={edge.status === 'traversed' ? 2.5 : 1.5} markerEnd="url(#yv-graph-arrow)" />;
+              }
+              const dx = to.x - from.x, dy = to.y - from.y;
+              const length = Math.max(1, Math.hypot(dx, dy));
+              return <line key={edge.key + (edge.status !== 'steady' ? ':' + selectedIndex : '')} className={`yv-graph-edge yv-graph-edge-${edge.status}`}
+                data-graph-edge-from={edge.from} data-graph-edge-to={edge.to}
+                data-graph-edge-status={edge.status}
+                x1={from.x + dx / length * 43} y1={from.y + dy / length * 25}
+                x2={to.x - dx / length * 50} y2={to.y - dy / length * 30}
+                stroke={stroke} strokeDasharray={edge.status === 'removed' ? '4 3' : undefined}
+                opacity={edge.status === 'removed' ? 0.65 : 1} strokeWidth={edge.status === 'traversed' ? 2.5 : 1.5} markerEnd="url(#yv-graph-arrow)" />;
+            })}
+          </svg>
+          {nodes.map(node => {
+            const point = positions.get(node.id)!;
+            const pointers = pointerNames.get(node.id) ?? [];
+            const changed = changedNodeIds.has(node.id);
+            const entered = enteredNodeIds.has(node.id);
+            return <div key={node.id + ((changed || entered || createdNodeIds.has(node.id)) ? ':' + selectedIndex : '')} className={'yv-graph-node' + (changed ? ' yv-graph-node-changed' : '') + (entered ? ' yv-graph-node-entered' : '') + (createdNodeIds.has(node.id) ? ' yv-graph-node-created' : '')}
+              data-graph-node-id={node.id} data-graph-changed={changed ? 'true' : undefined} data-graph-entered={entered ? 'true' : undefined}
+              data-graph-created={createdNodeIds.has(node.id) ? 'true' : undefined}
+              style={{ position: 'absolute', left: point.x - 47, top: point.y - 23, width: 94, minHeight: 46,
+                boxSizing: 'border-box', display: 'flex', flexDirection: 'column', alignItems: 'center',
+                justifyContent: 'center', gap: 2, padding: '5px 6px', border: '1px solid var(--yv-accent, #65a9ff)',
+                borderRadius: 10, background: changed ? 'var(--yv-highlight, #203b5b)' : 'var(--yv-panel, #101b2d)', color: 'var(--yv-text, #f3f6ff)',
+                boxShadow: entered ? '0 0 0 3px color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 55%)' : changed ? '0 0 0 2px color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 55%)' : '0 2px 8px rgba(0,0,0,.2)', textAlign: 'center', fontSize: 12, zIndex: 1 }}>
+              <span>{compactValue(node.label)}</span>
+              <span style={{ color: 'var(--yv-accent, #65a9ff)', fontSize: 10 }}>{node.id}</span>
+              {pointers.length > 0 && <span style={{ color: 'var(--yv-muted, #8b9bb4)', fontSize: 10 }}>{pointers.join(' · ')}</span>}
+            </div>;
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function LinkedListView({
   root,
   objects,
-  variables = {}
+  variables = {},
+  state
 }: {
   root: unknown;
   objects: Record<string, unknown>;
   variables?: Record<string, unknown>;
+  state?: TraceState;
 }) {
+  const session = sessionStore.get();
+  const selectedIndex = state ? session.states.indexOf(state) : -1;
+  const previous = selectedIndex > 0 ? session.states[selectedIndex - 1] : undefined;
+  const previousObjects = previous?.objects ?? {};
   type ListNodeRecord = { id: string; value: unknown; fields: Obj; nextId: string | null; cycleTo: string | null };
   type ListComponent = { nodes: ListNodeRecord[]; cycleTo: string | null };
   const pointerNames = new Map<string, string[]>();
@@ -2529,21 +3405,51 @@ export function LinkedListView({
   const pointerSignature = [...pointerSnapshot.entries()].map(([name, id]) => `${name}:${id}`).join('|');
   const graphRef = useRef<HTMLDivElement | null>(null);
   const [connectionPaths, setConnectionPaths] = useState<Array<{ key: string; d: string; kind: 'prev' | 'cross-next' | 'null-next' | 'cycle'; from: string; to: string }>>([]);
-  const previousEdges = useRef<Map<string, string | null>>(new Map());
-  const previousPointers = useRef<Map<string, string>>(new Map());
+  // Derive transitions from the selected trace step, not render history. This
+  // keeps pointer/edge cues correct when users step backward or seek directly.
+  const previousEdges = new Map<string, string | null>();
+  for (const [key, raw] of Object.entries(previousObjects)) {
+    const value = resolveRef(raw, previousObjects);
+    if (!isPlainObject(value) || !looksListNode(value)) continue;
+    const id = String(value.$objectId ?? key);
+    const next = objectFields(value).next;
+    const resolvedNext = next == null ? null : resolveRef(next, previousObjects);
+    const target = isPlainObject(resolvedNext) ? String(resolvedNext.$objectId ?? resolvedNext.$ref ?? '') || null : null;
+    previousEdges.set(id, target);
+  }
+  const previousPointers = new Map<string, string>();
+  for (const [name, value] of Object.entries(previous?.variables ?? {})) {
+    if (!isPlainObject(value)) continue;
+    const id = typeof value.$objectId === 'string' ? value.$objectId : typeof value.$ref === 'string' ? value.$ref : null;
+    if (id) previousPointers.set(name, id);
+  }
   const changedEdgeIds = new Set<string>();
-  for (const [id, target] of edgeSnapshot) {
-    if (previousEdges.current.has(id) && previousEdges.current.get(id) !== target) changedEdgeIds.add(id);
+  if (previous && selectedIndex >= 0) {
+    for (const [id, target] of edgeSnapshot) {
+      if (previousEdges.has(id) && previousEdges.get(id) !== target) changedEdgeIds.add(id);
+    }
   }
   const movedPointerNames = new Set<string>();
-  for (const [name, nodeId] of pointerSnapshot) {
-    const previousNode = previousPointers.current.get(name);
-    if (previousNode && previousNode !== nodeId) movedPointerNames.add(name);
+  if (previous && selectedIndex >= 0) {
+    for (const [name, nodeId] of pointerSnapshot) {
+      const previousNode = previousPointers.get(name);
+      if (previousNode && previousNode !== nodeId) movedPointerNames.add(name);
+    }
   }
-  useEffect(() => {
-    previousEdges.current = new Map(edgeSnapshot);
-    previousPointers.current = new Map(pointerSnapshot);
-  }, [edgeSignature, pointerSignature]);
+  const changedValueIds = new Set<string>();
+  const createdNodeIds = new Set<string>();
+  if (previous && selectedIndex >= 0) {
+    for (const node of allNodes) {
+      const previousRaw = previousObjects[node.id];
+      if (previousRaw === undefined) {
+        createdNodeIds.add(node.id);
+        continue;
+      }
+      const previousNode = resolveRef(previousRaw, previousObjects);
+      if (!isPlainObject(previousNode) || !looksListNode(previousNode)) continue;
+      if (valueChanged(nodeValue(previousNode), node.value)) changedValueIds.add(node.id);
+    }
+  }
   useLayoutEffect(() => {
     const graph = graphRef.current;
     if (!graph) return;
@@ -2676,7 +3582,7 @@ export function LinkedListView({
                         {pointerNames.get(node.id)?.map(name => <div className={`yv-node-pointer ${movedPointerNames.has(name) ? 'yv-node-pointer-moved' : ''}`} data-pointer-name={name} key={name}>{name}</div>)}
                       </div>
                       <div
-                        className={`yv-node yv-linked-node ${changedEdgeIds.has(node.id) ? 'yv-node-link-changed' : ''}`}
+                        className={`yv-node yv-linked-node ${changedEdgeIds.has(node.id) ? 'yv-node-link-changed' : ''} ${changedValueIds.has(node.id) ? 'yv-node-value-changed' : ''} ${createdNodeIds.has(node.id) ? 'yv-linked-node-created' : ''}`}
                         data-linked-node-value={node.id}
                         style={(() => {
                           const incoming = allNodes.find(candidate => candidate.nextId === node.id);
@@ -2708,9 +3614,91 @@ export function LinkedListView({
   );
 }
 
-function TreeNodeView({ value, objects, depth=0 }: { value: unknown; objects: Record<string,unknown>; depth?: number }) {
-  const resolved=resolveRef(value,objects); if(!isPlainObject(resolved) || depth>6)return null;
-  const f=objectFields(resolved); return <div className="yv-tree-node"><div className="yv-node">{displayValue(nodeValue(resolved))}</div>{(f.left!=null||f.right!=null)&&<div className="yv-tree-children"><div>{f.left!=null?<TreeNodeView value={f.left} objects={objects} depth={depth+1}/>:<span className="yv-null">null</span>}</div><div>{f.right!=null?<TreeNodeView value={f.right} objects={objects} depth={depth+1}/>:<span className="yv-null">null</span>}</div></div>}</div>;
+export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>(), state }: {
+  value: unknown;
+  objects: Record<string, unknown>;
+  depth?: number;
+  seen?: Set<string>;
+  state?: TraceState;
+}) {
+  const session = sessionStore.get();
+  const selectedIndex = state ? session.states.indexOf(state) : -1;
+  const previous = selectedIndex > 0 ? session.states[selectedIndex - 1] : undefined;
+  const previousObjects = previous?.objects ?? {};
+  const resolved = resolveRef(value, objects);
+  if (!isPlainObject(resolved)) return null;
+  if (depth > 12) return <span className="yv-code">…</span>;
+  const id = typeof resolved.$objectId === 'string' ? resolved.$objectId
+    : isPlainObject(value) && typeof value.$ref === 'string' ? value.$ref : undefined;
+  if (id && seen.has(id)) return <span className="yv-code yv-tree-cycle" data-tree-cycle-to={id}>↻ {displayValue(nodeValue(resolved))}</span>;
+  const nextSeen = new Set(seen);
+  if (id) nextSeen.add(id);
+  const fields = objectFields(resolved);
+  const previousNode = id ? previousObjects[id] : undefined;
+  const previousFields = isPlainObject(previousNode) ? objectFields(previousNode) : {};
+  const hasPreviousSnapshot = Boolean(state && previous && session.states.includes(state) && previousNode !== undefined);
+  const changed = Boolean(hasPreviousSnapshot && stableStringify(previousNode) !== stableStringify(resolved));
+  const created = Boolean(state && previous && session.states.includes(state) && id && previousNode === undefined);
+  const leftBefore = hasPreviousSnapshot ? graphReferenceId(previousFields.left, previousObjects) : undefined;
+  const leftAfter = graphReferenceId(fields.left, objects);
+  const rightBefore = hasPreviousSnapshot ? graphReferenceId(previousFields.right, previousObjects) : undefined;
+  const rightAfter = graphReferenceId(fields.right, objects);
+  const leftEdgeChanged = Boolean(hasPreviousSnapshot && leftBefore !== leftAfter);
+  const rightEdgeChanged = Boolean(hasPreviousSnapshot && rightBefore !== rightAfter);
+  // Keep the branch row for the removal step even if its last child vanished,
+  // so the changed edge can still show the transition to null.
+  const hasChildren = fields.left != null || fields.right != null || leftEdgeChanged || rightEdgeChanged;
+  const edgeStatus = (before: string | null | undefined, after: string | null | undefined) =>
+    before == null ? 'added' : after == null ? 'removed' : 'rewired';
+  const movedPointerTargets = new Set<string>();
+  if (state && previous && session.states.includes(state)) {
+    for (const [name, currentValue] of Object.entries(state.variables)) {
+      const currentTarget = graphReferenceId(currentValue, objects);
+      const previousTarget = graphReferenceId(previous.variables[name], previousObjects);
+      if (currentTarget && currentTarget !== previousTarget) movedPointerTargets.add(currentTarget);
+    }
+  }
+  const pointerNames = Object.entries(state?.variables ?? {})
+    .filter(([, pointerValue]) => graphReferenceId(pointerValue, objects) === id)
+    .map(([pointerName]) => pointerName);
+  const leftChildId = graphReferenceId(fields.left, objects);
+  const rightChildId = graphReferenceId(fields.right, objects);
+  const leftTraversal = Boolean(leftChildId && movedPointerTargets.has(leftChildId));
+  const rightTraversal = Boolean(rightChildId && movedPointerTargets.has(rightChildId));
+  const entered = Boolean(state && previous && id && session.states.includes(state) &&
+    movedPointerTargets.has(id));
+  return (
+    <div className={'yv-tree-node' + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '')}
+      data-tree-node-id={id} data-tree-changed={changed ? 'true' : undefined} data-tree-entered={entered ? 'true' : undefined}
+      data-tree-created={created ? 'true' : undefined}>
+      <div key={(changed || entered || created) ? id + ':' + selectedIndex : id} className="yv-node" style={changed ? { background: 'var(--yv-highlight, #203b5b)' } : undefined}>
+        <span>{displayValue(nodeValue(resolved))}</span>
+        {pointerNames.length > 0 && <span className="yv-tree-pointer-labels">
+          {pointerNames.map(pointerName => <span className="yv-tree-pointer-label" key={pointerName}>{pointerName}</span>)}
+        </span>}
+      </div>
+      {hasChildren && (
+        <div className="yv-tree-children">
+          <div key={(leftEdgeChanged || leftTraversal) ? 'left:' + id + ':' + selectedIndex : 'left:' + id} data-tree-edge="left" className={[leftEdgeChanged ? 'yv-tree-edge-changed' : '', leftTraversal ? 'yv-tree-edge-traversed' : ''].filter(Boolean).join(' ')}
+            data-tree-edge-status={leftEdgeChanged ? edgeStatus(leftBefore, leftAfter) : undefined}
+            data-tree-edge-traversed={leftTraversal ? 'true' : undefined}>
+            <div className="yv-tree-edge-label">LEFT</div>
+            {fields.left != null
+              ? <TreeNodeView value={fields.left} objects={objects} depth={depth + 1} seen={nextSeen} state={state} />
+              : <span className="yv-null">null</span>}
+          </div>
+          <div key={(rightEdgeChanged || rightTraversal) ? 'right:' + id + ':' + selectedIndex : 'right:' + id} data-tree-edge="right" className={[rightEdgeChanged ? 'yv-tree-edge-changed' : '', rightTraversal ? 'yv-tree-edge-traversed' : ''].filter(Boolean).join(' ')}
+            data-tree-edge-status={rightEdgeChanged ? edgeStatus(rightBefore, rightAfter) : undefined}
+            data-tree-edge-traversed={rightTraversal ? 'true' : undefined}>
+            <div className="yv-tree-edge-label">RIGHT</div>
+            {fields.right != null
+              ? <TreeNodeView value={fields.right} objects={objects} depth={depth + 1} seen={nextSeen} state={state} />
+              : <span className="yv-null">null</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 function linkedListReturnText(root: unknown, objects: Record<string, unknown>): string | undefined {
   if (!isPlainObject(root) || !looksListNode(root)) return undefined;
@@ -2758,7 +3746,7 @@ function ReturnValueView({
       <div className="yv-return-object">
         <div className="yv-return-reference yv-code">{text}</div>
         <div className="yv-return-caption">Returned root and reachable tree</div>
-        <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects ?? {}} /></div>
+        <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects ?? {}} state={state} /></div>
       </div>
     );
   }
@@ -2810,8 +3798,60 @@ function ObjectView({
 
   const fields = objectFields(value);
   const entries = Object.entries(fields);
+  const session = sessionStore.get();
+  const selectedIndex = state ? session.states.findIndex(candidate =>
+    candidate === state || (state.sequence !== undefined && candidate.sequence === state.sequence)
+  ) : -1;
+  const previousState = selectedIndex > 0 ? session.states[selectedIndex - 1] : undefined;
+  const previousObject = objectId ? previousState?.objects?.[objectId] : undefined;
+  const previousFields = isPlainObject(previousObject) ? objectFields(previousObject) : {};
+  const createdFields = new Set(entries.filter(([key]) =>
+    previousObject !== undefined && !(key in previousFields)
+  ).map(([key]) => key));
+  const changedFields = new Set<string>();
+  const eventData = state?.lastEvent?.data;
+  const collectChangedFields = (candidate: unknown, eventObjectId?: unknown) => {
+    if (!isPlainObject(candidate) || !Array.isArray(candidate.changes)) return;
+    for (const change of candidate.changes) {
+      if (!isPlainObject(change)) continue;
+      const changedObjectId = change.objectId ?? eventObjectId;
+      if (changedObjectId !== objectId) continue;
+      const path = Array.isArray(change.fields) ? change.fields : Array.isArray(change.path) ? change.path : [];
+      const field = path.find((part): part is string => typeof part === 'string');
+      if (field) changedFields.add(field);
+    }
+  };
+  if (objectId && isPlainObject(eventData)) {
+    collectChangedFields(eventData, eventData.objectId);
+    if (Array.isArray(eventData.executionEvents)) {
+      for (const event of eventData.executionEvents) {
+        if (isPlainObject(event) && event.type === 'OBJECT_FIELD_WRITE' && isPlainObject(event.data)) {
+          collectChangedFields(event.data, event.data.objectId);
+        }
+      }
+    }
+  }
+
+  const removedFieldNames = [...changedFields].filter(field => !(field in fields));
+  const objectClassName = "yv-object" +
+    (createdFields.size ? ' yv-object-has-created-fields' : '') +
+    (removedFieldNames.length ? ' yv-object-has-removed-fields' : '');
 
   if (!entries.length) {
+    // Keep the object container mounted for this trace step when its final field
+    // was removed, so the in-place mutation cue is not lost with the last row.
+    if (removedFieldNames.length) {
+      return (
+        <div className={objectClassName}
+          data-object-removed-fields={removedFieldNames.join(',')}>
+          <div className="yv-code yv-object-empty">
+            {objectType(value) || 'Object'}
+            {objectId ? ` · ${objectId}` : ''}
+            <span> · no fields</span>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="yv-code">
         {objectType(value) || 'Object'}
@@ -2821,9 +3861,12 @@ function ObjectView({
   }
 
   return (
-    <div className="yv-object">
+    <div className={objectClassName}
+      data-object-removed-fields={removedFieldNames.length ? removedFieldNames.join(',') : undefined}>
       {entries.map(([key, fieldValue]) => (
-        <div className="yv-object-field" key={key}>
+        <div className={"yv-object-field" + (changedFields.has(key) ? ' yv-object-field-changed' : '') + (createdFields.has(key) ? ' yv-object-field-created' : '')} key={key}
+          data-object-field={key} data-object-field-changed={changedFields.has(key) ? 'true' : undefined}
+          data-object-field-created={createdFields.has(key) ? 'true' : undefined}>
           <div className="yv-code yv-object-key">{key}</div>
           <div className="yv-object-value">
             <DataValue
@@ -2897,8 +3940,8 @@ function DataValue({
 
   if (Array.isArray(value)) return <ArrayView value={value} state={state} source={source} arrayName={name} depth={depth} seen={seen}/>;
   if (isPlainObject(value)) {
-    if (looksTreeNode(value)) return <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects??{}}/></div>;
-    if (looksListNode(value)) return <LinkedListView root={value} objects={state?.objects??{}} variables={state?.variables??{}}/>;
+    if (looksTreeNode(value)) return <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects??{}} state={state}/></div>;
+    if (looksListNode(value)) return <LinkedListView root={value} objects={state?.objects??{}} variables={state?.variables??{}} state={state}/>;
     const resolved = resolveObjects ? resolveRef(value, state?.objects ?? {}) : value;
     if (isPlainObject(resolved)) {
       return <ObjectView value={resolved} state={state} source={source} depth={depth} seen={seen}/>;
@@ -2991,6 +4034,7 @@ export function StringView({ value, state, name, source = '' }: { value: string;
       const isComparisonMismatch = effect.matched === false &&
         ['equals', 'equalsIgnoreCase', 'compareTo'].includes(String(effect.operation));
       if ((effect.matched === true || isComparisonMismatch) &&
+          Number.isInteger(effect.index) && Number.isInteger(effect.end) &&
           effect.index >= 0 && effect.end > effect.index && effect.end <= value.length) {
         if (isComparisonMismatch) {
           for (let index = effect.index; index < effect.end; index++) compared.add(index);
@@ -3000,10 +4044,15 @@ export function StringView({ value, state, name, source = '' }: { value: string;
       }
     }
     if (event.type === 'STRING_RANGE_ACCESS' && matchesName(effect.name) &&
-        typeof effect.start === 'number' && typeof effect.end === 'number') {
+        typeof effect.start === 'number' && Number.isInteger(effect.start) &&
+        typeof effect.end === 'number' && Number.isInteger(effect.end) &&
+        effect.start >= 0 && effect.end > effect.start && effect.end <= value.length) {
+      // Trace ranges are half-open UTF-16 offsets. Ignore malformed/out-of-range
+      // events rather than highlighting beyond the captured string or placing
+      // pointer labels at impossible positions.
       ranges.push({ start: effect.start, end: effect.end });
       if (typeof effect.startVariable === 'string') pointers.set(effect.startVariable, effect.start);
-      if (typeof effect.endVariable === 'string' && effect.end <= value.length) pointers.set(effect.endVariable, effect.end);
+      if (typeof effect.endVariable === 'string') pointers.set(effect.endVariable, effect.end);
       if (typeof effect.endExpression === 'string' && /\.length\s*\(\s*\)\s*$/.test(effect.endExpression) && effect.end === value.length) pointers.set('end', value.length);
     }
     if (event.type === 'STRING_RESULT' && (matchesName(effect.resultName) || matchesName(effect.name)) &&
@@ -3015,15 +4064,24 @@ export function StringView({ value, state, name, source = '' }: { value: string;
     }
     if (event.type === 'STRING_MUTATION' && matchesName(effect.name) &&
         typeof effect.after === 'string' && typeof effect.before === 'string' && typeof effect.operation === 'string') {
+      // Appends often have no explicit index in the runtime event. The exact
+      // before snapshot gives an authoritative insertion point at its length.
+      const mutationIndex = typeof effect.index === 'number' ? effect.index
+        : effect.operation === 'append' ? effect.before.length : undefined;
+      const mutationInserted = typeof effect.inserted === 'string' ? effect.inserted
+        : effect.operation === 'append' && effect.after.startsWith(effect.before)
+          ? effect.after.slice(effect.before.length) : undefined;
       if (effect.after === value) {
-        transition = { operation: effect.operation, before: effect.before, after: effect.after, kind: 'mutation', index: typeof effect.index === 'number' ? effect.index : undefined, removed: typeof effect.removed === 'string' ? effect.removed : undefined, inserted: typeof effect.inserted === 'string' ? effect.inserted : undefined };
+        transition = { operation: effect.operation, before: effect.before, after: effect.after, kind: 'mutation',
+          index: mutationIndex, removed: typeof effect.removed === 'string' ? effect.removed : undefined,
+          inserted: mutationInserted };
       } else if (effect.before === value) {
         const operation = effect.operation === 'append' || effect.operation === 'insert' ? 'delete'
           : effect.operation === 'delete' || effect.operation === 'deleteCharAt' ? 'insert'
           : effect.operation;
         transition = { operation, before: effect.after, after: effect.before, kind: 'mutation',
-          index: typeof effect.index === 'number' ? effect.index : undefined,
-          removed: typeof effect.inserted === 'string' ? effect.inserted : undefined,
+          index: mutationIndex,
+          removed: mutationInserted,
           inserted: typeof effect.removed === 'string' ? effect.removed : undefined };
       }
     }
@@ -3060,9 +4118,47 @@ export function StringView({ value, state, name, source = '' }: { value: string;
   // mapping. Render a space as a blank cell, never as a visible abbreviation.
   const enhancedBinding = enhancedForBinding(source, state, name, value.split(''));
   const characters = value.split('');
+  const usesStableCharacterKeys = Boolean(transition?.kind === 'mutation' &&
+    (['insert', 'delete', 'deleteCharAt', 'reverse'].includes(transition.operation) ||
+      transition.before.length !== transition.after.length));
+  const stringRootRef = useRef<HTMLDivElement | null>(null);
+  const previousCharacterPositions = useRef<Map<string, { left: number; top: number }>>(new Map());
+  const characterAnimations = useRef<WeakMap<HTMLElement, Animation>>(new WeakMap());
+  useLayoutEffect(() => {
+    const root = stringRootRef.current;
+    if (!root) return;
+    const reduceMotion = typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const cells = Array.from(root.querySelectorAll<HTMLElement>('[data-string-cell-key]'));
+    const nextPositions = new Map<string, { left: number; top: number }>();
+    for (const cell of cells) {
+      const key = cell.dataset.stringCellKey;
+      if (!key) continue;
+      characterAnimations.current.get(cell)?.cancel();
+      const position = { left: cell.offsetLeft, top: cell.offsetTop };
+      nextPositions.set(key, position);
+      const previousPosition = previousCharacterPositions.current.get(key);
+      if (!reduceMotion && usesStableCharacterKeys && previousPosition) {
+        const dx = previousPosition.left - position.left;
+        const dy = previousPosition.top - position.top;
+        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+          characterAnimations.current.set(cell, cell.animate(
+            [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }],
+            { duration: 240, easing: 'cubic-bezier(.2,.75,.25,1)' }
+          ));
+        }
+      }
+    }
+    previousCharacterPositions.current = nextPositions;
+  });
   const hasPointers = [...pointers.values()].some(index => index >= 0 && index <= value.length);
+  const emptiedThisStep = Boolean(transition?.kind === 'mutation' &&
+    transition.before.length > 0 && transition.after.length === 0 && value === transition.after);
   return (
-    <div className={`yv-string-view ${hasPointers ? 'has-pointers' : ''}`} data-string-structure={name} data-string-length={value.length}>
+    <div ref={stringRootRef} className={`yv-string-view ${hasPointers ? 'has-pointers' : ''}`}
+      data-string-structure={name} data-string-length={value.length}
+      data-string-emptied={emptiedThisStep ? 'true' : undefined}>
       {(transition || operationResult) && <div className="yv-string-operation">
         {transition && <span>{transition.operation} · {transition.kind === 'mutation' ? 'mutated' : 'result'}</span>}
         {operationResult && <span>{operationResult.operation} → {String(operationResult.result)}</span>}
@@ -3071,7 +4167,7 @@ export function StringView({ value, state, name, source = '' }: { value: string;
         {hasPointers && <div className="yv-string-pointer-layer" aria-hidden="true">
           {[...new Set(pointers.values())].map(pointerIndex => (
             <span className="yv-string-pointer-group" key={pointerIndex} data-string-pointer-index={pointerIndex}
-              style={{ left: pointerIndex * 40 + 18 }}>
+              style={{ left: pointerIndex * 40 + 18 + (enhancedBinding ? 44 : 0) }}>
               {[...pointers.entries()].filter(([, index]) => index === pointerIndex).map(([pointer]) => (
                 <span className="yv-string-pointer" key={pointer} data-string-pointer={pointer}>{pointer}</span>
               ))}
@@ -3100,32 +4196,115 @@ export function StringView({ value, state, name, source = '' }: { value: string;
           const inserted = Boolean(transition?.kind === 'mutation' && transition.inserted && transition.index !== undefined && index >= transition.index && index < transition.index + transition.inserted.length);
           const added = Boolean((transition?.kind === 'result' && transition.before.length === 0 && index < transition.after.length) ||
             (simpleAppend && transition && index >= transition.before.length && index < transition.after.length) || inserted);
-          const shiftsRight = Boolean(transition?.kind === 'mutation' && transition.index !== undefined &&
-            (transition.operation === 'insert' || (transition.operation === 'replace' && transition.after.length > transition.before.length)) &&
-            index >= transition.index + (transition.inserted?.length ?? 1));
-          const shiftsLeft = Boolean(transition?.kind === 'mutation' && transition.index !== undefined &&
-            (transition.operation === 'delete' || transition.operation === 'deleteCharAt' || (transition.operation === 'replace' && transition.after.length < transition.before.length)) &&
-            index >= transition.index);
-          const removedHere = transition?.kind === 'mutation' && transition.removed && transition.index === index ? transition.removed : undefined;
           return (
-            <div className="yv-string-cell-wrap" key={index} data-string-cell-index={index} style={enhancedBinding?.index === index ? { position: "relative" } : undefined}>
+            <div className="yv-string-cell-wrap"
+              key={String(codeUnit) + '#' + characters.slice(0, index).filter(candidate => candidate === character).length}
+              data-string-cell-index={index}
+              data-string-cell-key={String(codeUnit) + '#' + characters.slice(0, index).filter(candidate => candidate === character).length}
+              style={enhancedBinding?.index === index ? { position: "relative" } : undefined}>
               {enhancedBinding?.index === index && <EnhancedForValueCard binding={enhancedBinding} />}
-              {removedHere && <div className="yv-string-removed-overlay" aria-hidden="true">{removedHere}</div>}
-              <div className={`yv-string-cell ${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-string-cell-compared ' : ''}${inRange ? 'yv-cell-range ' : ''}${changed ? 'yv-string-cell-changed ' : ''}${added ? 'yv-string-cell-added ' : ''}${swapFromRight ? 'yv-string-cell-swap-right ' : ''}${swapFromLeft ? 'yv-string-cell-swap-left ' : ''}${shiftsRight ? 'yv-string-cell-shift-right ' : ''}${shiftsLeft ? 'yv-string-cell-shift-left' : ''}`} data-string-index={index}>
+              <div className={`yv-string-cell ${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-string-cell-compared ' : ''}${inRange ? 'yv-cell-range ' : ''}${changed ? 'yv-string-cell-changed ' : ''}${added ? 'yv-string-cell-added ' : ''}${swapFromRight ? 'yv-string-cell-swap-right ' : ''}${swapFromLeft ? 'yv-string-cell-swap-left ' : ''}`} data-string-index={index}>
                 <div className={`yv-string-character ${isSurrogateUnit ? 'yv-string-code-unit' : ''}`} title={isSurrogateUnit ? `UTF-16 code unit U+${codeUnit.toString(16).toUpperCase().padStart(4, '0')}` : undefined}>{characterLabel}</div>
               </div>
               <div className="yv-string-index">{index}</div>
             </div>
           );
         })}
-        {transition?.kind === 'mutation' && transition.removed && transition.index !== undefined && transition.index >= value.length &&
-          <div className="yv-string-cell-wrap yv-string-removal-tail"><div className="yv-string-removed-overlay" aria-hidden="true">{transition.removed}</div></div>}
         {!characters.length && <div className="yv-empty">Empty string</div>}
         {[...pointers.entries()].some(([, index]) => index === value.length) &&
           <div className="yv-string-cell-wrap yv-string-end-pointer">
-            <div className="yv-string-end-marker" aria-label="String end">∅</div>
+            <div className="yv-string-cell" aria-label="String boundary, not a character" title="One past the last character"><div className="yv-string-character">×</div></div>
             <div className="yv-string-index">{value.length}</div>
           </div>}
+      </div>
+    </div>
+  );
+}
+
+export function DisjointSetView({ parent, name, state, rank, size, rankName, sizeName }: {
+  parent: unknown[];
+  name: string;
+  state?: TraceState;
+  rank?: unknown[];
+  size?: unknown[];
+  rankName?: string;
+  sizeName?: string;
+}) {
+  const count = Math.min(parent.length, 100);
+  const values = parent.slice(0, count);
+  const children = Array.from({ length: count }, () => [] as number[]);
+  const roots: number[] = [];
+  values.forEach((value, index) => {
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < -1 || value >= count) return;
+    if (value === index || value === -1) roots.push(index);
+    else children[value]!.push(index);
+  });
+  const changed = changedArrayIndices(state, name);
+  const changedRanks = rankName ? changedArrayIndices(state, rankName) : new Set<number>();
+  const changedSizes = sizeName ? changedArrayIndices(state, sizeName) : new Set<number>();
+  const session = sessionStore.get();
+  const selectedIndex = state ? session.states.indexOf(state) : -1;
+  const previous = selectedIndex > 0 ? session.states[selectedIndex - 1] : undefined;
+  const previousParent = previous ? [
+    ...Object.entries(previous.variables ?? {}),
+    ...Object.entries(previous.dataStructures ?? {})
+  ].find(([candidateName, candidate]) => candidateName === name && isArraySnapshot(candidate))?.[1] : undefined;
+  const previousLength = isArraySnapshot(previousParent) ? previousParent.values.length : count;
+  const created = new Set<number>();
+  if (previous && selectedIndex >= 0) {
+    for (let index = previousLength; index < count; index++) created.add(index);
+  }
+  const visited = new Set<number>();
+  const renderNode = (index: number, path: Set<number>): React.ReactNode => {
+    if (path.has(index)) return <span className="yv-code" data-dsu-cycle={index}>↻ {index}</span>;
+    if (visited.has(index)) return <span className="yv-code" data-dsu-reference={index}>↗ {index}</span>;
+    visited.add(index);
+    const nextPath = new Set(path);
+    nextPath.add(index);
+    const parentIndex = values[index];
+    const isRoot = parentIndex === index || parentIndex === -1;
+    return (
+      <div className={'yv-dsu-branch' + (changed.has(index) || changedRanks.has(index) || changedSizes.has(index) ? ' yv-dsu-changed' : '') + (created.has(index) ? ' yv-dsu-created' : '')} key={index}
+        data-dsu-node-index={index} data-dsu-parent={typeof parentIndex === 'number' ? parentIndex : 'invalid'}
+        data-dsu-created={created.has(index) ? 'true' : undefined}
+        data-dsu-parent-changed={changed.has(index) ? 'true' : undefined}
+        data-dsu-rank-changed={changedRanks.has(index) ? 'true' : undefined}
+        data-dsu-size-changed={changedSizes.has(index) ? 'true' : undefined}
+        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, padding: 7 }}>
+        <div className="yv-dsu-node" style={{ minWidth: 52, padding: '7px 9px', border: '1px solid var(--yv-accent, #65a9ff)',
+          borderRadius: 9, background: changed.has(index) ? 'var(--yv-highlight, #203b5b)' : 'var(--yv-panel, #101b2d)',
+          color: 'var(--yv-text, #f3f6ff)', textAlign: 'center', fontSize: 12 }}>
+          <div>{index}</div>
+          <div style={{ fontSize: 10, color: isRoot ? 'var(--yv-accent, #65a9ff)' : 'var(--yv-muted, #8b9bb4)' }}>
+            {isRoot ? 'ROOT' : 'parent → ' + String(parentIndex)}
+          </div>
+          {rank?.[index] !== undefined && <div className={changedRanks.has(index) ? 'yv-dsu-field-changed' : undefined} style={{ fontSize: 10 }}>rank {displayValue(rank[index])}</div>}
+          {size?.[index] !== undefined && <div className={changedSizes.has(index) ? 'yv-dsu-field-changed' : undefined} style={{ fontSize: 10 }}>size {displayValue(size[index])}</div>}
+        </div>
+        {children[index]!.length > 0 && (
+          <div className="yv-dsu-children" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+            gap: 8, flexWrap: 'wrap', borderTop: '1px solid var(--yv-border, #334155)', paddingTop: 8 }}>
+            {children[index]!.map(child => renderNode(child, nextPath))}
+          </div>
+        )}
+      </div>
+    );
+  };
+  const forestRoots = roots.length ? roots : values.map((_, index) => index);
+  const trees = forestRoots.map(index => renderNode(index, new Set<number>()));
+  const disconnected = values.map((_, index) => index).filter(index => !visited.has(index));
+  disconnected.forEach(index => trees.push(renderNode(index, new Set<number>())));
+
+  return (
+    <div className="yv-dsu" data-dsu-array={name} data-dsu-node-count={count}>
+      <div className="yv-collection-meta">
+        <span>Disjoint-set forest · {name}</span>
+        <span>{roots.length} roots · {count} elements{parent.length > count ? ' · display limit reached' : ''}</span>
+      </div>
+      <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
+        <div className="yv-dsu-forest" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 12, minWidth: 'max-content' }}>
+          {trees}
+        </div>
       </div>
     </div>
   );
@@ -3154,6 +4333,37 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
       item.names.push(name);
     } else {
       grouped.set(`array:${id}`, { names: [name], value });
+    }
+  }
+
+  // Design-class state is rooted at `this`, so fields such as
+  // `this.cache` are not named locals. Promote structural fields from the
+  // current instance into the same renderer used for ordinary local maps,
+  // collections and arrays. This keeps encapsulated state visible while
+  // avoiding a generic object dump of the whole instance.
+  const thisValue = state?.variables?.this;
+  const thisObjectId = isPlainObject(thisValue)
+    ? (typeof thisValue.$objectId === 'string' ? thisValue.$objectId
+      : typeof thisValue.$ref === 'string' ? thisValue.$ref : undefined)
+    : undefined;
+  // Object snapshots may be embedded directly in the `this` local (as in
+  // OBJECT_FIELD_WRITE events), or represented by an ID resolved through the
+  // trace's object table. Prefer the embedded snapshot because it is the exact
+  // state for this step.
+  const thisObject = isPlainObject(thisValue) && isPlainObject(thisValue.fields)
+    ? thisValue
+    : thisObjectId ? state?.objects?.[thisObjectId] : undefined;
+  if (isPlainObject(thisObject)) {
+    for (const [fieldName, fieldValue] of Object.entries(objectFields(thisObject))) {
+      if (!isStructuralValue(fieldValue)) continue;
+      const displayName = 'this.' + fieldName;
+      if (isArraySnapshot(fieldValue)) {
+        grouped.set(`array:instance:${fieldValue.$arrayId}`, { names: [displayName], value: fieldValue });
+      } else if (isMapSnapshot(fieldValue)) {
+        grouped.set(`map:instance:${fieldValue.$mapId}`, { names: [displayName], value: fieldValue });
+      } else if (isCollectionSnapshot(fieldValue)) {
+        grouped.set(`collection:instance:${fieldValue.$collectionId}`, { names: [displayName], value: fieldValue });
+      }
     }
   }
 
@@ -3208,8 +4418,42 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
     }
   }
 
+  const graphNodeEntries = objectEntries.filter(([, value]) =>
+    isPlainObject(value) && looksGraphNode(value)
+  );
+  const trieNodeEntries = objectEntries.filter(([, value]) =>
+    isPlainObject(value) && looksTrieNode(value)
+  );
+  const trieNodeIds = new Set(trieNodeEntries.map(([id, value]) =>
+    isPlainObject(value) && typeof value.$objectId === 'string' ? value.$objectId : id
+  ));
+
+  const dsuContext = /\b(?:find|union)\s*\(/i.test(source) && /\b(?:parent|parents|par)\s*\[/i.test(source);
+  const dsuParentEntry = dsuContext ? Object.entries(state?.arrays ?? {}).find(([name, value]) =>
+    /^(?:parent|parents|par)$/i.test(name) && isArraySnapshot(value) &&
+    value.values.length > 0 && value.values.every(item => typeof item === 'number' && Number.isInteger(item) && item >= -1 && item < value.values.length)
+  ) : undefined;
+  const dsuRankEntry = dsuContext ? Object.entries(state?.arrays ?? {}).find(([name, value]) =>
+    /^(?:rank|ranks)$/i.test(name) && isArraySnapshot(value)
+  ) : undefined;
+  const dsuSizeEntry = dsuContext ? Object.entries(state?.arrays ?? {}).find(([name, value]) =>
+    /^(?:size|sizes)$/i.test(name) && isArraySnapshot(value)
+  ) : undefined;
+
+  const trieNames = Object.entries(state?.variables ?? {}).flatMap(([name, value]) => {
+    const id = graphReferenceId(value, state?.objects ?? {});
+    if (id && trieNodeIds.has(id)) return [name];
+    const resolved = id ? state?.objects?.[id] : undefined;
+    const rootId = isPlainObject(resolved) ? graphReferenceId(objectFields(resolved).root, state?.objects ?? {}) : undefined;
+    return rootId && trieNodeIds.has(rootId) ? [name] : [];
+  });
+
   for (const [id, value] of objectEntries) {
-    if (isPlainObject(value) && looksListNode(value)) continue;
+    if (isPlainObject(value) && (looksListNode(value) || looksGraphNode(value) || looksTrieNode(value))) continue;
+    if (isPlainObject(value) && /Trie$/.test(objectType(value))) {
+      const rootId = graphReferenceId(objectFields(value).root, state?.objects ?? {});
+      if (rootId && trieNodeIds.has(rootId)) continue;
+    }
     const names = namedObjectIds.get(id);
     if (!names?.length) continue;
     grouped.set(`object:${id}`, { names, value });
@@ -3217,7 +4461,7 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
 
   const items = [...grouped.values()];
 
-  if (!items.length) {
+  if (!items.length && graphNodeEntries.length === 0 && trieNodeEntries.length === 0 && !dsuParentEntry) {
     return <div className="yv-empty">Structures appear here as your code creates or mutates them.</div>;
   }
 
@@ -3246,6 +4490,35 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
           </div>
         );
       })}
+      {dsuParentEntry && isArraySnapshot(dsuParentEntry[1]) && (
+        <div className="yv-ds" key="Disjoint-set forest">
+          <div className="yv-ds-title">Disjoint Set → {dsuParentEntry[0]}</div>
+          <DisjointSetView
+            parent={dsuParentEntry[1].values}
+            name={dsuParentEntry[0]}
+            state={state}
+            rank={dsuRankEntry && isArraySnapshot(dsuRankEntry[1]) ? dsuRankEntry[1].values : undefined}
+            rankName={dsuRankEntry?.[0]}
+            size={dsuSizeEntry && isArraySnapshot(dsuSizeEntry[1]) ? dsuSizeEntry[1].values : undefined}
+            sizeName={dsuSizeEntry?.[0]}
+          />
+        </div>
+      )}
+      {trieNodeEntries.length > 0 && (
+        <div className="yv-ds" key="Trie → runtime nodes">
+          <div className="yv-ds-title">Trie → {trieNames.join(' / ') || 'runtime nodes'}</div>
+          <TrieView objects={state?.objects ?? {}} variables={state?.variables ?? {}} source={source} state={state} />
+        </div>
+      )}
+      {graphNodeEntries.length > 0 && (
+        <div className="yv-ds" key="Graph → runtime nodes">
+          <div className="yv-ds-title">Graph → {[...new Set(Object.entries(state?.variables ?? {}).flatMap(([name, value]) => {
+            const id = graphReferenceId(value, state?.objects ?? {});
+            return id && graphNodeEntries.some(([key, node]) => id === key || (isPlainObject(node) && node.$objectId === id)) ? [name] : [];
+          }))].join(' / ') || 'runtime nodes'}</div>
+          <GraphView objects={state?.objects ?? {}} variables={state?.variables ?? {}} state={state} />
+        </div>
+      )}
     </div>
   );
 }

@@ -20,6 +20,10 @@ import {
   Variables,
   ArrayView,
   DataStructures,
+  DisjointSetView,
+  GraphView,
+  TrieView,
+  TreeNodeView,
   LinkedListView,
   StringView,
 } from './VisualizerPanel';
@@ -42,6 +46,81 @@ function markup(nodes: ReactNode[]): string {
 }
 
 
+
+describe('design-class instance state visualization', () => {
+  it('renders structural fields on this as first-class data structures', () => {
+    const cache = {
+      $mapId: 'cache-map',
+      $type: 'LinkedHashMap',
+      entries: [{ key: 1, value: 10 }, { key: 2, value: 20 }],
+    };
+    const current = state({
+      variables: { this: { $objectId: 'lru-instance' } },
+      objects: {
+        'lru-instance': {
+          $objectId: 'lru-instance',
+          $type: 'LRUCache',
+          fields: { capacity: 2, cache },
+        },
+      },
+    });
+    const html = renderToStaticMarkup(
+      <DataStructures state={current} source="cache.put(2, 20);" />,
+    );
+    expect(html).toContain('Map → this.cache');
+    expect(html).toContain('data-map-key-identity="1"');
+    expect(html).toContain('data-map-key-identity="2"');
+    expect(html).toContain('10');
+    expect(html).toContain('20');
+  });
+
+  it('labels access-ordered LinkedHashMap state accurately', () => {
+    const current = state({
+      variables: { this: { $objectId: 'lru-instance' } },
+      objects: {
+        'lru-instance': {
+          $objectId: 'lru-instance',
+          $type: 'LRUCache',
+          fields: { cache: { $mapId: 'cache-map', $type: 'LinkedHashMap', entries: [{ key: 2, value: 20 }, { key: 1, value: 10 }] } },
+        },
+      },
+    });
+    const html = renderToStaticMarkup(
+      <DataStructures state={current} source="this.cache = new LinkedHashMap<>(16, 0.75f, true);" />,
+    );
+    expect(html).toContain('ACCESS ORDER · 2 entries');
+  });
+
+  it('updates the same instance map in place across design-class steps', () => {
+    const previous = state({
+      variables: { this: { $objectId: 'lru-instance' } },
+      objects: {
+        'lru-instance': {
+          $objectId: 'lru-instance',
+          $type: 'LRUCache',
+          fields: { cache: { $mapId: 'cache-map', $type: 'LinkedHashMap', entries: [{ key: 1, value: 10 }] } },
+        },
+      },
+    });
+    const current = state({
+      sequence: 2,
+      variables: { this: { $objectId: 'lru-instance' } },
+      objects: {
+        'lru-instance': {
+          $objectId: 'lru-instance',
+          $type: 'LRUCache',
+          fields: { cache: { $mapId: 'cache-map', $type: 'LinkedHashMap', entries: [{ key: 1, value: 10 }, { key: 2, value: 20 }] } },
+        },
+      },
+    });
+    const html = renderToStaticMarkup(
+      <DataStructures state={current} source="cache.put(2, 20);" />,
+    );
+    expect(html).toContain('Map → this.cache');
+    expect(html).toContain('data-map-key-identity="1"');
+    expect(html).toContain('data-map-key-identity="2"');
+  });
+});
 
 describe('linked-list graph visualization', () => {
   it('preserves node identity, aliases, and explicit null termination', () => {
@@ -186,6 +265,364 @@ describe('linked-list graph visualization', () => {
   });
 });
 
+describe('binary-tree visualization', () => {
+  it('labels left and right branches and keeps stable node ids', () => {
+    const html = renderToStaticMarkup(<TreeNodeView
+      value={{ $objectId: 't1' }}
+      objects={{
+        t1: { $objectId: 't1', $type: 'TreeNode', fields: { val: 1, left: { $ref: 't2' }, right: { $ref: 't3' } } },
+        t2: { $objectId: 't2', $type: 'TreeNode', fields: { val: 2, left: null, right: null } },
+        t3: { $objectId: 't3', $type: 'TreeNode', fields: { val: 3, left: null, right: null } },
+      }}
+    />);
+    expect(html).toContain('data-tree-node-id="t1"');
+    expect(html).toContain('data-tree-node-id="t2"');
+    expect(html).toContain('data-tree-node-id="t3"');
+    expect(html).toContain('data-tree-edge="left"');
+    expect(html).toContain('data-tree-edge="right"');
+    expect(html).toContain('LEFT');
+    expect(html).toContain('RIGHT');
+  });
+
+  it('highlights a mutated tree node and a pointer arrival on the current step', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 101,
+      variables: { current: { $objectId: 't1' } },
+      objects: {
+        t1: { $objectId: 't1', $type: 'TreeNode', fields: { val: 1, left: { $ref: 't2' }, right: null } },
+        t2: { $objectId: 't2', $type: 'TreeNode', fields: { val: 2, left: null, right: null } },
+      },
+    });
+    const current = state({
+      sequence: 102,
+      variables: { current: { $objectId: 't2' } },
+      objects: {
+        t1: { $objectId: 't1', $type: 'TreeNode', fields: { val: 1, left: { $ref: 't2' }, right: null } },
+        t2: { $objectId: 't2', $type: 'TreeNode', fields: { val: 3, left: null, right: null } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'current.val = 3;', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 't1' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-tree-node-id="t2" data-tree-changed="true" data-tree-entered="true"');
+      expect(html).toContain('yv-tree-node-entered');
+      expect(html).toContain('yv-tree-node-changed');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('keeps the removed-child cue when the last child is detached', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 117,
+      objects: {
+        t1: { $objectId: 't1', $type: 'TreeNode', fields: { val: 1, left: { $ref: 't2' }, right: null } },
+        t2: { $objectId: 't2', $type: 'TreeNode', fields: { val: 2, left: null, right: null } },
+      },
+    });
+    const current = state({
+      sequence: 118,
+      objects: {
+        t1: { $objectId: 't1', $type: 'TreeNode', fields: { val: 1, left: null, right: null } },
+        t2: { $objectId: 't2', $type: 'TreeNode', fields: { val: 2, left: null, right: null } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'root.left = null;', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 't1' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-tree-edge="left"');
+      expect(html).toContain('data-tree-edge-status="removed"');
+      expect(html).toContain('class="yv-null">null</span>');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('renders a cycle reference instead of recursing into a duplicate tree node', () => {
+    const html = renderToStaticMarkup(<TreeNodeView
+      value={{ $objectId: 'cycle-root' }}
+      objects={{
+        'cycle-root': { $objectId: 'cycle-root', $type: 'TreeNode', fields: { val: 7, left: { $ref: 'cycle-root' }, right: null } },
+      }}
+    />);
+    expect(html).toContain('data-tree-cycle-to="cycle-root"');
+    expect((html.match(/data-tree-node-id="cycle-root"/g) ?? []).length).toBe(1);
+  });
+});
+
+describe('disjoint-set visualization', () => {
+  it('renders the parent forest and highlights parent-array writes', () => {
+    const current = state({
+      arrays: {
+        parent: { $arrayId: 'parent-array', $type: 'int[]', values: [0, 0, 2, 2, 0] },
+        rank: { $arrayId: 'rank-array', $type: 'int[]', values: [1, 0, 1, 0, 0] },
+      },
+      lastEvent: {
+        type: 'STEP',
+        line: 8,
+        data: {
+          executionEvents: [{
+            type: 'ARRAY_WRITE',
+            data: { name: 'parent', changes: [{ indices: [4], before: 4, after: 0 }] },
+          }],
+        },
+      },
+    });
+    const source = [
+      'int find(int x) {',
+      '  return parent[x] == x ? x : find(parent[x]);',
+      '}',
+      'void union(int a, int b) {',
+      '  parent[find(a)] = find(b);',
+      '}',
+    ].join('\n');
+    const html = renderToStaticMarkup(<DataStructures state={current} source={source} />);
+    expect(html).toContain('Disjoint Set → parent');
+    expect(html).toContain('data-dsu-node-count="5"');
+    expect(html).toContain('data-dsu-node-index="0"');
+    expect(html).toContain('data-dsu-node-index="4"');
+    expect(html).toContain('data-dsu-parent="0"');
+    expect(html).toContain('rank 1');
+    expect(html).toContain('yv-dsu-changed');
+  });
+
+  it('renders the component safely for an empty parent forest', () => {
+    const html = renderToStaticMarkup(<DisjointSetView parent={[]} name="parent" />);
+    expect(html).toContain('data-dsu-node-count="0"');
+    expect(html).toContain('0 roots');
+  });
+});
+
+describe('trie data structure visualization', () => {
+  it('highlights the trie node reached by a pointer move', () => {
+    const priorSession = sessionStore.get();
+    const objects = {
+      t1: { $objectId: 't1', $type: 'TrieNode', fields: { isEnd: false, children: { entries: [{ key: 'a', value: { $ref: 't2' } }] } } },
+      t2: { $objectId: 't2', $type: 'TrieNode', fields: { isEnd: true, children: { entries: [] } } },
+    };
+    const previous = state({ sequence: 91, variables: { current: { $objectId: 't1' } }, objects });
+    const current = state({ sequence: 92, variables: { current: { $objectId: 't2' } }, objects });
+    try {
+      sessionStore.set({ source: 'current = current.children.get(ch);', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source="current = current.children.get(ch);" />);
+      expect(html).toContain('data-trie-node-id="t2"');
+      expect(html).toContain('data-trie-entered="true"');
+      expect(html).toContain('yv-trie-node-entered');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('keeps the final removed trie edge visible for the mutation step', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 119,
+      variables: { trie: { $objectId: 't1' } },
+      objects: {
+        t1: { $objectId: 't1', $type: 'TrieNode', fields: { isEnd: false, children: { entries: [{ key: 'a', value: { $ref: 't2' } }] } } },
+        t2: { $objectId: 't2', $type: 'TrieNode', fields: { isEnd: true, children: { entries: [] } } },
+      },
+    });
+    const current = state({
+      sequence: 120,
+      variables: { trie: { $objectId: 't1' } },
+      objects: {
+        t1: { $objectId: 't1', $type: 'TrieNode', fields: { isEnd: false, children: { entries: [] } } },
+        t2: { $objectId: 't2', $type: 'TrieNode', fields: { isEnd: true, children: { entries: [] } } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'node.children.remove(\'a\');', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TrieView objects={current.objects} variables={current.variables} source="" state={current} />);
+      expect(html).toContain('data-trie-edge-label="a"');
+      expect(html).toContain('data-trie-edge-status="removed"');
+      expect(html).toContain('a · removed');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('renders child edges and terminal-word state from captured trie nodes', () => {
+    const current = state({
+      variables: { trie: { $objectId: 'container' } },
+      objects: {
+        container: { $objectId: 'container', $type: 'Trie', fields: { root: { $ref: 't1' } } },
+        t1: {
+          $objectId: 't1',
+          $type: 'TrieNode',
+          fields: { isEnd: false, children: { $mapId: 'children-1', $type: 'java.util.HashMap', entries: [{ key: 'a', value: { $ref: 't2' } }] } },
+        },
+        t2: {
+          $objectId: 't2',
+          $type: 'TrieNode',
+          fields: { isEnd: true, children: { $mapId: 'children-2', $type: 'java.util.HashMap', entries: [] } },
+        },
+      },
+    });
+    const html = renderToStaticMarkup(<DataStructures state={current} source="" />);
+    expect(html).toContain('Trie → trie');
+    expect(html).toContain('data-trie-node-count="2"');
+    expect(html).toContain('data-trie-node-id="t1"');
+    expect(html).toContain('data-trie-node-id="t2"');
+    expect(html).toContain('data-trie-edge-label="a"');
+    expect(html).toContain('WORD END');
+    expect(html).not.toContain('Object → trie');
+  });
+});
+
+describe('graph data structure visualization', () => {
+  it('renders actual adjacency links with stable node identities and pointer names', () => {
+    const current = state({
+      variables: { start: { $objectId: 'g1' } },
+      objects: {
+        g1: {
+          $objectId: 'g1',
+          $type: 'Node',
+          fields: { val: 1, neighbors: { $collectionId: 'neighbors-1', $kind: 'list', values: [{ $ref: 'g2' }] } },
+        },
+        g2: {
+          $objectId: 'g2',
+          $type: 'Node',
+          fields: { val: 2, neighbors: { $collectionId: 'neighbors-2', $kind: 'list', values: [{ $ref: 'g1' }] } },
+        },
+      },
+    });
+    const html = renderToStaticMarkup(<DataStructures state={current} source="" />);
+    expect(html).toContain('Graph → start');
+    expect(html).toContain('data-graph-node-count="2"');
+    expect(html).toContain('data-graph-edge-count="2"');
+    expect(html).toContain('data-graph-node-id="g1"');
+    expect(html).toContain('data-graph-node-id="g2"');
+    expect(html).toContain('data-graph-edge-from="g1" data-graph-edge-to="g2"');
+    expect(html).toContain('data-graph-edge-from="g2" data-graph-edge-to="g1"');
+    expect(html).toContain('start');
+  });
+
+  it('highlights graph nodes entered by a pointer moving on the current trace step', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 81,
+      variables: { current: { $objectId: 'g1' } },
+      objects: {
+        g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'g2' }] } } },
+        g2: { $objectId: 'g2', $type: 'Node', fields: { val: 2, neighbors: { values: [{ $ref: 'g1' }] } } },
+      },
+    });
+    const current = state({
+      sequence: 82,
+      variables: { current: { $objectId: 'g2' } },
+      objects: {
+        g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'g2' }] } } },
+        g2: { $objectId: 'g2', $type: 'Node', fields: { val: 2, neighbors: { values: [{ $ref: 'g1' }] } } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'current = current.neighbors.get(0);', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<GraphView objects={current.objects} variables={current.variables} state={current} />);
+      expect(html).toContain('data-graph-node-id="g2" data-graph-entered="true"');
+      expect(html).toContain('data-graph-entered="true"');
+      expect(html).toContain('yv-graph-node-entered');
+      expect(html).not.toContain('data-graph-node-id="g1" data-graph-entered="true"');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('keeps a removed graph edge visible as a dashed transition cue', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 111,
+      objects: {
+        g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'g2' }] } } },
+        g2: { $objectId: 'g2', $type: 'Node', fields: { val: 2, neighbors: { values: [] } } },
+      },
+    });
+    const current = state({
+      sequence: 112,
+      objects: {
+        g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [] } } },
+        g2: { $objectId: 'g2', $type: 'Node', fields: { val: 2, neighbors: { values: [] } } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'adj.remove(g2);', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<GraphView objects={current.objects} state={current} />);
+      expect(html).toContain('data-graph-edge-from="g1" data-graph-edge-to="g2"');
+      expect(html).toContain('data-graph-edge-status="removed"');
+      expect(html).toContain('stroke-dasharray="4 3"');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('marks only the additional parallel edge as added', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 113,
+      objects: {
+        g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'g2' }] } } },
+        g2: { $objectId: 'g2', $type: 'Node', fields: { val: 2, neighbors: { values: [] } } },
+      },
+    });
+    const current = state({
+      sequence: 114,
+      objects: {
+        g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'g2' }, { $ref: 'g2' }] } } },
+        g2: { $objectId: 'g2', $type: 'Node', fields: { val: 2, neighbors: { values: [] } } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'g1.neighbors.add(g2);', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<GraphView objects={current.objects} state={current} />);
+      expect((html.match(/data-graph-edge-status="added"/g) ?? []).length).toBe(1);
+      expect((html.match(/data-graph-edge-status="steady"/g) ?? []).length).toBe(1);
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('shows one removed transition when a parallel edge is deleted', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 115,
+      objects: {
+        g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'g2' }, { $ref: 'g2' }] } } },
+        g2: { $objectId: 'g2', $type: 'Node', fields: { val: 2, neighbors: { values: [] } } },
+      },
+    });
+    const current = state({
+      sequence: 116,
+      objects: {
+        g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'g2' }] } } },
+        g2: { $objectId: 'g2', $type: 'Node', fields: { val: 2, neighbors: { values: [] } } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'g1.neighbors.remove(g2);', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<GraphView objects={current.objects} state={current} />);
+      expect((html.match(/data-graph-edge-status="removed"/g) ?? []).length).toBe(1);
+      expect((html.match(/data-graph-edge-status="steady"/g) ?? []).length).toBe(1);
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('handles a self-loop without duplicating the graph node', () => {
+    const html = renderToStaticMarkup(<GraphView
+      objects={{
+        g1: { $objectId: 'g1', $type: 'Node', fields: { val: 4, neighbors: { values: [{ $ref: 'g1' }] } } },
+      }}
+      variables={{ node: { $objectId: 'g1' } }}
+    />);
+    expect(html).toContain('data-graph-node-count="1"');
+    expect(html).toContain('data-graph-edge-count="1"');
+    expect(html).toContain('data-graph-edge-from="g1" data-graph-edge-to="g1"');
+    expect((html.match(/data-graph-node-id="g1"/g) ?? []).length).toBe(1);
+  });
+});
+
 describe('string data structure visualization', () => {
   it('keeps strings in Variables and also renders them as indexed character cells', () => {
     const current = state({ variables: { s: '({[]})', count: 6 } });
@@ -231,6 +668,25 @@ describe('string data structure visualization', () => {
     expect(effects.some(text => text.includes('builder.reverse'))).toBe(true);
   });
 
+  it('ignores invalid string range coordinates and their pointer labels', () => {
+    const current = state({ lastEvent: { type: 'STEP', line: 4, data: { executionEvents: [
+      { type: 'STRING_RANGE_ACCESS', data: { name: 's', start: -1, end: 99, startVariable: 'left', endVariable: 'right' } },
+    ] } } });
+    const html = renderToStaticMarkup(<StringView value="hello" state={current} name="s" />);
+    expect(html).not.toContain('yv-cell-range');
+    expect(html).not.toContain('data-string-pointer="left"');
+    expect(html).not.toContain('data-string-pointer="right"');
+  });
+
+  it('ignores fractional string search range coordinates', () => {
+    const current = state({ lastEvent: { type: 'STEP', line: 4, data: { executionEvents: [
+      { type: 'STRING_SEARCH_RESULT', data: { name: 's', operation: 'indexOf', result: 1, index: 1.5, end: 3.5, matched: true } },
+    ] } } });
+    const html = renderToStaticMarkup(<StringView value="hello" state={current} name="s" />);
+    expect(html).not.toContain('yv-cell-range');
+    expect(html).not.toContain('data-string-range');
+  });
+
   it('preserves Java UTF-16 indexing for supplementary Unicode characters', () => {
     const html = renderToStaticMarkup(<StringView value="😀" state={state()} name="s" />);
     expect(html).toContain('data-string-length="2"');
@@ -240,6 +696,16 @@ describe('string data structure visualization', () => {
     expect(html).toContain('\\uDE00');
     expect(html).toContain('UTF-16 code unit U+D83D');
     expect(html).toContain('UTF-16 code unit U+DE00');
+  });
+
+  it('keeps an in-place cue when a string mutation removes its final character', () => {
+    const current = state({ lastEvent: { type: 'STEP', line: 4, data: { executionEvents: [
+      { type: 'STRING_MUTATION', data: { name: 'builder', operation: 'delete', before: 'x', after: '', index: 0, removed: 'x' } },
+    ] } } });
+    const html = renderToStaticMarkup(<StringView value="" state={current} name="builder" />);
+    expect(html).toContain('data-string-emptied="true"');
+    expect(html).toContain('Empty string');
+    expect(html).not.toContain('yv-string-cell-exit');
   });
 
   it('renders spaces as blank fixed-width cells and keeps every index in its own aligned wrapper', () => {
@@ -406,7 +872,7 @@ describe('string data structure visualization', () => {
     const html = renderToStaticMarkup(<StringView value="banana" state={current} name="s" source="String suffix = s.substring(start, s.length());" />);
     expect(html).toContain('data-string-pointer="start"');
     expect(html).toContain('data-string-pointer="end"');
-    expect(html).toContain('yv-string-end-marker');
+    expect(html).toContain('yv-string-end-pointer');
   });
 
   it('shows scalar string operation results without inventing character reads', () => {
@@ -420,13 +886,14 @@ describe('string data structure visualization', () => {
     expect(html).not.toContain('yv-cell-range');
   });
 
-  it('animates StringBuilder insertions and deletion ghosts without moving index labels', () => {
+  it('animates StringBuilder insertions without detached deletion ghosts or moving index labels', () => {
     const deletedState = state({ lastEvent: { type: 'STEP', line: 6, data: { executionEvents: [
       { type: 'STRING_MUTATION', data: { name: 'builder', operation: 'deleteCharAt', before: 'cba', after: 'ca', index: 1, removed: 'b', kind: 'mutation' } },
     ] } } });
     const deletedHtml = renderToStaticMarkup(<StringView value="ca" state={deletedState} name="builder" />);
-    expect(deletedHtml).toContain('yv-string-removed-overlay');
-    expect(deletedHtml).toContain('>b</div>');
+    // Deletions update the string in place; do not render a detached pop-out box.
+    expect(deletedHtml).not.toContain('yv-string-removed-overlay');
+    expect(deletedHtml).not.toContain('>b</div>');
 
     const insertedState = state({ lastEvent: { type: 'STEP', line: 7, data: { executionEvents: [
       { type: 'STRING_MUTATION', data: { name: 'builder', operation: 'insert', before: 'ca', after: 'cba', index: 1, inserted: 'b', kind: 'mutation' } },
@@ -434,6 +901,15 @@ describe('string data structure visualization', () => {
     const insertedHtml = renderToStaticMarkup(<StringView value="cba" state={insertedState} name="builder" />);
     expect(insertedHtml).toContain('yv-string-cell-added');
     expect(insertedHtml).toContain('data-string-index="1"');
+
+    const appendedState = state({ lastEvent: { type: 'STEP', line: 8, data: { executionEvents: [
+      { type: 'STRING_MUTATION', data: {
+        name: 'builder', operation: 'append', before: 'abc', after: 'abcd', inserted: 'd', kind: 'mutation',
+      } },
+    ] } } });
+    const appendedHtml = renderToStaticMarkup(<StringView value="abcd" state={appendedState} name="builder" />);
+    expect(appendedHtml).toContain('yv-string-cell-added');
+    expect(appendedHtml).toContain('data-string-index="3"');
   });
 
   it('renders StringBuilder snapshots as an indexed mutable character sequence', () => {
@@ -652,6 +1128,28 @@ describe('execution visualization feature matrix', () => {
     });
   });
 
+  it('compares collection deltas by captured identity when an item mutates', () => {
+    const beforeItem = { $objectId: 'mutable-collection-item', fields: { value: 1 } };
+    const afterItem = { $objectId: 'mutable-collection-item', fields: { value: 2 } };
+    expect(collectionDelta([beforeItem, 7], [afterItem, 7])).toBeUndefined();
+    expect(unorderedCollectionDelta([beforeItem, 7], [afterItem, 7])).toBeUndefined();
+    expect(collectionDelta([beforeItem], [afterItem, 7])).toEqual({ added: 7, index: 1 });
+  });
+
+  it('matches map entries by captured object identity when a key object mutates', () => {
+    const beforeKey = { $objectId: 'mutable-key', $type: 'Key', fields: { code: 'A' } };
+    const afterKey = { $objectId: 'mutable-key', $type: 'Key', fields: { code: 'B' } };
+    expect(compareMapEntries(
+      [{ key: beforeKey, value: 'before' }],
+      [{ key: afterKey, value: 'after' }],
+    )).toEqual([{
+      kind: 'update',
+      key: afterKey,
+      before: 'before',
+      after: 'after',
+    }]);
+  });
+
   it('handles unordered collection deltas without assuming Set order', () => {
     expect(unorderedCollectionDelta([1, 2], [1, 2, 3])).toEqual({
       added: 3,
@@ -660,6 +1158,240 @@ describe('execution visualization feature matrix', () => {
       removed: 1,
     });
     expect(unorderedCollectionDelta([1, 2], [2, 1])).toBeUndefined();
+  });
+
+  it('marks a newly inserted map entry from the captured MAP_WRITE delta', () => {
+    const current = state({
+      dataStructures: {
+        lookup: {
+          $mapId: 'map-motion',
+          $type: 'java.util.HashMap',
+          entries: [{ key: 'answer', value: 42 }],
+          size: 1,
+        },
+      },
+      lastEvent: {
+        type: 'MAP_WRITE',
+        data: {
+          changes: [{ kind: 'insert', key: 'answer', after: 42 }],
+        },
+      },
+    });
+    const html = renderToStaticMarkup(<DataStructures state={current} source="lookup.put('answer', 42);" />);
+    expect(html).toContain('class="yv-map-row yv-map-insert"');
+    expect(html).toContain('NEW');
+    expect(html).toContain('answer');
+    expect(html).toContain('42');
+  });
+
+  it('classifies HashSet mutations by membership rather than snapshot iteration order', () => {
+    const previous = state({
+      dataStructures: {
+        seen: { $collectionId: 'set-id', $type: 'java.util.HashSet', $kind: 'set', values: [1, 2], size: 2 },
+      },
+    });
+    const current = state({
+      dataStructures: {
+        seen: { $collectionId: 'set-id', $type: 'java.util.HashSet', $kind: 'set', values: [2, 1, 3], size: 3 },
+      },
+    });
+    const html = markup(dataStructureResults(current, previous, 'seen.add(3);'));
+    expect(html).toContain('[Add]');
+    expect(html).toContain('3');
+    expect(html).not.toContain('[Set]');
+  });
+
+  it('animates a newly pushed stack item only when the prior snapshot proves an insertion', () => {
+    const previousSession = sessionStore.get();
+    const previous = state({
+      sequence: 40,
+      dataStructures: {
+        stack: { $collectionId: 'stack-motion', $type: 'java.util.Stack', $kind: 'stack', values: [1, 2], size: 2 },
+      },
+    });
+    const current = state({
+      sequence: 41,
+      dataStructures: {
+        stack: { $collectionId: 'stack-motion', $type: 'java.util.Stack', $kind: 'stack', values: [1, 2, 3], size: 3 },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'stack.push(3);', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source="stack.push(3);" />);
+      expect(html).toContain('class="yv-stack-cell yv-collection-item-enter"');
+      expect((html.match(/yv-collection-item-enter/g) ?? []).length).toBe(1);
+    } finally {
+      sessionStore.set(previousSession);
+    }
+  });
+
+  it('does not render a separate removal box when a stack value is popped', () => {
+    const previousSession = sessionStore.get();
+    const previous = state({
+      sequence: 70,
+      dataStructures: {
+        stack: { $collectionId: 'stack-remove', $type: 'java.util.Stack', $kind: 'stack', values: [1, 2, 3], size: 3 },
+      },
+    });
+    const current = state({
+      sequence: 71,
+      dataStructures: {
+        stack: { $collectionId: 'stack-remove', $type: 'java.util.Stack', $kind: 'stack', values: [1, 2], size: 2 },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'stack.pop();', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source="stack.pop();" />);
+      expect(html).not.toContain('yv-collection-removals');
+      expect(html).not.toContain('yv-collection-item-exit');
+      expect(html).not.toContain('>3</');
+    } finally {
+      sessionStore.set(previousSession);
+    }
+  });
+
+  it.each([
+    ['queue', 'java.util.ArrayDeque'],
+    ['deque', 'java.util.ArrayDeque'],
+    ['set', 'java.util.HashSet'],
+    ['priorityQueue', 'java.util.PriorityQueue'],
+    ['list', 'java.util.ArrayList'],
+  ])('does not render a separate removal box for %s', (kind, type) => {
+    const previousSession = sessionStore.get();
+    const id = `remove-${kind}`;
+    const previous = state({
+      sequence: 72,
+      dataStructures: {
+        items: { $collectionId: id, $type: type, $kind: kind, values: [1, 2], size: 2 },
+      },
+    });
+    const current = state({
+      sequence: 73,
+      dataStructures: {
+        items: { $collectionId: id, $type: type, $kind: kind, values: [1], size: 1 },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'items.remove();', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source="items.remove();" />);
+      expect(html).not.toContain('yv-collection-removals');
+      expect(html).not.toContain('yv-collection-item-exit');
+    } finally {
+      sessionStore.set(previousSession);
+    }
+  });
+
+  it('marks a collection emptied by the current step without a detached removal box', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 79,
+      dataStructures: {
+        items: { $collectionId: 'emptied-stack', $type: 'java.util.Stack', $kind: 'stack', values: [1], size: 1 },
+      },
+    });
+    const current = state({
+      sequence: 80,
+      dataStructures: {
+        items: { $collectionId: 'emptied-stack', $type: 'java.util.Stack', $kind: 'stack', values: [], size: 0 },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'items.pop();', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source="items.pop();" />);
+      expect(html).toContain('data-collection-emptied="true"');
+      expect(html).toContain('Empty stack');
+      expect(html).not.toContain('yv-collection-removals');
+      expect(html).not.toContain('yv-collection-item-exit');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('tracks collection insertion and removal across variable aliases by collection identity', () => {
+    const previousSession = sessionStore.get();
+    const previous = state({
+      sequence: 80,
+      dataStructures: {
+        oldName: { $collectionId: 'aliased-collection', $type: 'java.util.ArrayDeque', $kind: 'deque', values: [1, 2], size: 2 },
+      },
+    });
+    const current = state({
+      sequence: 81,
+      dataStructures: {
+        newName: { $collectionId: 'aliased-collection', $type: 'java.util.ArrayDeque', $kind: 'deque', values: [1, 3], size: 2 },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'newName.addLast(3);', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source="newName.addLast(3);" />);
+      expect(html).toContain('yv-collection-item-enter');
+      expect(html).not.toContain('yv-collection-removals');
+      expect(html).not.toContain('yv-collection-item-exit');
+    } finally {
+      sessionStore.set(previousSession);
+    }
+  });
+
+  it('preserves collection item identity when a captured object mutates in place', () => {
+    const previousSession = sessionStore.get();
+    const previous = state({
+      sequence: 91,
+      dataStructures: {
+        queue: {
+          $collectionId: 'mutable-item-queue',
+          $type: 'java.util.ArrayDeque',
+          $kind: 'queue',
+          values: [{ $objectId: 'mutable-item', fields: { value: 1 } }, 7],
+          size: 2,
+        },
+      },
+    });
+    const current = state({
+      sequence: 92,
+      dataStructures: {
+        queue: {
+          $collectionId: 'mutable-item-queue',
+          $type: 'java.util.ArrayDeque',
+          $kind: 'queue',
+          values: [{ $objectId: 'mutable-item', fields: { value: 2 } }, 7],
+          size: 2,
+        },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'queue.peek().value = 2;', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source="queue.peek().value = 2;" />);
+      expect(html).not.toContain('yv-collection-item-enter');
+      expect(html).not.toContain('yv-collection-removals');
+      expect(html).toContain('data-collection-item-key="\u0024objectId:mutable-item#0"');
+    } finally {
+      sessionStore.set(previousSession);
+    }
+  });
+
+  it('keeps duplicate queue item identities stable when an item is inserted at the front', () => {
+    const previousSession = sessionStore.get();
+    const previous = state({
+      sequence: 90,
+      dataStructures: {
+        queue: { $collectionId: 'stable-queue', $type: 'java.util.ArrayDeque', $kind: 'queue', values: [1, 1], size: 2 },
+      },
+    });
+    const current = state({
+      sequence: 91,
+      dataStructures: {
+        queue: { $collectionId: 'stable-queue', $type: 'java.util.ArrayDeque', $kind: 'queue', values: [0, 1, 1], size: 3 },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'queue.addFirst(0);', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source="queue.addFirst(0);" />);
+      expect(html).toContain('data-collection-item-key="1#0"');
+      expect(html).toContain('data-collection-item-key="1#1"');
+      expect(html).toContain('data-collection-item-key="0#0"');
+    } finally {
+      sessionStore.set(previousSession);
+    }
   });
 
   it('maps stack, queue, deque, priority queue, list, and set operations', () => {
@@ -704,6 +1436,60 @@ describe('execution visualization feature matrix', () => {
     });
     expect(collectionOperation('set', 'remove', { removed: 5 })).toEqual({
       operation: 'Remove', value: 5, position: 'Element',
+    });
+  });
+
+  it('renders TreeSet as sorted and keeps its add/remove operations recognizable', () => {
+    const current = state({
+      dataStructures: {
+        ordered: {
+          $collectionId: 'tree-set-1',
+          $type: 'java.util.TreeSet',
+          $kind: 'sortedSet',
+          values: [2, 5, 9],
+          size: 3,
+        },
+      },
+    });
+    const html = renderToStaticMarkup(<DataStructures state={current} source="" />);
+    expect(html).toContain('SORTED · 3 elements');
+    expect(html).not.toContain('UNORDERED · 3 elements');
+    expect(collectionOperation('sortedSet', 'add', { added: 7 })).toEqual({
+      operation: 'Add', value: 7, position: 'Element',
+    });
+    expect(collectionOperation('sortedSet', 'remove', { removed: 5 })).toEqual({
+      operation: 'Remove', value: 5, position: 'Element',
+    });
+  });
+
+  it('does not assume a PriorityQueue uses a min-heap comparator', () => {
+    const current = state({
+      dataStructures: {
+        pq: { $collectionId: 'pq-1', $type: 'java.util.PriorityQueue', $kind: 'priorityQueue', values: [9, 2, 5], size: 3 },
+      },
+    });
+    const html = renderToStaticMarkup(<DataStructures state={current} source="" />);
+    expect(html).toContain('HEAP · 3 items');
+    expect(html).not.toContain('MIN-HEAP');
+    expect(html).toContain('Heap tree · root is index 0');
+  });
+
+  it('distinguishes sorted and insertion-ordered collection labels', () => {
+    const current = state({
+      dataStructures: {
+        sorted: { $collectionId: 'sorted', $type: 'java.util.TreeSet', $kind: 'sortedSet', values: [1, 2], size: 2 },
+        insertion: { $collectionId: 'insertion', $type: 'java.util.LinkedHashSet', $kind: 'insertionOrderedSet', values: [8, 3], size: 2 },
+        treeMap: { $mapId: 'tree-map', $type: 'java.util.TreeMap', entries: [{ key: 1, value: 'a' }, { key: 2, value: 'b' }] },
+        linkedMap: { $mapId: 'linked-map', $type: 'java.util.LinkedHashMap', entries: [{ key: 2, value: 'b' }, { key: 1, value: 'a' }] },
+      },
+    });
+    const html = renderToStaticMarkup(<DataStructures state={current} source="" />);
+    expect(html).toContain('SORTED · 2 elements');
+    expect(html).toContain('INSERTION ORDER · 2 elements');
+    expect(html).toContain('SORTED BY KEY · 2 entries');
+    expect(html).toContain('INSERTION ORDER · 2 entries');
+    expect(collectionOperation('insertionOrderedSet', 'add', { added: 6 })).toEqual({
+      operation: 'Add', value: 6, position: 'Element',
     });
   });
 
@@ -795,6 +1581,131 @@ describe('execution visualization feature matrix', () => {
   });
 });
 
+
+  it('keeps a deleted map entry visible as a trace-backed removal cue', () => {
+    const previousSession = sessionStore.get();
+    const previous = state({
+      sequence: 80,
+      dataStructures: {
+        mp: { $mapId: 'map-delete', $type: 'java.util.HashMap', entries: [{ key: 'gone', value: 17 }, { key: 'stay', value: 21 }] },
+      },
+    });
+    const current = state({
+      sequence: 81,
+      dataStructures: {
+        mp: { $mapId: 'map-delete', $type: 'java.util.HashMap', entries: [{ key: 'stay', value: 21 }] },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'mp.remove("gone");', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source='mp.remove("gone");' />);
+      expect(html).toContain('yv-map-delete');
+      expect(html).toContain('gone');
+      expect(html).toContain('17');
+      expect(html).toContain('REMOVED');
+      expect(html).toContain('stay');
+    } finally {
+      sessionStore.set(previousSession);
+    }
+  });
+
+  it('applies an explicit MAP_WRITE only to the matching map identity', () => {
+    const previousSession = sessionStore.get();
+    const current = state({
+      sequence: 86,
+      dataStructures: {
+        first: { $mapId: 'map-a', $type: 'java.util.HashMap', entries: [{ key: 'shared', value: 1 }], size: 1 },
+        second: { $mapId: 'map-b', $type: 'java.util.HashMap', entries: [{ key: 'shared', value: 1 }], size: 1 },
+      },
+      lastEvent: {
+        type: 'STEP',
+        line: 12,
+        data: {
+          executionEvents: [{
+            type: 'MAP_WRITE',
+            data: {
+              mapId: 'map-a',
+              changes: [{ kind: 'update', key: 'shared', before: 0, after: 1 }],
+            },
+          }],
+        },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'first.put("shared", 1);', states: [current], index: 0 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source='first.put("shared", 1);' />);
+      const mapA = html.split('data-map-id="map-a"')[1]?.split('data-map-id="map-b"')[0] ?? '';
+      const mapB = html.split('data-map-id="map-b"')[1] ?? '';
+      expect(mapA).toContain('yv-map-update');
+      expect(mapB).not.toContain('yv-map-update');
+      expect(mapB).not.toContain('yv-old-value');
+    } finally {
+      sessionStore.set(previousSession);
+    }
+  });
+
+  it('derives a map value update from adjacent snapshots when no MAP_WRITE payload exists', () => {
+    const previousSession = sessionStore.get();
+    const previous = state({
+      sequence: 82,
+      dataStructures: {
+        mp: { $mapId: 'map-update-fallback', $type: 'java.util.HashMap', entries: [{ key: 'count', value: 1 }] },
+      },
+    });
+    const current = state({
+      sequence: 83,
+      dataStructures: {
+        mp: { $mapId: 'map-update-fallback', $type: 'java.util.HashMap', entries: [{ key: 'count', value: 2 }] },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'mp.put("count", 2);', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source='mp.put("count", 2);' />);
+      expect(html).toContain('yv-map-update');
+      expect(html).toContain('count');
+      expect(html).toContain('1');
+      expect(html).toContain('→');
+      expect(html).toContain('2');
+    } finally {
+      sessionStore.set(previousSession);
+    }
+  });
+
+  it('finds previous map snapshots in variables when a map alias moves into data structures', () => {
+    const previousSession = sessionStore.get();
+    const previous = state({
+      sequence: 84,
+      variables: {
+        oldLookup: {
+          $mapId: 'renamed-map',
+          $type: 'java.util.HashMap',
+          entries: [{ key: 'gone', value: 17 }, { key: 'stay', value: 21 }],
+          size: 2,
+        },
+      },
+    });
+    const current = state({
+      sequence: 85,
+      dataStructures: {
+        newLookup: {
+          $mapId: 'renamed-map',
+          $type: 'java.util.HashMap',
+          entries: [{ key: 'stay', value: 21 }],
+          size: 1,
+        },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'newLookup.remove("gone");', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source='newLookup.remove("gone");' />);
+      expect(html).toContain('yv-map-delete');
+      expect(html).toContain('gone');
+      expect(html).toContain('17');
+      expect(html).toContain('stay');
+    } finally {
+      sessionStore.set(previousSession);
+    }
+  });
 
 describe('deterministic semantic pointer roles', () => {
   it('exposes boundary roles even when variables are not array indices', () => {
@@ -911,6 +1822,27 @@ describe('semantic roles in rendered visualization', () => {
     expect(html).toContain('[1,2]');
   });
 
+  it('anchors row pointers to empty rows without inventing a matrix-cell intersection', () => {
+    const current = state({
+      variables: { row: 0, col: 0 },
+      lastEvent: { type: 'STEP', line: 4, data: {
+        executionEvents: [
+          { type: 'ARRAY_ACCESS', data: { name: 'matrix', indices: [0, 0], value: null, kind: 'read' } },
+        ],
+        semanticRoles: [
+          { name: 'row', role: 'pointer', confidence: 0.99, evidence: 'first index in matrix access', structureName: 'matrix' },
+          { name: 'col', role: 'pointer', confidence: 0.99, evidence: 'second index in matrix access', structureName: 'matrix' },
+        ],
+      } },
+    });
+    const html = renderToStaticMarkup(
+      <ArrayView value={[[], [7]]} state={current} source="matrix[row][col]" arrayName="matrix" />,
+    );
+    expect(html).toContain('data-matrix-pointer="row"');
+    expect(html).not.toContain('yv-matrix-cell-active');
+    expect(html).not.toContain('data-matrix-intersection="row,col"');
+  });
+
   it('does not invent an active matrix cell while row and column assignments are between checkpoints', () => {
     const current = state({
       variables: { row: 0, col: 1, mid: 2, n: 4 },
@@ -988,4 +1920,97 @@ describe('semantic roles in rendered visualization', () => {
     );
   });
 
+});
+
+describe('array and matrix mutation animations', () => {
+  it('animates only the cells involved in a trace-confirmed array swap', () => {
+    const current = state({ lastEvent: { type: 'ARRAY_WRITE', line: 2, data: {
+      name: 'nums',
+      changes: [
+        { indices: [0], before: 1, after: 2 },
+        { indices: [1], before: 2, after: 1 },
+      ],
+    } } });
+    const html = renderToStaticMarkup(
+      <ArrayView value={[2, 1, 3]} state={current} source="int t = nums[i];" arrayName="nums" />,
+    );
+    expect(html.match(/yv-cell-swapped/g)).toHaveLength(2);
+    expect(html.match(/yv-array-cell-content-swapped/g)).toHaveLength(2);
+  });
+
+  it('animates a confirmed multi-cell shift without moving array index labels', () => {
+    const current = state({ lastEvent: { type: 'ARRAY_WRITE', line: 3, data: {
+      name: 'nums',
+      changes: [
+        { indices: [1], before: 2, after: 9 },
+        { indices: [2], before: 3, after: 2 },
+        { indices: [3], before: 4, after: 3 },
+      ],
+    } } });
+    const html = renderToStaticMarkup(
+      <ArrayView value={[1, 9, 2, 3]} state={current} source="nums[i] = value;" arrayName="nums" />,
+    );
+    expect(html.match(/yv-array-cell-content-shift-right/g)).toHaveLength(3);
+    expect(html).toContain('class="yv-cell-index">1</div>');
+    expect(html).toContain('class="yv-cell-index">3</div>');
+  });
+
+  it('animates a trace-confirmed cyclic array rotation without guessing from final values alone', () => {
+    const current = state({ lastEvent: { type: 'ARRAY_WRITE', line: 4, data: {
+      name: 'nums',
+      changes: [
+        { indices: [0], before: 1, after: 2 },
+        { indices: [1], before: 2, after: 3 },
+        { indices: [2], before: 3, after: 1 },
+      ],
+    } } });
+    const html = renderToStaticMarkup(
+      <ArrayView value={[2, 3, 1]} state={current} source="rotate(nums);" arrayName="nums" />,
+    );
+    expect(html.match(/yv-cell-rotated-left/g)).toHaveLength(3);
+    expect(html.match(/yv-array-cell-content-rotate-left/g)).toHaveLength(3);
+  });
+
+  it('animates matrix cell swaps only when the recorded writes exchange before-values', () => {
+    const swapped = state({ lastEvent: { type: 'ARRAY_WRITE', line: 5, data: {
+      name: 'matrix',
+      changes: [
+        { indices: [0, 0], before: 1, after: 2 },
+        { indices: [1, 0], before: 2, after: 1 },
+      ],
+    } } });
+    const html = renderToStaticMarkup(
+      <ArrayView value={[[2, 3], [1, 4]]} state={swapped} source="swap(matrix);" arrayName="matrix" />,
+    );
+    expect(html.match(/yv-matrix-cell-swapped/g)).toHaveLength(2);
+
+    const notSwapped = state({ lastEvent: { type: 'ARRAY_WRITE', line: 5, data: {
+      name: 'matrix',
+      changes: [
+        { indices: [0, 0], before: 1, after: 2 },
+        { indices: [1, 0], before: 2, after: 3 },
+      ],
+    } } });
+    const plainHtml = renderToStaticMarkup(
+      <ArrayView value={[[2, 3], [3, 4]]} state={notSwapped} source="matrix[row][col] = value;" arrayName="matrix" />,
+    );
+    expect(plainHtml).not.toContain('yv-matrix-cell-swapped');
+  });
+
+  it('renders an explicit empty state for a zero-row matrix', () => {
+    const html = renderToStaticMarkup(
+      <ArrayView value={[]} state={state()} source="matrix[row][col]" arrayName="matrix" />,
+    );
+    expect(html).toContain('data-matrix-empty="true"');
+    expect(html).toContain('Empty matrix · 0 rows');
+  });
+
+  it('preserves jagged matrix rows instead of inventing missing values', () => {
+    const html = renderToStaticMarkup(
+      <ArrayView value={[[1, 2, 3], [4], []]} state={state()} source="" arrayName="matrix" />,
+    );
+    expect(html).toContain('yv-matrix-cell-empty');
+    expect(html).toContain('yv-matrix-missing');
+    expect((html.match(/class="yv-matrix-row-fragment"/g) ?? []).length).toBe(3);
+  });
 });

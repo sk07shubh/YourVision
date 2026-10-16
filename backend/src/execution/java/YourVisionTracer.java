@@ -63,6 +63,8 @@ public class YourVisionTracer {
     private static long sequence = 0;
     private static String tracedClass = "";
     private static String solutionSourcePath = "";
+    private static final Map<String, Integer> lastExecutableLines =
+        new LinkedHashMap<>();
     private static final Set<Long> steppedThreads = new HashSet<>();
     private static final Set<String> installedLoopBreakpoints =
         new HashSet<>();
@@ -139,7 +141,22 @@ public class YourVisionTracer {
             }
 
             Set<String> recordedStepLocations = new HashSet<>();
+
+            // JDI may deliver a STEP and METHOD_EXIT for the same suspended
+            // thread in one EventSet. Process the executable checkpoint first,
+            // otherwise METHOD_EXIT can be emitted before the final body line
+            // and cannot associate its return/final locals with that line.
+            List<Event> orderedEvents = new java.util.ArrayList<>();
             for (Event event : events) {
+                orderedEvents.add(event);
+            }
+            orderedEvents.sort((left, right) -> {
+                int leftPriority = eventPriority(left);
+                int rightPriority = eventPriority(right);
+                return Integer.compare(leftPriority, rightPriority);
+            });
+
+            for (Event event : orderedEvents) {
                 if (event instanceof StepEvent step) {
                     if (isTraceableUserMethod(step.location().method())) {
                         if (recordedStepLocations.add(stepLocationKey(
@@ -262,23 +279,27 @@ public class YourVisionTracer {
                             declarationLine
                         );
 
-                        emit(
-                            "METHOD_ENTER",
-                            methodLocation,
-                            entry.thread(),
-                            data
-                        );
+                        // The compiler-generated default constructor is
+                        // not user-authored code. Keep its entry request as the
+                        // point where line stepping is armed, but do not expose a
+                        // synthetic constructor checkpoint in the user's trace.
+                        if (
+                            !enteredMethod.isConstructor() ||
+                            hasExplicitConstructorDeclaration(enteredMethod)
+                        ) {
+                            emit(
+                                "METHOD_ENTER",
+                                methodLocation,
+                                entry.thread(),
+                                data
+                            );
+                        }
 
-                        // STEP_LINE resumes from MethodEntryEvent at the first
-                        // executable location and may report only the next
-                        // source line (skipping the first body statement).
-                        // Capture the suspended entry location itself as the
-                        // initial real STEP checkpoint before execution resumes.
-                        recordStep(
-                            methodLocation,
-                            entry.thread()
-                        );
-
+                        // A method-entry location can point at the declaration
+                        // line, which is not an executed statement. Do not emit
+                        // a STEP for that location: STEP_LINE supplies the first
+                        // executable body checkpoint and keeps effects aligned
+                        // with the line that actually ran.
                         enableLineStepping(
                             manager,
                             entry.thread()
@@ -286,7 +307,12 @@ public class YourVisionTracer {
                     }
 
                 } else if (event instanceof MethodExitEvent exit) {
-                    if (isTraceableUserMethod(exit.method()) && isTraced(exit.location())) {
+                    if (
+                        isTraceableUserMethod(exit.method()) &&
+                        (!exit.method().isConstructor() ||
+                         hasExplicitConstructorDeclaration(exit.method())) &&
+                        isTraced(exit.location())
+                    ) {
                         Map<String, Object> data =
                             new LinkedHashMap<>();
 
@@ -303,6 +329,16 @@ public class YourVisionTracer {
                                         new HashSet<>()
                                     )
                                 );
+                            }
+
+                            String lastLineKey = lastExecutableLineKey(
+                                exit.thread(),
+                                exit.method()
+                            );
+                            int executedLine =
+                                lastExecutableLines.getOrDefault(lastLineKey, 0);
+                            if (executedLine > 0) {
+                                data.put("displayLine", executedLine);
                             }
 
                             // Capture the final local-variable snapshot as
@@ -470,8 +506,10 @@ public class YourVisionTracer {
         Method method
     ) {
         try {
-            return !method.isConstructor() &&
-                !method.isStaticInitializer() &&
+            // Constructors are user code too. Excluding them made design-class
+            // traces jump straight to the first operation (e.g. cache.put),
+            // hiding initialization of fields and the constructor body.
+            return !method.isStaticInitializer() &&
                 !method.isNative() &&
                 !method.isAbstract() &&
                 method.declaringType().name().equals(tracedClass);
@@ -735,6 +773,54 @@ public class YourVisionTracer {
             location.method().signature() + ":" + location.codeIndex();
     }
 
+    private static boolean hasExplicitConstructorDeclaration(Method method) {
+        if (solutionSourcePath.isEmpty() || method == null || !method.isConstructor()) {
+            return false;
+        }
+
+        try {
+            String className = method.declaringType().name();
+            className = className.substring(className.lastIndexOf('.') + 1);
+            java.util.regex.Pattern constructorPattern =
+                java.util.regex.Pattern.compile(
+                    "\\b" + java.util.regex.Pattern.quote(className) + "\\s*\\("
+                );
+
+            for (String line : Files.readAllLines(
+                Path.of(solutionSourcePath),
+                StandardCharsets.UTF_8
+            )) {
+                String trimmed = line.trim();
+                if (trimmed.startsWith("class ") ||
+                    trimmed.startsWith("public class ") ||
+                    trimmed.startsWith("private class ") ||
+                    trimmed.startsWith("abstract class ")) {
+                    continue;
+                }
+
+                java.util.regex.Matcher matcher = constructorPattern.matcher(line);
+                if (matcher.find()) {
+                    String prefix = line.substring(0, matcher.start()).trim();
+                    if (prefix.isEmpty() ||
+                        prefix.matches("(public|protected|private)")) {
+                        return true;
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        return false;
+    }
+
+    private static int eventPriority(Event event) {
+        // Preserve JDI order for entries, steps, breakpoints and exceptions:
+        // in particular, a caller's call-site STEP must remain before the
+        // callee's METHOD_ENTER. Only defer exits until same-set checkpoints
+        // have captured the final executed line.
+        return event instanceof MethodExitEvent ? 1 : 0;
+    }
+
     private static int findMethodDeclarationLine(
         Location location,
         Method method
@@ -755,33 +841,108 @@ public class YourVisionTracer {
                     StandardCharsets.UTF_8
                 );
 
-            int limit =
-                Math.min(
-                    Math.max(fallback - 1, 0),
-                    lines.size()
+            String methodName = method.isConstructor()
+                ? method.declaringType().name().substring(
+                    method.declaringType().name().lastIndexOf('.') + 1
+                )
+                : method.name();
+            java.util.regex.Pattern declarationPattern =
+                java.util.regex.Pattern.compile(
+                    "\\b" +
+                    java.util.regex.Pattern.quote(methodName) +
+                    "\\s*\\("
                 );
 
-            String methodName = method.name();
-            String pattern =
-                "\\b" +
-                java.util.regex.Pattern.quote(methodName) +
-                "\\s*\\(";
+            // JDI's method-entry Location can point at the first bytecode
+            // line rather than the declaration (and can be line 1 for a
+            // method declared later in the source). Search the whole source
+            // for declaration-shaped lines, then choose the closest match to
+            // the runtime location. This handles constructors and overloads
+            // without pretending the declaration itself was executed.
+            int bestLine = fallback;
+            int bestDistance = Integer.MAX_VALUE;
 
-            for (int index = limit - 1; index >= 0; index--) {
-                if (lines.get(index).matches(".*" + pattern + ".*")) {
-                    return index + 1;
+            for (int index = 0; index < lines.size(); index++) {
+                String sourceLine = lines.get(index);
+                java.util.regex.Matcher declarationMatcher =
+                    declarationPattern.matcher(sourceLine);
+                if (!declarationMatcher.find()) {
+                    continue;
+                }
+
+                String trimmed = sourceLine.trim();
+                int methodNameStart = declarationMatcher.start();
+                // Matcher offsets are based on the untrimmed line; convert
+                // them before inspecting the return-type/modifier prefix.
+                int leadingWhitespace = sourceLine.length() -
+                    sourceLine.stripLeading().length();
+                methodNameStart = Math.max(0, methodNameStart - leadingWhitespace);
+                String prefix = methodNameStart >= 0
+                    ? trimmed.substring(0, methodNameStart).trim()
+                    : "";
+                boolean declarationLike =
+                    methodNameStart >= 0 &&
+                    !prefix.isEmpty() &&
+                    !prefix.endsWith(".") &&
+                    !prefix.endsWith("return") &&
+                    !prefix.contains("=") &&
+                    (trimmed.contains("{") ||
+                     trimmed.endsWith(")") ||
+                     trimmed.endsWith("throws") ||
+                     trimmed.matches(".*\\)\\s*throws\\s+.*"));
+
+                if (!declarationLike) {
+                    continue;
+                }
+
+                int candidateLine = index + 1;
+                int distance = fallback > 0
+                    ? Math.abs(candidateLine - fallback)
+                    : candidateLine;
+
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestLine = candidateLine;
                 }
             }
+
+            return bestLine;
         } catch (Exception ignored) {
         }
 
         return fallback;
     }
 
+    private static String lastExecutableLineKey(
+        ThreadReference thread,
+        Method method
+    ) {
+        try {
+            // The JDI frame count can change at METHOD_EXIT, so it is
+            // not a stable identity for matching a method's most recent STEP.
+            // Keep thread + full method signature; recursion is resolved by
+            // the newest executed line for that signature.
+            return thread.uniqueID() + ":" +
+                method.declaringType().name() + ":" +
+                method.name() + ":" +
+                method.signature();
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
     private static void recordStep(
         Location location,
         ThreadReference thread
     ) {
+        try {
+            lastExecutableLines.put(
+                lastExecutableLineKey(thread, location.method()),
+                location.lineNumber()
+            );
+        } catch (Exception ignored) {
+        }
+
         if (!isTraced(location)) {
             return;
         }
@@ -1286,7 +1447,20 @@ public class YourVisionTracer {
                 "table"
             );
 
-            if (tableField != null) {
+            if (type.contains("LinkedHashMap")) {
+                // A LinkedHashMap's table is hash-bucket order, not its
+                // observable iteration order. Follow the linked entry chain.
+                Field headField = findField(object, "head");
+                Value headValue = headField == null
+                    ? null
+                    : object.getValue(headField);
+                collectLinkedHashEntries(
+                    headValue,
+                    entries,
+                    depth,
+                    activeObjects
+                );
+            } else if (tableField != null) {
                 Value tableValue =
                     object.getValue(tableField);
 
@@ -1375,11 +1549,13 @@ public class YourVisionTracer {
             kind = "priorityQueue";
         } else if (type.contains("LinkedList")) {
             kind = "list";
-        } else if (
-            type.contains("HashSet") ||
-            type.contains("LinkedHashSet") ||
-            type.contains("TreeSet")
-        ) {
+        } else if (type.contains("TreeSet")) {
+            // TreeSet iteration follows comparator order.
+            kind = "sortedSet";
+        } else if (type.contains("LinkedHashSet")) {
+            // LinkedHashSet preserves insertion order through its backing map.
+            kind = "insertionOrderedSet";
+        } else if (type.contains("HashSet")) {
             kind = "set";
         }
 
@@ -1660,6 +1836,28 @@ public class YourVisionTracer {
         }
     }
 
+    private static void collectLinkedHashEntries(
+        Value nodeValue,
+        List<Map<String, Object>> entries,
+        int depth,
+        Set<Long> activeObjects
+    ) {
+        Value current = nodeValue;
+        Set<Long> seen = new HashSet<>();
+
+        while (
+            current instanceof ObjectReference node &&
+            entries.size() < MAX_FIELDS &&
+            seen.add(node.uniqueID())
+        ) {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("key", snapshotValue(fieldValue(node, "key"), depth + 1, activeObjects));
+            entry.put("value", snapshotValue(fieldValue(node, "value"), depth + 1, activeObjects));
+            entries.add(entry);
+            current = fieldValue(node, "after");
+        }
+    }
+
     private static void collectTreeEntries(
         Value nodeValue,
         List<Map<String, Object>> entries,
@@ -1779,6 +1977,18 @@ public class YourVisionTracer {
 
                 method =
                     location.method().name();
+            }
+
+            // JDI may report the method-entry location at the first bytecode
+            // line rather than the source declaration. Keep the declaration
+            // marker as metadata, and use it for METHOD_ENTER's displayed line.
+            if (
+                ("METHOD_ENTER".equals(type) ||
+                 "METHOD_EXIT".equals(type)) &&
+                data != null &&
+                data.get("displayLine") instanceof Number displayLine
+            ) {
+                line = displayLine.intValue();
             }
 
             if (thread != null) {

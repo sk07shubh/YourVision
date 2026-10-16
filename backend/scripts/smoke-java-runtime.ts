@@ -845,6 +845,54 @@ if (failures > 0) {
     );
 }
 
+
+const sessionResult = await runJava(
+    "class Counter { int value; Counter(int start) { value = start; } public void add(int amount) { value += amount; } public int read() { return value; } }",
+    { mode: "design", className: "Counter", constructorArguments: ["5"], operations: [
+        { method: "add", arguments: ["3"] },
+        { method: "read", arguments: [] },
+        { method: "add", arguments: ["2"] },
+        { method: "read", arguments: [] }
+    ] }
+);
+if (sessionResult.kind !== "OK" || sessionResult.result !== "[null,null,8,null,10]") {
+    throw new Error("Persistent design execution failed: " + sessionResult.kind + " " + sessionResult.result + " " + sessionResult.message);
+}
+console.log("PASS: persistent design-class execution");
+
+const lruResult = await runJava(
+    "import java.util.*; class LRUCache { int cap; LinkedHashMap<Integer,Integer> map; LRUCache(int c) { cap=c; map=new LinkedHashMap<>(16,0.75f,true); } public int get(int k) { return map.getOrDefault(k,-1); } public void put(int k,int v) { map.put(k,v); if(map.size()>cap) map.remove(map.keySet().iterator().next()); } }",
+    { mode: "design", className: "LRUCache", constructorArguments: ["2"], operations: [
+        { method: "put", arguments: ["1", "1"] },
+        { method: "put", arguments: ["2", "2"] },
+        { method: "get", arguments: ["1"] },
+        { method: "put", arguments: ["3", "3"] },
+        { method: "get", arguments: ["2"] },
+        { method: "get", arguments: ["1"] }
+    ] }
+);
+if (lruResult.kind !== "OK" || lruResult.result !== "[null,null,null,1,null,-1,1]") {
+    throw new Error("LRU design sequence failed: " + lruResult.kind + " " + lruResult.result + " " + lruResult.message);
+}
+console.log("PASS: LRU cache design sequence");
+
+const minStackResult = await runJava(
+    "import java.util.*; class MinStack { Deque<Integer> v=new ArrayDeque<>(), m=new ArrayDeque<>(); public MinStack() {} public void push(int x) { v.push(x); if(m.isEmpty()||x<=m.peek()) m.push(x); } public void pop() { int x=v.pop(); if(x==m.peek()) m.pop(); } public int top() { return v.peek(); } public int getMin() { return m.peek(); } }",
+    { mode: "design", className: "MinStack", constructorArguments: [], operations: [
+        { method: "push", arguments: ["-2"] },
+        { method: "push", arguments: ["0"] },
+        { method: "push", arguments: ["-3"] },
+        { method: "getMin", arguments: [] },
+        { method: "pop", arguments: [] },
+        { method: "top", arguments: [] },
+        { method: "getMin", arguments: [] }
+    ] }
+);
+if (minStackResult.kind !== "OK" || minStackResult.result !== "[null,null,null,null,-3,null,0,-2]") {
+    throw new Error("MinStack design sequence failed: " + minStackResult.kind + " " + minStackResult.result + " " + minStackResult.message);
+}
+console.log("PASS: MinStack design sequence");
+
 console.log(
     "All Java runtime smoke tests passed."
 );

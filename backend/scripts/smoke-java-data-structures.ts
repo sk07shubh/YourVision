@@ -15,12 +15,50 @@ class Solution {
         Box(int value) { this.value = value; }
     }
 
+    static class GraphNode {
+        int val;
+        ArrayList<GraphNode> neighbors = new ArrayList<>();
+        GraphNode(int val) { this.val = val; }
+    }
+
+    static class TreeNode {
+        int val;
+        TreeNode left;
+        TreeNode right;
+        TreeNode(int val) { this.val = val; }
+    }
+
+    static class TrieNode {
+        boolean isEnd;
+        HashMap<Character, TrieNode> children = new HashMap<>();
+    }
+
+    static class Trie {
+        TrieNode root = new TrieNode();
+    }
+
     public int structures() {
         int[] nums = {2, 7, 11};
         HashMap<Integer, Integer> map = new HashMap<>();
         map.put(2, 7);
+        LinkedHashMap<Integer, Integer> linkedMap = new LinkedHashMap<>();
+        linkedMap.put(5, 50);
+        linkedMap.put(1, 10);
+        linkedMap.put(3, 30);
+        TreeMap<Integer, Integer> treeMap = new TreeMap<>();
+        treeMap.put(5, 50);
+        treeMap.put(1, 10);
+        treeMap.put(3, 30);
         HashSet<Integer> set = new HashSet<>();
         set.add(10);
+        TreeSet<Integer> sortedSet = new TreeSet<>();
+        sortedSet.add(11);
+        sortedSet.add(3);
+        sortedSet.add(7);
+        LinkedHashSet<Integer> insertionOrderedSet = new LinkedHashSet<>();
+        insertionOrderedSet.add(9);
+        insertionOrderedSet.add(2);
+        insertionOrderedSet.add(7);
         Stack<Integer> stack = new Stack<>();
         stack.push(5);
         Queue<Integer> queue = new ArrayDeque<>();
@@ -42,6 +80,44 @@ class Solution {
 
         return nums[0] + map.get(3) + set.size() +
             stack.peek() + queue.peek() + priorityQueue.peek() + list.get(1);
+    }
+
+    public GraphNode graph() {
+        GraphNode first = new GraphNode(1);
+        GraphNode second = new GraphNode(2);
+        first.neighbors.add(second);
+        second.neighbors.add(first);
+        return first;
+    }
+
+    public GraphNode graphMutationTraversal() {
+        GraphNode first = new GraphNode(1);
+        GraphNode second = new GraphNode(2);
+        first.neighbors.add(second);
+        GraphNode cursor = first;
+        cursor = cursor.neighbors.get(0);
+        cursor.val = 7;
+        cursor.neighbors.add(first);
+        return first;
+    }
+
+    public TreeNode treeMutationTraversal() {
+        TreeNode root = new TreeNode(4);
+        root.left = new TreeNode(2);
+        root.right = new TreeNode(6);
+        TreeNode cursor = root;
+        cursor = cursor.left;
+        cursor.val = 3;
+        cursor.right = new TreeNode(5);
+        return root;
+    }
+
+    public Trie trie() {
+        Trie trie = new Trie();
+        TrieNode terminal = new TrieNode();
+        terminal.isEnd = true;
+        trie.root.children.put('a', terminal);
+        return trie;
     }
 
     public int nested() {
@@ -160,13 +236,17 @@ assert(!("nums" in variables), "array leaked into Variables");
 assert(!("map" in variables), "map leaked into Variables");
 assert("nums" in arrays, "array missing from Data Structures");
 
-for (const name of ["map","set","stack","queue","priorityQueue","list"]) {
+for (const name of ["map","linkedMap","treeMap","set","sortedSet","insertionOrderedSet","stack","queue","priorityQueue","list"]) {
     assert(name in structures, name + " missing from Data Structures");
 }
 
 const nums = arrays.nums as Record<string, unknown>;
 const map = structures.map as Record<string, unknown>;
+const linkedMap = structures.linkedMap as Record<string, any>;
+const treeMap = structures.treeMap as Record<string, any>;
 const set = structures.set as Record<string, unknown>;
+const sortedSet = structures.sortedSet as Record<string, unknown>;
+const insertionOrderedSet = structures.insertionOrderedSet as Record<string, unknown>;
 const stack = structures.stack as Record<string, unknown>;
 const queue = structures.queue as Record<string, unknown>;
 const priorityQueue = structures.priorityQueue as Record<string, unknown>;
@@ -174,12 +254,70 @@ const list = structures.list as Record<string, unknown>;
 
 assert(JSON.stringify(nums.values) === "[99,7,11]", "array values incorrect");
 assert(Array.isArray(map.entries) && (map.entries as unknown[]).length === 2, "map entries incorrect");
+assert(JSON.stringify(linkedMap.entries.map((entry: any) => entry.key)) === "[5,1,3]", "LinkedHashMap insertion order was not preserved");
+assert(JSON.stringify(treeMap.entries.map((entry: any) => entry.key)) === "[1,3,5]", "TreeMap comparator order was not preserved");
 assert(JSON.stringify(set.values) === "[10,11]", "set values incorrect");
+assert(sortedSet.$kind === "sortedSet", "TreeSet ordering kind is incorrect");
+assert(JSON.stringify(sortedSet.values) === "[3,7,11]", "TreeSet comparator order was not preserved");
+assert(insertionOrderedSet.$kind === "insertionOrderedSet", "LinkedHashSet ordering kind is incorrect");
+assert(JSON.stringify(insertionOrderedSet.values) === "[9,2,7]", "LinkedHashSet insertion order was not preserved");
 assert(JSON.stringify(stack.values) === "[5,6]", "stack values incorrect");
 assert(JSON.stringify(queue.values) === "[8,12]", "queue values incorrect");
 assert(priorityQueue.$kind === "priorityQueue", "priority queue kind is incorrect");
 assert(JSON.stringify(priorityQueue.values) === "[1,2,5,9]", "priority queue heap snapshot incorrect");
 assert(JSON.stringify(list.values) === "[3,4]", "list values incorrect");
+
+const graph = await runJava(source, { method: "graph" });
+assert(graph.kind === "OK", "graph structure execution failed");
+const graphState = graph.states?.at(-1);
+const graphObjects = Object.values(graphState?.objects ?? {}).filter((value: any) =>
+    value && typeof value === "object" && typeof value.$type === "string" && value.$type.includes("GraphNode")
+);
+assert(graphObjects.length >= 2, "graph node snapshots were not preserved");
+assert(graphObjects.some((value: any) => Array.isArray(value.fields?.neighbors?.values)), "graph adjacency collection was not preserved");
+
+// Exercise pointer movement, node mutation, and edge insertion through the real Java tracer.
+const graphMutation = await runJava(source, { method: "graphMutationTraversal" });
+assert(graphMutation.kind === "OK", "graph traversal/mutation execution failed");
+const graphMutationStates = graphMutation.states ?? [];
+assert(graphMutationStates.some((state: any) => {
+    const cursor = state.variables?.cursor as Record<string, any> | undefined;
+    const id = cursor?.$objectId ?? cursor?.$ref;
+    const target = typeof id === "string" ? state.objects?.[id] as Record<string, any> | undefined : undefined;
+    return target?.fields?.val === 2;
+}), "graph pointer traversal did not preserve the reached node identity");
+assert(graphMutationStates.some((state: any) => Object.values(state.objects ?? {}).some((value: any) =>
+    value && typeof value === "object" && value.$type?.includes("GraphNode") && value.fields?.val === 7
+)), "graph node mutation was not preserved in a trace snapshot");
+const graphMutationFinalObjects = Object.values(graphMutationStates.at(-1)?.objects ?? {}) as Array<Record<string, any>>;
+const mutatedGraphNode = graphMutationFinalObjects.find(value => value?.$type?.includes("GraphNode") && value.fields?.val === 7);
+assert(Array.isArray(mutatedGraphNode?.fields?.neighbors?.values) && mutatedGraphNode.fields.neighbors.values.length === 1,
+    "graph edge insertion was not preserved in the final snapshot");
+
+// Tree pointer movement and in-place node/child mutations must survive trace capture too.
+const treeMutation = await runJava(source, { method: "treeMutationTraversal" });
+assert(treeMutation.kind === "OK", "tree traversal/mutation execution failed");
+const treeMutationStates = treeMutation.states ?? [];
+assert(treeMutationStates.some((state: any) => {
+    const cursor = state.variables?.cursor as Record<string, any> | undefined;
+    const id = cursor?.$objectId ?? cursor?.$ref;
+    const target = typeof id === "string" ? state.objects?.[id] as Record<string, any> | undefined : undefined;
+    return target?.$type?.includes("TreeNode") && target.fields?.val === 2;
+}), "tree pointer traversal did not preserve the reached node identity");
+assert(treeMutationStates.some((state: any) => Object.values(state.objects ?? {}).some((value: any) =>
+    value && typeof value === "object" && value.$type?.includes("TreeNode") && value.fields?.val === 3 && value.fields?.right
+)),
+    "tree node value/child mutation was not preserved in a trace snapshot");
+
+const trie = await runJava(source, { method: "trie" });
+assert(trie.kind === "OK", "trie structure execution failed");
+const trieState = trie.states?.at(-1);
+const trieObjects = Object.values(trieState?.objects ?? {}).filter((value: any) =>
+    value && typeof value === "object" && typeof value.$type === "string" && value.$type.includes("TrieNode")
+);
+assert(trieObjects.length >= 2, "trie node snapshots were not preserved");
+assert(trieObjects.some((value: any) => value.fields?.isEnd === true), "trie terminal state was not preserved");
+assert(trieObjects.some((value: any) => Array.isArray(value.fields?.children?.entries)), "trie child map snapshot was not preserved");
 
 const nested = await runJava(source, { method: "nested" });
 assert(nested.kind === "OK", "nested data structure execution failed");

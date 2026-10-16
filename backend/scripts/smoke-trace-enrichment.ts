@@ -725,3 +725,12 @@ console.log("PASS: for-loop visualization uses runtime state directly");
 
 // The semantic loop fixture intentionally models JDI checkpoints whose source-line order is ambiguous.
 console.log("PASS: semantic for-loop ordering");
+
+const designClassConditionTrace: ExecutionTrace = { version: 1, events: [
+  { sequence: 1, type: "STEP", line: 3, method: "put", depth: 1, data: { variables: { capacity: 2, this: { $objectId: "307", $type: "LRUCache", fields: { capacity: 2, cache: { $mapId: "309", $type: "java.util.LinkedHashMap", size: 3, entries: [{ key: 1, value: 1 }, { key: 2, value: 2 }, { key: 3, value: 3 }] } } } } } },
+  { sequence: 2, type: "STEP", line: 4, method: "put", depth: 1, data: { variables: { capacity: 2, this: { $objectId: "307", $type: "LRUCache", fields: { capacity: 2, cache: { $mapId: "309", $type: "java.util.LinkedHashMap", size: 3, entries: [{ key: 1, value: 1 }, { key: 2, value: 2 }, { key: 3, value: 3 }] } } } } } }
+] };
+const designClassCondition = enrichTrace(designClassConditionTrace, ["", "", "if (cache.size() > capacity) {", "return cache.getOrDefault(2, -1);"].join("\n")).events.filter(event => event.type === "STEP");
+if (designClassCondition[0]?.data?.conditionResult !== true) throw new Error("design-class cache.size() condition was not evaluated");
+if (designClassCondition[1]?.data?.returnValue !== 2) throw new Error("design-class map getOrDefault return value was not derived");
+console.log("PASS: design-class map condition and return values");
