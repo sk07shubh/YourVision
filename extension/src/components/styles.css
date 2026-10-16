@@ -1360,8 +1360,10 @@
 
 
 /* Function-call argument preview: one trigger for the complete argument list.
-   The preview expands in-flow beneath that list so it is not clipped by the tree rail. */
+   The dropdown overlays below the signature, so hovering never reflows the tree or
+   pushes the argument list onto another line. */
 .yv-tree-arguments {
+  position: relative;
   display: inline-flex;
   flex-direction: column;
   align-items: flex-start;
@@ -1381,7 +1383,8 @@
   font-weight: inherit;
   line-height: inherit;
   text-align: left;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow-wrap: normal;
   cursor: pointer;
   transition: background-color .12s ease, border-color .12s ease, box-shadow .12s ease;
 }
@@ -1395,13 +1398,17 @@
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--yv-depth-border, #60a5fa), transparent 82%);
 }
 .yv-tree-arguments-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
   display: none;
   box-sizing: border-box;
   width: max-content;
-  min-width: min(100%, 190px);
-  max-width: min(100%, 320px);
+  min-width: min(190px, calc(100vw - 32px));
+  max-width: min(320px, calc(100vw - 32px));
   max-height: min(42dvh, 360px);
-  margin-top: 6px;
+  margin-top: 0;
   padding: 8px;
   overflow: auto;
   overscroll-behavior: contain;
