@@ -3346,7 +3346,6 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
         root.method = data.declaringType;
         root.signature = data.declaringType;
       }
-      const compactSignature = `${returnType ? `${returnType} ` : ''}${signature}`;
       const node: InvocationNode = { id, parentId: parentId === id ? 'root' : parentId, method, signature, entryIndex: index, status: 'active', returnType, frameVariables: {}, arguments: argumentsList, entryState: states[index], children: [] };
       nodes.set(id, node);
     } else if (event?.type === 'METHOD_EXIT' && typeof data.invocationId === 'string') {
@@ -3422,7 +3421,7 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
         <span className="yv-tree-depth" style={{ fontSize: '0.68em', lineHeight: 1.1, opacity: 0.72 }}>Depth {depth}</span>
         {node.arguments.length > 0 ? (
           <span className="yv-tree-method">
-            <span>{node.method}(</span>
+            <span>{node.method}</span>
             <span className="yv-tree-arguments">
               <button
                 type="button"
@@ -3431,11 +3430,11 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
                 onClick={event => event.stopPropagation()}
                 onKeyDown={event => event.stopPropagation()}
               >
-                {node.arguments.map((argument, argumentIndex) => (
+                ({node.arguments.map((argument, argumentIndex) => (
                   <span className="yv-tree-argument-name" key={argument.name}>
                     {argument.name}{argumentIndex < node.arguments.length - 1 ? ', ' : ''}
                   </span>
-                ))}
+                ))})
               </button>
               <span className="yv-tree-arguments-popover" role="region" aria-label={`Arguments for ${node.method}`}>
                 {node.arguments.map(argument => (
@@ -3450,7 +3449,6 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
                 ))}
               </span>
             </span>
-            <span>)</span>
           </span>
         ) : (
           <span className="yv-tree-method">{node.signature}</span>
