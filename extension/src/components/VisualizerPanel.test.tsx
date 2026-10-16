@@ -91,8 +91,7 @@ describe('synchronized function invocation tree', () => {
     expect(historical.get('call-1')?.status).toBe('active');
   });
 
-  it('renders compact return-value previews alongside argument previews for nested calls', () => {
-    const source = 'class Solution { int solve(int n) { return helper(n); } int helper(int x) { return x + 1; } }';
+  it('captures a nested call return value for its compact preview', () => {
     const states = [
       state({ invocationId: 'solve-call', lastEvent: { type: 'METHOD_ENTER', method: 'solve', data: {
         invocationId: 'solve-call', declaringType: 'Solution', parameterTypes: ['int'], returnType: 'int', variables: { n: 4 },
@@ -104,13 +103,11 @@ describe('synchronized function invocation tree', () => {
         invocationId: 'helper-call', parentInvocationId: 'solve-call', returnType: 'int', returnValue: 5, returnedVoid: false,
       } } }),
     ];
-    const html = renderToStaticMarkup(
-      <InvocationTree states={states} currentIndex={2} source={source} onSelect={() => {}} />,
-    );
-    expect(html).toContain('Preview all arguments passed to helper');
-    expect(html).toContain('Preview return value from helper');
-    expect(html).toContain('Class context');
-    expect(html).not.toContain('class="yv-tree-arguments-popover"');
+    const { nodes } = buildInvocationNodes(states);
+    expect(nodes.get('helper-call')?.arguments).toEqual([{ name: 'x', value: 4 }]);
+    expect(nodes.get('helper-call')?.status).toBe('returned');
+    expect(nodes.get('helper-call')?.returnValue).toBe(5);
+    expect(nodes.get('helper-call')?.exitState).toBe(states[2]);
   });
 
   it('keeps the source variable name for a returned collection', () => {
