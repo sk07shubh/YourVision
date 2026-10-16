@@ -22,6 +22,7 @@ import com.sun.jdi.Value;
 import com.sun.jdi.VirtualMachine;
 import com.sun.jdi.connect.LaunchingConnector;
 import com.sun.jdi.event.BreakpointEvent;
+import com.sun.jdi.event.ClassPrepareEvent;
 import com.sun.jdi.event.Event;
 import com.sun.jdi.event.EventSet;
 import com.sun.jdi.event.ExceptionEvent;
@@ -31,6 +32,7 @@ import com.sun.jdi.event.StepEvent;
 import com.sun.jdi.event.VMDeathEvent;
 import com.sun.jdi.event.VMDisconnectEvent;
 import com.sun.jdi.request.BreakpointRequest;
+import com.sun.jdi.request.ClassPrepareRequest;
 import com.sun.jdi.request.EventRequest;
 import com.sun.jdi.request.EventRequestManager;
 import com.sun.jdi.request.ExceptionRequest;
@@ -297,7 +299,18 @@ public class YourVisionTracer {
                         }
                     }
 
+                } else if (event instanceof ClassPrepareEvent prepared) {
+                    if (tracedClass.equals(prepared.referenceType().name())) {
+                        installStaticInitializerBreakpoints(manager, prepared.referenceType());
+                    }
+
                 } else if (event instanceof BreakpointEvent breakpoint) {
+                    if (isTraceableClassSetupMethod(breakpoint.location().method()) &&
+                        breakpoint.location().method().isStaticInitializer()) {
+                        // Class-prepare breakpoints stop before <clinit> advances;
+                        // begin line stepping now so every real initializer line is captured.
+                        enableLineStepping(manager, breakpoint.thread());
+                    }
                     if (
                         (isTraceableClassSetupMethod(breakpoint.location().method()) || isTraceableUserMethod(breakpoint.location().method())) &&
                         recordedStepLocations.add(stepLocationKey(
@@ -628,6 +641,11 @@ public class YourVisionTracer {
         );
         exit.enable();
 
+        ClassPrepareRequest prepared = manager.createClassPrepareRequest();
+        prepared.addClassFilter(tracedClass);
+        prepared.setSuspendPolicy(EventRequest.SUSPEND_ALL);
+        prepared.enable();
+
         ExceptionRequest exception =
             manager.createExceptionRequest(
                 null,
@@ -648,6 +666,29 @@ public class YourVisionTracer {
             EventRequest.SUSPEND_ALL
         );
         death.enable();
+    }
+
+    private static void installStaticInitializerBreakpoints(
+        EventRequestManager manager,
+        ReferenceType type
+    ) {
+        try {
+            for (Method method : type.methods()) {
+                if (!method.isStaticInitializer()) {
+                    continue;
+                }
+                for (Location location : method.allLineLocations()) {
+                    if (location.lineNumber() <= 0) {
+                        continue;
+                    }
+                    BreakpointRequest breakpoint = manager.createBreakpointRequest(location);
+                    breakpoint.setSuspendPolicy(EventRequest.SUSPEND_EVENT_THREAD);
+                    breakpoint.enable();
+                }
+            }
+        } catch (Exception ignored) {
+            // Static-initializer capture is best-effort if the VM has no line table.
+        }
     }
 
     private static boolean isTraceableClassSetupMethod(Method method) {
