@@ -2,7 +2,14 @@ import type { VisualizationResponse } from './trace';
 
 export type ExtensionRequest =
   | { type: 'READ_SOURCE' }
-  | { type: 'RUN_VISUALIZATION'; source: string; method: string; arguments: string[] };
+  | {
+      type: 'RUN_VISUALIZATION';
+      source: string;
+      method: string;
+      arguments: string[];
+      constructorArguments?: string[];
+      calls?: Array<{ method: string; arguments: string[] }>;
+    };
 
 export type ExtensionResponse =
   | { ok: true; source: string }
