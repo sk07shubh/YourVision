@@ -1398,8 +1398,10 @@
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--yv-depth-border, #60a5fa), transparent 82%);
 }
 
-.yv-class-context {
+.yv-tree-node.class-context-node {
   position: relative;
+}
+.yv-class-context {
   display: inline-flex;
   align-items: center;
 }
@@ -1417,7 +1419,7 @@
 }
 .yv-class-context-trigger:hover,
 .yv-class-context-trigger:focus-visible,
-.yv-class-context:hover .yv-class-context-trigger,
+.yv-tree-node.class-context-node:hover .yv-class-context-trigger,
 .yv-class-context:focus-within .yv-class-context-trigger {
   outline: none;
   border-color: color-mix(in srgb, var(--yv-depth-border, #60a5fa), transparent 42%);
@@ -1449,8 +1451,8 @@
   text-align: left;
   cursor: default;
 }
-.yv-class-context:hover .yv-class-context-popover,
-.yv-class-context:focus-within .yv-class-context-popover {
+.yv-tree-node.class-context-node:hover .yv-class-context-popover,
+.yv-tree-node.class-context-node:focus-within .yv-class-context-popover {
   display: flex;
   flex-direction: column;
   gap: 9px;
