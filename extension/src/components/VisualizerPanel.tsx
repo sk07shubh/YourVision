@@ -4710,6 +4710,17 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
   const classDeclarations = useMemo(() => parseClassFieldDeclarations(source), [source]);
   const current = states[currentIndex];
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const seenInvocationIds = useRef<Set<string>>(new Set());
+  const enteringInvocationIds = useMemo(() => {
+    const entering = new Set<string>();
+    for (const id of nodes.keys()) {
+      if (!seenInvocationIds.current.has(id)) entering.add(id);
+    }
+    return entering;
+  }, [nodes]);
+  useEffect(() => {
+    for (const id of enteringInvocationIds) seenInvocationIds.current.add(id);
+  }, [enteringInvocationIds]);
   useEffect(() => {
     const viewport = viewportRef.current;
     const selected = viewport?.querySelector<HTMLElement>('.yv-tree-node.selected');
@@ -4722,7 +4733,7 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
     if (!node) return null;
     const selected = id === selectedId;
     const result = node.status === 'active' ? '-' : node.status === 'void' ? 'void' : node.status === 'exceptional' ? 'Exception' : displayValue(node.returnValue);
-    return <div className={`yv-tree-branch depth-${Math.min(depth, 5)}`} key={id}>
+    return <div className={`yv-tree-branch depth-${Math.min(depth, 5)} ${enteringInvocationIds.has(id) ? 'yv-tree-branch-entering' : ''}`} key={id}>
       <div
         role="button"
         tabIndex={0}
