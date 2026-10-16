@@ -3283,12 +3283,14 @@ type InvocationNode = {
   returnValue?: unknown;
   returnType?: string;
   frameVariables: Record<string, unknown>;
+  arguments: Array<{ name: string; value: unknown }>;
+  entryState?: TraceState;
   children: string[];
 };
 
 export function buildInvocationNodes(states: TraceState[], source = ''): { nodes: Map<string, InvocationNode>; currentId?: string } {
   const nodes = new Map<string, InvocationNode>();
-  nodes.set('root', { id: 'root', parentId: '', method: 'Solution', signature: 'Solution', entryIndex: 0, status: 'active', frameVariables: {}, children: [] });
+  nodes.set('root', { id: 'root', parentId: '', method: 'Solution', signature: 'Solution', entryIndex: 0, status: 'active', frameVariables: {}, arguments: [], children: [] });
   for (let index = 0; index < states.length; index += 1) {
     const event = states[index]?.lastEvent;
     const data = isPlainObject(event?.data) ? event.data : {};
@@ -3328,19 +3330,16 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
       const entryVariables = isPlainObject(data.variables)
         ? data.variables
         : isPlainObject(states[index]?.variables) ? states[index].variables : {};
-      const signatureParams = rawParams.map((type, index) => {
-        const name = parameterNames[index] && parameterNames[index] !== 'this'
+      const argumentNames = rawParams.map((_type, index) =>
+        parameterNames[index] && parameterNames[index] !== 'this'
           ? parameterNames[index]
-          : 'arg' + (index + 1);
-        // METHOD_ENTER snapshots expose the callee's bound parameter values on runtimes
-        // that support them. Prefer those real values over the declared type; retain a
-        // typed name only when the trace doesn't contain a value for that parameter.
-        if (Object.prototype.hasOwnProperty.call(entryVariables, name)) {
-          return name + ' = ' + compactValue(entryVariables[name]);
-        }
-        return displayType(type) + ' ' + name;
-      });
-      const signature = `${method}(${signatureParams.join(', ')})`;
+          : 'arg' + (index + 1)
+      );
+      const argumentsList = argumentNames.map(name => ({
+        name,
+        value: Object.prototype.hasOwnProperty.call(entryVariables, name) ? entryVariables[name] : undefined
+      }));
+      const signature = `${method}(${argumentNames.join(', ')})`;
       const returnType = typeof data.returnType === 'string' ? displayType(data.returnType) : undefined;
       const root = nodes.get('root');
       if (root && typeof data.declaringType === 'string' && data.declaringType) {
@@ -3348,7 +3347,7 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
         root.signature = data.declaringType;
       }
       const compactSignature = `${returnType ? `${returnType} ` : ''}${signature}`;
-      const node: InvocationNode = { id, parentId: parentId === id ? 'root' : parentId, method, signature: compactSignature, entryIndex: index, status: 'active', returnType, frameVariables: {}, children: [] };
+      const node: InvocationNode = { id, parentId: parentId === id ? 'root' : parentId, method, signature, entryIndex: index, status: 'active', returnType, frameVariables: {}, arguments: argumentsList, entryState: states[index], children: [] };
       nodes.set(id, node);
     } else if (event?.type === 'METHOD_EXIT' && typeof data.invocationId === 'string') {
       const node = nodes.get(data.invocationId);
@@ -3405,11 +3404,59 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
     const selected = id === selectedId;
     const result = node.status === 'active' ? '-' : node.status === 'void' ? 'void' : node.status === 'exceptional' ? 'Exception' : displayValue(node.returnValue);
     return <div className={`yv-tree-branch depth-${Math.min(depth, 5)}`} key={id}>
-      <button type="button" className={`yv-tree-node ${selected ? 'selected' : ''} ${node.status}`} style={{ '--yv-tree-depth': depth } as CSSProperties} onClick={() => onSelect(node.entryIndex)} aria-current={selected ? 'step' : undefined}>
+      <div
+        role="button"
+        tabIndex={0}
+        className={`yv-tree-node ${selected ? 'selected' : ''} ${node.status}`}
+        style={{ '--yv-tree-depth': depth } as CSSProperties}
+        onClick={() => onSelect(node.entryIndex)}
+        onKeyDown={event => {
+          if (event.target !== event.currentTarget) return;
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onSelect(node.entryIndex);
+          }
+        }}
+        aria-current={selected ? 'step' : undefined}
+      >
         <span className="yv-tree-depth" style={{ fontSize: '0.68em', lineHeight: 1.1, opacity: 0.72 }}>Depth {depth}</span>
-        <span className="yv-tree-method">{node.signature}</span>
+        {node.arguments.length > 0 ? (
+          <span className="yv-tree-method">
+            <span>{node.method}(</span>
+            <span className="yv-tree-arguments">
+              <button
+                type="button"
+                className="yv-tree-arguments-trigger"
+                aria-label={`Preview all arguments passed to ${node.method}`}
+                onClick={event => event.stopPropagation()}
+                onKeyDown={event => event.stopPropagation()}
+              >
+                {node.arguments.map((argument, argumentIndex) => (
+                  <span className="yv-tree-argument-name" key={argument.name}>
+                    {argument.name}{argumentIndex < node.arguments.length - 1 ? ', ' : ''}
+                  </span>
+                ))}
+              </button>
+              <span className="yv-tree-arguments-popover" role="region" aria-label={`Arguments for ${node.method}`}>
+                {node.arguments.map(argument => (
+                  <span className="yv-tree-argument-preview" key={argument.name}>
+                    <strong className="yv-tree-argument-label">{argument.name}</strong>
+                    <span className="yv-tree-argument-value">
+                      {argument.value === undefined
+                        ? <span className="yv-code">Value not captured</span>
+                        : <DataValue value={argument.value} state={node.entryState} source={source} name={argument.name} />}
+                    </span>
+                  </span>
+                ))}
+              </span>
+            </span>
+            <span>)</span>
+          </span>
+        ) : (
+          <span className="yv-tree-method">{node.signature}</span>
+        )}
         <span className="yv-tree-outcome">{id === 'root' ? 'Class context' : result}</span>
-      </button>
+      </div>
       {node.children.length > 0 && <div className="yv-tree-children">{node.children.map(child => renderNode(child, depth + 1))}</div>}
     </div>;
   };
