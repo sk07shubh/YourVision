@@ -110,6 +110,33 @@ describe('synchronized function invocation tree', () => {
     expect(nodes.get('helper-call')?.exitState).toBe(states[2]);
   });
 
+  it('shows caller expressions mapped to the callee parameters with captured values', () => {
+    const source = [
+      'class Solution {',
+      '  boolean find(int[] nums, int target, int idx) { return false; }',
+      '  boolean solve(int[] arr, int trgt, int index) {',
+      '    return find(arr, trgt, index + 1);',
+      '  }',
+      '}',
+    ].join('\\n');
+    const states = [
+      state({ line: 3, invocationId: 'solve-call', lastEvent: { type: 'METHOD_ENTER', method: 'solve', data: {
+        invocationId: 'solve-call', declaringType: 'Solution', parameterTypes: ['int[]', 'int', 'int'], variables: { arr: [2, 5, 8], trgt: 8, index: 3 },
+      } } }),
+      state({ line: 4, invocationId: 'solve-call', lastEvent: { type: 'STEP', method: 'solve', data: { invocationId: 'solve-call', variables: { arr: [2, 5, 8], trgt: 8, index: 3 } } } }),
+      state({ line: 4, invocationId: 'find-call', parentInvocationId: 'solve-call', lastEvent: { type: 'METHOD_ENTER', method: 'find', data: {
+        invocationId: 'find-call', parentInvocationId: 'solve-call', parameterTypes: ['int[]', 'int', 'int'], variables: { nums: [2, 5, 8], target: 8, idx: 4 },
+      } } }),
+    ];
+    const { nodes } = buildInvocationNodes(states, source);
+    expect(nodes.get('find-call')?.signature).toBe('find(arr, trgt, index + 1)');
+    expect(nodes.get('find-call')?.arguments).toEqual([
+      { name: 'nums', expression: 'arr', value: [2, 5, 8] },
+      { name: 'target', expression: 'trgt', value: 8 },
+      { name: 'idx', expression: 'index + 1', value: 4 },
+    ]);
+  });
+
   it('keeps the source variable name for a returned collection', () => {
     const source = 'class Solution { int[] solve(int[] nums) { return nums; } }';
     const states = [
