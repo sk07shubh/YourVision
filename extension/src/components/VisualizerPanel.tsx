@@ -3325,9 +3325,20 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
         .replace(/^java\.lang\./, '')
         .replace(/^java\.util\./, '')
         .replace(/\bboolean\b/g, 'bool');
+      const entryVariables = isPlainObject(data.variables)
+        ? data.variables
+        : isPlainObject(states[index]?.variables) ? states[index].variables : {};
       const signatureParams = rawParams.map((type, index) => {
-        const name = parameterNames[index];
-        return displayType(type) + ' ' + (name && name !== 'this' ? name : 'arg' + (index + 1));
+        const name = parameterNames[index] && parameterNames[index] !== 'this'
+          ? parameterNames[index]
+          : 'arg' + (index + 1);
+        // METHOD_ENTER snapshots expose the callee's bound parameter values on runtimes
+        // that support them. Prefer those real values over the declared type; retain a
+        // typed name only when the trace doesn't contain a value for that parameter.
+        if (Object.prototype.hasOwnProperty.call(entryVariables, name)) {
+          return name + ' = ' + compactValue(entryVariables[name]);
+        }
+        return displayType(type) + ' ' + name;
       });
       const signature = `${method}(${signatureParams.join(', ')})`;
       const returnType = typeof data.returnType === 'string' ? displayType(data.returnType) : undefined;
@@ -3395,7 +3406,7 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
     const result = node.status === 'active' ? '-' : node.status === 'void' ? 'void' : node.status === 'exceptional' ? 'Exception' : displayValue(node.returnValue);
     return <div className={`yv-tree-branch depth-${Math.min(depth, 5)}`} key={id}>
       <button type="button" className={`yv-tree-node ${selected ? 'selected' : ''} ${node.status}`} style={{ '--yv-tree-depth': depth } as CSSProperties} onClick={() => onSelect(node.entryIndex)} aria-current={selected ? 'step' : undefined}>
-        <span className="yv-tree-depth">Depth {depth}</span>
+        <span className="yv-tree-depth" style={{ fontSize: '0.68em', lineHeight: 1.1, opacity: 0.72 }}>Depth {depth}</span>
         <span className="yv-tree-method">{node.signature}</span>
         <span className="yv-tree-outcome">{id === 'root' ? 'Class context' : result}</span>
       </button>
