@@ -927,7 +927,8 @@ if (!designEvents.some(event => event.type === "STEP" && event.method === "<init
     throw new Error("Design trace must include executable constructor-body checkpoints.");
 }
 if (!designEvents.some(event => event.type === "STEP" && event.method === "<clinit>" && event.line === 2)) {
-    throw new Error("Design trace must include static field initialization before methods.");
+    const setupDiagnostics = designEvents.map(event => ({ type: event.type, line: event.line, method: event.method, classSetup: event.data?.classSetup, displayLine: event.data?.displayLine, classFields: event.data?.classFields ? Object.keys(event.data.classFields as object) : undefined }));
+    throw new Error("Design trace must include static field initialization before methods. Events: " + JSON.stringify(setupDiagnostics.slice(0, 30)));
 }
 if (!designEvents.some(event => event.type === "STEP" && event.data?.classFields && Object.prototype.hasOwnProperty.call(event.data.classFields, "shared"))) {
     throw new Error("Class-level fields must be captured during setup.");
