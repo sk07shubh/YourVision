@@ -747,7 +747,8 @@ async function visualize(region?: HTMLElement) {
       await runVisualization(
         source,
         method.name,
-        testcase.orderedArguments
+        testcase.orderedArguments,
+        testcase.designClass
       );
 
     sessionStore.finish(
