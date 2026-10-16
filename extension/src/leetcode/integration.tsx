@@ -26,15 +26,17 @@ import {
 } from './code-source';
 
 import {
-  inferMethod,
+  matchEntryMethod,
 } from './method';
 
 import {
   readSelectedTestcase,
+  readDesignTestcaseArrays,
 } from './dom-testcase';
 
 import {
   runVisualization,
+  runDesignVisualization,
 } from '../api/backend';
 
 import {
@@ -727,28 +729,55 @@ async function visualize(region?: HTMLElement) {
     const source =
       await readUserSource();
 
-    const method =
-      inferMethod(source);
+    // Read the method signature from LeetCode's canonical Java starter code.
+    // This is independent of the user's current method order and helper methods.
+    const starterResponse = await chrome.runtime.sendMessage({
+      type: 'READ_ENTRY_METHOD',
+    }) as { ok?: boolean; source?: string; error?: string };
 
-    const testcase =
-      readSelectedTestcase(
-        method,
-        region
+    if (!starterResponse?.ok || !starterResponse.source) {
+      throw new Error(
+        starterResponse?.error ??
+        'Could not retrieve LeetCode’s original Java starter signature.'
       );
+    }
 
-    sessionStore.begin(
-      source,
-      testcase
-    );
-
-    activateTab();
-
-    const response =
-      await runVisualization(
-        source,
-        method.name,
-        testcase.orderedArguments
-      );
+    let response;
+    if (!/\bclass\s+Solution\b/.test(starterResponse.source)) {
+      const classMatch = starterResponse.source.match(/\bclass\s+([A-Za-z_$][\w$]*)/);
+      if (!classMatch?.[1]) throw new Error('Could not identify the LeetCode design class.');
+      const design = readDesignTestcaseArrays(region);
+      if (design.names[0] !== classMatch[1]) {
+        throw new Error('The selected testcase constructor does not match LeetCode class ' + classMatch[1] + '.');
+      }
+      const serialize = (value: unknown): string => typeof value === 'string'
+        ? JSON.stringify(value)
+        : value === null ? 'null'
+        : typeof value === 'number' || typeof value === 'boolean' ? String(value)
+        : JSON.stringify(value);
+      const constructorArguments = (design.values[0] ?? []).map(serialize);
+      const operations = design.names.slice(1).map((name, index) => ({
+        method: name,
+        arguments: (design.values[index + 1] ?? []).map(serialize),
+      }));
+      if (!operations.length) throw new Error('The design testcase has no operations to visualize.');
+      sessionStore.begin(source, {
+        id: 'design:' + classMatch[1] + ':' + design.raw,
+        label: design.label,
+        source: region?.dataset.yourvisionResultRegion === 'true' ? 'failed' : 'default',
+        raw: design.raw,
+        inputs: {},
+        orderedArguments: [],
+      });
+      activateTab();
+      response = await runDesignVisualization(source, classMatch[1], constructorArguments, operations);
+    } else {
+      const method = matchEntryMethod(source, starterResponse.source);
+      const testcase = readSelectedTestcase(method, region);
+      sessionStore.begin(source, testcase);
+      activateTab();
+      response = await runVisualization(source, method.name, testcase.orderedArguments);
+    }
 
     sessionStore.finish(
       response

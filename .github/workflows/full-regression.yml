@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - automation/comprehensive-regression-lab
+      - feat/all-remaining-ds-visualization
   pull_request:
     branches:
       - main

@@ -394,21 +394,31 @@ function attachStepResult(
     step.data = data;
 }
 
-function annotateCondition(
-    event: ExecutionEvent,
-    sourceLines: string[]
-): ExecutionEvent {
+function annotateCondition(event: ExecutionEvent, sourceLines: string[]): ExecutionEvent {
     if (typeof event.line !== "number" || event.line < 1 || !event.data?.variables) return event;
     const statement = sourceLines[event.line - 1]?.trim() ?? "";
-    const expression = extractConditionExpression(statement);
-    if (!expression) return event;
     const variables = event.data.variables;
     if (!variables || typeof variables !== "object" || Array.isArray(variables)) return event;
-    const result = evaluateCondition(expression, variables as Record<string, unknown>);
-    if (result === undefined) return event;
-    return { ...event, data: { ...event.data, conditionResult: result } };
+    const data = { ...event.data };
+    const expression = extractConditionExpression(statement);
+    if (expression) {
+        const result = evaluateCondition(expression, variables as Record<string, unknown>);
+        if (result !== undefined) data.conditionResult = result;
+    }
+    // Library calls do not emit user-method METHOD_EXIT events; derive simple
+    // return expressions from the runtime snapshots captured for this step.
+    const returnMatch = statement.match(/^return\s+(.+?)\s*;?$/);
+    if (returnMatch?.[1] && !("returnValue" in data)) {
+        const result = evaluateValue(returnMatch[1], variables as Record<string, unknown>);
+        if (result !== undefined) data.returnValue = result;
+    }
+    return data.conditionResult !== undefined || "returnValue" in data ? { ...event, data } : event;
 }
 
+function evaluateValue(expression: string, variables: Record<string, unknown>): unknown {
+    try { return new ConditionParser(tokenizeCondition(expression), variables).parse(); }
+    catch { return undefined; }
+}
 function extractConditionExpression(statement: string): string | undefined {
     const trimmed = statement.trim();
     // A branch checkpoint can retain the full source spelling "else if (...)";
@@ -723,7 +733,12 @@ class ConditionParser {
         return value;
     }
     private resolveVariable(name: string): unknown {
-        return conditionSnapshotValue(this.variables[name]);
+        if (name in this.variables) return conditionSnapshotValue(this.variables[name]);
+        const thisValue = this.variables.this;
+        if (isPlainObject(thisValue) && isPlainObject(thisValue.fields) && name in thisValue.fields) {
+            return conditionSnapshotValue(thisValue.fields[name]);
+        }
+        return undefined;
     }
 }
 
@@ -794,6 +809,18 @@ function readMethod(value: unknown, method: string, args: unknown[]): unknown {
             return snapshot.values[snapshot.values.length - 1];
         }
         throw new Error("peek receiver unavailable");
+    }
+
+    if (method === "size" && args.length === 0) {
+        if (Array.isArray(snapshot.entries)) return snapshot.entries.length;
+        if (Array.isArray(snapshot.values)) return snapshot.values.length;
+        throw new Error("size receiver unavailable");
+    }
+    if (method === "getOrDefault" || method === "get") {
+        const entries = Array.isArray(snapshot.entries) ? snapshot.entries : [];
+        const found = entries.find((entry) => entry && typeof entry === "object" && sameConditionValue((entry as Record<string, unknown>).key, args[0]));
+        if (found && typeof found === "object") return (found as Record<string, unknown>).value;
+        return method === "getOrDefault" ? args[1] : null;
     }
 
     if (method === "containsKey") {
@@ -1732,50 +1759,47 @@ function deriveMapChanges(
 ): ExecutionEvent[] {
     const before = getVariables(previous);
     const after = getVariables(current);
-
     const derived: ExecutionEvent[] = [];
+    const compared = new Set<string>();
 
-    for (const [name, currentValue] of Object.entries(after)) {
-        if (!(name in before)) {
-            continue;
-        }
-
-        const previousValue = before[name];
-
+    const compareNamedMap = (
+        name: string,
+        previousValue: unknown,
+        currentValue: unknown
+    ): void => {
         const beforeMap = asMapSnapshot(previousValue);
         const afterMap = asMapSnapshot(currentValue);
-
-        if (
-            !beforeMap ||
-            !afterMap ||
-            beforeMap.$mapId !== afterMap.$mapId
-        ) {
-            continue;
-        }
-
-        const changes = compareMapEntries(
-            beforeMap.entries,
-            afterMap.entries
-        );
-
-        if (changes.length === 0) {
-            continue;
-        }
-
+        if (!beforeMap || !afterMap || beforeMap.$mapId !== afterMap.$mapId) return;
+        const identity = name + ":" + afterMap.$mapId;
+        if (compared.has(identity)) return;
+        compared.add(identity);
+        const changes = compareMapEntries(beforeMap.entries, afterMap.entries);
+        if (changes.length === 0) return;
         derived.push({
             sequence: 0,
             type: "MAP_WRITE",
             line: previous.line,
             method: previous.method,
             depth: previous.depth,
-            data: {
-                name,
-                mapId: afterMap.$mapId,
-                changes,
-                entries: afterMap.entries,
-                size: afterMap.size
-            }
+            data: { name, mapId: afterMap.$mapId, changes, entries: afterMap.entries, size: afterMap.size }
         });
+    };
+
+    // Compare ordinary local maps.
+    for (const [name, currentValue] of Object.entries(after)) {
+        if (name in before) compareNamedMap(name, before[name], currentValue);
+    }
+
+    // Design-class fields live inside the captured this.fields snapshot.
+    // Emit key-level deltas for this.cache just as for a local map.
+    const beforeThis = before.this;
+    const afterThis = after.this;
+    const beforeFields = isPlainObject(beforeThis) && isPlainObject(beforeThis.fields) ? beforeThis.fields : undefined;
+    const afterFields = isPlainObject(afterThis) && isPlainObject(afterThis.fields) ? afterThis.fields : undefined;
+    if (beforeFields && afterFields) {
+        for (const [fieldName, currentValue] of Object.entries(afterFields)) {
+            if (fieldName in beforeFields) compareNamedMap("this." + fieldName, beforeFields[fieldName], currentValue);
+        }
     }
 
     return derived;

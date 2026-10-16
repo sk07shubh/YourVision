@@ -217,4 +217,44 @@ const mixed = await runJava(source, { method: "mixedStructureScore", arguments: 
 assert(mixed.kind === "OK" && mixed.result === "10", "mixed array/object structure returned the wrong result");
 assert(mixed.states?.some((state) => state.dataStructures.rows !== undefined) === true, "mixed collection/array structure was not captured");
 
+
+const helperDeclaredFirst = `
+import java.util.*;
+class Solution {
+    private void dfs(char[][] grid, int r, int c) {
+        if (r < 0 || c < 0 || r >= grid.length || c >= grid[0].length || grid[r][c] != '1') return;
+        grid[r][c] = '0';
+        dfs(grid, r + 1, c);
+        dfs(grid, r - 1, c);
+        dfs(grid, r, c + 1);
+        dfs(grid, r, c - 1);
+    }
+
+    public int numIslands(char[][] grid) {
+        int count = 0;
+        for (int r = 0; r < grid.length; r++) {
+            for (int c = 0; c < grid[r].length; c++) {
+                if (grid[r][c] == '1') {
+                    count++;
+                    dfs(grid, r, c);
+                }
+            }
+        }
+        return count;
+    }
+}
+`;
+const islandsHelperFirst = await runJava(helperDeclaredFirst, {
+    method: "numIslands",
+    arguments: ['[["1","1","0","0"],["1","0","0","1"],["0","0","1","1"]]']
+});
+assert(
+    islandsHelperFirst.kind === "OK" && islandsHelperFirst.result === "2",
+    `Number of Islands failed when dfs is declared before numIslands: kind=${islandsHelperFirst.kind}, message=${islandsHelperFirst.message ?? ""}, stderr=${islandsHelperFirst.stderr}`
+);
+assert(
+    hasCallStack(islandsHelperFirst, "numIslands", "dfs"),
+    "Number of Islands did not trace dfs when the helper is declared first"
+);
+
 console.log("PASS: LeetCode algorithms - nested loops, DFS, BFS, backtracking, mixed structures");
