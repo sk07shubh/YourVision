@@ -3451,7 +3451,27 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
         ) : (
           <span className="yv-tree-method">{node.signature}</span>
         )}
-        <span className="yv-tree-outcome">{id === 'root' ? 'Class context' : result}</span>
+        {id === 'root' ? (
+          <span className="yv-tree-outcome yv-class-context">
+            <button
+              type="button"
+              className="yv-class-context-trigger"
+              aria-label={`Preview class declarations and captured values for ${node.method}`}
+              onClick={event => event.stopPropagation()}
+              onKeyDown={event => event.stopPropagation()}
+            >Class context</button>
+            <span className="yv-class-context-popover" role="region" aria-label={`Class fields for ${node.method}`}>
+              {Object.entries(node.frameVariables).length > 0 ? Object.entries(node.frameVariables).map(([name, value]) => (
+                <span className="yv-tree-argument-preview" key={name}>
+                  <strong className="yv-tree-argument-label">{name}</strong>
+                  <span className="yv-tree-argument-value">
+                    <DataValue value={value} state={current} source={source} name={name} />
+                  </span>
+                </span>
+              )) : <span className="yv-class-context-empty">Class fields appear here as they are captured.</span>}
+            </span>
+          </span>
+        ) : <span className="yv-tree-outcome">{result}</span>}
       </div>
       {node.children.length > 0 && <div className="yv-tree-children">{node.children.map(child => renderNode(child, depth + 1))}</div>}
     </div>;
@@ -3465,7 +3485,14 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
 export function VisualizerPanel(){
   const [treeOpen,setTreeOpen]=useState(false);
   const s=useSession(); const current=s.states[s.index]; const prev=s.index>0?s.states[s.index-1]:undefined;
-  const line = current?.line;
+  const classDeclarationLine = useMemo(() => {
+    const lines = s.source.split(/\r?\n/);
+    const index = lines.findIndex(value => /\bclass\s+[A-Za-z_$][\w$]*/.test(value) && !/^\s*(?:\/\/|\*|\*)/.test(value));
+    return index >= 0 ? index + 1 : undefined;
+  }, [s.source]);
+  // The first checkpoint is the class-entry frame: highlight the declaration
+  // before the JVM reaches the first executable initializer or method line.
+  const line = current?.line ?? (s.index === 0 ? classDeclarationLine : undefined);
   const lastEventData = isPlainObject(current?.lastEvent?.data) ? current.lastEvent.data : undefined;
   const sourceLines=useMemo(()=>s.source.split(/\r?\n/),[s.source]);
   const statement=line?sourceLines[line-1]?.trim():'';
