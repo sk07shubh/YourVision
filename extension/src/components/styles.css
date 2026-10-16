@@ -1558,7 +1558,9 @@
 .yv-tree-arguments-popover-portal {
   position: fixed;
   z-index: 2147483000;
-  display: flex;
+  /* The base popover rule is hidden for the legacy inline version. Keep the
+     portal visible independently of its now-non-ancestor hover trigger. */
+  display: flex !important;
   flex-direction: column;
   gap: 9px;
   width: max-content;
