@@ -3327,9 +3327,10 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
         .replace(/^java\.lang\./, '')
         .replace(/^java\.util\./, '')
         .replace(/\bboolean\b/g, 'bool');
-      const entryVariables = isPlainObject(data.variables)
-        ? data.variables
-        : isPlainObject(states[index]?.variables) ? states[index].variables : {};
+      const entryVariables = {
+        ...(isPlainObject(states[index]?.variables) ? states[index].variables : {}),
+        ...(isPlainObject(data.variables) ? data.variables : {})
+      };
       const argumentNames = rawParams.map((_type, index) =>
         parameterNames[index] && parameterNames[index] !== 'this'
           ? parameterNames[index]
