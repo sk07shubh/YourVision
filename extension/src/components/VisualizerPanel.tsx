@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { CSSProperties, ReactNode } from 'react';
 import { useSession } from '../state/session';
 import { sessionStore } from '../state/store';
@@ -4603,7 +4604,6 @@ type InvocationNode = {
   frameVariables: Record<string, unknown>;
   arguments: Array<{ name: string; value: unknown }>;
   entryState?: TraceState;
-  exitState?: TraceState;
   children: string[];
 };
 
@@ -4674,13 +4674,16 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
       node.status = data.exceptional === true ? 'exceptional' : data.returnedVoid === true ? 'void' : 'returned';
       if (Object.prototype.hasOwnProperty.call(data, 'returnValue')) node.returnValue = data.returnValue;
       else if (data.hasReturnValue === true) node.returnValue = null;
-      node.exitState = states[index];
       if (typeof data.returnType === 'string') node.returnType = data.returnType;
     }
 
-    if (isPlainObject(data.classFields)) {
-      const root = nodes.get('root');
-      if (root) root.frameVariables = data.classFields;
+    const root = nodes.get('root');
+    if (root && typeof data.declaringType === 'string' && data.declaringType) {
+      root.method = data.declaringType;
+      root.signature = data.declaringType;
+    }
+    if (root && isPlainObject(data.classFields)) {
+      root.frameVariables = data.classFields;
     }
 
     const checkpointId = typeof states[index]?.invocationId === 'string'
@@ -4707,7 +4710,89 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
   return { nodes, currentId };
 }
 
-function InvocationTree({ states, currentIndex, onSelect, source }: { states: TraceState[]; currentIndex: number; onSelect: (index: number) => void; source: string }) {
+export function InvocationTree({ states, currentIndex, onSelect, source }: { states: TraceState[]; currentIndex: number; onSelect: (index: number) => void; source: string }) {
+  const [openArguments, setOpenArguments] = useState<{ node: InvocationNode; anchor: HTMLElement; kind?: 'arguments' | 'return' } | null>(null);
+  const [argumentPopoverPosition, setArgumentPopoverPosition] = useState<{ left: number; top: number; maxHeight: number } | null>(null);
+  const argumentCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const argumentPopoverRef = useRef<HTMLDivElement | null>(null);
+  const [openClassContext, setOpenClassContext] = useState<{ node: InvocationNode; anchor: HTMLElement } | null>(null);
+  const [classContextPosition, setClassContextPosition] = useState<{ left: number; top: number; maxHeight: number } | null>(null);
+  const classContextCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const classContextPopoverRef = useRef<HTMLDivElement | null>(null);
+  const updateClassContextPosition = useMemo(() => () => {
+    const anchor = openClassContext?.anchor;
+    if (!anchor || !anchor.isConnected) { setClassContextPosition(null); return; }
+    const rect = anchor.getBoundingClientRect();
+    const margin = 8;
+    const width = Math.min(680, window.innerWidth - margin * 2);
+    const gap = 8;
+    // Keep the class-context preview beside its trigger, matching the function dropdown.
+    // Prefer the right side; flip left only when there is not enough room on the right.
+    const rightSpace = window.innerWidth - rect.right - gap - margin;
+    const leftSpace = rect.left - gap - margin;
+    const placeRight = rightSpace >= Math.min(width, 220) || rightSpace >= leftSpace;
+    const left = placeRight
+      ? Math.max(margin, Math.min(rect.right + gap, window.innerWidth - width - margin))
+      : Math.max(margin, rect.left - gap - width);
+    const maxHeight = Math.max(100, Math.min(380, window.innerHeight - margin * 2));
+    const top = Math.max(margin, Math.min(rect.top, window.innerHeight - maxHeight - margin));
+    setClassContextPosition({ left, top, maxHeight });
+  }, [openClassContext]);
+  useLayoutEffect(() => {
+    if (!openClassContext) { setClassContextPosition(null); return; }
+    updateClassContextPosition();
+    window.addEventListener('resize', updateClassContextPosition);
+    window.addEventListener('scroll', updateClassContextPosition, true);
+    return () => { window.removeEventListener('resize', updateClassContextPosition); window.removeEventListener('scroll', updateClassContextPosition, true); };
+  }, [openClassContext, updateClassContextPosition]);
+  const openClassContextPreview = (node: InvocationNode, anchor: HTMLElement) => {
+    if (classContextCloseTimer.current) clearTimeout(classContextCloseTimer.current);
+    classContextCloseTimer.current = null;
+    setOpenClassContext({ node, anchor });
+  };
+  const scheduleClassContextClose = () => {
+    if (classContextCloseTimer.current) clearTimeout(classContextCloseTimer.current);
+    classContextCloseTimer.current = setTimeout(() => {
+      if (!classContextPopoverRef.current?.matches(':hover') && !classContextPopoverRef.current?.contains(document.activeElement)) setOpenClassContext(null);
+      classContextCloseTimer.current = null;
+    }, 180);
+  };
+  useEffect(() => () => { if (classContextCloseTimer.current) clearTimeout(classContextCloseTimer.current); }, []);
+  const updateArgumentPopoverPosition = useMemo(() => () => {
+    const anchor = openArguments?.anchor;
+    if (!anchor || !anchor.isConnected) { setArgumentPopoverPosition(null); return; }
+    const rect = anchor.getBoundingClientRect();
+    const margin = 8;
+    const width = Math.min(680, window.innerWidth - margin * 2);
+    const left = Math.max(margin, Math.min(rect.left, window.innerWidth - width - margin));
+    const below = window.innerHeight - rect.bottom - 14;
+    const above = rect.top - 14;
+    const placeBelow = below >= Math.min(180, above) || below >= above;
+    const maxHeight = Math.max(100, Math.min(360, Math.floor(placeBelow ? below : above)));
+    const top = placeBelow ? Math.min(window.innerHeight - margin - maxHeight, rect.bottom + 6) : Math.max(margin, rect.top - 6 - maxHeight);
+    setArgumentPopoverPosition({ left, top, maxHeight });
+  }, [openArguments]);
+  useLayoutEffect(() => {
+    if (!openArguments) { setArgumentPopoverPosition(null); return; }
+    updateArgumentPopoverPosition();
+    window.addEventListener('resize', updateArgumentPopoverPosition);
+    window.addEventListener('scroll', updateArgumentPopoverPosition, true);
+    return () => { window.removeEventListener('resize', updateArgumentPopoverPosition); window.removeEventListener('scroll', updateArgumentPopoverPosition, true); };
+  }, [openArguments, updateArgumentPopoverPosition]);
+  const openArgumentPreview = (node: InvocationNode, anchor: HTMLElement, kind: 'arguments' | 'return' = 'arguments') => {
+    if (argumentCloseTimer.current) clearTimeout(argumentCloseTimer.current);
+    argumentCloseTimer.current = null;
+    setOpenArguments({ node, anchor, kind });
+  };
+  const scheduleArgumentPreviewClose = () => {
+    if (argumentCloseTimer.current) clearTimeout(argumentCloseTimer.current);
+    argumentCloseTimer.current = setTimeout(() => {
+      if (!argumentPopoverRef.current?.matches(':hover') && !argumentPopoverRef.current?.contains(document.activeElement)) setOpenArguments(null);
+      argumentCloseTimer.current = null;
+    }, 140);
+  };
+  useEffect(() => () => { if (argumentCloseTimer.current) clearTimeout(argumentCloseTimer.current); }, []);
+
   const { nodes } = useMemo(() => buildInvocationNodes(states.slice(0, currentIndex + 1), source), [states, currentIndex, source]);
   const classDeclarations = useMemo(() => parseClassFieldDeclarations(source), [source]);
   const current = states[currentIndex];
@@ -4765,8 +4850,14 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
                 type="button"
                 className="yv-tree-arguments-trigger"
                 aria-label={`Preview all arguments passed to ${node.method}`}
-                onClick={event => event.stopPropagation()}
-                onKeyDown={event => event.stopPropagation()}
+                aria-haspopup="true"
+                aria-expanded={openArguments?.node.id === node.id && (openArguments.kind ?? 'arguments') === 'arguments'}
+                onMouseEnter={event => openArgumentPreview(node, event.currentTarget)}
+                onMouseLeave={scheduleArgumentPreviewClose}
+                onFocus={event => openArgumentPreview(node, event.currentTarget)}
+                onBlur={scheduleArgumentPreviewClose}
+                onClick={event => { event.stopPropagation(); if (openArguments?.node.id === node.id && (openArguments.kind ?? 'arguments') === 'arguments') setOpenArguments(null); else openArgumentPreview(node, event.currentTarget, 'arguments'); }}
+                onKeyDown={event => { event.stopPropagation(); if (event.key === "Escape") setOpenArguments(null); }}
               >
                 ({node.arguments.map((argument, argumentIndex) => (
                   <span className="yv-tree-argument-name" key={argument.name}>
@@ -4774,18 +4865,6 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
                   </span>
                 ))})
               </button>
-              <span className="yv-tree-arguments-popover" role="region" aria-label={`Arguments for ${node.method}`}>
-                {node.arguments.map(argument => (
-                  <span className="yv-tree-argument-preview" key={argument.name}>
-                    <strong className="yv-tree-argument-label">{argument.name}</strong>
-                    <span className="yv-tree-argument-value">
-                      {argument.value === undefined
-                        ? <span className="yv-code">Value not captured</span>
-                        : <DataValue value={argument.value} state={node.entryState} source={source} name={argument.name} />}
-                    </span>
-                  </span>
-                ))}
-              </span>
             </span>
           </span>
         ) : (
@@ -4797,8 +4876,14 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
               type="button"
               className="yv-class-context-trigger"
               aria-label={`Preview class declarations and captured values for ${node.method}`}
-              onClick={event => event.stopPropagation()}
-              onKeyDown={event => event.stopPropagation()}
+              aria-haspopup="true"
+              aria-expanded={openClassContext?.node.id === node.id}
+              onMouseEnter={event => openClassContextPreview(node, event.currentTarget)}
+              onMouseLeave={scheduleClassContextClose}
+              onFocus={event => openClassContextPreview(node, event.currentTarget)}
+              onBlur={scheduleClassContextClose}
+              onClick={event => { event.stopPropagation(); if (openClassContext?.node.id === node.id) setOpenClassContext(null); else openClassContextPreview(node, event.currentTarget); }}
+              onKeyDown={event => { event.stopPropagation(); if (event.key === "Escape") setOpenClassContext(null); }}
             >Class context</button>
           </span>
         ) : (
@@ -4809,40 +4894,89 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
                   type="button"
                   className="yv-tree-arguments-trigger yv-tree-return-trigger"
                   aria-label={`Preview return value from ${node.method}`}
-                  onClick={event => event.stopPropagation()}
-                  onKeyDown={event => event.stopPropagation()}
+                  aria-haspopup="true"
+                  aria-expanded={openArguments?.node.id === node.id && openArguments.kind === 'return'}
+                  onMouseEnter={event => openArgumentPreview(node, event.currentTarget, 'return')}
+                  onMouseLeave={scheduleArgumentPreviewClose}
+                  onFocus={event => openArgumentPreview(node, event.currentTarget, 'return')}
+                  onBlur={scheduleArgumentPreviewClose}
+                  onClick={event => { event.stopPropagation(); if (openArguments?.node.id === node.id && openArguments.kind === 'return') setOpenArguments(null); else openArgumentPreview(node, event.currentTarget, 'return'); }}
+                  onKeyDown={event => { event.stopPropagation(); if (event.key === "Escape") setOpenArguments(null); }}
                 >return</button>
-                <span className="yv-tree-arguments-popover yv-tree-return-popover" role="region" aria-label={`Return value from ${node.method}`}>
-                  <span className="yv-tree-argument-preview">
-                    <strong className="yv-tree-argument-label">return</strong>
-                    <span className="yv-tree-argument-value">
-                      <DataValue value={node.returnValue} state={node.exitState ?? node.entryState} source={source} name="return" />
-                    </span>
-                  </span>
-                </span>
               </span>
             ) : result}
           </span>
         )}
-        {id === 'root' && (
-          <span className="yv-class-context-popover" role="region" aria-label={`Class fields for ${node.method}`}>
-            {classDeclarations.length > 0 || Object.entries(node.frameVariables).length > 0 ? (
+      </div>
+      {node.children.length > 0 && <div className="yv-tree-children">{node.children.map(child => renderNode(child, depth + 1))}</div>}
+    </div>;
+  };
+  return <>
+    <aside className="yv-function-tree" aria-label="Function call tree">
+      <div className="yv-tree-heading"><strong>Function tree</strong><span>{Math.max(0, nodes.size - 1)} calls</span></div>
+      <div className="yv-tree-viewport" ref={viewportRef}>{renderNode('root', 0)}</div>
+    </aside>
+    {openArguments && argumentPopoverPosition && createPortal(
+      <div
+        ref={argumentPopoverRef}
+        className="yv-tree-arguments-popover yv-tree-arguments-popover-portal"
+        role="region"
+        aria-label={openArguments.kind === 'return' ? `Return value from ${openArguments.node.method}` : `Arguments for ${openArguments.node.method}`}
+        style={{ left: argumentPopoverPosition.left, top: argumentPopoverPosition.top, maxHeight: argumentPopoverPosition.maxHeight }}
+        onMouseEnter={() => { if (argumentCloseTimer.current) clearTimeout(argumentCloseTimer.current); argumentCloseTimer.current = null; }}
+        onMouseLeave={scheduleArgumentPreviewClose}
+        onFocus={() => { if (argumentCloseTimer.current) clearTimeout(argumentCloseTimer.current); argumentCloseTimer.current = null; }}
+        onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) scheduleArgumentPreviewClose(); }}
+      >
+        {openArguments.kind === 'return' ? (
+          <span className="yv-tree-argument-preview">
+            <strong className="yv-tree-argument-label">return</strong>
+            <span className="yv-tree-argument-value">
+              <DataValue value={openArguments.node.returnValue} state={openArguments.node.exitState ?? openArguments.node.entryState} source={source} name="return" />
+            </span>
+          </span>
+        ) : openArguments.node.arguments.map(argument => (
+          <span className="yv-tree-argument-preview" key={argument.name}>
+            <strong className="yv-tree-argument-label">{argument.name}</strong>
+            <span className="yv-tree-argument-value">
+              {argument.value === undefined
+                ? <span className="yv-code">Value not captured</span>
+                : <DataValue value={argument.value} state={openArguments.node.entryState} source={source} name={argument.name} />}
+            </span>
+          </span>
+        ))}
+      </div>,
+      openArguments.anchor.getRootNode() as ShadowRoot
+    )}
+    {openClassContext && classContextPosition && createPortal(
+      <div
+        ref={classContextPopoverRef}
+        className="yv-class-context-popover yv-class-context-popover-portal"
+        role="region"
+        aria-label={`Class fields for ${openClassContext.node.method}`}
+        style={{ left: classContextPosition.left, top: classContextPosition.top, maxHeight: classContextPosition.maxHeight }}
+        onMouseEnter={() => { if (classContextCloseTimer.current) clearTimeout(classContextCloseTimer.current); classContextCloseTimer.current = null; }}
+        onMouseLeave={scheduleClassContextClose}
+        onFocus={() => { if (classContextCloseTimer.current) clearTimeout(classContextCloseTimer.current); classContextCloseTimer.current = null; }}
+        onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) scheduleClassContextClose(); }}
+      >
+            {classDeclarations.length > 0 || Object.entries(openClassContext.node.frameVariables).length > 0 ? (
               <>
                 {classDeclarations.map(field => {
-                  const captured = Object.prototype.hasOwnProperty.call(node.frameVariables, field.name);
+                  const captured = Object.prototype.hasOwnProperty.call(openClassContext.node.frameVariables, field.name);
                   return (
                     <span className="yv-tree-argument-preview" key={field.name}>
                       <strong className="yv-tree-argument-label">{field.name}</strong>
                       <span className="yv-class-field-declaration">{field.declaration}</span>
                       <span className="yv-tree-argument-value">
                         {captured
-                          ? <DataValue value={node.frameVariables[field.name]} state={current} source={source} name={field.name} />
+                          ? <DataValue value={openClassContext.node.frameVariables[field.name]} state={current} source={source} name={field.name} />
                           : <span className="yv-class-field-pending">Not captured yet</span>}
                       </span>
                     </span>
                   );
                 })}
-                {Object.entries(node.frameVariables).filter(([name]) => !classDeclarations.some(field => field.name === name)).map(([name, value]) => (
+                {Object.entries(openClassContext.node.frameVariables).filter(([name]) => !classDeclarations.some(field => field.name === name)).map(([name, value]) => (
                   <span className="yv-tree-argument-preview" key={name}>
                     <strong className="yv-tree-argument-label">{name}</strong>
                     <span className="yv-tree-argument-value"><DataValue value={value} state={current} source={source} name={name} /></span>
@@ -4850,16 +4984,10 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
                 ))}
               </>
             ) : <span className="yv-class-context-empty">No class fields are declared in this solution.</span>}
-          </span>
-        )}
-      </div>
-      {node.children.length > 0 && <div className="yv-tree-children">{node.children.map(child => renderNode(child, depth + 1))}</div>}
-    </div>;
-  };
-  return <aside className="yv-function-tree" aria-label="Function call tree">
-    <div className="yv-tree-heading"><strong>Function tree</strong><span>{Math.max(0, nodes.size - 1)} calls</span></div>
-    <div className="yv-tree-viewport" ref={viewportRef}>{renderNode('root', 0)}</div>
-  </aside>;
+</div>,
+      openClassContext.anchor.getRootNode() as ShadowRoot
+    )}
+  </>;
 }
 
 export function VisualizerPanel(){
