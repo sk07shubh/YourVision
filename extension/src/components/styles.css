@@ -1347,7 +1347,6 @@
   max-width: none;
   margin: 7px 0 0 5px;
   padding: 8px 0 0 10px;
-  border-left: 2px solid color-mix(in srgb, var(--yv-depth-border, #818cf8), transparent 22%);
 }
 .yv-workspace.tree-open .yv-tree-children > .yv-tree-branch {
   width: max-content;
@@ -1393,7 +1392,6 @@
   max-width: 100%;
   margin: 8px 0 0;
   padding: 8px 0 0 10px;
-  border-left: 2px solid color-mix(in srgb, var(--yv-depth-border, #818cf8), transparent 22%);
 }
 .yv-workspace.tree-open .yv-tree-children > .yv-tree-branch {
   flex: 0 0 auto;
