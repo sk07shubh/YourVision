@@ -364,12 +364,14 @@ public class YourVisionTracer {
                     Method enteredMethod = entry.method();
 
                     if (isTraceableClassSetupMethod(enteredMethod) && !isTraceableUserMethod(enteredMethod)) {
-                        // Class initializers and constructors execute before the
-                        // selected LeetCode method can be entered. Keep these
-                        // checkpoints in the class context rather than showing
-                        // synthetic function nodes for JVM setup methods.
-                        recordStep(entry.location(), entry.thread());
-                        enableLineStepping(manager, entry.thread());
+                        // JVM setup methods (including the implicit default
+                        // constructor) run before the selected user method.
+                        // Do not emit their source locations as user STEP
+                        // checkpoints: they point at the class declaration and
+                        // shift the first visible checkpoint away from the
+                        // selected method's first executable line. The selected
+                        // method's METHOD_ENTER snapshot captures the initialized
+                        // fields, so line stepping starts when that method enters.
                     } else if (isTraceableUserMethod(enteredMethod)) {
                         installSameLineLoopBreakpoints(
                             manager,
