@@ -844,7 +844,7 @@
 .yv-tree-node.exceptional { border-color:#874343; }
 .yv-tree-method { display:block; width:max-content; max-width:100%; overflow-wrap:normal; white-space:normal; font-size:11px; font-weight:600; padding:2px 0 6px; border-bottom:1px solid #465160; }
 .yv-tree-outcome { display:block; width:max-content; max-width:100%; box-sizing:border-box; color:#a4adba; font-size:10px; overflow-wrap:anywhere; border-top:1px solid #465160; padding:6px 0 2px; }
-.yv-tree-children { margin:0 0 4px 13px; padding-left:10px; border-left:1px solid #48515e; }
+.yv-tree-children { margin:0 0 4px 13px; padding-left:10px; border-left: none; }
 @media (prefers-reduced-motion: reduce) { .yv-workspace-tree { transition:none; } }
 @media (max-width:680px) {
   .yv-workspace.tree-open { flex-direction:column; }
@@ -929,7 +929,7 @@
   max-width: none;
   margin: 0 0 4px 13px;
   padding-left: 10px;
-  border-left: 2px solid #596575;
+  border-left: none;
 }
 .yv-tree-children > .yv-tree-branch {
   width: max-content;
