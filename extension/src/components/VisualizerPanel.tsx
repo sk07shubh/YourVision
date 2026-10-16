@@ -4882,7 +4882,7 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
           </span>
         ))}
       </div>,
-      document.body
+      openArguments.anchor.getRootNode() as ShadowRoot
     )}
   </>;
 }
