@@ -921,7 +921,7 @@ describe('deterministic semantic pointer roles', () => {
 });
 
 describe('semantic roles in rendered visualization', () => {
-  it('renders boundary badges in the variable panel', () => {
+  it('keeps semantic boundary roles internal instead of rendering badges in the variable panel', () => {
     const current = state({
       variables: { left: 1, right: 3 },
       lastEvent: { type: 'STEP', line: 5, data: { semanticRoles: [
@@ -930,8 +930,10 @@ describe('semantic roles in rendered visualization', () => {
       ] } },
     });
     const html = renderToStaticMarkup(<Variables state={current} />);
-    expect(html).toContain('LEFT BOUND');
-    expect(html).toContain('RIGHT BOUND');
+    expect(html).toContain('left');
+    expect(html).toContain('right');
+    expect(html).not.toContain('LEFT BOUND');
+    expect(html).not.toContain('RIGHT BOUND');
   });
 
   it('renders pointer labels over cells when source has no array indexing', () => {
@@ -1050,10 +1052,10 @@ describe('semantic roles in rendered visualization', () => {
     expect(semanticRoleForVariable(current, 'col')?.role).toBe('pointer');
 
     const variablesHtml = renderToStaticMarkup(<Variables state={current} />);
-    expect(variablesHtml).toContain('LEFT BOUND');
-    expect(variablesHtml).toContain('RIGHT BOUND');
-    expect(variablesHtml).toContain('MIDPOINT');
-    expect(variablesHtml).toContain('POINTER');
+    expect(variablesHtml).not.toContain('LEFT BOUND');
+    expect(variablesHtml).not.toContain('RIGHT BOUND');
+    expect(variablesHtml).not.toContain('MIDPOINT');
+    expect(variablesHtml).not.toContain('POINTER');
 
     const matrixHtml = renderToStaticMarkup(
       <ArrayView value={[[1, 2, 3], [4, 5, 6]]} state={current} source="matrix[row][col]" arrayName="matrix" />,
