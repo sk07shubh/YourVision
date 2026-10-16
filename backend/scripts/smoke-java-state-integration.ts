@@ -296,6 +296,14 @@ class Solution {
         return doubleIt(5);
     }
 
+    public int captureArguments(int zero, boolean enabled, String nothing, int[] nums) {
+        zero = 9;
+        enabled = !enabled;
+        nothing = "changed";
+        nums[0] = 7;
+        return zero;
+    }
+
     private int doubleIt(int value) {
         int result = value * 2;
         return result;
@@ -342,6 +350,31 @@ const localValues = (locals.states ?? [])
 assert(localValues.includes(1), "local variable initial value was not captured");
 assert(localValues.includes(2), "local variable reassignment was not captured");
 assert(localValues.includes(3), "local variable increment was not captured");
+
+const argumentCapture = await runJava(source, {
+    method: "captureArguments",
+    arguments: ["0", "false", "null", "[1,2]"]
+});
+
+assert(
+    argumentCapture.kind === "OK" && argumentCapture.result === "9",
+    "method argument capture fixture did not execute successfully"
+);
+const argumentEntry = argumentCapture.trace?.events.find(
+    (event) => event.type === "METHOD_ENTER" && event.method === "captureArguments"
+);
+const capturedArguments = snapshotField(argumentEntry?.data, "argumentValues");
+assert(
+    Array.isArray(capturedArguments) &&
+    capturedArguments[0] === 0 &&
+    capturedArguments[1] === false &&
+    capturedArguments[2] === null,
+    "METHOD_ENTER did not preserve exact primitive and null argument values"
+);
+assert(
+    JSON.stringify(snapshotField(capturedArguments?.[3], "values")) === "[1,2]",
+    "METHOD_ENTER did not preserve the entry-time array argument before mutation"
+);
 
 const positive = await runJava(source, {
     method: "branch",
