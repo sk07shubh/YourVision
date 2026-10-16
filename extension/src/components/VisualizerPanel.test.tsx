@@ -118,7 +118,7 @@ describe('synchronized function invocation tree', () => {
       '    return find(arr, trgt, index + 1);',
       '  }',
       '}',
-    ].join('\\n');
+    ].join('\n');
     const states = [
       state({ line: 3, invocationId: 'solve-call', lastEvent: { type: 'METHOD_ENTER', method: 'solve', data: {
         invocationId: 'solve-call', declaringType: 'Solution', parameterTypes: ['int[]', 'int', 'int'], variables: { arr: [2, 5, 8], trgt: 8, index: 3 },
