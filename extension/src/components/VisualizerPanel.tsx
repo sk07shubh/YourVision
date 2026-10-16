@@ -4604,6 +4604,7 @@ type InvocationNode = {
   frameVariables: Record<string, unknown>;
   arguments: Array<{ name: string; value: unknown }>;
   entryState?: TraceState;
+  exitState?: TraceState;
   children: string[];
 };
 
@@ -4672,6 +4673,7 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
       const node = nodes.get(data.invocationId);
       if (!node) continue;
       node.status = data.exceptional === true ? 'exceptional' : data.returnedVoid === true ? 'void' : 'returned';
+      node.exitState = states[index];
       if (Object.prototype.hasOwnProperty.call(data, 'returnValue')) node.returnValue = data.returnValue;
       else if (data.hasReturnValue === true) node.returnValue = null;
       if (typeof data.returnType === 'string') node.returnType = data.returnType;
