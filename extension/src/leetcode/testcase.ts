@@ -73,7 +73,7 @@ function serializeJavaArgument(value: unknown): string {
   if (typeof value === 'string') return JSON.stringify(value);
   if (value === null) return 'null';
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  return JSON.stringify(value);
+  return JSON.stringify(value) ?? String(value);
 }
 
 function detectDesignClass(inputs: Record<string, string>, raw: string): LeetCodeTestcase['designClass'] {
