@@ -312,6 +312,7 @@ const cases: Case[] = [
         expectedKind: "OK",
         expectedResult: "5",
         expectedEntryLine: 2,
+        expectedFirstStepLine: 1,
         expectedReturnLine: 4
     },
     {
@@ -320,7 +321,7 @@ const cases: Case[] = [
         method: "twoSum",
         args: ["[3,2,4]", "6"],
         expectedKind: "OK",
-        expectedFirstStepLine: 5
+        expectedFirstStepLine: 3
     },
     {
         name: "zero arguments",
