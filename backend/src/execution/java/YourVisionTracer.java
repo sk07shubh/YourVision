@@ -255,6 +255,7 @@ public class YourVisionTracer {
             null,
             Map.of()
         );
+        emitClassDeclarationCheckpoint();
 
         boolean finished = false;
 
@@ -381,14 +382,9 @@ public class YourVisionTracer {
                     Method enteredMethod = entry.method();
 
                     if (isTraceableClassSetupMethod(enteredMethod) && !isTraceableUserMethod(enteredMethod)) {
-                        // JVM setup methods (including the implicit default
-                        // constructor) run before the selected user method.
-                        // Do not emit their source locations as user STEP
-                        // checkpoints: they point at the class declaration and
-                        // shift the first visible checkpoint away from the
-                        // selected method's first executable line. The selected
-                        // method's METHOD_ENTER snapshot captures the initialized
-                        // fields, so line stepping starts when that method enters.
+                        // Static initializers are class setup, not a user function.
+                        // Trace their real source lines without adding a tree node.
+                        enableLineStepping(manager, entry.thread());
                     } else if (isTraceableUserMethod(enteredMethod)) {
                         installSameLineLoopBreakpoints(
                             manager,
@@ -418,14 +414,10 @@ public class YourVisionTracer {
                         );
                         enterInvocation(entry.thread(), enteredMethod, data);
 
-                        // The compiler-generated default constructor is
-                        // not user-authored code. Keep its entry request as the
-                        // point where line stepping is armed, but do not expose a
-                        // synthetic constructor checkpoint in the user's trace.
-                        if (
-                            !enteredMethod.isConstructor() ||
-                            hasExplicitConstructorDeclaration(enteredMethod)
-                        ) {
+                        // Constructors and instance-field initialization are class setup.
+                        // Trace their executable lines, but keep the function tree at
+                        // the class cell until the selected question method enters.
+                        if (!enteredMethod.isConstructor()) {
                             emit(
                                 "METHOD_ENTER",
                                 methodLocation,
@@ -2162,6 +2154,25 @@ public class YourVisionTracer {
         }
     }
 
+    private static void emitClassDeclarationCheckpoint() {
+        if (solutionSourcePath == null || solutionSourcePath.isEmpty()) return;
+        try {
+            List<String> lines = Files.readAllLines(Path.of(solutionSourcePath));
+            for (int index = 0; index < lines.size(); index++) {
+                String code = lines.get(index).replaceAll("//.*$", "").trim();
+                if (code.matches("(?:(?:public|protected|private|abstract|final|static|strictfp)\\s+)*class\\s+[A-Za-z_$][\\w$]*(?:\\s+extends\\s+[^{]+)?(?:\\s+implements\\s+[^{]+)?\\s*\\{?")) {
+                    Map<String, Object> data = new LinkedHashMap<>();
+                    data.put("displayLine", index + 1);
+                    data.put("classSetup", true);
+                    emit("STEP", null, null, data);
+                    return;
+                }
+            }
+        } catch (Exception ignored) {
+            // Source lookup is only for the initial class marker; never fail execution.
+        }
+    }
+
     private static boolean isTraced(
         Location location
     ) {
@@ -2201,7 +2212,8 @@ public class YourVisionTracer {
             // marker as metadata, and use it for METHOD_ENTER's displayed line.
             if (
                 ("METHOD_ENTER".equals(type) ||
-                 "METHOD_EXIT".equals(type)) &&
+                 "METHOD_EXIT".equals(type) ||
+                 "STEP".equals(type)) &&
                 data != null &&
                 data.get("displayLine") instanceof Number displayLine
             ) {
