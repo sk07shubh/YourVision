@@ -267,7 +267,7 @@ public class YourVisionTracer {
             Set<String> recordedStepLocations = new HashSet<>();
             for (Event event : events) {
                 if (event instanceof StepEvent step) {
-                    if (isTraceableUserMethod(step.location().method())) {
+                    if (isTraceableClassSetupMethod(step.location().method()) || isTraceableUserMethod(step.location().method())) {
                         if (recordedStepLocations.add(stepLocationKey(
                             step.location(),
                             step.thread()
@@ -281,7 +281,7 @@ public class YourVisionTracer {
 
                 } else if (event instanceof BreakpointEvent breakpoint) {
                     if (
-                        isTraceableUserMethod(breakpoint.location().method()) &&
+                        (isTraceableClassSetupMethod(breakpoint.location().method()) || isTraceableUserMethod(breakpoint.location().method())) &&
                         recordedStepLocations.add(stepLocationKey(
                             breakpoint.location(),
                             breakpoint.thread()
@@ -363,7 +363,14 @@ public class YourVisionTracer {
                 } else if (event instanceof MethodEntryEvent entry) {
                     Method enteredMethod = entry.method();
 
-                    if (isTraceableUserMethod(enteredMethod)) {
+                    if (isTraceableClassSetupMethod(enteredMethod) && !isTraceableUserMethod(enteredMethod)) {
+                        // Class initializers and constructors execute before the
+                        // selected LeetCode method can be entered. Keep these
+                        // checkpoints in the class context rather than showing
+                        // synthetic function nodes for JVM setup methods.
+                        recordStep(entry.location(), entry.thread());
+                        enableLineStepping(manager, entry.thread());
+                    } else if (isTraceableUserMethod(enteredMethod)) {
                         installSameLineLoopBreakpoints(
                             manager,
                             enteredMethod
@@ -601,6 +608,16 @@ public class YourVisionTracer {
             EventRequest.SUSPEND_ALL
         );
         death.enable();
+    }
+
+    private static boolean isTraceableClassSetupMethod(Method method) {
+        try {
+            return method != null &&
+                method.declaringType().name().equals(tracedClass) &&
+                (method.isStaticInitializer() || method.isConstructor());
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private static boolean isTraceableUserMethod(
