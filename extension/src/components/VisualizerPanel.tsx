@@ -4807,6 +4807,7 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
                 ))})
               </button>
             </span>
+          </span>
         ) : (
           <span className="yv-tree-method">{node.signature}</span>
         )}
