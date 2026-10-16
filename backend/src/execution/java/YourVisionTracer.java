@@ -2169,7 +2169,13 @@ public class YourVisionTracer {
         try {
             List<String> lines = Files.readAllLines(Path.of(solutionSourcePath));
             for (int index = 0; index < lines.size(); index++) {
-                String code = lines.get(index).replaceAll("//.*$", "").trim();
+                String code = lines.get(index)
+                    .replaceAll("//.*$", "")
+                    // prepareJavaSource may prepend imports on the same physical
+                    // line to preserve the user's source-line mapping. Strip
+                    // package/import declarations before matching the class token.
+                    .replaceAll("\\b(?:package|import)\\s+[^;]+;\\s*", "")
+                    .trim();
                 if (code.matches("(?:(?:public|protected|private|abstract|final|static|strictfp)\\s+)*class\\s+[A-Za-z_$][\\w$]*(?:\\s+extends\\s+[^{]+)?(?:\\s+implements\\s+[^{]+)?\\s*\\{?")) {
                     Map<String, Object> data = new LinkedHashMap<>();
                     data.put("displayLine", index + 1);
