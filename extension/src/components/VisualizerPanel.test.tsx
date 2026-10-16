@@ -91,6 +91,28 @@ describe('synchronized function invocation tree', () => {
     expect(historical.get('call-1')?.status).toBe('active');
   });
 
+  it('renders compact return-value previews alongside argument previews for nested calls', () => {
+    const source = 'class Solution { int solve(int n) { return helper(n); } int helper(int x) { return x + 1; } }';
+    const states = [
+      state({ invocationId: 'solve-call', lastEvent: { type: 'METHOD_ENTER', method: 'solve', data: {
+        invocationId: 'solve-call', declaringType: 'Solution', parameterTypes: ['int'], returnType: 'int', variables: { n: 4 },
+      } } }),
+      state({ invocationId: 'helper-call', parentInvocationId: 'solve-call', lastEvent: { type: 'METHOD_ENTER', method: 'helper', data: {
+        invocationId: 'helper-call', parentInvocationId: 'solve-call', parameterTypes: ['int'], returnType: 'int', variables: { x: 4 },
+      } } }),
+      state({ invocationId: 'helper-call', parentInvocationId: 'solve-call', lastEvent: { type: 'METHOD_EXIT', method: 'helper', data: {
+        invocationId: 'helper-call', parentInvocationId: 'solve-call', returnType: 'int', returnValue: 5, returnedVoid: false,
+      } } }),
+    ];
+    const html = renderToStaticMarkup(
+      <InvocationTree states={states} currentIndex={2} source={source} onSelect={() => {}} />,
+    );
+    expect(html).toContain('Preview all arguments passed to helper');
+    expect(html).toContain('Preview return value from helper');
+    expect(html).toContain('Class context');
+    expect(html).not.toContain('class="yv-tree-arguments-popover"');
+  });
+
   it('uses the checkpoint parent id when the event payload omits it', () => {
     const states = [
       state({
