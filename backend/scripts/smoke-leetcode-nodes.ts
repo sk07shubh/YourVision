@@ -93,7 +93,12 @@ const tree = await runJava(
 
 assert(tree.success && tree.kind === "OK", "TreeNode execution failed");
 assert(tree.result === "10", "TreeNode level-order parsing produced the wrong result");
-assert(tree.states?.[0]?.line === 3, "TreeNode method entry line is incorrect");
+assert(
+    tree.states?.some(state =>
+        state.lastEvent?.type === "METHOD_ENTER" && state.line === 3
+    ) === true,
+    "TreeNode method entry line is incorrect after the class checkpoint"
+);
 
 const commentedDefinitionSource = [
     "/**",
