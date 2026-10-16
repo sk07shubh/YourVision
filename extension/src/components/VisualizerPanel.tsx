@@ -4734,6 +4734,12 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
           ? parameterNames[index]
           : 'arg' + (index + 1)
       );
+      // These values are captured directly from StackFrame.getArgumentValues()
+      // by the Java tracer, so they remain correct even when JDI cannot expose
+      // parameter names/locals at the method-entry location.
+      const capturedArgumentValues = Array.isArray(data.argumentValues)
+        ? data.argumentValues
+        : [];
       const parentCallLine = (() => {
         for (let previous = index - 1; previous >= 0; previous -= 1) {
           const prior = states[previous];
@@ -4745,7 +4751,9 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
       const argumentsList = argumentNames.map((name, argumentIndex) => ({
         name,
         expression: callExpressions[argumentIndex] || name,
-        value: Object.prototype.hasOwnProperty.call(entryVariables, name) ? entryVariables[name] : undefined
+        value: argumentIndex < capturedArgumentValues.length
+          ? capturedArgumentValues[argumentIndex]
+          : Object.prototype.hasOwnProperty.call(entryVariables, name) ? entryVariables[name] : undefined
       }));
       const signature = `${method}(${argumentsList.map(argument => argument.expression ?? argument.name).join(', ')})`;
       const returnType = typeof data.returnType === 'string' ? displayType(data.returnType) : undefined;
