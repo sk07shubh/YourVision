@@ -232,7 +232,9 @@ const TREE_NODE_FILE = fileURLToPath(
 function resolveTargetClassName(source: string): string {
     const code = source
         .replace(/\/\*[\s\S]*?\*\//g, " ")
-        .replace(/\/\/[^\r\n]*/g, " ");
+        .replace(/\/\/[^\r\n]*/g, " ")
+        .replace(/"(?:\\.|[^"\\])*"/g, " ")
+        .replace(/'(?:\\.|[^'\\])*'/g, " ");
     const classNames = [...code.matchAll(/\bclass\s+([A-Za-z_$][\w$]*)/g)]
         .map((match) => match[1])
         .filter((name): name is string => Boolean(name));
