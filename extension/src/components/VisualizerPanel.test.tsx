@@ -115,7 +115,7 @@ describe('synchronized function invocation tree', () => {
       'class Solution {',
       '  boolean find(int[] nums, int target, int idx) { return false; }',
       '  boolean solve(int[] arr, int trgt, int index) {',
-      '    return find(arr, trgt, index + 1);',
+      '    return find(arr, trgt, index + 1); // find(wrong, wrong, wrong)',
       '  }',
       '}',
     ].join('\n');
