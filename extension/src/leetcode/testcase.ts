@@ -90,7 +90,7 @@ function detectDesignClass(inputs: Record<string, string>, raw: string): LeetCod
     Array.isArray(value) &&
     value.length > 0 &&
     value.every(item => typeof item === 'string') &&
-    /^[A-Za-z_$][\w$]*$/.test(value[0] ?? '')
+    /^[A-Z_$][\w$]*$/.test(value[0] ?? '')
   );
   const argumentRows = parsed.find((value): value is unknown[][] =>
     Array.isArray(value) &&
