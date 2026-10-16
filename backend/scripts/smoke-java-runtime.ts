@@ -877,6 +877,8 @@ if (lruResult.kind !== "OK" || lruResult.result !== "[null,null,null,1,null,-1,1
 console.log("PASS: LRU cache design sequence");
 
 const designTraceSource = `class LRUCache {
+    static Map<Integer, Integer> shared = new HashMap<>();
+    int seed = 3;
     int capacity;
     Map<Integer, Integer> cache;
     public LRUCache(int capacity) {
@@ -901,14 +903,26 @@ if (designTraceResult.kind !== "OK" || designTraceResult.result !== "[null,null,
     throw new Error("Design source trace execution failed: " + designTraceResult.kind + " " + designTraceResult.result + " " + designTraceResult.message);
 }
 const designEvents = designTraceResult.trace?.events ?? [];
-const constructorEntry = designEvents.find(event =>
-    event.type === "METHOD_ENTER" && event.method === "<init>"
+const classEntry = designEvents.find(event =>
+    event.type === "STEP" && event.data?.classSetup === true && event.line === 1
 );
-if (!constructorEntry || constructorEntry.data?.displayLine !== 4) {
-    throw new Error("Design trace must emit the explicit constructor declaration at source line 4.");
+if (!classEntry) {
+    throw new Error("Design trace must begin with the class declaration checkpoint.");
 }
-if (!designEvents.some(event => event.type === "STEP" && event.method === "<init>" && (event.line === 5 || event.line === 6))) {
+if (designEvents.some(event => event.type === "METHOD_ENTER" && event.method === "<init>")) {
+    throw new Error("Constructor setup must not create a function-tree invocation.");
+}
+if (!designEvents.some(event => event.type === "STEP" && event.method === "<init>" && event.line === 6)) {
+    throw new Error("Design trace must highlight the explicit constructor declaration.");
+}
+if (!designEvents.some(event => event.type === "STEP" && event.method === "<init>" && (event.line === 7 || event.line === 8))) {
     throw new Error("Design trace must include executable constructor-body checkpoints.");
+}
+if (!designEvents.some(event => event.type === "STEP" && event.method === "<clinit>" && event.line === 2)) {
+    throw new Error("Design trace must include static field initialization before methods.");
+}
+if (!designEvents.some(event => event.type === "STEP" && event.data?.classFields && Object.prototype.hasOwnProperty.call(event.data.classFields, "shared"))) {
+    throw new Error("Class-level fields must be captured during setup.");
 }
 for (const method of ["put", "get"]) {
     if (!designEvents.some(event => event.type === "METHOD_ENTER" && event.method === method)) {
