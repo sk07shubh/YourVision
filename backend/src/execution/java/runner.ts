@@ -168,9 +168,19 @@ function runJavaTracer(
     });
 }
 
-export interface JavaTestcase {
+export interface JavaTestcaseCall {
     method: string;
     arguments?: string[];
+}
+
+export interface JavaTestcase {
+    /** Single-method execution for ordinary LeetCode Solution problems. */
+    method?: string;
+    arguments?: string[];
+    /** Design-class execution: arguments passed to the class constructor. */
+    constructorArguments?: string[];
+    /** Ordered instance method calls on the same constructed object. */
+    calls?: JavaTestcaseCall[];
 }
 
 export interface JavaExecutionResult {
@@ -219,6 +229,23 @@ const TREE_NODE_FILE = fileURLToPath(
         import.meta.url
     )
 );
+function resolveTargetClassName(source: string): string {
+    const code = source
+        .replace(/\/\*[\s\S]*?\*\//g, " ")
+        .replace(/\/\/[^\r\n]*/g, " ");
+    const classNames = [...code.matchAll(/\bclass\s+([A-Za-z_$][\w$]*)/g)]
+        .map((match) => match[1])
+        .filter((name): name is string => Boolean(name));
+
+    if (classNames.includes("Solution")) {
+        return "Solution";
+    }
+    if (classNames.length > 0 && classNames[0]) {
+        return classNames[0];
+    }
+    throw new Error("Could not find a Java class declaration in source");
+}
+
 function prepareJavaSource(source: string): string {
     const standardImport =
         "import java.util.*;";
@@ -260,53 +287,74 @@ export async function runJava(
     testcase?: JavaTestcase
 ): Promise<JavaExecutionResult> {
 
+    const designMode = testcase?.calls !== undefined;
+
     if (
         !testcase ||
-        typeof testcase.method !== "string" ||
-        testcase.method.trim() === ""
+        (!designMode && (
+            typeof testcase.method !== "string" ||
+            testcase.method.trim() === ""
+        ))
     ) {
         return {
             success: false,
             kind: "VALIDATION_ERROR",
             stdout: "",
             stderr: "",
-            message:
-                "testcase.method is required"
+            message: "testcase.method is required unless testcase.calls is supplied"
         };
     }
+
+    const isStringArray = (value: unknown): value is string[] =>
+        Array.isArray(value) && value.every((item) => typeof item === "string");
 
     if (
         testcase.arguments !== undefined &&
-        !Array.isArray(testcase.arguments)
+        !isStringArray(testcase.arguments)
     ) {
         return {
             success: false,
             kind: "VALIDATION_ERROR",
             stdout: "",
             stderr: "",
-            message:
-                "testcase.arguments must be an array of strings"
+            message: "testcase.arguments must be an array of strings"
         };
     }
-
-    const rawArguments =
-        testcase.arguments ?? [];
 
     if (
-        rawArguments.some(
-            (value) =>
-                typeof value !== "string"
-        )
+        testcase.constructorArguments !== undefined &&
+        !isStringArray(testcase.constructorArguments)
     ) {
         return {
             success: false,
             kind: "VALIDATION_ERROR",
             stdout: "",
             stderr: "",
-            message:
-                "every testcase argument must be a string"
+            message: "testcase.constructorArguments must be an array of strings"
         };
     }
+
+    if (designMode && (
+        !Array.isArray(testcase.calls) ||
+        testcase.calls.length === 0 ||
+        testcase.calls.some((call) =>
+            !call ||
+            typeof call.method !== "string" ||
+            call.method.trim() === "" ||
+            (call.arguments !== undefined && !isStringArray(call.arguments))
+        )
+    )) {
+        return {
+            success: false,
+            kind: "VALIDATION_ERROR",
+            stdout: "",
+            stderr: "",
+            message: "testcase.calls must be a non-empty array of { method, arguments? }"
+        };
+    }
+
+    const rawArguments = testcase.arguments ?? [];
+    const constructorArguments = testcase.constructorArguments ?? [];
 
     const tempDir =
         await fs.mkdtemp(
@@ -414,6 +462,10 @@ await fs.writeFile(
             };
         }
 
+        const targetClassName = resolveTargetClassName(source);
+        const encodeArgument = (value: string) =>
+            "__YV_B64__" + Buffer.from(value, "utf8").toString("base64");
+
         const childArguments = [
             "--add-modules",
             "jdk.jdi",
@@ -422,20 +474,28 @@ await fs.writeFile(
             "YourVisionTracer",
             tempDir,
             "YourVisionRuntime",
-            "Solution",
-            testcase.method,
-            ...(
-                rawArguments.length === 0
-                    ? [NO_ARGS]
-                    : rawArguments.map(
-                        (value) =>
-                            "__YV_B64__" +
-                            Buffer.from(
-                                value,
-                                "utf8"
-                            ).toString("base64")
-                    )
-            )
+            targetClassName,
+            ...(designMode
+                ? [
+                    "__YV_DESIGN__",
+                    String(constructorArguments.length),
+                    ...constructorArguments.map(encodeArgument),
+                    String(testcase.calls!.length),
+                    ...testcase.calls!.flatMap((call) => {
+                        const args = call.arguments ?? [];
+                        return [
+                            call.method,
+                            String(args.length),
+                            ...args.map(encodeArgument)
+                        ];
+                    })
+                ]
+                : [
+                    testcase.method!,
+                    ...(rawArguments.length === 0
+                        ? [NO_ARGS]
+                        : rawArguments.map(encodeArgument))
+                ])
         ];
 
         try {
