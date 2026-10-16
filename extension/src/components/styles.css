@@ -1553,6 +1553,22 @@
   flex-direction: column;
   gap: 9px;
 }
+
+/* Portal preview escapes both the scrolling viewport and the rounded panel. */
+.yv-tree-arguments-popover-portal {
+  position: fixed;
+  z-index: 2147483000;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  width: max-content;
+  min-width: min(190px, calc(100vw - 16px));
+  max-width: min(320px, calc(100vw - 16px));
+  margin: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+}
 .yv-tree-argument-preview {
   display: flex;
   flex-direction: column;
