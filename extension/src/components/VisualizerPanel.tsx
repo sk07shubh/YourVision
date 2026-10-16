@@ -1139,7 +1139,15 @@ function CollectionBackingArray({
   return (
     <div className="yv-collection-backing">
       <div className="yv-code yv-collection-backing-title">Array view · snapshot order</div>
-      <ArrayView value={value.values} state={state} source={source} arrayName={name} depth={depth} seen={seen}/>
+      <ArrayView
+        value={value.values}
+        state={state}
+        source={source}
+        arrayName={name}
+        depth={depth}
+        seen={seen}
+        nestedItems={value.values.some(item => isCollectionSnapshot(item) || isArraySnapshot(item) || Array.isArray(item))}
+      />
     </div>
   );
 }
@@ -2131,23 +2139,25 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
   );
 }
 
-export function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<string>() }: {
+export function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<string>(), nestedItems = false }: {
   value: unknown[];
   state?: TraceState;
   source: string;
   arrayName?: string;
   depth?: number;
   seen?: Set<string>;
+  /** A collection's elements are nested containers, not a Java 2D matrix. */
+  nestedItems?: boolean;
 }) {
-  // A Java 2D array may arrive as raw nested arrays or as row-level array
-  // snapshots. Normalize both shapes into a single grid without flattening it.
-  const matrixLike = value.length > 0 && value.every(row => Array.isArray(row) || isArraySnapshot(row));
+  // Keep true Java matrices on the existing MatrixView path. A List<int[]>
+  // or List<List<...>> is instead a one-dimensional collection of nested items.
+  const matrixLike = !nestedItems && value.length > 0 && value.every(row => Array.isArray(row) || isArraySnapshot(row));
   if (matrixLike) {
     const rows = value.map(row => Array.isArray(row) ? row : isArraySnapshot(row) ? row.values : []);
     return <MatrixView value={rows} state={state} source={source} arrayName={arrayName} depth={depth} seen={seen}/>;
   }
 
-  const containsNestedCollections = value.some(item => isCollectionSnapshot(item));
+  const containsNestedCollections = nestedItems || value.some(item => isCollectionSnapshot(item) || isArraySnapshot(item) || Array.isArray(item));
   const indexNames = arrayIndexVariableNames(source, arrayName);
   const targets = pointerTargets(state, value.length, indexNames, arrayName, source);
   const targetSignature = targets.map(target => target.name + ':' + target.index).sort().join('|');
