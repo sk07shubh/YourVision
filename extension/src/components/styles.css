@@ -1375,6 +1375,14 @@
 .yv-workspace.tree-open .yv-tree-viewport {
   overflow-x: hidden;
 }
+/* Reuse the existing node-arrival animation for each invocation exactly once. */
+.yv-workspace.tree-open .yv-tree-branch-entering > .yv-tree-node {
+  animation: yv-graph-node-created 360ms cubic-bezier(.2,.8,.2,1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-workspace.tree-open .yv-tree-branch-entering > .yv-tree-node { animation: none; }
+}
+
 .yv-workspace.tree-open .yv-tree-branch {
   box-sizing: border-box;
   display: block;
