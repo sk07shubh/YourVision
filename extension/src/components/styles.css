@@ -1530,6 +1530,26 @@
   max-width: 260px;
   line-height: 1.45;
 }
+/* Return values use the same compact hover/focus preview as arguments. */
+.yv-tree-return-value {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+.yv-tree-return-trigger {
+  color: var(--yv-accent, #93c5fd);
+}
+.yv-tree-return-value:hover .yv-tree-return-popover,
+.yv-tree-return-value:focus-within .yv-tree-return-popover {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.yv-tree-return-value .yv-tree-return-popover {
+  left: auto;
+  right: 0;
+}
 .yv-tree-arguments-popover {
   position: absolute;
   top: calc(100% + 6px);
