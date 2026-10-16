@@ -932,6 +932,29 @@ public class YourVisionTracer {
         return fallback;
     }
 
+    private static Map<String, Object> readClassFields(ReferenceType type, ThreadReference thread) {
+        Map<String, Object> fields = readStaticFields(type);
+        // LeetCode solutions often use instance fields as class-level state.
+        // Include those fields from the current Solution instance alongside
+        // static fields so the class-context preview can show both kinds.
+        try {
+            if (thread != null && thread.frameCount() > 0) {
+                ObjectReference instance = thread.frame(0).thisObject();
+                if (instance != null && instance.referenceType().name().equals(tracedClass)) {
+                    for (Field field : instance.referenceType().allFields()) {
+                        if (field.isStatic() || field.isSynthetic()) continue;
+                        try {
+                            fields.put(field.name(), snapshotValue(instance.getValue(field), 0, new HashSet<>()));
+                        } catch (Exception ignored) {
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return fields;
+    }
+
     private static Map<String, Object> readStaticFields(ReferenceType type) {
         Map<String, Object> fields = new LinkedHashMap<>();
         try {
@@ -979,7 +1002,7 @@ public class YourVisionTracer {
             new LinkedHashMap<>();
 
         attachCurrentInvocation(thread, data);
-        data.put("classFields", readStaticFields(location.declaringType()));
+        data.put("classFields", readClassFields(location.declaringType(), thread));
 
         try {
             StackFrame frame =
