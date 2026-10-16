@@ -4604,6 +4604,7 @@ type InvocationNode = {
   frameVariables: Record<string, unknown>;
   arguments: Array<{ name: string; value: unknown }>;
   entryState?: TraceState;
+  exitState?: TraceState;
   children: string[];
 };
 
@@ -4672,6 +4673,7 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
       const node = nodes.get(data.invocationId);
       if (!node) continue;
       node.status = data.exceptional === true ? 'exceptional' : data.returnedVoid === true ? 'void' : 'returned';
+      node.exitState = states[index];
       if (Object.prototype.hasOwnProperty.call(data, 'returnValue')) node.returnValue = data.returnValue;
       else if (data.hasReturnValue === true) node.returnValue = null;
       if (typeof data.returnType === 'string') node.returnType = data.returnType;
@@ -4711,7 +4713,7 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
 }
 
 function InvocationTree({ states, currentIndex, onSelect, source }: { states: TraceState[]; currentIndex: number; onSelect: (index: number) => void; source: string }) {
-  const [openArguments, setOpenArguments] = useState<{ node: InvocationNode; anchor: HTMLElement } | null>(null);
+  const [openArguments, setOpenArguments] = useState<{ node: InvocationNode; anchor: HTMLElement; kind?: 'arguments' | 'return' } | null>(null);
   const [argumentPopoverPosition, setArgumentPopoverPosition] = useState<{ left: number; top: number; maxHeight: number } | null>(null);
   const argumentCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const argumentPopoverRef = useRef<HTMLDivElement | null>(null);
@@ -4779,10 +4781,10 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
     window.addEventListener('scroll', updateArgumentPopoverPosition, true);
     return () => { window.removeEventListener('resize', updateArgumentPopoverPosition); window.removeEventListener('scroll', updateArgumentPopoverPosition, true); };
   }, [openArguments, updateArgumentPopoverPosition]);
-  const openArgumentPreview = (node: InvocationNode, anchor: HTMLElement) => {
+  const openArgumentPreview = (node: InvocationNode, anchor: HTMLElement, kind: 'arguments' | 'return' = 'arguments') => {
     if (argumentCloseTimer.current) clearTimeout(argumentCloseTimer.current);
     argumentCloseTimer.current = null;
-    setOpenArguments({ node, anchor });
+    setOpenArguments({ node, anchor, kind });
   };
   const scheduleArgumentPreviewClose = () => {
     if (argumentCloseTimer.current) clearTimeout(argumentCloseTimer.current);
@@ -4835,12 +4837,12 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
                 className="yv-tree-arguments-trigger"
                 aria-label={`Preview all arguments passed to ${node.method}`}
                 aria-haspopup="true"
-                aria-expanded={openArguments?.node.id === node.id}
+                aria-expanded={openArguments?.node.id === node.id && (openArguments.kind ?? 'arguments') === 'arguments'}
                 onMouseEnter={event => openArgumentPreview(node, event.currentTarget)}
                 onMouseLeave={scheduleArgumentPreviewClose}
                 onFocus={event => openArgumentPreview(node, event.currentTarget)}
                 onBlur={scheduleArgumentPreviewClose}
-                onClick={event => { event.stopPropagation(); if (openArguments?.node.id === node.id) setOpenArguments(null); else openArgumentPreview(node, event.currentTarget); }}
+                onClick={event => { event.stopPropagation(); if (openArguments?.node.id === node.id && (openArguments.kind ?? 'arguments') === 'arguments') setOpenArguments(null); else openArgumentPreview(node, event.currentTarget, 'arguments'); }}
                 onKeyDown={event => { event.stopPropagation(); if (event.key === "Escape") setOpenArguments(null); }}
               >
                 ({node.arguments.map((argument, argumentIndex) => (
@@ -4870,7 +4872,27 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
               onKeyDown={event => { event.stopPropagation(); if (event.key === "Escape") setOpenClassContext(null); }}
             >Class context</button>
           </span>
-        ) : <span className="yv-tree-outcome">{result}</span>}
+        ) : (
+          <span className="yv-tree-outcome">
+            {node.status === 'returned' ? (
+              <span className="yv-tree-return-value">
+                <button
+                  type="button"
+                  className="yv-tree-arguments-trigger yv-tree-return-trigger"
+                  aria-label={`Preview return value from ${node.method}`}
+                  aria-haspopup="true"
+                  aria-expanded={openArguments?.node.id === node.id && openArguments.kind === 'return'}
+                  onMouseEnter={event => openArgumentPreview(node, event.currentTarget, 'return')}
+                  onMouseLeave={scheduleArgumentPreviewClose}
+                  onFocus={event => openArgumentPreview(node, event.currentTarget, 'return')}
+                  onBlur={scheduleArgumentPreviewClose}
+                  onClick={event => { event.stopPropagation(); if (openArguments?.node.id === node.id && openArguments.kind === 'return') setOpenArguments(null); else openArgumentPreview(node, event.currentTarget, 'return'); }}
+                  onKeyDown={event => { event.stopPropagation(); if (event.key === "Escape") setOpenArguments(null); }}
+                >return</button>
+              </span>
+            ) : result}
+          </span>
+        )}
       </div>
       {node.children.length > 0 && <div className="yv-tree-children">{node.children.map(child => renderNode(child, depth + 1))}</div>}
     </div>;
@@ -4885,14 +4907,21 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
         ref={argumentPopoverRef}
         className="yv-tree-arguments-popover yv-tree-arguments-popover-portal"
         role="region"
-        aria-label={`Arguments for ${openArguments.node.method}`}
+        aria-label={openArguments.kind === 'return' ? `Return value from ${openArguments.node.method}` : `Arguments for ${openArguments.node.method}`}
         style={{ left: argumentPopoverPosition.left, top: argumentPopoverPosition.top, maxHeight: argumentPopoverPosition.maxHeight }}
         onMouseEnter={() => { if (argumentCloseTimer.current) clearTimeout(argumentCloseTimer.current); argumentCloseTimer.current = null; }}
         onMouseLeave={scheduleArgumentPreviewClose}
         onFocus={() => { if (argumentCloseTimer.current) clearTimeout(argumentCloseTimer.current); argumentCloseTimer.current = null; }}
         onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) scheduleArgumentPreviewClose(); }}
       >
-        {openArguments.node.arguments.map(argument => (
+        {openArguments.kind === 'return' ? (
+          <span className="yv-tree-argument-preview">
+            <strong className="yv-tree-argument-label">return</strong>
+            <span className="yv-tree-argument-value">
+              <DataValue value={openArguments.node.returnValue} state={openArguments.node.exitState ?? openArguments.node.entryState} source={source} name="return" />
+            </span>
+          </span>
+        ) : openArguments.node.arguments.map(argument => (
           <span className="yv-tree-argument-preview" key={argument.name}>
             <strong className="yv-tree-argument-label">{argument.name}</strong>
             <span className="yv-tree-argument-value">
