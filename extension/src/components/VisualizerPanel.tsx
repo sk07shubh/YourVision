@@ -3310,6 +3310,10 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
       const escapedMethod = method.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
       const declarationPattern = new RegExp('\\b(?:public|private|protected)\\s+(?:(?:static|final|synchronized)\\s+)*[\\w.$<>?,\\[\\] ]+?\\s+' + escapedMethod + '\\s*\\(([^)]*)\\)');
       const declarationMatch = source.match(declarationPattern);
+      // The runtime can report framework/JVM implementation entries as method events.
+      // The visual tree represents calls into methods declared in the submitted solution,
+      // so do not create a visible node for an event that has no matching source declaration.
+      if (source.trim() && !declarationMatch) continue;
       const parameterText = declarationMatch?.[1] ?? '';
       const parameterNames = parameterText
         ? parameterText.split(',').map(parameter => parameter.trim().replace(/\s*=.*$/, '').split(/\s+/).pop() ?? '')
@@ -3332,9 +3336,8 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
         root.method = data.declaringType;
         root.signature = data.declaringType;
       }
-      const frameVariables = isPlainObject(data.variables) ? data.variables : {};
-      const compactSignature = `${returnType ? `${returnType} ` : ''}${method}()`;
-      const node: InvocationNode = { id, parentId, method, signature: compactSignature, entryIndex: index, status: 'active', returnType, frameVariables: {}, children: [] };
+      const compactSignature = `${returnType ? `${returnType} ` : ''}${signature}`;
+      const node: InvocationNode = { id, parentId: parentId === id ? 'root' : parentId, method, signature: compactSignature, entryIndex: index, status: 'active', returnType, frameVariables: {}, children: [] };
       nodes.set(id, node);
     } else if (event?.type === 'METHOD_EXIT' && typeof data.invocationId === 'string') {
       const node = nodes.get(data.invocationId);
@@ -3392,6 +3395,7 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
     const result = node.status === 'active' ? '-' : node.status === 'void' ? 'void' : node.status === 'exceptional' ? 'Exception' : displayValue(node.returnValue);
     return <div className={`yv-tree-branch depth-${Math.min(depth, 5)}`} key={id}>
       <button type="button" className={`yv-tree-node ${selected ? 'selected' : ''} ${node.status}`} style={{ '--yv-tree-depth': depth } as CSSProperties} onClick={() => onSelect(node.entryIndex)} aria-current={selected ? 'step' : undefined}>
+        <span className="yv-tree-depth">Depth {depth}</span>
         <span className="yv-tree-method">{node.signature}</span>
         <span className="yv-tree-outcome">{id === 'root' ? 'Class context' : result}</span>
       </button>
