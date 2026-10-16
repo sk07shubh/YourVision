@@ -4722,7 +4722,8 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
         ...(isPlainObject(states[index]?.variables) ? states[index].variables : {}),
         ...(isPlainObject(data.variables) ? data.variables : {})
       };
-      const argumentNames = rawParams.map((_type, index) =>
+      const argumentCount = Math.max(rawParams.length, parameterNames.length);
+      const argumentNames = Array.from({ length: argumentCount }, (_unused, index) =>
         parameterNames[index] && parameterNames[index] !== 'this'
           ? parameterNames[index]
           : 'arg' + (index + 1)
