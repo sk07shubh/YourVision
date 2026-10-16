@@ -3270,6 +3270,52 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
   );
 }
 
+type ClassFieldDeclaration = { name: string; declaration: string };
+
+function parseClassFieldDeclarations(source: string): ClassFieldDeclaration[] {
+  const lines = source.split(/\r?\n/);
+  const classLine = lines.findIndex(line => /\bclass\s+[A-Za-z_$][\w$]*/.test(line));
+  if (classLine < 0) return [];
+  let depth = 0;
+  let enteredClass = false;
+  let pending = "";
+  const declarations: ClassFieldDeclaration[] = [];
+  for (let index = classLine; index < lines.length; index++) {
+    const line = lines[index] ?? "";
+    const code = line.replace(/\/\/.*$/, "").trim();
+    if (!code) {
+      if (depth === 1 && pending) pending += " ";
+      continue;
+    }
+    if (!enteredClass) {
+      const open = code.indexOf("{");
+      if (open < 0) continue;
+      enteredClass = true;
+      depth += (code.slice(open).match(/{/g) ?? []).length - (code.slice(open).match(/}/g) ?? []).length;
+      const afterOpen = code.slice(open + 1).trim();
+      if (afterOpen) pending += afterOpen + " ";
+      continue;
+    }
+    if (depth === 1) {
+      pending += code + " ";
+      if (code.includes(";")) {
+        const candidate = pending.slice(0, pending.indexOf(";") + 1).trim();
+        const declaration = candidate.replace(/\s+/g, " ");
+        const beforeInitializer = declaration.split("=")[0] ?? "";
+        const match = beforeInitializer.match(/^(?:(?:public|protected|private|static|final|transient|volatile)\s+)*(?:[\w.$<>?,\[\] ]+?)\s+([A-Za-z_$][\w$]*)\s*$/);
+        if (match?.[1] && !beforeInitializer.includes("(") && !/^(?:return|throw|break|continue)\b/.test(declaration)) {
+          declarations.push({ name: match[1], declaration });
+        }
+        pending = pending.slice(pending.indexOf(";") + 1);
+      }
+    }
+    depth += (code.match(/{/g) ?? []).length - (code.match(/}/g) ?? []).length;
+    if (depth <= 0) break;
+    if (depth !== 1) pending = "";
+  }
+  return declarations.filter((item, index, all) => all.findIndex(candidate => candidate.name === item.name) === index);
+}
+
 type InvocationNode = {
   id: string;
   parentId: string;
@@ -3386,6 +3432,7 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
 
 function InvocationTree({ states, currentIndex, onSelect, source }: { states: TraceState[]; currentIndex: number; onSelect: (index: number) => void; source: string }) {
   const { nodes } = useMemo(() => buildInvocationNodes(states.slice(0, currentIndex + 1), source), [states, currentIndex, source]);
+  const classDeclarations = useMemo(() => parseClassFieldDeclarations(source), [source]);
   const current = states[currentIndex];
   const viewportRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -3461,14 +3508,30 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
               onKeyDown={event => event.stopPropagation()}
             >Class context</button>
             <span className="yv-class-context-popover" role="region" aria-label={`Class fields for ${node.method}`}>
-              {Object.entries(node.frameVariables).length > 0 ? Object.entries(node.frameVariables).map(([name, value]) => (
-                <span className="yv-tree-argument-preview" key={name}>
-                  <strong className="yv-tree-argument-label">{name}</strong>
-                  <span className="yv-tree-argument-value">
-                    <DataValue value={value} state={current} source={source} name={name} />
-                  </span>
-                </span>
-              )) : <span className="yv-class-context-empty">Class fields appear here as they are captured.</span>}
+              {classDeclarations.length > 0 || Object.entries(node.frameVariables).length > 0 ? (
+                <>
+                  {classDeclarations.map(field => {
+                    const captured = Object.prototype.hasOwnProperty.call(node.frameVariables, field.name);
+                    return (
+                      <span className="yv-tree-argument-preview" key={field.name}>
+                        <strong className="yv-tree-argument-label">{field.name}</strong>
+                        <span className="yv-class-field-declaration">{field.declaration}</span>
+                        <span className="yv-tree-argument-value">
+                          {captured
+                            ? <DataValue value={node.frameVariables[field.name]} state={current} source={source} name={field.name} />
+                            : <span className="yv-class-field-pending">Not captured yet</span>}
+                        </span>
+                      </span>
+                    );
+                  })}
+                  {Object.entries(node.frameVariables).filter(([name]) => !classDeclarations.some(field => field.name === name)).map(([name, value]) => (
+                    <span className="yv-tree-argument-preview" key={name}>
+                      <strong className="yv-tree-argument-label">{name}</strong>
+                      <span className="yv-tree-argument-value"><DataValue value={value} state={current} source={source} name={name} /></span>
+                    </span>
+                  ))}
+                </>
+              ) : <span className="yv-class-context-empty">No class fields are declared in this solution.</span>}
             </span>
           </span>
         ) : <span className="yv-tree-outcome">{result}</span>}
