@@ -4923,7 +4923,7 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
           <span className="yv-tree-argument-preview">
             <strong className="yv-tree-argument-label">return</strong>
             <span className="yv-tree-argument-value">
-              <DataValue value={openArguments.node.returnValue} state={openArguments.node.exitState ?? openArguments.node.entryState} source={source} name="return" />
+              <DataValue value={openArguments.node.returnValue} state={openArguments.node.exitState ?? openArguments.node.entryState} source={source} name={openArguments.node.returnValueName ?? "return"} />
             </span>
           </span>
         ) : openArguments.node.arguments.map(argument => (
