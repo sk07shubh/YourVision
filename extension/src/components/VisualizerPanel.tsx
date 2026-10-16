@@ -4710,17 +4710,22 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
   const classDeclarations = useMemo(() => parseClassFieldDeclarations(source), [source]);
   const current = states[currentIndex];
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  const seenInvocationIds = useRef<Set<string>>(new Set());
+  // Match the linked-list creation effect to trace checkpoints: a call is "new"
+  // when its invocation node first exists in the immediately preceding state.
+  // This also works when expanding nested function-call dropdowns after stepping.
+  const previousInvocationNodes = useMemo(
+    () => currentIndex > 0
+      ? buildInvocationNodes(states.slice(0, currentIndex), source).nodes
+      : new Map<string, ReturnType<typeof buildInvocationNodes>['nodes'] extends Map<string, infer T> ? T : never>(),
+    [states, currentIndex, source],
+  );
   const enteringInvocationIds = useMemo(() => {
     const entering = new Set<string>();
     for (const id of nodes.keys()) {
-      if (!seenInvocationIds.current.has(id)) entering.add(id);
+      if (!previousInvocationNodes.has(id)) entering.add(id);
     }
     return entering;
-  }, [nodes]);
-  useEffect(() => {
-    for (const id of enteringInvocationIds) seenInvocationIds.current.add(id);
-  }, [enteringInvocationIds]);
+  }, [nodes, previousInvocationNodes]);
   useEffect(() => {
     const viewport = viewportRef.current;
     const selected = viewport?.querySelector<HTMLElement>('.yv-tree-node.selected');
