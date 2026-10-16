@@ -3555,7 +3555,7 @@ export function VisualizerPanel(){
   }, [s.source]);
   // The first checkpoint is the class-entry frame: highlight the declaration
   // before the JVM reaches the first executable initializer or method line.
-  const line = current?.line ?? (s.index === 0 ? classDeclarationLine : undefined);
+  const line = current?.line && current.line > 0 ? current.line : (s.index === 0 ? classDeclarationLine : undefined);
   const lastEventData = isPlainObject(current?.lastEvent?.data) ? current.lastEvent.data : undefined;
   const sourceLines=useMemo(()=>s.source.split(/\r?\n/),[s.source]);
   const statement=line?sourceLines[line-1]?.trim():'';
