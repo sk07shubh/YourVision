@@ -203,6 +203,44 @@ if (
     throw new Error("repeated runtime checkpoints at the same source line were deduplicated");
 }
 
+const invocationTrace: ExecutionTrace = {
+    version: 1,
+    events: [
+        {
+            sequence: 1, type: "METHOD_ENTER", line: 10, method: "visit", depth: 1,
+            data: { invocationId: "call-1", methodSignature: "()I", declaringType: "Solution", returnType: "int", parameterTypes: [], variables: { value: 1 } }
+        },
+        {
+            sequence: 2, type: "METHOD_EXIT", line: 11, method: "visit", depth: 1,
+            data: { invocationId: "call-1", methodSignature: "()I", declaringType: "Solution", returnType: "int", returnValue: 1, returnValueType: "int", returnedVoid: false, variables: { value: 1 } }
+        },
+        {
+            sequence: 3, type: "METHOD_ENTER", line: 10, method: "visit", depth: 1,
+            data: { invocationId: "call-2", methodSignature: "()I", declaringType: "Solution", returnType: "int", parameterTypes: [], variables: { value: 1 } }
+        },
+        {
+            sequence: 4, type: "METHOD_EXIT", line: 11, method: "visit", depth: 1,
+            data: { invocationId: "call-2", methodSignature: "()I", declaringType: "Solution", returnType: "int", returnValue: 2, returnValueType: "int", returnedVoid: false, variables: { value: 1 } }
+        }
+    ]
+};
+const invocationStates = buildStates(invocationTrace);
+if (invocationStates.length !== 4) {
+    throw new Error("identical repeated invocation checkpoints were deduplicated");
+}
+if (stateAt(invocationStates, 0).invocationId !== "call-1" ||
+    stateAt(invocationStates, 2).invocationId !== "call-2") {
+    throw new Error("invocation identity was not retained on method-entry checkpoints");
+}
+if (stateAt(invocationStates, 1).returnValue !== 1 ||
+    stateAt(invocationStates, 1).invocationStatus !== "returned" ||
+    stateAt(invocationStates, 3).returnValue !== 2) {
+    throw new Error("typed invocation return outcomes were not retained in replay state");
+}
+if (stateAt(invocationStates, 2).returnValue !== undefined) {
+    throw new Error("new invocation inherited a previous invocation's return value");
+}
+
 if (stateAt(states, 3).variables.left !== 0) throw new Error("caller variables were not restored on caller resume");
 if (stateAt(states, 5).error?.type !== "IndexOutOfBoundsException") throw new Error("error state was not replayed");
 if (stateAt(states, 4).variables.left !== 1) throw new Error("STEP variables were not hydrated");
@@ -212,5 +250,128 @@ if (nums.objectId !== "41" || JSON.stringify(nums.values) !== JSON.stringify([2,
     throw new Error("STEP array snapshot was not hydrated");
 }
 if (!stateAt(states, 4).objects["99"]) throw new Error("object identity snapshot was not hydrated");
+
+const nestedReturnTrace: ExecutionTrace = {
+    version: 1,
+    events: [
+        {
+            sequence: 1, type: "METHOD_ENTER", line: 2, method: "solve", depth: 0,
+            data: {
+                invocationId: "parent-call",
+                methodSignature: "(I)I",
+                declaringType: "Solution",
+                returnType: "int",
+                variables: { n: 3, board: { $arrayId: "board-1", $type: "char[][]", values: [["A"]] } }
+            }
+        },
+        {
+            sequence: 2, type: "METHOD_ENTER", line: 8, method: "dfs", depth: 1,
+            data: {
+                invocationId: "child-call",
+                parentInvocationId: "parent-call",
+                methodSignature: "(II)Z",
+                declaringType: "Solution",
+                returnType: "boolean",
+                variables: { row: 1, col: 2, board: { $arrayId: "board-1", $type: "char[][]", values: [["A"]] } }
+            }
+        },
+        {
+            sequence: 3, type: "METHOD_EXIT", line: 12, method: "dfs", depth: 1,
+            data: {
+                invocationId: "child-call",
+                parentInvocationId: "parent-call",
+                parentMethodSignature: "(I)I",
+                parentDeclaringType: "Solution",
+                parentReturnType: "int",
+                returnType: "boolean",
+                returnValue: true,
+                returnValueType: "boolean",
+                returnedVoid: false,
+                variables: { row: 1, col: 2 }
+            }
+        },
+        {
+            sequence: 4, type: "STEP", line: 9, method: "solve", depth: 0,
+            data: {
+                variables: { n: 3, board: { $arrayId: "board-1", $type: "char[][]", values: [["A"]] }, found: true }
+            }
+        }
+    ]
+};
+const nestedReturnStates = buildStates(nestedReturnTrace);
+if (nestedReturnStates.length !== 4) {
+    throw new Error("nested call entry, return, and caller resume checkpoints must all be replayable");
+}
+const childReturn = stateAt(nestedReturnStates, 2);
+const resumedParent = stateAt(nestedReturnStates, 3);
+if (childReturn.invocationId !== "child-call" || childReturn.invocationStatus !== "returned" || childReturn.returnValue !== true) {
+    throw new Error("callee return checkpoint lost the child invocation or typed return outcome");
+}
+if (resumedParent.invocationId !== "parent-call" || resumedParent.methodSignature !== "(I)I" || resumedParent.invocationStatus !== "active") {
+    throw new Error("caller invocation identity/signature/status were not restored after child return");
+}
+if (resumedParent.returnValue !== undefined || resumedParent.returnedVoid !== undefined) {
+    throw new Error("callee return metadata leaked into the resumed caller checkpoint");
+}
+if (resumedParent.variables.row !== undefined || resumedParent.variables.col !== undefined || resumedParent.variables.found !== true) {
+    throw new Error("caller locals were not restored independently from callee locals");
+}
+
+
+// Three-level return regression: each return must restore exactly its immediate
+// caller, not jump to the root or leave the grandchild identity active.
+const deepReturnTrace: ExecutionTrace = {
+    version: 1,
+    events: [
+        {
+            sequence: 1, type: "METHOD_ENTER", line: 2, method: "solve", depth: 0,
+            data: { invocationId: "root-call", methodSignature: "()I", declaringType: "Solution", returnType: "int", variables: { n: 2 } }
+        },
+        {
+            sequence: 2, type: "METHOD_ENTER", line: 6, method: "search", depth: 1,
+            data: { invocationId: "middle-call", parentInvocationId: "root-call", methodSignature: "(I)Z", declaringType: "Solution", returnType: "boolean", variables: { n: 2, index: 0 } }
+        },
+        {
+            sequence: 3, type: "METHOD_ENTER", line: 10, method: "matches", depth: 2,
+            data: { invocationId: "leaf-call", parentInvocationId: "middle-call", methodSignature: "(II)Z", declaringType: "Solution", returnType: "boolean", variables: { index: 0, target: 2 } }
+        },
+        {
+            sequence: 4, type: "METHOD_EXIT", line: 12, method: "matches", depth: 2,
+            data: { invocationId: "leaf-call", parentInvocationId: "middle-call", parentMethodSignature: "(I)Z", parentDeclaringType: "Solution", parentReturnType: "boolean", parentParentInvocationId: "root-call", returnType: "boolean", returnValue: true, returnValueType: "boolean", returnedVoid: false, variables: { index: 0, target: 2 } }
+        },
+        {
+            sequence: 5, type: "STEP", line: 7, method: "search", depth: 1,
+            data: { variables: { n: 2, index: 0, matched: true } }
+        },
+        {
+            sequence: 6, type: "METHOD_EXIT", line: 8, method: "search", depth: 1,
+            data: { invocationId: "middle-call", parentInvocationId: "root-call", parentMethodSignature: "()I", parentDeclaringType: "Solution", parentReturnType: "int", returnType: "boolean", returnValue: true, returnValueType: "boolean", returnedVoid: false, variables: { n: 2, index: 0, matched: true } }
+        },
+        {
+            sequence: 7, type: "STEP", line: 3, method: "solve", depth: 0,
+            data: { variables: { n: 2, answer: 1 } }
+        }
+    ]
+};
+const deepReturnStates = buildStates(deepReturnTrace);
+if (deepReturnStates.length !== 7) {
+    throw new Error("three-level invocation trace lost a return or resume checkpoint");
+}
+const resumedMiddle = stateAt(deepReturnStates, 4);
+const resumedRoot = stateAt(deepReturnStates, 6);
+if (resumedMiddle.invocationId !== "middle-call" || resumedMiddle.parentInvocationId !== "root-call" ||
+    resumedMiddle.methodSignature !== "(I)Z" || resumedMiddle.invocationStatus !== "active") {
+    throw new Error("grandchild return did not restore the exact middle caller frame");
+}
+if (resumedMiddle.variables.target !== undefined || resumedMiddle.variables.matched !== true) {
+    throw new Error("grandchild locals leaked into the resumed middle frame");
+}
+if (resumedRoot.invocationId !== "root-call" || resumedRoot.parentInvocationId !== undefined ||
+    resumedRoot.methodSignature !== "()I" || resumedRoot.invocationStatus !== "active") {
+    throw new Error("middle return did not restore the root invocation identity and ancestry");
+}
+if (resumedRoot.variables.index !== undefined || resumedRoot.variables.answer !== 1) {
+    throw new Error("middle-frame locals leaked into the resumed root frame");
+}
 
 console.log("PASS: trace state builder");

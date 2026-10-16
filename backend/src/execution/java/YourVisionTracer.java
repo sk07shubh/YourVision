@@ -47,6 +47,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,6 +63,130 @@ public class YourVisionTracer {
     private static final long MAX_EVENTS = 5000;
 
     private static long sequence = 0;
+    private static long invocationSequence = 0;
+    private static final Map<Long, List<InvocationContext>> invocationStacks =
+        new HashMap<>();
+
+    private static final class InvocationContext {
+        final String id;
+        final String parentId;
+        final String method;
+        final String signature;
+        final String declaringType;
+        final String returnType;
+
+        InvocationContext(String id, String parentId, Method method) {
+            this.id = id;
+            this.parentId = parentId;
+            this.method = method.name();
+            this.signature = method.signature();
+            this.declaringType = method.declaringType().name();
+            this.returnType = safeReturnType(method);
+        }
+    }
+
+    private static void enterInvocation(
+        ThreadReference thread,
+        Method method,
+        Map<String, Object> data
+    ) {
+        List<InvocationContext> stack = invocationStacks.computeIfAbsent(
+            thread.uniqueID(),
+            ignored -> new ArrayList<>()
+        );
+        String parentId = stack.isEmpty()
+            ? null
+            : stack.get(stack.size() - 1).id;
+        InvocationContext context = new InvocationContext(
+            "call-" + (++invocationSequence),
+            parentId,
+            method
+        );
+        stack.add(context);
+        data.put("invocationId", context.id);
+        if (parentId != null) {
+            data.put("parentInvocationId", parentId);
+        }
+        data.put("methodSignature", context.signature);
+        data.put("declaringType", context.declaringType);
+        data.put("returnType", safeReturnType(method));
+        data.put("parameterTypes", safeArgumentTypeNames(method));
+    }
+
+    private static String safeReturnType(Method method) {
+        try {
+            return method.returnTypeName();
+        } catch (Exception ignored) {
+            return method.signature();
+        }
+    }
+
+    private static List<String> safeArgumentTypeNames(Method method) {
+        try {
+            return method.argumentTypeNames();
+        } catch (Exception ignored) {
+            return List.of();
+        }
+    }
+
+    private static void attachExitInvocation(
+        ThreadReference thread,
+        Method method,
+        Map<String, Object> data,
+        Value returnValue
+    ) {
+        List<InvocationContext> stack = invocationStacks.get(thread.uniqueID());
+        InvocationContext context = null;
+        InvocationContext parentContext = null;
+        if (stack != null) {
+            for (int i = stack.size() - 1; i >= 0; i--) {
+                InvocationContext candidate = stack.get(i);
+                if (candidate.method.equals(method.name()) &&
+                    candidate.signature.equals(method.signature()) &&
+                    candidate.declaringType.equals(method.declaringType().name())) {
+                    context = candidate;
+                    parentContext = i > 0 ? stack.get(i - 1) : null;
+                    while (stack.size() > i + 1) {
+                        stack.remove(stack.size() - 1);
+                    }
+                    stack.remove(i);
+                    break;
+                }
+            }
+            if (stack.isEmpty()) {
+                invocationStacks.remove(thread.uniqueID());
+            }
+        }
+
+        if (context != null) {
+            data.put("invocationId", context.id);
+            if (context.parentId != null) {
+                data.put("parentInvocationId", context.parentId);
+            }
+            data.put("methodSignature", context.signature);
+            data.put("declaringType", context.declaringType);
+            if (parentContext != null) {
+                data.put("parentMethodSignature", parentContext.signature);
+                data.put("parentDeclaringType", parentContext.declaringType);
+                data.put("parentReturnType", parentContext.returnType);
+                if (parentContext.parentId != null) {
+                    data.put("parentParentInvocationId", parentContext.parentId);
+                }
+            }
+        } else {
+            data.put("invocationId", "unmatched-" + (++invocationSequence));
+            data.put("invocationMatch", "unmatched");
+        }
+        String returnType = safeReturnType(method);
+        data.put("returnType", returnType);
+        boolean returnedVoid = returnType.equals("void");
+        data.put("returnedVoid", returnedVoid);
+        data.put("hasReturnValue", !returnedVoid);
+        if (returnValue != null) {
+            data.put("returnValueType", returnValue.type().name());
+        }
+        data.put("exceptional", false);
+    }
     private static String tracedClass = "";
     private static String solutionSourcePath = "";
     private static final Map<String, Integer> lastExecutableLines =
@@ -158,7 +284,7 @@ public class YourVisionTracer {
 
             for (Event event : orderedEvents) {
                 if (event instanceof StepEvent step) {
-                    if (isTraceableUserMethod(step.location().method())) {
+                    if (isTraceableClassSetupMethod(step.location().method()) || isTraceableUserMethod(step.location().method())) {
                         if (recordedStepLocations.add(stepLocationKey(
                             step.location(),
                             step.thread()
@@ -172,7 +298,7 @@ public class YourVisionTracer {
 
                 } else if (event instanceof BreakpointEvent breakpoint) {
                     if (
-                        isTraceableUserMethod(breakpoint.location().method()) &&
+                        (isTraceableClassSetupMethod(breakpoint.location().method()) || isTraceableUserMethod(breakpoint.location().method())) &&
                         recordedStepLocations.add(stepLocationKey(
                             breakpoint.location(),
                             breakpoint.thread()
@@ -231,10 +357,13 @@ public class YourVisionTracer {
                                     Map<String, Object> unwindData =
                                         new LinkedHashMap<>();
 
-                                    unwindData.put(
-                                        "exceptional",
-                                        true
+                                    attachExitInvocation(
+                                        exception.thread(),
+                                        frame.location().method(),
+                                        unwindData,
+                                        null
                                     );
+                                    unwindData.put("exceptional", true);
 
                                     emit(
                                         "METHOD_EXIT",
@@ -251,7 +380,16 @@ public class YourVisionTracer {
                 } else if (event instanceof MethodEntryEvent entry) {
                     Method enteredMethod = entry.method();
 
-                    if (isTraceableUserMethod(enteredMethod)) {
+                    if (isTraceableClassSetupMethod(enteredMethod) && !isTraceableUserMethod(enteredMethod)) {
+                        // JVM setup methods (including the implicit default
+                        // constructor) run before the selected user method.
+                        // Do not emit their source locations as user STEP
+                        // checkpoints: they point at the class declaration and
+                        // shift the first visible checkpoint away from the
+                        // selected method's first executable line. The selected
+                        // method's METHOD_ENTER snapshot captures the initialized
+                        // fields, so line stepping starts when that method enters.
+                    } else if (isTraceableUserMethod(enteredMethod)) {
                         installSameLineLoopBreakpoints(
                             manager,
                             enteredMethod
@@ -278,6 +416,7 @@ public class YourVisionTracer {
                             "displayLine",
                             declarationLine
                         );
+                        enterInvocation(entry.thread(), enteredMethod, data);
 
                         // The compiler-generated default constructor is
                         // not user-authored code. Keep its entry request as the
@@ -319,6 +458,13 @@ public class YourVisionTracer {
                         try {
                             Value returnValue =
                                 exit.returnValue();
+
+                            attachExitInvocation(
+                                exit.thread(),
+                                exit.method(),
+                                data,
+                                returnValue
+                            );
 
                             if (returnValue != null) {
                                 data.put(
@@ -500,6 +646,16 @@ public class YourVisionTracer {
             EventRequest.SUSPEND_ALL
         );
         death.enable();
+    }
+
+    private static boolean isTraceableClassSetupMethod(Method method) {
+        try {
+            return method != null &&
+                method.declaringType().name().equals(tracedClass) &&
+                (method.isStaticInitializer() || method.isConstructor());
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private static boolean isTraceableUserMethod(
@@ -913,6 +1069,64 @@ public class YourVisionTracer {
         return fallback;
     }
 
+    private static Map<String, Object> readClassFields(ReferenceType type, ThreadReference thread) {
+        Map<String, Object> fields = readStaticFields(type);
+        // LeetCode solutions often use instance fields as class-level state.
+        // Include those fields from the current Solution instance alongside
+        // static fields so the class-context preview can show both kinds.
+        try {
+            if (thread != null && thread.frameCount() > 0) {
+                ObjectReference instance = thread.frame(0).thisObject();
+                if (instance != null && instance.referenceType().name().equals(tracedClass)) {
+                    for (Field field : instance.referenceType().allFields()) {
+                        if (field.isStatic() || field.isSynthetic()) continue;
+                        try {
+                            fields.put(field.name(), snapshotValue(instance.getValue(field), 0, new HashSet<>()));
+                        } catch (Exception ignored) {
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return fields;
+    }
+
+    private static Map<String, Object> readStaticFields(ReferenceType type) {
+        Map<String, Object> fields = new LinkedHashMap<>();
+        try {
+            for (Field field : type.allFields()) {
+                if (!field.isStatic() || field.isSynthetic()) {
+                    continue;
+                }
+                try {
+                    fields.put(field.name(), snapshotValue(type.getValue(field), 0, new HashSet<>()));
+                } catch (Exception ignored) {
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return fields;
+    }
+
+    private static void attachCurrentInvocation(
+        ThreadReference thread,
+        Map<String, Object> data
+    ) {
+        List<InvocationContext> stack = invocationStacks.get(thread.uniqueID());
+        if (stack == null || stack.isEmpty()) {
+            return;
+        }
+        InvocationContext current = stack.get(stack.size() - 1);
+        data.put("invocationId", current.id);
+        if (current.parentId != null) {
+            data.put("parentInvocationId", current.parentId);
+        }
+        data.put("methodSignature", current.signature);
+        data.put("declaringType", current.declaringType);
+        data.put("returnType", current.returnType);
+    }
+
     private static String lastExecutableLineKey(
         ThreadReference thread,
         Method method
@@ -949,6 +1163,9 @@ public class YourVisionTracer {
 
         Map<String, Object> data =
             new LinkedHashMap<>();
+
+        attachCurrentInvocation(thread, data);
+        data.put("classFields", readClassFields(location.declaringType(), thread));
 
         try {
             StackFrame frame =

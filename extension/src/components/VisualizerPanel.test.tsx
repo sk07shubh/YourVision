@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import type { TraceState } from '../types/trace';
 import { sessionStore } from '../state/store';
 import {
+  buildInvocationNodes,
   collectionDelta,
   collectionOperation,
   compareArrayValues,
@@ -46,6 +47,82 @@ function markup(nodes: ReactNode[]): string {
 }
 
 
+
+describe('synchronized function invocation tree', () => {
+  it('keeps recursive calls distinct and attaches each call to its actual parent', () => {
+    const states = [
+      state({ invocationId: 'call-1', lastEvent: { type: 'METHOD_ENTER', method: 'search', data: { invocationId: 'call-1', methodSignature: '(I)Z', parameterTypes: ['int'], returnType: 'boolean' } } }),
+      state({ invocationId: 'call-2', parentInvocationId: 'call-1', lastEvent: { type: 'METHOD_ENTER', method: 'search', data: { invocationId: 'call-2', parentInvocationId: 'call-1', methodSignature: '(I)Z', parameterTypes: ['int'], returnType: 'boolean' } } }),
+      state({ invocationId: 'call-2', parentInvocationId: 'call-1', lastEvent: { type: 'METHOD_EXIT', method: 'search', data: { invocationId: 'call-2', parentInvocationId: 'call-1', returnType: 'boolean', returnValue: true, returnValueType: 'boolean', returnedVoid: false } } }),
+      state({ invocationId: 'call-1', lastEvent: { type: 'METHOD_EXIT', method: 'search', data: { invocationId: 'call-1', returnType: 'boolean', returnValue: false, returnValueType: 'boolean', returnedVoid: false } } }),
+    ];
+    const { nodes } = buildInvocationNodes(states);
+    expect(nodes.get('root')?.children).toEqual(['call-1']);
+    expect(nodes.get('call-1')?.children).toEqual(['call-2']);
+    expect(nodes.get('call-2')?.status).toBe('returned');
+    expect(nodes.get('call-2')?.returnValue).toBe(true);
+    expect(nodes.get('call-1')?.status).toBe('returned');
+    expect(nodes.get('call-1')?.returnValue).toBe(false);
+
+    const historical = buildInvocationNodes(states.slice(0, 1)).nodes;
+    expect(historical.has('call-1')).toBe(true);
+    expect(historical.has('call-2')).toBe(false);
+    expect(historical.get('call-1')?.children).toEqual([]);
+    expect(historical.get('call-1')?.status).toBe('active');
+  });
+
+  it('uses the checkpoint parent id when the event payload omits it', () => {
+    const states = [
+      state({
+        invocationId: 'outer',
+        lastEvent: { type: 'METHOD_ENTER', method: 'solve', data: { invocationId: 'outer' } },
+      }),
+      state({
+        invocationId: 'inner',
+        parentInvocationId: 'outer',
+        lastEvent: { type: 'METHOD_ENTER', method: 'dfs', data: { invocationId: 'inner' } },
+      }),
+    ];
+    const { nodes } = buildInvocationNodes(states);
+    expect(nodes.get('root')?.children).toEqual(['outer']);
+    expect(nodes.get('outer')?.children).toEqual(['inner']);
+    expect(nodes.get('inner')?.parentId).toBe('outer');
+  });
+
+  it('tracks each active frame snapshot without leaking child locals into its parent', () => {
+    const states = [
+      state({ invocationId: 'call-1', lastEvent: { type: 'METHOD_ENTER', method: 'solve', data: { invocationId: 'call-1', declaringType: 'Solution', classFields: { counter: 1 }, variables: { board: 'shared-board', row: 0 } } } }),
+      state({ invocationId: 'call-2', parentInvocationId: 'call-1', lastEvent: { type: 'METHOD_ENTER', method: 'dfs', data: { invocationId: 'call-2', parentInvocationId: 'call-1', variables: { board: 'shared-board', row: 1, col: 2 } } } }),
+      state({ invocationId: 'call-2', parentInvocationId: 'call-1', lastEvent: { type: 'STEP', data: { invocationId: 'call-2', variables: { board: 'shared-board', row: 1, col: 3 } } } }),
+    ];
+    const { nodes } = buildInvocationNodes(states);
+    expect(nodes.get('root')?.signature).toBe('Solution');
+    expect(nodes.get('root')?.frameVariables).toEqual({ counter: 1 });
+    expect(nodes.get('call-1')?.frameVariables).toEqual({ board: 'shared-board', row: 0 });
+    expect(nodes.get('call-2')?.frameVariables).toEqual({ board: 'shared-board', row: 1, col: 3 });
+    expect(nodes.get('call-1')?.frameVariables).not.toHaveProperty('col');
+  });
+
+  it('keeps repeated non-recursive invocations as separate siblings and represents void returns', () => {
+    const states = [
+      state({ lastEvent: { type: 'METHOD_ENTER', method: 'visit', data: { invocationId: 'call-1', methodSignature: '()V', parameterTypes: [], returnType: 'void' } } }),
+      state({ lastEvent: { type: 'METHOD_EXIT', method: 'visit', data: { invocationId: 'call-1', returnType: 'void', returnedVoid: true } } }),
+      state({ lastEvent: { type: 'METHOD_ENTER', method: 'visit', data: { invocationId: 'call-2', methodSignature: '()V', parameterTypes: [], returnType: 'void' } } }),
+      state({ lastEvent: { type: 'METHOD_EXIT', method: 'visit', data: { invocationId: 'call-2', returnType: 'void', returnedVoid: true } } }),
+    ];
+    const { nodes } = buildInvocationNodes(states);
+    expect(nodes.get('root')?.children).toEqual(['call-1', 'call-2']);
+    expect(nodes.get('call-1')?.status).toBe('void');
+    expect(nodes.get('call-2')?.status).toBe('void');
+
+    const nullable = buildInvocationNodes([
+      state({ lastEvent: { type: 'METHOD_ENTER', method: 'find', data: { invocationId: 'call-null', returnType: 'Node' } } }),
+      state({ lastEvent: { type: 'METHOD_EXIT', method: 'find', data: { invocationId: 'call-null', returnType: 'Node', hasReturnValue: true, returnedVoid: false } } }),
+    ]).nodes;
+    expect(nullable.get('call-null')?.status).toBe('returned');
+    expect(nullable.get('call-null')?.returnValue).toBeNull();
+  });
+});
 
 describe('design-class instance state visualization', () => {
   it('renders structural fields on this as first-class data structures', () => {
@@ -1755,7 +1832,7 @@ describe('deterministic semantic pointer roles', () => {
 });
 
 describe('semantic roles in rendered visualization', () => {
-  it('renders boundary badges in the variable panel', () => {
+  it('keeps semantic boundary roles internal instead of rendering badges in the variable panel', () => {
     const current = state({
       variables: { left: 1, right: 3 },
       lastEvent: { type: 'STEP', line: 5, data: { semanticRoles: [
@@ -1764,8 +1841,10 @@ describe('semantic roles in rendered visualization', () => {
       ] } },
     });
     const html = renderToStaticMarkup(<Variables state={current} />);
-    expect(html).toContain('LEFT BOUND');
-    expect(html).toContain('RIGHT BOUND');
+    expect(html).toContain('left');
+    expect(html).toContain('right');
+    expect(html).not.toContain('LEFT BOUND');
+    expect(html).not.toContain('RIGHT BOUND');
   });
 
   it('renders pointer labels over cells when source has no array indexing', () => {
@@ -1905,10 +1984,10 @@ describe('semantic roles in rendered visualization', () => {
     expect(semanticRoleForVariable(current, 'col')?.role).toBe('pointer');
 
     const variablesHtml = renderToStaticMarkup(<Variables state={current} />);
-    expect(variablesHtml).toContain('LEFT BOUND');
-    expect(variablesHtml).toContain('RIGHT BOUND');
-    expect(variablesHtml).toContain('MIDPOINT');
-    expect(variablesHtml).toContain('POINTER');
+    expect(variablesHtml).not.toContain('LEFT BOUND');
+    expect(variablesHtml).not.toContain('RIGHT BOUND');
+    expect(variablesHtml).not.toContain('MIDPOINT');
+    expect(variablesHtml).not.toContain('POINTER');
 
     const matrixHtml = renderToStaticMarkup(
       <ArrayView value={[[1, 2, 3], [4, 5, 6]]} state={current} source="matrix[row][col]" arrayName="matrix" />,

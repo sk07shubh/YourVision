@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { useSession } from '../state/session';
 import { sessionStore } from '../state/store';
 import { displayValue, stableStringify, isPlainObject } from '../utils/value';
@@ -1148,8 +1149,15 @@ function CollectionBackingArray({
 }) {
   return (
     <div className="yv-collection-backing">
-      <div className="yv-code yv-collection-backing-title">Array view · snapshot order</div>
-      <ArrayView value={value.values} state={state} source={source} arrayName={name} depth={depth} seen={seen}/>
+      <ArrayView
+        value={value.values}
+        state={state}
+        source={source}
+        arrayName={name}
+        depth={depth}
+        seen={seen}
+        nestedItems={value.values.some(item => isCollectionSnapshot(item) || isArraySnapshot(item) || Array.isArray(item))}
+      />
     </div>
   );
 }
@@ -1582,12 +1590,10 @@ export function Variables({ state, previous }: { state?: TraceState; previous?: 
         const changed =
           Boolean(previous) &&
           stableStringify(old) !== stableStringify(value);
-        const role = semanticRoleForVariable(state, name);
-        const roleTitle = [role?.evidence, ...(role?.usage ?? [])].filter(Boolean).join(' · ');
 
         return (
           <div className={`yv-var ${changed ? 'changed' : ''}`} key={name}>
-            <div className="yv-var-name"><span>{name}</span>{role&&<span className="yv-role" title={roleTitle}>{semanticRoleLabel(role.role)}</span>}</div>
+            <div className="yv-var-name"><span>{name}</span></div>
             <div className="yv-change">
               {changed && (
                 <>
@@ -2442,37 +2448,54 @@ function MatrixView({ value, state, source, arrayName, depth, seen }: {
   );
 }
 
-export function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<string>() }: {
+export function ArrayView({ value, state, source, arrayName, depth = 0, seen = new Set<string>(), nestedItems = false }: {
   value: unknown[];
   state?: TraceState;
   source: string;
   arrayName?: string;
   depth?: number;
   seen?: Set<string>;
+  /** A collection's elements are nested containers, not a Java 2D matrix. */
+  nestedItems?: boolean;
 }) {
-  // A Java 2D array may arrive as raw nested arrays or as row-level array
-  // snapshots. Normalize both shapes into a single grid without flattening it.
+  // Preserve collection-of-collections rendering while recognizing empty
+  // Java matrices from their two-dimensional indexed access.
   const matrixAccess = /\b[A-Za-z_$][\w$]*\s*\[[^\]]+\]\s*\[[^\]]+\]/.test(source) &&
     (!arrayName || source.includes(arrayName));
-  const matrixLike = value.length > 0
-    ? value.every(row => Array.isArray(row) || isArraySnapshot(row))
-    : matrixAccess;
+  const matrixLike = !nestedItems && (
+    value.length > 0
+      ? value.every(row => Array.isArray(row) || isArraySnapshot(row))
+      : matrixAccess
+  );
   if (matrixLike) {
     const rows = value.map(row => Array.isArray(row) ? row : isArraySnapshot(row) ? row.values : []);
     return <MatrixView value={rows} state={state} source={source} arrayName={arrayName} depth={depth} seen={seen}/>;
   }
 
+  const containsNestedCollections = nestedItems || value.some(item => isCollectionSnapshot(item) || isArraySnapshot(item) || Array.isArray(item));
   const indexNames = arrayIndexVariableNames(source, arrayName);
   const targets = pointerTargets(state, value.length, indexNames, arrayName, source);
   const targetSignature = targets.map(target => target.name + ':' + target.index).sort().join('|');
   const arrayRef = useRef<HTMLDivElement | null>(null);
   const cellRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const previousTargets = useRef<Map<string, number>>(new Map());
+  // A variable name such as "index" is reused by every recursive invocation.
+  // Do not animate a pointer from the caller's index to the callee's index as
+  // if it were one continuous pointer; each invocation owns its own frame.
+  const previousPointerInvocation = useRef<string | undefined>(state?.invocationId);
   const [pointerLayout, setPointerLayout] = useState<{ offsets: Record<string, number>; moving: Set<string> }>({ offsets: {}, moving: new Set() });
 
   useLayoutEffect(() => {
     const host = arrayRef.current;
     if (!host) return;
+
+    // Recursive frames commonly reuse the same local names with different
+    // values. Reset transition history on frame changes so labels snap to the
+    // current checkpoint rather than animating from a different stack frame.
+    if (previousPointerInvocation.current !== state?.invocationId) {
+      previousPointerInvocation.current = state?.invocationId;
+      previousTargets.current.clear();
+    }
 
     const layoutPointers = () => {
       const offsets: Record<string, number> = {};
@@ -2526,7 +2549,7 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
     Object.values(cellRefs.current).forEach(cell => { if (cell) observer.observe(cell); });
     host.querySelectorAll<HTMLElement>('[data-array-pointer]').forEach(label => observer.observe(label));
     return () => observer.disconnect();
-  }, [targetSignature, state?.sequence, value.length]);
+  }, [targetSignature, state?.sequence, state?.invocationId, value.length]);
 
   const enhancedBinding = enhancedForBinding(source, state, arrayName, value);
   const changed = changedArrayIndices(state, arrayName);
@@ -2541,7 +2564,7 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
   const rangeEnd = targets.length >= 2 ? Math.max(...targets.map(target => target.index)) : -1;
 
   return (
-    <div className={`yv-array yv-array-pointer-host ${targets.length ? 'has-pointers' : ''}`} ref={arrayRef} style={enhancedBinding ? { paddingTop: 52, paddingLeft: 44, boxSizing: 'border-box' } : undefined}>
+    <div className={`yv-array yv-array-pointer-host ${targets.length ? 'has-pointers' : ''} ${containsNestedCollections ? 'yv-array-nested-collections' : ''}`} ref={arrayRef} style={enhancedBinding ? { paddingTop: 52, paddingLeft: 44, boxSizing: 'border-box' } : undefined}>
       <div className="yv-pointer-layer" aria-hidden="true">
         {targets.map(target => (
           <div
@@ -2556,7 +2579,6 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
         <div className="yv-cell" key={index} ref={element => { cellRefs.current[index] = element; }} style={enhancedBinding?.index === index ? { position: "relative" } : undefined}>
           {enhancedBinding?.index === index && <EnhancedForValueCard binding={enhancedBinding} alignStart={index === 0} />}
           <div
-            key={`${index}-${state?.sequence ?? state?.line ?? 'initial'}`}
             className={`yv-cell-value ${rangeStart >= 0 && index >= rangeStart && index <= rangeEnd ? 'yv-cell-range ' : ''}${rangeStart >= 0 && index === rangeStart ? 'yv-cell-range-start ' : ''}${rangeEnd >= 0 && index === rangeEnd && rangeEnd !== rangeStart ? 'yv-cell-range-end ' : ''}${changed.has(index) ? 'yv-cell-written ' : ''}${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-cell-compared ' : ''}${accumulated.has(index) && !copied.has(index) ? 'yv-cell-accumulated ' : ''}${copied.has(index) ? 'yv-cell-copied ' : ''}${rotated.has(index) ? 'yv-cell-rotated-' + rotated.get(index) + ' ' : ''}${swapped.has(index) ? 'yv-cell-swapped' : ''}`}
           >
             <div className={`yv-array-cell-content ${swapped.has(index) ? 'yv-array-cell-content-swapped' : ''}${rotated.has(index) ? ' yv-array-cell-content-rotate-' + rotated.get(index) : shifted.has(index) ? ' yv-array-cell-content-shift-' + shifted.get(index) : ''}`}>
@@ -4523,9 +4545,294 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
   );
 }
 
+type ClassFieldDeclaration = { name: string; declaration: string };
+
+function parseClassFieldDeclarations(source: string): ClassFieldDeclaration[] {
+  const lines = source.split(/\r?\n/);
+  const classLine = lines.findIndex(line => /\bclass\s+[A-Za-z_$][\w$]*/.test(line));
+  if (classLine < 0) return [];
+  let depth = 0;
+  let enteredClass = false;
+  let pending = "";
+  const declarations: ClassFieldDeclaration[] = [];
+  for (let index = classLine; index < lines.length; index++) {
+    const line = lines[index] ?? "";
+    const code = line.replace(/\/\/.*$/, "").trim();
+    if (!code) {
+      if (depth === 1 && pending) pending += " ";
+      continue;
+    }
+    if (!enteredClass) {
+      const open = code.indexOf("{");
+      if (open < 0) continue;
+      enteredClass = true;
+      depth += (code.slice(open).match(/{/g) ?? []).length - (code.slice(open).match(/}/g) ?? []).length;
+      const afterOpen = code.slice(open + 1).trim();
+      if (afterOpen) pending += afterOpen + " ";
+      continue;
+    }
+    if (depth === 1) {
+      pending += code + " ";
+      if (code.includes(";")) {
+        const candidate = pending.slice(0, pending.indexOf(";") + 1).trim();
+        const declaration = candidate.replace(/\s+/g, " ");
+        const beforeInitializer = declaration.split("=")[0] ?? "";
+        const match = beforeInitializer.match(/^(?:(?:public|protected|private|static|final|transient|volatile)\s+)*(?:[\w.$<>?,\[\] ]+?)\s+([A-Za-z_$][\w$]*)\s*$/);
+        if (match?.[1] && !beforeInitializer.includes("(") && !/^(?:return|throw|break|continue)\b/.test(declaration)) {
+          declarations.push({ name: match[1], declaration });
+        }
+        pending = pending.slice(pending.indexOf(";") + 1);
+      }
+    }
+    depth += (code.match(/{/g) ?? []).length - (code.match(/}/g) ?? []).length;
+    if (depth <= 0) break;
+    if (depth !== 1) pending = "";
+  }
+  return declarations.filter((item, index, all) => all.findIndex(candidate => candidate.name === item.name) === index);
+}
+
+type InvocationNode = {
+  id: string;
+  parentId: string;
+  method: string;
+  signature: string;
+  entryIndex: number;
+  status: 'active' | 'returned' | 'void' | 'exceptional';
+  returnValue?: unknown;
+  returnType?: string;
+  frameVariables: Record<string, unknown>;
+  arguments: Array<{ name: string; value: unknown }>;
+  entryState?: TraceState;
+  children: string[];
+};
+
+export function buildInvocationNodes(states: TraceState[], source = ''): { nodes: Map<string, InvocationNode>; currentId?: string } {
+  const nodes = new Map<string, InvocationNode>();
+  nodes.set('root', { id: 'root', parentId: '', method: 'Solution', signature: 'Solution', entryIndex: 0, status: 'active', frameVariables: {}, arguments: [], children: [] });
+  for (let index = 0; index < states.length; index += 1) {
+    const event = states[index]?.lastEvent;
+    const data = isPlainObject(event?.data) ? event.data : {};
+    if (event?.type === 'METHOD_ENTER' && typeof data.invocationId === 'string') {
+      const id = data.invocationId;
+      if (nodes.has(id)) continue;
+      // Parent identity may live on the checkpoint state rather than the event payload.
+      // Preserve the declared parent even if its node is encountered later; links are resolved
+      // after processing the visible trace prefix instead of incorrectly flattening calls to root.
+      const checkpointParentId = states[index]?.parentInvocationId;
+      const parentId = typeof data.parentInvocationId === 'string'
+        ? data.parentInvocationId
+        : typeof checkpointParentId === 'string'
+          ? checkpointParentId
+          : 'root';
+      const method = typeof event.method === 'string' && event.method ? event.method : 'method';
+      // Only read parameter names from a method declaration, never a call site such as
+      // helper(this). The old substring search could mistake that call for the declaration.
+      const escapedMethod = method.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
+      const declarationPattern = new RegExp('\\b(?:(?:public|private|protected)\\s+)?(?:(?:static|final|synchronized)\\s+)*[\\w.$<>?,\\[\\] ]+?\\s+' + escapedMethod + '\\s*\\(([^)]*)\\)');
+      const declarationMatch = source.match(declarationPattern);
+      // The runtime can report framework/JVM implementation entries as method events.
+      // The visual tree represents calls into methods declared in the submitted solution,
+      // so do not create a visible node for an event that has no matching source declaration.
+      if (source.trim() && !declarationMatch) continue;
+      const parameterText = declarationMatch?.[1] ?? '';
+      const parameterNames = parameterText
+        ? parameterText.split(',').map(parameter => parameter.trim().replace(/\s*=.*$/, '').split(/\s+/).pop() ?? '')
+        : [];
+      const rawParams = Array.isArray(data.parameterTypes)
+        ? data.parameterTypes.filter((item): item is string => typeof item === 'string' && item !== 'this')
+        : [];
+      const displayType = (type: string): string => type
+        .replace(/^java\.lang\./, '')
+        .replace(/^java\.util\./, '')
+        .replace(/\bboolean\b/g, 'bool');
+      const entryVariables = {
+        ...(isPlainObject(states[index]?.variables) ? states[index].variables : {}),
+        ...(isPlainObject(data.variables) ? data.variables : {})
+      };
+      const argumentNames = rawParams.map((_type, index) =>
+        parameterNames[index] && parameterNames[index] !== 'this'
+          ? parameterNames[index]
+          : 'arg' + (index + 1)
+      );
+      const argumentsList = argumentNames.map(name => ({
+        name,
+        value: Object.prototype.hasOwnProperty.call(entryVariables, name) ? entryVariables[name] : undefined
+      }));
+      const signature = `${method}(${argumentNames.join(', ')})`;
+      const returnType = typeof data.returnType === 'string' ? displayType(data.returnType) : undefined;
+      const root = nodes.get('root');
+      if (root && typeof data.declaringType === 'string' && data.declaringType) {
+        root.method = data.declaringType;
+        root.signature = data.declaringType;
+      }
+      const node: InvocationNode = { id, parentId: parentId === id ? 'root' : parentId, method, signature, entryIndex: index, status: 'active', returnType, frameVariables: {}, arguments: argumentsList, entryState: states[index], children: [] };
+      nodes.set(id, node);
+    } else if (event?.type === 'METHOD_EXIT' && typeof data.invocationId === 'string') {
+      const node = nodes.get(data.invocationId);
+      if (!node) continue;
+      node.status = data.exceptional === true ? 'exceptional' : data.returnedVoid === true ? 'void' : 'returned';
+      if (Object.prototype.hasOwnProperty.call(data, 'returnValue')) node.returnValue = data.returnValue;
+      else if (data.hasReturnValue === true) node.returnValue = null;
+      if (typeof data.returnType === 'string') node.returnType = data.returnType;
+    }
+
+    if (isPlainObject(data.classFields)) {
+      const root = nodes.get('root');
+      if (root) root.frameVariables = data.classFields;
+    }
+
+    const checkpointId = typeof states[index]?.invocationId === 'string'
+      ? states[index].invocationId
+      : typeof data.invocationId === 'string' ? data.invocationId : undefined;
+    const checkpointNode = checkpointId ? nodes.get(checkpointId) : undefined;
+    if (checkpointNode && event?.type !== 'METHOD_EXIT' && isPlainObject(data.variables)) {
+      checkpointNode.frameVariables = data.variables;
+    }
+  }
+  // Resolve relationships only after every invocation in this checkpoint prefix is known.
+  // This handles trace producers that report parentInvocationId on the state, and avoids
+  // creating a long flat list when a parent node is registered later in the prefix.
+  for (const node of nodes.values()) node.children = [];
+  for (const node of nodes.values()) {
+    if (node.id === 'root') continue;
+    const parent = nodes.get(node.parentId) ?? nodes.get('root');
+    if (parent && !parent.children.includes(node.id)) parent.children.push(node.id);
+  }
+
+  const last = states[states.length - 1];
+  const lastData = isPlainObject(last?.lastEvent?.data) ? last.lastEvent.data : {};
+  const currentId = typeof last?.invocationId === 'string' ? last.invocationId : typeof lastData.invocationId === 'string' ? lastData.invocationId : undefined;
+  return { nodes, currentId };
+}
+
+function InvocationTree({ states, currentIndex, onSelect, source }: { states: TraceState[]; currentIndex: number; onSelect: (index: number) => void; source: string }) {
+  const { nodes } = useMemo(() => buildInvocationNodes(states.slice(0, currentIndex + 1), source), [states, currentIndex, source]);
+  const classDeclarations = useMemo(() => parseClassFieldDeclarations(source), [source]);
+  const current = states[currentIndex];
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    const selected = viewport?.querySelector<HTMLElement>('.yv-tree-node.selected');
+    selected?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
+  }, [currentIndex, nodes.size]);
+  const currentData = isPlainObject(current?.lastEvent?.data) ? current.lastEvent.data : {};
+  const selectedId = typeof current?.invocationId === 'string' ? current.invocationId : typeof currentData.invocationId === 'string' ? currentData.invocationId : undefined;
+  const renderNode = (id: string, depth: number): ReactNode => {
+    const node = nodes.get(id);
+    if (!node) return null;
+    const selected = id === selectedId;
+    const result = node.status === 'active' ? '-' : node.status === 'void' ? 'void' : node.status === 'exceptional' ? 'Exception' : displayValue(node.returnValue);
+    return <div className={`yv-tree-branch depth-${Math.min(depth, 5)}`} key={id}>
+      <div
+        role="button"
+        tabIndex={0}
+        className={`yv-tree-node ${selected ? 'selected' : ''} ${node.status} ${id === 'root' ? 'class-context-node' : ''}`}
+        style={{ '--yv-tree-depth': depth } as CSSProperties}
+        onClick={() => onSelect(node.entryIndex)}
+        onKeyDown={event => {
+          if (event.target !== event.currentTarget) return;
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onSelect(node.entryIndex);
+          }
+        }}
+        aria-current={selected ? 'step' : undefined}
+      >
+        <span className="yv-tree-depth" style={{ fontSize: '0.68em', lineHeight: 1.1, opacity: 0.72 }}>Depth {depth}</span>
+        {node.arguments.length > 0 ? (
+          <span className="yv-tree-method">
+            <span>{node.method}</span>
+            <span className="yv-tree-arguments">
+              <button
+                type="button"
+                className="yv-tree-arguments-trigger"
+                aria-label={`Preview all arguments passed to ${node.method}`}
+                onClick={event => event.stopPropagation()}
+                onKeyDown={event => event.stopPropagation()}
+              >
+                ({node.arguments.map((argument, argumentIndex) => (
+                  <span className="yv-tree-argument-name" key={argument.name}>
+                    {argument.name}{argumentIndex < node.arguments.length - 1 ? ', ' : ''}
+                  </span>
+                ))})
+              </button>
+              <span className="yv-tree-arguments-popover" role="region" aria-label={`Arguments for ${node.method}`}>
+                {node.arguments.map(argument => (
+                  <span className="yv-tree-argument-preview" key={argument.name}>
+                    <strong className="yv-tree-argument-label">{argument.name}</strong>
+                    <span className="yv-tree-argument-value">
+                      {argument.value === undefined
+                        ? <span className="yv-code">Value not captured</span>
+                        : <DataValue value={argument.value} state={node.entryState} source={source} name={argument.name} />}
+                    </span>
+                  </span>
+                ))}
+              </span>
+            </span>
+          </span>
+        ) : (
+          <span className="yv-tree-method">{node.signature}</span>
+        )}
+        {id === 'root' ? (
+          <span className="yv-tree-outcome yv-class-context">
+            <button
+              type="button"
+              className="yv-class-context-trigger"
+              aria-label={`Preview class declarations and captured values for ${node.method}`}
+              onClick={event => event.stopPropagation()}
+              onKeyDown={event => event.stopPropagation()}
+            >Class context</button>
+          </span>
+        ) : <span className="yv-tree-outcome">{result}</span>}
+        {id === 'root' && (
+          <span className="yv-class-context-popover" role="region" aria-label={`Class fields for ${node.method}`}>
+            {classDeclarations.length > 0 || Object.entries(node.frameVariables).length > 0 ? (
+              <>
+                {classDeclarations.map(field => {
+                  const captured = Object.prototype.hasOwnProperty.call(node.frameVariables, field.name);
+                  return (
+                    <span className="yv-tree-argument-preview" key={field.name}>
+                      <strong className="yv-tree-argument-label">{field.name}</strong>
+                      <span className="yv-class-field-declaration">{field.declaration}</span>
+                      <span className="yv-tree-argument-value">
+                        {captured
+                          ? <DataValue value={node.frameVariables[field.name]} state={current} source={source} name={field.name} />
+                          : <span className="yv-class-field-pending">Not captured yet</span>}
+                      </span>
+                    </span>
+                  );
+                })}
+                {Object.entries(node.frameVariables).filter(([name]) => !classDeclarations.some(field => field.name === name)).map(([name, value]) => (
+                  <span className="yv-tree-argument-preview" key={name}>
+                    <strong className="yv-tree-argument-label">{name}</strong>
+                    <span className="yv-tree-argument-value"><DataValue value={value} state={current} source={source} name={name} /></span>
+                  </span>
+                ))}
+              </>
+            ) : <span className="yv-class-context-empty">No class fields are declared in this solution.</span>}
+          </span>
+        )}
+      </div>
+      {node.children.length > 0 && <div className="yv-tree-children">{node.children.map(child => renderNode(child, depth + 1))}</div>}
+    </div>;
+  };
+  return <aside className="yv-function-tree" aria-label="Function call tree">
+    <div className="yv-tree-heading"><strong>Function tree</strong><span>{Math.max(0, nodes.size - 1)} calls</span></div>
+    <div className="yv-tree-viewport" ref={viewportRef}>{renderNode('root', 0)}</div>
+  </aside>;
+}
+
 export function VisualizerPanel(){
+  const [treeOpen,setTreeOpen]=useState(false);
   const s=useSession(); const current=s.states[s.index]; const prev=s.index>0?s.states[s.index-1]:undefined;
-  const line = current?.line;
+  const classDeclarationLine = useMemo(() => {
+    const lines = s.source.split(/\r?\n/);
+    const index = lines.findIndex(value => /\bclass\s+[A-Za-z_$][\w$]*/.test(value) && !/^\s*(?:\/\/|\*|\*)/.test(value));
+    return index >= 0 ? index + 1 : undefined;
+  }, [s.source]);
+  // The first checkpoint is the class-entry frame: highlight the declaration
+  // before the JVM reaches the first executable initializer or method line.
+  const line = current?.line && current.line > 0 ? current.line : (s.index === 0 ? classDeclarationLine : undefined);
   const lastEventData = isPlainObject(current?.lastEvent?.data) ? current.lastEvent.data : undefined;
   const sourceLines=useMemo(()=>s.source.split(/\r?\n/),[s.source]);
   const statement=line?sourceLines[line-1]?.trim():'';
@@ -4536,6 +4843,6 @@ export function VisualizerPanel(){
   return <div className="yv-root"><div className="yv-scroll">
     {tc&&<div className="yv-top"><div className="yv-title-row"><div className="yv-case">{tc.label}</div>{tc.source==='custom'&&<span className="yv-case-kind">Custom</span>}{tc.source==='failed'&&<span className="yv-case-kind">Failed testcase</span>}</div><div className="yv-inputs">{Object.keys(tc.inputs).length?Object.entries(tc.inputs).map(([k,v])=><div className="yv-input" key={k}><div className="yv-key">{k}</div><div className="yv-code">{v}</div></div>):<div className="yv-code">{tc.raw}</div>}</div><div className="yv-output-row"><div className={`yv-output ${finished&&s.response?.success?'good':''}`}><div className="yv-label">Output</div>{finished&&output!==undefined?<ReturnValueView text={displayValue(output)} value={lastEventData?.returnValue} state={current}/>:<div className="yv-code">—</div>}</div></div></div>}
     {s.loading&&<div className="yv-loading">Tracing your code…</div>}{s.error&&<div className="yv-error">{s.error}</div>}
-    {!s.loading&&<><Section title="Variables"><Variables state={current} previous={prev}/></Section><Section title="Call Stack">{current?.callStack?.length?<div className="yv-stack-wrap"><div className="yv-stack-label">TOP</div><div className="yv-stack">{current.callStack.map((f:string,i:number)=><div className="yv-frame" key={`${f}-${i}`}>{f}</div>)}</div><div className="yv-stack-label bottom">BOTTOM</div></div>:<div className="yv-empty">No active method calls.</div>}</Section><Section title="Data Structures"><DataStructures state={current} source={s.source}/></Section></>}
+    {!s.loading&&!finished&&<div className={`yv-workspace ${treeOpen?'tree-open':''}`}><div className="yv-workspace-tree"><InvocationTree states={s.states} currentIndex={s.index} source={s.source} onSelect={index=>{sessionStore.set({index,playing:false});}}/></div><div className="yv-workspace-content"><div className="yv-tree-toggle-row"><button type="button" className="yv-tree-toggle" aria-expanded={treeOpen} onClick={()=>setTreeOpen(open=>!open)}><span aria-hidden="true">⌘</span> Function tree <span className="yv-tree-toggle-hint">Recursion & calls</span></button></div><Section title="Variables"><Variables state={current} previous={prev}/></Section><Section title="Data Structures"><DataStructures state={current} source={s.source}/></Section></div></div>}
   </div><div className="yv-current"><ExecutionInspector state={current} previous={prev} statement={statement} index={s.index} total={s.states.length}/><div className="yv-controls"><div className="yv-buttons"><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.restart()} disabled={!s.states.length}>↺ Restart</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.prev()} disabled={s.index<=0}>← Prev</button><button className="yv-btn primary" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.togglePlay()} disabled={s.states.length<2}>{s.playing?'■ Stop':'▶ Play'}</button><button className="yv-btn" tabIndex={-1} onMouseDown={e=>e.preventDefault()} onClick={()=>sessionStore.next()} disabled={!s.states.length||s.index>=s.states.length-1}>Next →</button></div></div></div></div>;
 }

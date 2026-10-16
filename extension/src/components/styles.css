@@ -562,7 +562,7 @@
   }
 }
 .yv-var-name{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
-.yv-role{font-size:9px;line-height:1.35;font-weight:700;letter-spacing:.025em;padding:1px 5px;border:1px solid var(--yv-border);border-radius:999px;color:var(--yv-muted);white-space:nowrap}
+
 
 /* Fixed-width string cells: glyph widths never affect index alignment. */
 .yv-string-view{width:100%;min-width:0;overflow-x:auto;overflow-y:visible;padding:2px 0 5px}
@@ -819,6 +819,774 @@
 /* Keep the terminal null box level with the node itself, not the taller metadata column. */
 .yv-linked-piece > .yv-edge-null { align-self: flex-start; }
 
+
+/* Synchronized invocation-tree workspace. The testcase and floating controller
+   intentionally remain outside this reflow container. */
+.yv-workspace { display:flex; align-items:stretch; gap:0; min-width:0; width:100%; }
+.yv-workspace-content { flex:1 1 auto; min-width:0; }
+.yv-tree-toggle-row { display:flex; justify-content:flex-start; margin:2px 0 10px; }
+.yv-tree-toggle { display:inline-flex; align-items:center; gap:8px; border:1px solid #343943; border-radius:8px; background:#191c22; color:#e5e7eb; padding:7px 10px; font:inherit; font-size:12px; cursor:pointer; }
+.yv-tree-toggle:hover { border-color:#5b6472; background:#20242c; }
+.yv-tree-toggle:focus-visible,.yv-tree-node:focus-visible { outline:2px solid #f59e0b; outline-offset:2px; }
+.yv-tree-toggle-hint { color:#8c95a3; font-size:11px; }
+.yv-workspace-tree { flex:0 0 0; width:0; min-width:0; overflow:hidden; opacity:0; pointer-events:none; transition:flex-basis .22s ease,width .22s ease,opacity .16s ease; }
+.yv-workspace.tree-open .yv-workspace-content { flex:1 1 0; }
+ .yv-workspace.tree-open .yv-workspace-tree { flex:0 1 auto; width:max-content; min-width:max-content; max-width:min(48%, 520px); margin-right:12px; opacity:1; pointer-events:auto; }
+.yv-function-tree { display:flex; flex-direction:column; align-self:stretch; height:100%; min-height:calc(100dvh - 220px); max-height:calc(100dvh - 160px); border:1px solid #596575; border-radius:10px; background:#111419; overflow:hidden; resize:none; min-width:max-content; max-width:100%; box-shadow:0 0 0 1px rgba(148,163,184,.16),inset 0 0 0 1px rgba(148,163,184,.08); }
+.yv-tree-heading { flex:0 0 auto; display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 11px; border-bottom:1px solid #2b3039; color:#e5e7eb; font-size:12px; }
+.yv-tree-heading span { color:#8e98a7; font-size:11px; }
+.yv-tree-viewport { flex:1 1 auto; min-height:0; overflow-x:hidden; overflow-y:auto; padding:10px 8px 14px; overscroll-behavior:contain; scroll-behavior:auto; }
+.yv-tree-branch { position:relative; min-width:max-content; }
+.yv-tree-node { display:flex; flex-direction:column; gap:5px; align-items:flex-start; width:max-content; max-width:100%; min-width:max-content; text-align:left; padding:9px 10px; margin:0 0 5px; border:1px solid #596575; border-radius:8px; background:#1a1e25; color:#e8ebf0; cursor:pointer; }
+.yv-tree-node:hover { border-color:#667386; background:#202630; }
+.yv-tree-node.selected { border-color:#f59e0b; box-shadow:inset 3px 0 #f59e0b; background:#282219; }
+.yv-tree-node.returned,.yv-tree-node.void { border-color:#2f6551; }
+.yv-tree-node.exceptional { border-color:#874343; }
+.yv-tree-method { display:block; width:max-content; max-width:100%; overflow-wrap:normal; white-space:normal; font-size:11px; font-weight:600; padding:2px 0 6px; border-bottom:1px solid #465160; }
+.yv-tree-outcome { display:block; width:max-content; max-width:100%; box-sizing:border-box; color:#a4adba; font-size:10px; overflow-wrap:anywhere; border-top:1px solid #465160; padding:6px 0 2px; }
+.yv-tree-children { margin:0 0 4px 13px; padding-left:10px; border-left:1px solid #48515e; }
+@media (prefers-reduced-motion: reduce) { .yv-workspace-tree { transition:none; } }
+@media (max-width:680px) {
+  .yv-workspace.tree-open { flex-direction:column; }
+  .yv-workspace.tree-open .yv-workspace-tree { flex:0 0 auto; width:100%; min-width:0; margin:0 0 12px; }
+  .yv-function-tree { max-width:100% !important; resize:vertical; max-height:70dvh; }
+}
+
+
+
+
+/* The call tree should size to its content, not force a horizontal scrollbar.
+   Keep a bounded vertical viewport and let the surrounding workspace reflow. */
+.yv-workspace,
+.yv-workspace-content,
+.yv-workspace-tree {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+.yv-workspace.tree-open {
+  width: 100%;
+  overflow: hidden;
+  align-items: stretch;
+}
+.yv-workspace.tree-open .yv-workspace-content {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.yv-workspace.tree-open .yv-workspace-tree {
+  /* A compact navigation rail; width stays stable as recursion grows. */
+  flex: 0 0 clamp(220px, 25vw, 285px);
+  width: clamp(220px, 25vw, 285px);
+  min-width: 220px;
+  max-width: 285px;
+  min-height: calc(100dvh - 220px);
+  overflow: hidden;
+}
+.yv-function-tree {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: calc(100dvh - 220px);
+  min-height: 420px;
+  max-height: calc(100dvh - 160px);
+  resize: none;
+  min-height: 240px;
+  border: 1px solid #596575;
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, .16), inset 0 0 0 1px rgba(148, 163, 184, .08);
+}
+.yv-tree-viewport {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: 12px;
+}
+.yv-tree-branch {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.yv-tree-node {
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  border-color: #596575;
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, .10);
+}
+.yv-tree-children {
+  box-sizing: border-box;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  margin: 0 0 4px 13px;
+  padding-left: 10px;
+  border-left: 2px solid #596575;
+}
+.yv-tree-children > .yv-tree-branch {
+  width: max-content;
+  min-width: max-content;
+  max-width: 100%;
+}
+.yv-tree-method,
+.yv-tree-outcome,
+.yv-tree-frame,
+.yv-tree-variable {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.yv-tree-method {
+  width: 100%;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+/* Nested collections (e.g. List<List<Integer>>) are a compact grid rather
+   than one unbounded horizontal row of full-width collection cards. */
+/* Inline nested-list visualizer: outer index -> dashed inner container -> values. */
+.yv-array-nested-collections {
+  display: flex !important;
+  flex-flow: row nowrap;
+  align-items: flex-end;
+  gap: 10px;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 100%;
+  min-width: 0 !important;
+  padding: 12px;
+  overflow-x: auto;
+  border: 2px solid var(--yv-accent, #ffa116);
+  border-radius: 12px;
+  background: var(--yv-panel, #282828);
+}
+.yv-array-nested-collections > .yv-cell {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+  min-width: 0;
+  width: max-content;
+  gap: 5px;
+}
+.yv-array-nested-collections > .yv-cell > .yv-cell-value {
+  box-sizing: border-box;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+.yv-array-nested-collections .yv-collection {
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 0;
+}
+.yv-array-nested-collections .yv-collection-meta,
+.yv-array-nested-collections .yv-collection-backing-title {
+  display: none;
+}
+/* Inner list / array is the green dashed group from the reference design. */
+.yv-array-nested-collections .yv-collection-backing {
+  display: block;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: none;
+  min-width: 0;
+  padding: 6px;
+  border: 2px dashed var(--yv-success, #2cbb5d);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--yv-panel, #282828), transparent 10%);
+}
+.yv-array-nested-collections .yv-collection-backing .yv-array,
+.yv-array-nested-collections .yv-cell-value > .yv-array {
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: flex-start;
+  gap: 4px;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: none;
+  min-width: 0;
+  flex-wrap: nowrap;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.yv-array-nested-collections .yv-collection-backing .yv-cell,
+.yv-array-nested-collections .yv-cell-value > .yv-array > .yv-cell {
+  flex: 0 0 auto;
+  min-width: 36px;
+}
+.yv-array-nested-collections .yv-collection-backing .yv-cell-value,
+.yv-array-nested-collections .yv-cell-value > .yv-array .yv-cell-value {
+  min-width: 36px;
+  min-height: 44px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border-color: var(--yv-accent, #ffa116);
+  background: var(--yv-accent, #ffa116);
+  color: var(--yv-bg, #1a1a1a);
+  font-weight: 700;
+}
+.yv-array-nested-collections .yv-collection-backing .yv-cell-index,
+.yv-array-nested-collections .yv-cell-value > .yv-array .yv-cell-index {
+  color: var(--yv-muted, #a8a8a8);
+  text-align: center;
+}
+.yv-array-nested-collections > .yv-cell > .yv-cell-index {
+  color: var(--yv-accent, #ffa116);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+/* Keep the existing read/write/range feedback visible on nested values. */
+.yv-array-nested-collections .yv-collection-backing .yv-cell-value.yv-cell-read,
+.yv-array-nested-collections .yv-cell-value > .yv-array .yv-cell-value.yv-cell-read {
+  border-color: color-mix(in srgb, #3b82f6, var(--yv-border) 35%);
+  background: color-mix(in srgb, #3b82f6, var(--yv-elevated) 93%);
+  animation: yv-array-read-pulse 420ms ease-out;
+}
+.yv-array-nested-collections .yv-collection-backing .yv-cell-value.yv-cell-written,
+.yv-array-nested-collections .yv-cell-value > .yv-array .yv-cell-value.yv-cell-written {
+  border-color: color-mix(in srgb, var(--yv-success), var(--yv-border) 22%);
+  background: color-mix(in srgb, var(--yv-success), var(--yv-elevated) 89%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--yv-success), transparent 30%);
+  animation: yv-array-write-pulse 520ms cubic-bezier(.2, .75, .25, 1);
+}
+.yv-array-nested-collections .yv-collection-backing .yv-cell-value.yv-cell-range,
+.yv-array-nested-collections .yv-cell-value > .yv-array .yv-cell-value.yv-cell-range {
+  border-bottom-color: color-mix(in srgb, #3b82f6, var(--yv-border) 20%);
+  background: color-mix(in srgb, #3b82f6, var(--yv-elevated) 96%);
+}
+.yv-array-nested-collections .yv-cell-value {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 900px) {
+  .yv-workspace.tree-open {
+    flex-direction: column;
+    overflow: visible;
+  }
+  .yv-workspace.tree-open .yv-workspace-content {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+  }
+  .yv-workspace.tree-open .yv-workspace-tree {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    margin: 0 0 12px;
+  }
+  .yv-workspace.tree-open .yv-workspace-tree { min-height: 0; }
+  .yv-function-tree {
+    height: min(62dvh, 560px);
+    min-height: 260px;
+    max-height: 70dvh;
+  }
+}
+
+
+/* Compact Function Tree rail: keep the visualization visible beside it. */
+.yv-workspace.tree-open .yv-workspace-tree {
+  flex: 0 0 clamp(220px, 25vw, 285px);
+  width: clamp(220px, 25vw, 285px);
+  min-width: 220px;
+  max-width: 285px;
+}
+.yv-workspace.tree-open .yv-function-tree {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.yv-workspace.tree-open .yv-tree-viewport {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.yv-workspace.tree-open .yv-tree-branch,
+.yv-workspace.tree-open .yv-tree-node,
+.yv-workspace.tree-open .yv-tree-method,
+.yv-workspace.tree-open .yv-tree-outcome {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.yv-workspace.tree-open .yv-tree-method {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+@media (max-width: 900px) {
+  .yv-workspace.tree-open .yv-workspace-tree {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+
+/* Function Tree sizing: readable labels and intrinsic card width, bounded by
+   the available workspace. Deep nesting can scroll horizontally as needed. */
+.yv-workspace.tree-open .yv-workspace-tree {
+  flex: 0 1 auto;
+  width: max-content;
+  min-width: max-content;
+  max-width: min(44vw, 440px);
+}
+.yv-workspace.tree-open .yv-function-tree {
+  width: max-content;
+  min-width: max-content;
+  max-width: 100%;
+}
+.yv-workspace.tree-open .yv-tree-viewport {
+  width: max-content;
+  min-width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+}
+.yv-workspace.tree-open .yv-tree-branch,
+.yv-workspace.tree-open .yv-tree-children {
+  width: max-content;
+  min-width: max-content;
+  max-width: none;
+}
+.yv-workspace.tree-open .yv-tree-node {
+  width: max-content;
+  min-width: max-content;
+  max-width: none;
+  white-space: nowrap;
+}
+.yv-workspace.tree-open .yv-tree-method,
+.yv-workspace.tree-open .yv-tree-outcome {
+  width: max-content;
+  min-width: max-content;
+  max-width: none;
+  overflow-wrap: normal;
+  white-space: nowrap;
+}
+@media (max-width: 900px) {
+  .yv-workspace.tree-open .yv-workspace-tree {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .yv-workspace.tree-open .yv-function-tree,
+  .yv-workspace.tree-open .yv-tree-viewport,
+  .yv-workspace.tree-open .yv-tree-branch,
+  .yv-workspace.tree-open .yv-tree-children,
+  .yv-workspace.tree-open .yv-tree-node,
+  .yv-workspace.tree-open .yv-tree-method,
+  .yv-workspace.tree-open .yv-tree-outcome {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+  }
+}
+
+
+/* Nested invocation cards: each child is physically contained by its parent
+   card. Depth colors are deliberately distinct but stay in the same cool,
+   high-contrast palette; active selection remains amber across every level. */
+.yv-workspace.tree-open .yv-workspace-tree {
+  flex: 0 1 auto;
+  width: max-content;
+  min-width: 238px;
+  max-width: min(44vw, 440px);
+  overflow: hidden;
+}
+.yv-workspace.tree-open .yv-function-tree {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: calc(100dvh - 220px);
+  min-height: 240px;
+  max-height: calc(100dvh - 160px);
+  border: 1px solid #46516a;
+  border-radius: 12px;
+  background: #0c1020;
+}
+.yv-workspace.tree-open .yv-tree-viewport {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: auto;
+  padding: 12px;
+  scrollbar-gutter: stable;
+}
+.yv-workspace.tree-open .yv-tree-branch {
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
+  padding: 8px;
+  margin: 0 0 9px;
+  border: 1px solid var(--yv-depth-border, #5965a8);
+  border-left-width: 3px;
+  border-radius: 11px;
+  background: var(--yv-depth-bg, #171c35);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 3px 10px rgba(0,0,0,.13);
+}
+.yv-workspace.tree-open .yv-tree-branch.depth-0 {
+  --yv-depth-bg: #171d3c;
+  --yv-depth-border: #818cf8;
+  --yv-depth-text: #eef2ff;
+  --yv-depth-muted: #c7d2fe;
+}
+.yv-workspace.tree-open .yv-tree-branch.depth-1 {
+  --yv-depth-bg: #142b3b;
+  --yv-depth-border: #38bdf8;
+  --yv-depth-text: #e0f2fe;
+  --yv-depth-muted: #bae6fd;
+}
+.yv-workspace.tree-open .yv-tree-branch.depth-2 {
+  --yv-depth-bg: #20213b;
+  --yv-depth-border: #a78bfa;
+  --yv-depth-text: #f3e8ff;
+  --yv-depth-muted: #ddd6fe;
+}
+.yv-workspace.tree-open .yv-tree-branch.depth-3 {
+  --yv-depth-bg: #12342f;
+  --yv-depth-border: #34d399;
+  --yv-depth-text: #d1fae5;
+  --yv-depth-muted: #a7f3d0;
+}
+.yv-workspace.tree-open .yv-tree-branch.depth-4 {
+  --yv-depth-bg: #39251c;
+  --yv-depth-border: #fb923c;
+  --yv-depth-text: #ffedd5;
+  --yv-depth-muted: #fed7aa;
+}
+.yv-workspace.tree-open .yv-tree-branch.depth-5 {
+  --yv-depth-bg: #382039;
+  --yv-depth-border: #e879f9;
+  --yv-depth-text: #fae8ff;
+  --yv-depth-muted: #f5d0fe;
+}
+.yv-workspace.tree-open .yv-tree-node {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  padding: 5px 6px 8px;
+  margin: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--yv-depth-text, #f1f5f9);
+  white-space: normal;
+  text-align: left;
+}
+.yv-workspace.tree-open .yv-tree-node:hover {
+  background: rgba(255,255,255,.055);
+}
+.yv-workspace.tree-open .yv-tree-node.selected {
+  background: rgba(251,191,36,.13);
+  box-shadow: inset 3px 0 #fbbf24, 0 0 0 1px rgba(251,191,36,.8);
+  color: #fff7d6;
+}
+.yv-workspace.tree-open .yv-tree-method {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  padding: 3px 2px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--yv-depth-border, #818cf8), transparent 45%);
+  color: var(--yv-depth-text, #f1f5f9);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.yv-workspace.tree-open .yv-tree-outcome {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  padding: 6px 2px 2px;
+  border: 0;
+  color: var(--yv-depth-muted, #cbd5e1);
+  font-size: 10px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.yv-workspace.tree-open .yv-tree-node.returned .yv-tree-outcome,
+.yv-workspace.tree-open .yv-tree-node.void .yv-tree-outcome { color: #86efac; }
+.yv-workspace.tree-open .yv-tree-node.exceptional .yv-tree-outcome { color: #fca5a5; }
+.yv-workspace.tree-open .yv-tree-children {
+  box-sizing: border-box;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  margin: 7px 0 0 5px;
+  padding: 8px 0 0 10px;
+  border-top: 1px solid color-mix(in srgb, var(--yv-depth-border, #818cf8), transparent 50%);
+  border-left: 2px solid color-mix(in srgb, var(--yv-depth-border, #818cf8), transparent 22%);
+}
+.yv-workspace.tree-open .yv-tree-children > .yv-tree-branch {
+  width: max-content;
+  min-width: 100%;
+}
+@media (max-width: 900px) {
+  .yv-workspace.tree-open .yv-workspace-tree {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .yv-workspace.tree-open .yv-function-tree {
+    height: min(62dvh, 560px);
+    min-height: 260px;
+    max-height: 70dvh;
+  }
+  .yv-workspace.tree-open .yv-tree-viewport {
+    overflow: auto;
+  }
+}
+
+
+/* Function Tree: only real invocation nodes, stacked vertically without phantom columns. */
+.yv-workspace.tree-open .yv-tree-viewport {
+  overflow-x: hidden;
+}
+.yv-workspace.tree-open .yv-tree-branch {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.yv-workspace.tree-open .yv-tree-children {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin: 8px 0 0;
+  padding: 8px 0 0 10px;
+  border-top: 1px solid color-mix(in srgb, var(--yv-depth-border, #818cf8), transparent 50%);
+  border-left: 2px solid color-mix(in srgb, var(--yv-depth-border, #818cf8), transparent 22%);
+}
+.yv-workspace.tree-open .yv-tree-children > .yv-tree-branch {
+  flex: 0 0 auto;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+}
+.yv-workspace.tree-open .yv-tree-branch > .yv-tree-children:empty {
+  display: none;
+}
+
+
+/* Function-call argument preview: one trigger for the complete argument list.
+   The dropdown overlays below the signature, so hovering never reflows the tree or
+   pushes the argument list onto another line. */
+.yv-tree-arguments {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  vertical-align: baseline;
+  max-width: 100%;
+}
+.yv-tree-arguments-trigger {
+  display: inline-block;
+  max-width: 100%;
+  margin: 0;
+  padding: 1px 4px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  text-align: left;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  cursor: pointer;
+  transition: background-color .12s ease, border-color .12s ease, box-shadow .12s ease;
+}
+.yv-tree-arguments-trigger:hover,
+.yv-tree-arguments-trigger:focus-visible,
+.yv-tree-arguments:hover .yv-tree-arguments-trigger,
+.yv-tree-arguments:focus-within .yv-tree-arguments-trigger {
+  outline: none;
+  border-color: color-mix(in srgb, var(--yv-depth-border, #60a5fa), transparent 42%);
+  background: color-mix(in srgb, var(--yv-depth-border, #60a5fa), transparent 88%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--yv-depth-border, #60a5fa), transparent 82%);
+}
+
+.yv-tree-node.class-context-node {
+  position: relative;
+}
+.yv-class-context {
+  display: inline-flex;
+  align-items: center;
+}
+.yv-class-context-trigger {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 2px 5px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color .12s ease, border-color .12s ease;
+}
+.yv-class-context-trigger:hover,
+.yv-class-context-trigger:focus-visible,
+.yv-tree-node.class-context-node:hover .yv-class-context-trigger,
+.yv-class-context:focus-within .yv-class-context-trigger {
+  outline: none;
+  border-color: color-mix(in srgb, var(--yv-depth-border, #60a5fa), transparent 42%);
+  background: color-mix(in srgb, var(--yv-depth-border, #60a5fa), transparent 88%);
+}
+.yv-class-context-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: none;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: min(210px, calc(100vw - 32px));
+  max-width: min(340px, calc(100vw - 32px));
+  max-height: min(45dvh, 380px);
+  padding: 9px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid color-mix(in srgb, var(--yv-depth-border, #60a5fa), transparent 32%);
+  border-radius: 8px;
+  background: #0b1220;
+  color: #e5edf8;
+  box-shadow: 0 8px 24px rgba(0,0,0,.32);
+  font-size: 11px;
+  font-weight: 400;
+  white-space: normal;
+  text-align: left;
+  cursor: default;
+}
+.yv-tree-node.class-context-node:hover .yv-class-context-popover,
+.yv-tree-node.class-context-node:focus-within .yv-class-context-popover {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.yv-class-field-declaration {
+  color: #cbd5e1;
+  font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-wrap: anywhere;
+}
+.yv-class-field-pending {
+  color: #94a3b8;
+  font-size: 10px;
+}
+.yv-class-context-empty {
+  color: #a8b3c5;
+  max-width: 260px;
+  line-height: 1.45;
+}
+.yv-tree-arguments-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  display: none;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: min(190px, calc(100vw - 32px));
+  max-width: min(320px, calc(100vw - 32px));
+  max-height: min(42dvh, 360px);
+  margin-top: 0;
+  padding: 8px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid color-mix(in srgb, var(--yv-depth-border, #60a5fa), transparent 32%);
+  border-radius: 8px;
+  background: #0b1220;
+  color: #e5edf8;
+  box-shadow: 0 8px 24px rgba(0,0,0,.32);
+  font-size: 11px;
+  font-weight: 400;
+  white-space: normal;
+  cursor: default;
+}
+.yv-tree-arguments:hover .yv-tree-arguments-popover,
+.yv-tree-arguments:focus-within .yv-tree-arguments-popover {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.yv-tree-argument-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.yv-tree-argument-label {
+  color: #93c5fd;
+  font: 700 10px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.yv-tree-argument-value {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  color: #e5edf8;
+}
+.yv-tree-argument-value .yv-array,
+.yv-tree-argument-value .yv-matrix,
+.yv-tree-argument-value .yv-linked {
+  max-width: 100%;
+}
+.yv-tree-argument-value .yv-object {
+  min-width: 0;
+}
+.yv-tree-argument-value .yv-cell-value {
+  padding: 4px 5px;
+  font-size: 10px;
+}
+.yv-tree-argument-value .yv-ds,
+.yv-tree-argument-value .yv-code {
+  color: inherit;
+  font-size: 11px;
+}
 
 /* Collection insertions are tied to a real before/after snapshot delta. */
 .yv-collection-item-enter {

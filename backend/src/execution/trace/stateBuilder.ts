@@ -76,6 +76,15 @@ function sameVisibleState(left: TraceState, right: TraceState): boolean {
         JSON.stringify(left.dataStructures) === JSON.stringify(right.dataStructures) &&
         JSON.stringify(left.objects) === JSON.stringify(right.objects) &&
         JSON.stringify(left.callStack) === JSON.stringify(right.callStack) &&
+        left.invocationId === right.invocationId &&
+        left.parentInvocationId === right.parentInvocationId &&
+        left.methodSignature === right.methodSignature &&
+        left.declaringType === right.declaringType &&
+        left.returnType === right.returnType &&
+        JSON.stringify(left.returnValue) === JSON.stringify(right.returnValue) &&
+        left.returnValueType === right.returnValueType &&
+        left.returnedVoid === right.returnedVoid &&
+        left.invocationStatus === right.invocationStatus &&
         JSON.stringify(left.error) === JSON.stringify(right.error)
     );
 }
@@ -90,13 +99,71 @@ function applyEvent(
         line: event.line ?? previous.line,
         method: event.method ?? previous.method,
         depth: event.depth ?? previous.depth,
-        lastEvent: event
+        lastEvent: event,
+        invocationId:
+            typeof event.data?.invocationId === "string"
+                ? event.data.invocationId
+                : event.type === "STEP" && previous.lastEvent?.type === "METHOD_EXIT"
+                    ? previous.parentInvocationId
+                    : previous.invocationId,
+        parentInvocationId:
+            typeof event.data?.parentInvocationId === "string"
+                ? event.data.parentInvocationId
+                : event.type === "METHOD_ENTER"
+                    ? undefined
+                    : event.type === "STEP" && previous.lastEvent?.type === "METHOD_EXIT"
+                        ? (typeof previous.lastEvent.data?.parentParentInvocationId === "string"
+                            ? previous.lastEvent.data.parentParentInvocationId
+                            : undefined)
+                        : previous.parentInvocationId,
+        methodSignature:
+            typeof event.data?.methodSignature === "string"
+                ? event.data.methodSignature
+                : event.type === "STEP" && previous.lastEvent?.type === "METHOD_EXIT"
+                    ? (typeof previous.lastEvent.data?.parentMethodSignature === "string" ? previous.lastEvent.data.parentMethodSignature : undefined)
+                    : previous.methodSignature,
+        declaringType:
+            typeof event.data?.declaringType === "string"
+                ? event.data.declaringType
+                : event.type === "STEP" && previous.lastEvent?.type === "METHOD_EXIT"
+                    ? (typeof previous.lastEvent.data?.parentDeclaringType === "string" ? previous.lastEvent.data.parentDeclaringType : undefined)
+                    : previous.declaringType,
+        returnType:
+            typeof event.data?.returnType === "string"
+                ? event.data.returnType
+                : event.type === "STEP" && previous.lastEvent?.type === "METHOD_EXIT"
+                    ? (typeof previous.lastEvent.data?.parentReturnType === "string" ? previous.lastEvent.data.parentReturnType : undefined)
+                    : previous.returnType,
+        returnValue:
+            event.data && Object.prototype.hasOwnProperty.call(event.data, "returnValue")
+                ? event.data.returnValue
+                : event.data?.hasReturnValue === true
+                    ? null
+                    : event.type === "METHOD_ENTER" || event.type === "STEP"
+                        ? undefined
+                        : previous.returnValue,
+        returnValueType:
+            typeof event.data?.returnValueType === "string"
+                ? event.data.returnValueType
+                : event.type === "METHOD_ENTER" || event.type === "STEP"
+                    ? undefined
+                    : previous.returnValueType,
+        returnedVoid:
+            typeof event.data?.returnedVoid === "boolean"
+                ? event.data.returnedVoid
+                : event.type === "METHOD_ENTER" || event.type === "STEP"
+                    ? undefined
+                    : previous.returnedVoid,
+        invocationStatus: previous.invocationStatus
     };
 
     const data = event.data ?? {};
 
     switch (event.type) {
         case "STEP":
+            if (previous.lastEvent?.type === "METHOD_EXIT") {
+                next.invocationStatus = "active";
+            }
             // STEP is a pre-execution JDI checkpoint. For replay,
             // use the postVariables snapshot captured from the next runtime
             // checkpoint so the state shown with this highlighted line is
@@ -222,6 +289,7 @@ function applyEvent(
             break;
 
         case "METHOD_ENTER":
+            next.invocationStatus = "active";
             if (typeof data.displayLine === "number") {
                 next.line = data.displayLine;
             }
@@ -237,6 +305,11 @@ function applyEvent(
             break;
 
         case "METHOD_EXIT":
+            next.invocationStatus = data.exceptional === true
+                ? "exceptional"
+                : data.returnedVoid === true
+                    ? "void"
+                    : "returned";
             // Preserve the callee's actual return location for this checkpoint.
             // A later caller STEP represents the caller resuming execution.
             next.line = event.line ?? previous.line;
