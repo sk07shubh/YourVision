@@ -1246,6 +1246,12 @@
   background: var(--yv-depth-bg, #171c35);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 3px 10px rgba(0,0,0,.13);
 }
+/* The running invocation highlights its actual outer card, not an inset outline. */
+.yv-workspace.tree-open .yv-tree-branch:has(> .yv-tree-node.selected) {
+  border: 2px solid #f8fafc;
+  background: #303746;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.16), 0 4px 14px rgba(0,0,0,.24);
+}
 .yv-workspace.tree-open .yv-tree-branch.depth-0 {
   --yv-depth-bg: #171d3c;
   --yv-depth-border: #818cf8;
@@ -1305,9 +1311,9 @@
   background: rgba(255,255,255,.055);
 }
 .yv-workspace.tree-open .yv-tree-node.selected {
-  background: rgba(251,191,36,.13);
-  box-shadow: inset 3px 0 #fbbf24, 0 0 0 1px rgba(251,191,36,.8);
-  color: #fff7d6;
+  background: transparent;
+  box-shadow: none;
+  color: #ffffff;
 }
 .yv-workspace.tree-open .yv-tree-method {
   box-sizing: border-box;
