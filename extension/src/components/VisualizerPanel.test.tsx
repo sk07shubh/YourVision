@@ -143,7 +143,7 @@ describe('synchronized function invocation tree', () => {
       '  void helper(int zero, boolean enabled, Object nothing) { zero = 9; }',
       '  void solve() { helper(0, false, null); }',
       '}',
-    ].join('\\n');
+    ].join('\n');
     const states = [
       state({
         line: 3,
