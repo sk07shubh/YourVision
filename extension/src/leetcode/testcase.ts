@@ -61,8 +61,54 @@ export function detectSource(label: string, panelText: string): TestcaseSource {
   return 'unknown';
 }
 
+function parseJsonValue(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+}
+
+function serializeJavaArgument(value: unknown): string {
+  if (typeof value === 'string') return JSON.stringify(value);
+  if (value === null) return 'null';
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return JSON.stringify(value);
+}
+
+function detectDesignClass(inputs: Record<string, string>): LeetCodeTestcase['designClass'] {
+  const parsed = Object.values(inputs).map(parseJsonValue);
+  const operations = parsed.find((value): value is string[] =>
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every(item => typeof item === 'string') &&
+    /^[A-Za-z_$][\w$]*$/.test(value[0] ?? '')
+  );
+  const argumentRows = parsed.find((value): value is unknown[][] =>
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every(item => Array.isArray(item))
+  );
+
+  if (!operations || !argumentRows || argumentRows.length < operations.length) return undefined;
+  const constructorRow = argumentRows[0];
+  if (!constructorRow) return undefined;
+
+  const calls = operations.slice(1).map((methodName, index) => ({
+    method: methodName,
+    arguments: (argumentRows[index + 1] ?? []).map(serializeJavaArgument),
+  }));
+
+  if (calls.some(call => !call.method)) return undefined;
+  return {
+    constructorArguments: constructorRow.map(serializeJavaArgument),
+    calls,
+  };
+}
+
 export function makeTestcase(raw: string, label: string, source: TestcaseSource, method: JavaMethod): LeetCodeTestcase {
   const inputs = parseAssignments(raw);
+  const designClass = detectDesignClass(inputs);
   return {
     id: `${source}:${label}:${raw}`,
     label: label || 'Selected testcase',
@@ -70,5 +116,6 @@ export function makeTestcase(raw: string, label: string, source: TestcaseSource,
     raw,
     inputs,
     orderedArguments: orderArguments(inputs, method),
+    ...(designClass ? { designClass } : {}),
   };
 }
