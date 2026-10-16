@@ -4600,7 +4600,8 @@ function splitCallArguments(source: string, method: string, line: number): strin
   const candidates: Array<{ startLine: number; distance: number; text: string }> = [];
   for (let start = Math.max(0, line - 3); start < Math.min(lines.length, line + 2); start += 1) {
     const text = lines.slice(start, Math.min(lines.length, start + 6)).join('\n');
-    const pattern = new RegExp('\\b' + method.replace(/[.*+?^$()|[\\]\\\\]/g, '\\type InvocationNode = {
+    const escapedMethod = method.replace(/[.*+?^${}()|[\\]\\]/g, '\\    const pattern = new RegExp('\\b' + method.replace(/[.*+?^$()|[\\]\\\\]/g, '\\type InvocationNode = {');
+    const pattern = new RegExp('\\b' + escapedMethod + '\\s*\\(');
 ') + '\\s*\\(');
     const match = pattern.exec(text);
     if (!match) continue;
