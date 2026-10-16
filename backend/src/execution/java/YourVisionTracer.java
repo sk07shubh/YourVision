@@ -403,6 +403,10 @@ public class YourVisionTracer {
                         }
 
                         Location methodLocation = entry.location();
+                        data.put(
+                            "classFields",
+                            readClassFields(methodLocation.declaringType(), entry.thread())
+                        );
                         int declarationLine =
                             findMethodDeclarationLine(
                                 methodLocation,
