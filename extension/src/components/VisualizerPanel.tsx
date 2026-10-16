@@ -1350,12 +1350,10 @@ export function Variables({ state, previous }: { state?: TraceState; previous?: 
         const changed =
           Boolean(previous) &&
           stableStringify(old) !== stableStringify(value);
-        const role = semanticRoleForVariable(state, name);
-        const roleTitle = [role?.evidence, ...(role?.usage ?? [])].filter(Boolean).join(' · ');
 
         return (
           <div className={`yv-var ${changed ? 'changed' : ''}`} key={name}>
-            <div className="yv-var-name"><span>{name}</span>{role&&<span className="yv-role" title={roleTitle}>{semanticRoleLabel(role.role)}</span>}</div>
+            <div className="yv-var-name"><span>{name}</span></div>
             <div className="yv-change">
               {changed && (
                 <>
