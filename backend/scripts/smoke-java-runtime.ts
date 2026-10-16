@@ -907,7 +907,15 @@ const classEntry = designEvents.find(event =>
     event.type === "STEP" && event.data?.classSetup === true && event.data?.displayLine === 1
 );
 if (!classEntry) {
-    throw new Error("Design trace must begin with the class declaration checkpoint.");
+    const checkpointDiagnostics = designEvents.map(event => ({
+        type: event.type,
+        line: event.line,
+        method: event.method,
+        classSetup: event.data?.classSetup,
+        displayLine: event.data?.displayLine,
+        declaringType: event.data?.declaringType
+    }));
+    throw new Error("Design trace must begin with the class declaration checkpoint. Events: " + JSON.stringify(checkpointDiagnostics.slice(0, 12)));
 }
 if (designEvents.some(event => event.type === "METHOD_ENTER" && event.method === "<init>")) {
     throw new Error("Constructor setup must not create a function-tree invocation.");
