@@ -876,6 +876,48 @@ if (lruResult.kind !== "OK" || lruResult.result !== "[null,null,null,1,null,-1,1
 }
 console.log("PASS: LRU cache design sequence");
 
+const designTraceSource = `class LRUCache {
+    int capacity;
+    Map<Integer, Integer> cache;
+    public LRUCache(int capacity) {
+        this.capacity = capacity;
+        this.cache = new HashMap<>();
+    }
+    public int get(int key) {
+        return cache.getOrDefault(key, -1);
+    }
+    public void put(int key, int value) {
+        cache.put(key, value);
+    }
+}`;
+const designTraceResult = await runJava(
+    designTraceSource,
+    { mode: "design", className: "LRUCache", constructorArguments: ["2"], operations: [
+        { method: "put", arguments: ["1", "1"] },
+        { method: "get", arguments: ["1"] }
+    ] }
+);
+if (designTraceResult.kind !== "OK" || designTraceResult.result !== "[null,null,1]") {
+    throw new Error("Design source trace execution failed: " + designTraceResult.kind + " " + designTraceResult.result + " " + designTraceResult.message);
+}
+const designEvents = designTraceResult.trace?.events ?? [];
+const constructorEntry = designEvents.find(event =>
+    event.type === "METHOD_ENTER" && event.method === "<init>"
+);
+if (!constructorEntry || constructorEntry.data?.displayLine !== 4) {
+    throw new Error("Design trace must emit the explicit constructor declaration at source line 4.");
+}
+if (!designEvents.some(event => event.type === "STEP" && event.method === "<init>" && (event.line === 5 || event.line === 6))) {
+    throw new Error("Design trace must include executable constructor-body checkpoints.");
+}
+for (const method of ["put", "get"]) {
+    if (!designEvents.some(event => event.type === "METHOD_ENTER" && event.method === method)) {
+        throw new Error("Design trace is missing the " + method + "() method entry.");
+    }
+}
+console.log("PASS: design constructor and class-method source checkpoints");
+
+
 const minStackResult = await runJava(
     "import java.util.*; class MinStack { Deque<Integer> v=new ArrayDeque<>(), m=new ArrayDeque<>(); public MinStack() {} public void push(int x) { v.push(x); if(m.isEmpty()||x<=m.peek()) m.push(x); } public void pop() { int x=v.pop(); if(x==m.peek()) m.pop(); } public int top() { return v.peek(); } public int getMin() { return m.peek(); } }",
     { mode: "design", className: "MinStack", constructorArguments: [], operations: [
