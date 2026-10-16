@@ -780,7 +780,7 @@ for (const test of cases) {
         firstStepIndex >= 0 &&
         result.trace?.events[firstStepIndex]?.line === test.expectedFirstStepLine &&
         result.states?.some(state => state.line === test.expectedFirstStepLine) === true &&
-        result.states?.some(state => state.line === test.expectedFirstStepLine + 1) === true;
+        result.states?.some(state => state.line === test.expectedFirstStepLine! + 1) === true;
 
     const returnLineMatches =
         test.expectedReturnLine === undefined ||
