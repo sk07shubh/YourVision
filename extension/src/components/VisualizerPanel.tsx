@@ -4592,6 +4592,76 @@ function parseClassFieldDeclarations(source: string): ClassFieldDeclaration[] {
   return declarations.filter((item, index, all) => all.findIndex(candidate => candidate.name === item.name) === index);
 }
 
+function splitCallArguments(source: string, method: string, line: number): string[] {
+  const lines = source.split(/\r?\n/);
+  if (!Number.isFinite(line) || line < 1 || line > lines.length) return [];
+  // Call expressions can wrap across lines. Start at the caller's recorded line and
+  // inspect a small surrounding window, preferring the closest matching invocation.
+  const candidates: Array<{ startLine: number; distance: number; text: string }> = [];
+  for (let start = Math.max(0, line - 3); start < Math.min(lines.length, line + 2); start += 1) {
+    const text = lines.slice(start, Math.min(lines.length, start + 6)).join('\n');
+    const pattern = new RegExp('\\b' + method.replace(/[.*+?^$()|[\\]\\\\]/g, '\\type InvocationNode = {
+') + '\\s*\\(');
+    const match = pattern.exec(text);
+    if (!match) continue;
+    const open = text.indexOf('(', match.index);
+    let depth = 0;
+    let quote = '';
+    let escaped = false;
+    let close = -1;
+    for (let i = open; i < text.length; i += 1) {
+      const ch = text[i];
+      if (quote) {
+        if (escaped) escaped = false;
+        else if (ch === '\\\\') escaped = true;
+        else if (ch === quote) quote = '';
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === '`') { quote = ch; continue; }
+      if (ch === '(') depth += 1;
+      else if (ch === ')') {
+        depth -= 1;
+        if (depth === 0) { close = i; break; }
+      }
+    }
+    if (close < 0) continue;
+    const after = text.slice(close + 1).trimStart();
+    // Avoid mistaking a declaration for a call when the nearby text is its body.
+    if (after.startsWith('{')) continue;
+    const raw = text.slice(open + 1, close);
+    const args: string[] = [];
+    let startArg = 0;
+    let parens = 0, brackets = 0, braces = 0;
+    quote = ''; escaped = false;
+    for (let i = 0; i < raw.length; i += 1) {
+      const ch = raw[i];
+      if (quote) {
+        if (escaped) escaped = false;
+        else if (ch === '\\\\') escaped = true;
+        else if (ch === quote) quote = '';
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === '`') { quote = ch; continue; }
+      if (ch === '(') parens += 1;
+      else if (ch === ')') parens -= 1;
+      else if (ch === '[') brackets += 1;
+      else if (ch === ']') brackets -= 1;
+      else if (ch === '{') braces += 1;
+      else if (ch === '}') braces -= 1;
+      else if (ch === ',' && parens === 0 && brackets === 0 && braces === 0) {
+        args.push(raw.slice(startArg, i).trim());
+        startArg = i + 1;
+      }
+    }
+    if (raw.trim()) args.push(raw.slice(startArg).trim());
+    else return [];
+    candidates.push({ startLine: start, distance: Math.abs(start + 1 - line), text: JSON.stringify(args) });
+  }
+  candidates.sort((a, b) => a.distance - b.distance);
+  if (!candidates.length) return [];
+  try { return JSON.parse(candidates[0].text) as string[]; } catch { return []; }
+}
+
 type InvocationNode = {
   id: string;
   parentId: string;
@@ -4603,7 +4673,7 @@ type InvocationNode = {
   returnValueName?: string;
   returnType?: string;
   frameVariables: Record<string, unknown>;
-  arguments: Array<{ name: string; value: unknown }>;
+  arguments: Array<{ name: string; value: unknown; expression?: string }>;
   entryState?: TraceState;
   exitState?: TraceState;
   children: string[];
@@ -4657,11 +4727,20 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
           ? parameterNames[index]
           : 'arg' + (index + 1)
       );
-      const argumentsList = argumentNames.map(name => ({
+      const parentCallLine = (() => {
+        for (let previous = index - 1; previous >= 0; previous -= 1) {
+          const prior = states[previous];
+          if (prior?.invocationId === parentId && typeof prior.line === 'number') return prior.line;
+        }
+        return typeof states[index - 1]?.line === 'number' ? states[index - 1].line : undefined;
+      })();
+      const callExpressions = parentCallLine === undefined ? [] : splitCallArguments(source, method, parentCallLine);
+      const argumentsList = argumentNames.map((name, argumentIndex) => ({
         name,
+        expression: callExpressions[argumentIndex] || name,
         value: Object.prototype.hasOwnProperty.call(entryVariables, name) ? entryVariables[name] : undefined
       }));
-      const signature = `${method}(${argumentNames.join(', ')})`;
+      const signature = `${method}(${argumentsList.map(argument => argument.expression ?? argument.name).join(', ')})`;
       const returnType = typeof data.returnType === 'string' ? displayType(data.returnType) : undefined;
       const root = nodes.get('root');
       if (root && typeof data.declaringType === 'string' && data.declaringType) {
@@ -4852,7 +4931,7 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
               >
                 ({node.arguments.map((argument, argumentIndex) => (
                   <span className="yv-tree-argument-name" key={argument.name}>
-                    {argument.name}{argumentIndex < node.arguments.length - 1 ? ', ' : ''}
+                    {argument.expression ?? argument.name}{argumentIndex < node.arguments.length - 1 ? ', ' : ''}
                   </span>
                 ))})
               </button>
@@ -4928,7 +5007,7 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
           </span>
         ) : openArguments.node.arguments.map(argument => (
           <span className="yv-tree-argument-preview" key={argument.name}>
-            <strong className="yv-tree-argument-label">{argument.name}</strong>
+            <strong className="yv-tree-argument-label">{argument.expression && argument.expression !== argument.name ? <>{argument.expression} <span aria-hidden="true">→</span> {argument.name}</> : argument.name}</strong>
             <span className="yv-tree-argument-value">
               {argument.value === undefined
                 ? <span className="yv-code">Value not captured</span>
