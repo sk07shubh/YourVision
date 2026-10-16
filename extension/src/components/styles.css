@@ -1561,6 +1561,20 @@
   flex-direction: column;
   gap: 9px;
 }
+
+/* Argument previews mount before the popover is revealed, so trace-checkpoint
+   creation classes alone won't replay the linked-list bounce for nested calls.
+   Replay the same linked-list entrance when any function's argument dropdown opens. */
+.yv-tree-arguments:hover .yv-tree-arguments-popover .yv-linked-node,
+.yv-tree-arguments:focus-within .yv-tree-arguments-popover .yv-linked-node {
+  animation: yv-graph-node-created 360ms cubic-bezier(.2,.8,.2,1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-tree-arguments:hover .yv-tree-arguments-popover .yv-linked-node,
+  .yv-tree-arguments:focus-within .yv-tree-arguments-popover .yv-linked-node {
+    animation: none;
+  }
+}
 .yv-tree-argument-preview {
   display: flex;
   flex-direction: column;
