@@ -4676,9 +4676,13 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
       if (typeof data.returnType === 'string') node.returnType = data.returnType;
     }
 
-    if (isPlainObject(data.classFields)) {
-      const root = nodes.get('root');
-      if (root) root.frameVariables = data.classFields;
+    const root = nodes.get('root');
+    if (root && typeof data.declaringType === 'string' && data.declaringType) {
+      root.method = data.declaringType;
+      root.signature = data.declaringType;
+    }
+    if (root && isPlainObject(data.classFields)) {
+      root.frameVariables = data.classFields;
     }
 
     const checkpointId = typeof states[index]?.invocationId === 'string'
