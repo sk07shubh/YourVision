@@ -1001,6 +1001,25 @@
   font-weight: 700;
   text-align: center;
 }
+/* Keep the existing read/write/range feedback visible on nested values. */
+.yv-array-nested-collections .yv-collection-backing .yv-cell-value.yv-cell-read,
+.yv-array-nested-collections .yv-cell-value > .yv-array .yv-cell-value.yv-cell-read {
+  border-color: color-mix(in srgb, #3b82f6, var(--yv-border) 35%);
+  background: color-mix(in srgb, #3b82f6, var(--yv-elevated) 93%);
+  animation: yv-array-read-pulse 420ms ease-out;
+}
+.yv-array-nested-collections .yv-collection-backing .yv-cell-value.yv-cell-written,
+.yv-array-nested-collections .yv-cell-value > .yv-array .yv-cell-value.yv-cell-written {
+  border-color: color-mix(in srgb, var(--yv-success), var(--yv-border) 22%);
+  background: color-mix(in srgb, var(--yv-success), var(--yv-elevated) 89%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--yv-success), transparent 30%);
+  animation: yv-array-write-pulse 520ms cubic-bezier(.2, .75, .25, 1);
+}
+.yv-array-nested-collections .yv-collection-backing .yv-cell-value.yv-cell-range,
+.yv-array-nested-collections .yv-cell-value > .yv-array .yv-cell-value.yv-cell-range {
+  border-bottom-color: color-mix(in srgb, #3b82f6, var(--yv-border) 20%);
+  background: color-mix(in srgb, #3b82f6, var(--yv-elevated) 96%);
+}
 .yv-array-nested-collections .yv-cell-value {
   overflow-wrap: anywhere;
 }
