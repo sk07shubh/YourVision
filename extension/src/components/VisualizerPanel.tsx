@@ -4893,7 +4893,7 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
                   onBlur={scheduleArgumentPreviewClose}
                   onClick={event => { event.stopPropagation(); if (openArguments?.node.id === node.id && openArguments.kind === 'return') setOpenArguments(null); else openArgumentPreview(node, event.currentTarget, 'return'); }}
                   onKeyDown={event => { event.stopPropagation(); if (event.key === "Escape") setOpenArguments(null); }}
-                >{openArguments.node.returnValueName ?? 'return'}</button>
+                >{node.returnValueName ?? 'return'}</button>
               </span>
             ) : result}
           </span>
@@ -4921,7 +4921,7 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
       >
         {openArguments.kind === 'return' ? (
           <span className="yv-tree-argument-preview">
-            <strong className="yv-tree-argument-label">return</strong>
+            <strong className="yv-tree-argument-label">{openArguments.node.returnValueName ?? "return"}</strong>
             <span className="yv-tree-argument-value">
               <DataValue value={openArguments.node.returnValue} state={openArguments.node.exitState ?? openArguments.node.entryState} source={source} name={openArguments.node.returnValueName ?? "return"} />
             </span>
