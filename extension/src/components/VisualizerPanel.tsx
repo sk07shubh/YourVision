@@ -3308,7 +3308,7 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
       // Only read parameter names from a method declaration, never a call site such as
       // helper(this). The old substring search could mistake that call for the declaration.
       const escapedMethod = method.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
-      const declarationPattern = new RegExp('\\b(?:public|private|protected)\\s+(?:(?:static|final|synchronized)\\s+)*[\\w.$<>?,\\[\\] ]+?\\s+' + escapedMethod + '\\s*\\(([^)]*)\\)');
+      const declarationPattern = new RegExp('\\b(?:(?:public|private|protected)\\s+)?(?:(?:static|final|synchronized)\\s+)*[\\w.$<>?,\\[\\] ]+?\\s+' + escapedMethod + '\\s*\\(([^)]*)\\)');
       const declarationMatch = source.match(declarationPattern);
       // The runtime can report framework/JVM implementation entries as method events.
       // The visual tree represents calls into methods declared in the submitted solution,
