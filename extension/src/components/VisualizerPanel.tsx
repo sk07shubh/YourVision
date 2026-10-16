@@ -4613,7 +4613,7 @@ function splitCallArguments(source: string, method: string, line: number): strin
       const ch = text[i];
       if (quote) {
         if (escaped) escaped = false;
-        else if (ch === '\\\\') escaped = true;
+        else if (ch === '\\') escaped = true;
         else if (ch === quote) quote = '';
         continue;
       }
@@ -4637,7 +4637,7 @@ function splitCallArguments(source: string, method: string, line: number): strin
       const ch = raw[i];
       if (quote) {
         if (escaped) escaped = false;
-        else if (ch === '\\\\') escaped = true;
+        else if (ch === '\\') escaped = true;
         else if (ch === quote) quote = '';
         continue;
       }
