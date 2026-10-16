@@ -34,11 +34,12 @@ assert(
     "method entry must highlight the declaration line after the class checkpoint"
 );
 assert(
-    Object.keys(middle.states?.[0]?.objects ?? {}).some(id => {
-        const object = middle.states?.[0]?.objects[id] as Record<string, unknown> | undefined;
-        return object?.$type === "ListNode";
-    }),
-    "ListNode argument was not captured as an object graph"
+    middle.states?.some(state =>
+        Object.values(state.objects ?? {}).some(value =>
+            (value as Record<string, unknown> | undefined)?.$type === "ListNode"
+        )
+    ) === true,
+    "ListNode argument was not captured as an object graph after the class checkpoint"
 );
 
 const middleExit = middle.states?.find(
