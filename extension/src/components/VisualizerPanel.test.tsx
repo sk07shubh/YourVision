@@ -137,6 +137,66 @@ describe('synchronized function invocation tree', () => {
     ]);
   });
 
+  it('recovers missing entry arguments from the earliest checkpoint of the same invocation', () => {
+    const source = [
+      'class Solution {',
+      '  void helper(int zero, boolean enabled, Object nothing) { zero = 9; }',
+      '  void solve() { helper(0, false, null); }',
+      '}',
+    ].join('\\n');
+    const states = [
+      state({
+        line: 3,
+        invocationId: 'solve-call',
+        lastEvent: { type: 'METHOD_ENTER', method: 'solve', data: {
+          invocationId: 'solve-call', declaringType: 'Solution', variables: {},
+        } },
+      }),
+      state({
+        line: 3,
+        invocationId: 'solve-call',
+        lastEvent: { type: 'STEP', method: 'solve', data: {
+          invocationId: 'solve-call', variables: {},
+        } },
+      }),
+      state({
+        line: 2,
+        invocationId: 'helper-call',
+        parentInvocationId: 'solve-call',
+        variables: {},
+        lastEvent: { type: 'METHOD_ENTER', method: 'helper', data: {
+          invocationId: 'helper-call', parentInvocationId: 'solve-call',
+          parameterTypes: ['int', 'boolean', 'java.lang.Object'], variables: {},
+        } },
+      }),
+      state({
+        line: 2,
+        invocationId: 'helper-call',
+        parentInvocationId: 'solve-call',
+        variables: { zero: 0, enabled: false, nothing: null },
+        lastEvent: { type: 'STEP', method: 'helper', data: {
+          invocationId: 'helper-call', variables: { zero: 0, enabled: false, nothing: null },
+        } },
+      }),
+      state({
+        line: 2,
+        invocationId: 'helper-call',
+        parentInvocationId: 'solve-call',
+        variables: { zero: 9, enabled: false, nothing: null },
+        lastEvent: { type: 'STEP', method: 'helper', data: {
+          invocationId: 'helper-call', variables: { zero: 9, enabled: false, nothing: null },
+        } },
+      }),
+    ];
+    const { nodes } = buildInvocationNodes(states, source);
+    expect(nodes.get('helper-call')?.signature).toBe('helper(0, false, null)');
+    expect(nodes.get('helper-call')?.arguments).toEqual([
+      { name: 'zero', expression: '0', value: 0 },
+      { name: 'enabled', expression: 'false', value: false },
+      { name: 'nothing', expression: 'null', value: null },
+    ]);
+  });
+
   it('keeps the source variable name for a returned collection', () => {
     const source = 'class Solution { int[] solve(int[] nums) { return nums; } }';
     const states = [
