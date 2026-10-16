@@ -137,6 +137,59 @@ describe('synchronized function invocation tree', () => {
     ]);
   });
 
+  it('prefers JVM-captured entry arguments over local snapshots and later mutations', () => {
+    const source = [
+      'class Solution {',
+      '  void helper(int zero, boolean enabled, Object nothing) { zero = 9; }',
+      '  void solve() { helper(0, false, null); }',
+      '}',
+    ].join('\n');
+    const states = [
+      state({
+        line: 3,
+        invocationId: 'solve-call',
+        lastEvent: { type: 'METHOD_ENTER', method: 'solve', data: {
+          invocationId: 'solve-call', declaringType: 'Solution', variables: {},
+        } },
+      }),
+      state({
+        line: 3,
+        invocationId: 'solve-call',
+        lastEvent: { type: 'STEP', method: 'solve', data: {
+          invocationId: 'solve-call', variables: {},
+        } },
+      }),
+      state({
+        line: 2,
+        invocationId: 'helper-call',
+        parentInvocationId: 'solve-call',
+        lastEvent: { type: 'METHOD_ENTER', method: 'helper', data: {
+          invocationId: 'helper-call',
+          parentInvocationId: 'solve-call',
+          parameterTypes: ['int', 'boolean', 'java.lang.Object'],
+          argumentValues: [0, false, null],
+          variables: { zero: 9, enabled: true, nothing: { stale: true } },
+        } },
+      }),
+      state({
+        line: 2,
+        invocationId: 'helper-call',
+        parentInvocationId: 'solve-call',
+        variables: { zero: 9, enabled: true, nothing: { stale: true } },
+        lastEvent: { type: 'STEP', method: 'helper', data: {
+          invocationId: 'helper-call',
+          variables: { zero: 9, enabled: true, nothing: { stale: true } },
+        } },
+      }),
+    ];
+    const { nodes } = buildInvocationNodes(states, source);
+    expect(nodes.get('helper-call')?.arguments).toEqual([
+      { name: 'zero', expression: '0', value: 0 },
+      { name: 'enabled', expression: 'false', value: false },
+      { name: 'nothing', expression: 'null', value: null },
+    ]);
+  });
+
   it('recovers missing entry arguments from the earliest checkpoint of the same invocation', () => {
     const source = [
       'class Solution {',
