@@ -4725,12 +4725,17 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
     const rect = anchor.getBoundingClientRect();
     const margin = 8;
     const width = Math.min(340, window.innerWidth - margin * 2);
-    const left = Math.max(margin, Math.min(rect.left, window.innerWidth - width - margin));
-    const below = window.innerHeight - rect.bottom - 14;
-    const above = rect.top - 14;
-    const placeBelow = below >= Math.min(180, above) || below >= above;
-    const maxHeight = Math.max(100, Math.min(380, Math.floor(placeBelow ? below : above)));
-    const top = placeBelow ? Math.min(window.innerHeight - margin - maxHeight, rect.bottom + 6) : Math.max(margin, rect.top - 6 - maxHeight);
+    const gap = 8;
+    // Keep the class-context preview beside its trigger, matching the function dropdown.
+    // Prefer the right side; flip left only when there is not enough room on the right.
+    const rightSpace = window.innerWidth - rect.right - gap - margin;
+    const leftSpace = rect.left - gap - margin;
+    const placeRight = rightSpace >= Math.min(width, 220) || rightSpace >= leftSpace;
+    const left = placeRight
+      ? Math.max(margin, Math.min(rect.right + gap, window.innerWidth - width - margin))
+      : Math.max(margin, rect.left - gap - width);
+    const maxHeight = Math.max(100, Math.min(380, window.innerHeight - margin * 2));
+    const top = Math.max(margin, Math.min(rect.top, window.innerHeight - maxHeight - margin));
     setClassContextPosition({ left, top, maxHeight });
   }, [openClassContext]);
   useLayoutEffect(() => {
