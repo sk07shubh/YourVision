@@ -1357,3 +1357,101 @@
 .yv-workspace.tree-open .yv-tree-branch > .yv-tree-children:empty {
   display: none;
 }
+
+
+/* Function-call argument preview: one trigger for the complete argument list.
+   The preview expands in-flow beneath that list so it is not clipped by the tree rail. */
+.yv-tree-arguments {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  vertical-align: baseline;
+  max-width: 100%;
+}
+.yv-tree-arguments-trigger {
+  display: inline-block;
+  max-width: 100%;
+  margin: 0;
+  padding: 1px 4px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition: background-color .12s ease, border-color .12s ease, box-shadow .12s ease;
+}
+.yv-tree-arguments-trigger:hover,
+.yv-tree-arguments-trigger:focus-visible,
+.yv-tree-arguments:hover .yv-tree-arguments-trigger,
+.yv-tree-arguments:focus-within .yv-tree-arguments-trigger {
+  outline: none;
+  border-color: color-mix(in srgb, var(--yv-depth-border, #60a5fa), transparent 42%);
+  background: color-mix(in srgb, var(--yv-depth-border, #60a5fa), transparent 88%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--yv-depth-border, #60a5fa), transparent 82%);
+}
+.yv-tree-arguments-popover {
+  display: none;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: min(100%, 190px);
+  max-width: min(100%, 320px);
+  max-height: min(42dvh, 360px);
+  margin-top: 6px;
+  padding: 8px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid color-mix(in srgb, var(--yv-depth-border, #60a5fa), transparent 32%);
+  border-radius: 8px;
+  background: #0b1220;
+  color: #e5edf8;
+  box-shadow: 0 8px 24px rgba(0,0,0,.32);
+  font-size: 11px;
+  font-weight: 400;
+  white-space: normal;
+  cursor: default;
+}
+.yv-tree-arguments:hover .yv-tree-arguments-popover,
+.yv-tree-arguments:focus-within .yv-tree-arguments-popover {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.yv-tree-argument-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.yv-tree-argument-label {
+  color: #93c5fd;
+  font: 700 10px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.yv-tree-argument-value {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  color: #e5edf8;
+}
+.yv-tree-argument-value .yv-array,
+.yv-tree-argument-value .yv-matrix,
+.yv-tree-argument-value .yv-linked {
+  max-width: 100%;
+}
+.yv-tree-argument-value .yv-object {
+  min-width: 0;
+}
+.yv-tree-argument-value .yv-cell-value {
+  padding: 4px 5px;
+  font-size: 10px;
+}
+.yv-tree-argument-value .yv-ds,
+.yv-tree-argument-value .yv-code {
+  color: inherit;
+  font-size: 11px;
+}
