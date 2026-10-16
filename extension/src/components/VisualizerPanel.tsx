@@ -4600,10 +4600,61 @@ function splitCallArguments(source: string, method: string, line: number): strin
   // small window. A declaration may precede the real call in that same window,
   // and multiline calls can extend beyond an arbitrary window boundary.
   const candidates: Array<{ distance: number; span: number; args: string[] }> = [];
+
+  // Keep offsets and newlines stable while hiding comments and string contents
+  // from call-name matching. Parse the actual argument text from the original source.
+  const searchable = source.split('');
+  let quote = '';
+  let escaped = false;
+  let lineComment = false;
+  let blockComment = false;
+  for (let i = 0; i < source.length; i += 1) {
+    const ch = source[i]!;
+    const next = source[i + 1] ?? '';
+    if (lineComment) {
+      if (ch === '\n' || ch === '\r') lineComment = false;
+      else searchable[i] = ' ';
+      continue;
+    }
+    if (blockComment) {
+      if (ch === '*' && next === '/') {
+        searchable[i] = ' ';
+        if (i + 1 < searchable.length) searchable[i + 1] = ' ';
+        i += 1;
+        blockComment = false;
+      } else if (ch !== '\n' && ch !== '\r') {
+        searchable[i] = ' ';
+      }
+      continue;
+    }
+    if (quote) {
+      searchable[i] = ' ';
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '/' && next === '/') {
+      searchable[i] = ' ';
+      if (i + 1 < searchable.length) searchable[i + 1] = ' ';
+      i += 1;
+      lineComment = true;
+    } else if (ch === '/' && next === '*') {
+      searchable[i] = ' ';
+      if (i + 1 < searchable.length) searchable[i + 1] = ' ';
+      i += 1;
+      blockComment = true;
+    } else if (ch === '"' || ch === "'") {
+      searchable[i] = ' ';
+      quote = ch;
+    }
+  }
+
+  const searchableSource = searchable.join('');
   const pattern = new RegExp('\\b' + method + '\\s*\\(', 'g');
   let match: RegExpExecArray | null;
 
-  while ((match = pattern.exec(source)) !== null) {
+  while ((match = pattern.exec(searchableSource)) !== null) {
     const open = source.indexOf('(', match.index);
     let depth = 0;
     let quote = '';
