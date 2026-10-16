@@ -1138,7 +1138,6 @@ function CollectionBackingArray({
 }) {
   return (
     <div className="yv-collection-backing">
-      <div className="yv-code yv-collection-backing-title">Array view · snapshot order</div>
       <ArrayView
         value={value.values}
         state={state}
