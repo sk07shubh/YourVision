@@ -4,6 +4,7 @@ import java.util.*;
 public class YourVisionRuntime {
     private static final String NO_ARGS = "__YV_NO_ARGS__";
     private static final String ENCODED_ARGUMENT_PREFIX = "__YV_B64__";
+    private static final String DESIGN_MODE = "__YV_DESIGN__";
     private static long traceSequence = 0;
 
     public static void main(String[] args) throws Exception {
@@ -13,6 +14,12 @@ public class YourVisionRuntime {
 
         String className = args[0];
         String methodName = args[1];
+
+        if (DESIGN_MODE.equals(methodName)) {
+            runDesignClass(Class.forName(className), args);
+            return;
+        }
+
         List<String> rawArguments = new ArrayList<>();
 
         if (args.length == 3 && NO_ARGS.equals(args[2])) {
@@ -95,6 +102,134 @@ public class YourVisionRuntime {
 
             cause.printStackTrace(System.err);
             System.exit(7);
+        }
+    }
+
+
+    private static void runDesignClass(
+        Class<?> targetClass,
+        String[] args
+    ) throws Exception {
+        int cursor = 2;
+        int constructorArgumentCount = Integer.parseInt(args[cursor++]);
+        List<String> constructorArguments = new ArrayList<>();
+        for (int i = 0; i < constructorArgumentCount; i++) {
+            constructorArguments.add(decodeArgument(args[cursor++]));
+        }
+
+        int callCount = Integer.parseInt(args[cursor++]);
+        List<DesignCall> calls = new ArrayList<>();
+        for (int i = 0; i < callCount; i++) {
+            String method = args[cursor++];
+            int argumentCount = Integer.parseInt(args[cursor++]);
+            List<String> arguments = new ArrayList<>();
+            for (int j = 0; j < argumentCount; j++) {
+                arguments.add(decodeArgument(args[cursor++]));
+            }
+            calls.add(new DesignCall(method, arguments));
+        }
+        if (cursor != args.length) {
+            throw new IllegalArgumentException("Unexpected trailing design-class arguments");
+        }
+
+        emitEvent("PROGRAM_START", targetClass.getSimpleName(), 0);
+        ConstructorResolution constructorResolution =
+            resolveConstructor(targetClass, constructorArguments);
+        Constructor<?> constructor = constructorResolution.constructor;
+        constructor.setAccessible(true);
+
+        try {
+            Object instance = constructor.newInstance(constructorResolution.arguments);
+            List<Object> results = new ArrayList<>();
+            results.add(null); // LeetCode's constructor operation has no return value.
+
+            for (DesignCall call : calls) {
+                MethodResolution resolution =
+                    resolveMethod(targetClass, call.method, call.arguments);
+                Method method = resolution.method;
+                method.setAccessible(true);
+
+                emitEvent("METHOD_ENTER", method.getName(), 1);
+                Object result = method.invoke(
+                    Modifier.isStatic(method.getModifiers()) ? null : instance,
+                    resolution.arguments
+                );
+                emitEvent("METHOD_EXIT", method.getName(), 1);
+                results.add(result);
+            }
+
+            System.out.println("__YV_RESULT__=" + formatValue(results));
+            emitEvent("PROGRAM_END", targetClass.getSimpleName(), 0);
+        } catch (InvocationTargetException ex) {
+            Throwable cause = ex.getCause() == null ? ex : ex.getCause();
+            emitEvent("ERROR", targetClass.getSimpleName(), 1, cause.getClass().getName());
+            System.err.println("__YV_EXCEPTION_TYPE__=" + cause.getClass().getName());
+            System.err.println("__YV_EXCEPTION_MESSAGE__=" + String.valueOf(cause.getMessage()));
+            cause.printStackTrace(System.err);
+            System.exit(7);
+        }
+    }
+
+    private static ConstructorResolution resolveConstructor(
+        Class<?> targetClass,
+        List<String> raw
+    ) {
+        List<ConstructorResolution> matches = new ArrayList<>();
+        List<String> failures = new ArrayList<>();
+
+        for (Constructor<?> constructor : targetClass.getDeclaredConstructors()) {
+            if (constructor.getParameterCount() != raw.size()) continue;
+            try {
+                Class<?>[] types = constructor.getParameterTypes();
+                Object[] parsed = new Object[types.length];
+                int score = 0;
+                for (int i = 0; i < types.length; i++) {
+                    ParseResult result = parseValue(raw.get(i), types[i]);
+                    parsed[i] = result.value;
+                    score += result.score;
+                }
+                matches.add(new ConstructorResolution(constructor, parsed, score));
+            } catch (RuntimeException ex) {
+                failures.add(constructor.toGenericString() + ": " + ex.getMessage());
+            }
+        }
+
+        if (matches.isEmpty()) {
+            throw new IllegalArgumentException(
+                "No compatible constructor for " + targetClass.getName() +
+                " with " + raw.size() + " argument(s). " + String.join(" | ", failures)
+            );
+        }
+        matches.sort((a, b) -> Integer.compare(b.score, a.score));
+        if (matches.size() > 1 && matches.get(0).score == matches.get(1).score) {
+            throw new IllegalArgumentException(
+                "Ambiguous constructor for " + targetClass.getName() + ": " +
+                matches.get(0).constructor.toGenericString() + " vs " +
+                matches.get(1).constructor.toGenericString()
+            );
+        }
+        return matches.get(0);
+    }
+
+    private static final class DesignCall {
+        final String method;
+        final List<String> arguments;
+
+        DesignCall(String method, List<String> arguments) {
+            this.method = method;
+            this.arguments = arguments;
+        }
+    }
+
+    private static final class ConstructorResolution {
+        final Constructor<?> constructor;
+        final Object[] arguments;
+        final int score;
+
+        ConstructorResolution(Constructor<?> constructor, Object[] arguments, int score) {
+            this.constructor = constructor;
+            this.arguments = arguments;
+            this.score = score;
         }
     }
 
