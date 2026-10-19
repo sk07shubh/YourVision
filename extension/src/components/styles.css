@@ -2193,116 +2193,74 @@
 /* Nested structure renderer: the parent owns its children.
    Deliberately no branch rail/stem layout from the previous renderer. */
 .yv-structure-node {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  width: max-content;
-  min-width: 0;
-  max-width: none;
-  box-sizing: border-box;
-  gap: 0;
-  padding: 0;
+  display: flex; flex-direction: column; align-items: center; width: max-content;
+  min-width: 0; max-width: none; box-sizing: border-box; gap: 0; padding: 0;
 }
 .yv-node.yv-structure-node-card {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-start;
-  gap: 7px;
-  width: max-content;
-  min-width: 190px;
-  max-width: min(420px, calc(100vw - 56px));
-  min-height: 54px;
-  margin: 0;
-  padding: 10px 12px;
-  border: 2px solid #4338CA;
-  border-radius: 12px;
-  background: var(--yv-bg);
-  color: var(--yv-text);
+  position: relative; z-index: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 5px; width: max-content;
+  min-width: 58px; max-width: min(280px, calc(100vw - 56px)); min-height: 58px;
+  margin: 0; padding: 9px 13px; border: 2px solid #4338CA; border-radius: 999px;
+  background: var(--yv-bg); color: var(--yv-text);
   box-shadow: 0 2px 0 color-mix(in srgb, #4338CA, transparent 78%);
-  text-align: left;
-  overflow-wrap: anywhere;
-  white-space: normal;
+  text-align: center; overflow-wrap: anywhere; white-space: normal;
 }
 .yv-structure-depth-0 > .yv-structure-node-card { background: color-mix(in srgb, #4338CA 7%, var(--yv-bg)); }
 .yv-structure-depth-1 > .yv-structure-node-card { background: color-mix(in srgb, #6366F1 8%, var(--yv-bg)); }
 .yv-structure-depth-2 > .yv-structure-node-card { background: color-mix(in srgb, #818CF8 10%, var(--yv-bg)); }
 .yv-structure-depth-3 > .yv-structure-node-card { background: color-mix(in srgb, #A5B4FC 12%, var(--yv-bg)); }
 .yv-structure-depth-4 > .yv-structure-node-card { background: color-mix(in srgb, #C7D2FE 14%, var(--yv-bg)); }
-.yv-structure-node-main { display:flex; flex-direction:column; align-items:flex-start; gap:4px; min-width:0; max-width:100%; }
-.yv-structure-node-heading { display:flex; align-items:center; gap:8px; min-width:0; }
-.yv-structure-node-depth-badge {
-  display:inline-flex;
-  flex:0 0 auto;
-  align-items:center;
-  justify-content:center;
-  width:22px;
-  height:22px;
-  border-radius:50%;
-  background:#4338CA;
-  color:#fff;
-  font:700 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+.yv-structure-node-main { display:flex; flex-direction:column; align-items:center; gap:3px; min-width:0; max-width:100%; }
+.yv-structure-node-heading { display:flex; align-items:center; justify-content:center; gap:5px; min-width:0; }
+.yv-structure-node-value { font:700 14px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; overflow-wrap:anywhere; }
+.yv-structure-node-identity { color:var(--yv-muted); font:9px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; }
+.yv-structure-node-depth-badge { display:none; }
+.yv-binary-tree-children {
+  position: relative; display: grid; grid-template-columns: repeat(2, minmax(110px, max-content));
+  justify-content: center; align-items: start; column-gap: 28px; row-gap: 0;
+  width: max-content; max-width: none; margin: 0; padding: 36px 0 0;
 }
-.yv-structure-node-value { font:650 14px/1.25 ui-monospace,SFMono-Regular,Menlo,monospace; overflow-wrap:anywhere; }
-.yv-structure-node-identity { color:var(--yv-muted); font:10px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; }
-.yv-nested-structure-children {
-  display:flex;
-  flex-direction:column;
-  align-items:stretch;
-  gap:8px;
-  margin:8px 0 0 16px;
-  padding:0 0 0 12px;
-  border-left:2px solid color-mix(in srgb, #6366F1 42%, var(--yv-border));
-  min-width:0;
-  width:max-content;
-  max-width:none;
+.yv-binary-tree-children::before {
+  content: ""; position: absolute; top: 0; left: 50%; height: 18px;
+  border-left: 1.5px solid color-mix(in srgb, #6366F1 65%, var(--yv-border));
 }
-.yv-nested-structure-edge {
-  display:flex;
-  flex-direction:column;
-  align-items:stretch;
-  gap:5px;
-  min-width:0;
-  width:max-content;
-  max-width:none;
-  padding:0;
+.yv-binary-tree-edge {
+  position: relative; display: flex; flex-direction: column; align-items: center;
+  min-width: 0; width: max-content; max-width: none; padding: 0;
 }
-.yv-nested-structure-edge-heading {
-  display:flex;
-  align-items:center;
-  gap:6px;
-  min-height:18px;
-  padding-left:2px;
+.yv-binary-tree-edge[data-tree-edge="left"] { grid-column: 1; }
+.yv-binary-tree-edge[data-tree-edge="right"] { grid-column: 2; }
+.yv-binary-tree-edge::before {
+  content: ""; position: absolute; top: -18px; left: 50%; height: 18px;
+  border-left: 1.5px solid color-mix(in srgb, #6366F1 65%, var(--yv-border));
 }
-.yv-nested-structure-edge-label {
-  display:inline-flex;
-  align-items:center;
-  padding:2px 7px;
-  border-radius:5px;
-  color:var(--yv-muted);
-  background:var(--yv-elevated);
-  border:1px solid var(--yv-border);
-  font:700 10px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;
-  letter-spacing:.035em;
+.yv-binary-tree-edge[data-tree-edge="left"]::after,
+.yv-binary-tree-edge[data-tree-edge="right"]::after {
+  content: ""; position: absolute; top: -18px; width: calc(50% + 14px);
+  border-top: 1.5px solid color-mix(in srgb, #6366F1 65%, var(--yv-border));
 }
-.yv-nested-structure-edge-content { min-width:0; }
-.yv-nested-structure-edge-content > .yv-structure-node { margin-left:0; }
-.yv-nested-structure-edge.yv-tree-edge-traversed > .yv-nested-structure-edge-heading .yv-nested-structure-edge-label {
-  color:var(--yv-accent);
-  border-color:color-mix(in srgb,var(--yv-accent),transparent 48%);
+.yv-binary-tree-edge[data-tree-edge="left"]::after { left: 50%; }
+.yv-binary-tree-edge[data-tree-edge="right"]::after { right: 50%; }
+.yv-binary-tree-edge-heading {
+  position: absolute; top: -33px; left: 50%; z-index: 2; display: flex;
+  align-items: center; justify-content: center; gap: 4px; min-height: 16px;
+  transform: translateX(-50%); white-space: nowrap;
 }
-.yv-nested-structure-edge-removed {
-  opacity: .82;
-  padding: 5px 7px;
-  border: 1px dashed color-mix(in srgb, var(--yv-warning, #f59e0b), transparent 42%);
-  border-radius: 8px;
+.yv-binary-tree-edge-label {
+  display: inline-flex; align-items: center; padding: 1px 5px; border-radius: 5px;
+  color: var(--yv-muted); background: var(--yv-bg); border: 1px solid var(--yv-border);
+  font: 700 9px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing: .025em;
 }
-.yv-nested-structure-edge-removed .yv-nested-structure-edge-label {
-  color: var(--yv-warning, #f59e0b);
-  border-color: color-mix(in srgb, var(--yv-warning, #f59e0b), transparent 42%);
+.yv-binary-tree-edge-content { min-width: 0; }
+.yv-binary-tree-edge-content > .yv-structure-node { margin: 0; }
+.yv-binary-tree-edge.yv-tree-edge-traversed > .yv-binary-tree-edge-heading .yv-binary-tree-edge-label {
+  color: var(--yv-accent); border-color: color-mix(in srgb,var(--yv-accent),transparent 48%);
 }
+.yv-binary-tree-edge-removed {
+  opacity: .82; padding: 5px 7px;
+  border: 1px dashed color-mix(in srgb, var(--yv-warning, #f59e0b), transparent 42%); border-radius: 8px;
+}
+.yv-binary-tree-edge-removed .yv-binary-tree-edge-label { color: var(--yv-warning, #f59e0b); }
 .yv-structure-node.yv-tree-node-changed > .yv-structure-node-card {
   border-color:var(--yv-warning, #f59e0b);
   box-shadow:0 0 0 2px color-mix(in srgb,var(--yv-warning, #f59e0b),transparent 76%);
@@ -2311,14 +2269,11 @@
   border-color:var(--yv-accent, #65a9ff);
   box-shadow:0 0 0 3px color-mix(in srgb,var(--yv-accent, #65a9ff),transparent 72%);
 }
-.yv-structure-node.yv-tree-node-created > .yv-structure-node-card {
-  border-style:dashed;
-}
+.yv-structure-node.yv-tree-node-created > .yv-structure-node-card { border-style:dashed; }
 @media (max-width: 520px) {
-  .yv-nested-structure-children { margin-left:8px; padding-left:8px; }
-  .yv-node.yv-structure-node-card { min-width:170px; }
+  .yv-binary-tree-children { column-gap: 12px; }
+  .yv-node.yv-structure-node-card { min-width: 48px; min-height: 48px; padding: 7px 9px; }
 }
-
 
 /* Extensible node metadata and multi-key node cells share the same card. */
 .yv-node-key-cells {
