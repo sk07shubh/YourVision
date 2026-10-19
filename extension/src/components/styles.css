@@ -2235,8 +2235,8 @@
 }
 .yv-structure-node > .yv-tree-connectors line {
   fill: none;
-  stroke: #6366F1;
-  stroke-width: 2.75;
+  stroke: #FFA116;
+  stroke-width: 3;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
 }
