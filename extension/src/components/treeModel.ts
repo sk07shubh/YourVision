@@ -209,7 +209,9 @@ export function buildObjectStructureModel(
   for (const edge of edgeList) {
     if (edge.kind === 'child') childParentCounts.set(edge.target, (childParentCounts.get(edge.target) ?? 0) + 1);
   }
-  const roots = nodeList.filter(node => !childParentCounts.has(node.id)).map(node => node.id);
+  const referenceTargets = new Set(edgeList.filter(edge => edge.kind === 'reference').map(edge => edge.target));
+  const roots = nodeList.filter(node => !childParentCounts.has(node.id) &&
+    (node.id === rootNode?.id || !referenceTargets.has(node.id))).map(node => node.id);
   const hasCycle = edgeList.some(edge => edge.kind === 'child' && (
     edge.source === edge.target || reaches(edge.target, edge.source, edgeList)
   ));
