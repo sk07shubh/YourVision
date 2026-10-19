@@ -4452,7 +4452,7 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
       '.yv-tree-edge-traversed',
     ];
     const rules: string[] = [];
-    const rulePattern = /([^{}]+)\\{([^{}]*)\\}/g;
+    const rulePattern = /([^{}]+)\{([^{}]*)\}/g;
     for (const match of css.matchAll(rulePattern)) {
       const selector = match[1]!.trim();
       if (selector.startsWith('@keyframes') || selector.startsWith('@media')) continue;
