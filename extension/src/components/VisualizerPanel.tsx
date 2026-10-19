@@ -2592,7 +2592,17 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
             className={`yv-cell-value ${rangeStart >= 0 && index >= rangeStart && index <= rangeEnd ? 'yv-cell-range ' : ''}${rangeStart >= 0 && index === rangeStart ? 'yv-cell-range-start ' : ''}${rangeEnd >= 0 && index === rangeEnd && rangeEnd !== rangeStart ? 'yv-cell-range-end ' : ''}${changed.has(index) ? 'yv-cell-written ' : ''}${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-cell-compared ' : ''}${accumulated.has(index) && !copied.has(index) ? 'yv-cell-accumulated ' : ''}${copied.has(index) ? 'yv-cell-copied ' : ''}${rotated.has(index) ? 'yv-cell-rotated-' + rotated.get(index) + ' ' : ''}${swapped.has(index) ? 'yv-cell-swapped' : ''}`}
           >
             <div className={`yv-array-cell-content ${swapped.has(index) ? 'yv-array-cell-content-swapped' : ''}${rotated.has(index) ? ' yv-array-cell-content-rotate-' + rotated.get(index) : shifted.has(index) ? ' yv-array-cell-content-shift-' + shifted.get(index) : ''}`}>
-              <DataValue value={item} state={state} source={source} name={arrayName} depth={depth + 1} seen={seen}/>
+              <DataValue
+                value={item}
+                state={state}
+                source={source}
+                name={arrayName}
+                depth={depth + 1}
+                seen={seen}
+                // Propagate nested context recursively so deeper arrays are not
+                // accidentally classified as matrices.
+                nestedArrayItem={containsNestedCollections}
+              />
             </div>
           </div>
           <div className="yv-cell-index">{index}</div>
