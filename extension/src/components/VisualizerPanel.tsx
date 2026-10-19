@@ -2977,7 +2977,12 @@ function objectFields(value: Obj): Obj {
 }
 function objectType(value: Obj): string { return typeof value.$type==='string'?value.$type:''; }
 function looksListNode(value: Obj): boolean { const f=objectFields(value); return /ListNode/i.test(objectType(value)) || ('next' in f && ('val' in f || 'value' in f)); }
-function looksTreeNode(value: Obj): boolean { const f=objectFields(value); return /TreeNode/i.test(objectType(value)) || (((('left' in f || 'right' in f) || ('children' in f && ('val' in f || 'value' in f || 'data' in f)))) && ('val' in f || 'value' in f || 'data' in f)); }
+function looksTreeNode(value: Obj): boolean {
+  const fields = objectFields(value);
+  const hasValue = 'val' in fields || 'value' in fields || 'data' in fields;
+  const hasChildren = 'left' in fields || 'right' in fields || ('children' in fields && hasValue);
+  return /TreeNode/i.test(objectType(value)) || (hasValue && hasChildren);
+}
 function resolveRef(value: unknown, objects: Record<string,unknown>): unknown {
   if (!isPlainObject(value)) return value;
   if (typeof value.$ref==='string') return objects[value.$ref] ?? value;
