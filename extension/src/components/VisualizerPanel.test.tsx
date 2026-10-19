@@ -346,8 +346,8 @@ describe('design-class instance state visualization', () => {
 
   it('renders the copy action in the Data Structures section, including the empty state', () => {
     const html = renderToStaticMarkup(<DataStructures state={state()} source="" />);
-    expect(html).toContain('Copy current data structures as JSON');
-    expect(html).toContain('Copy JSON');
+    expect(html).toContain('Copy visualization source code');
+    expect(html).toContain('Copy Visualization Code');
   });
 
   it('renders structural fields on this as first-class data structures', () => {
