@@ -2191,7 +2191,7 @@
 
 
 /* Shared N-ary tree layout: child edges use one rail and one stem per slot. */
-.yv-binary-node-card:has(+ .yv-universal-children)::after {
+.yv-structure-node-card:has(+ .yv-universal-children)::after {
   content: "";
   position: absolute;
   z-index: 0;
@@ -2301,4 +2301,24 @@
   background: color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 94%);
   font: 10px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
   white-space: nowrap;
+}
+
+
+/* Universal structure nodes replace the former binary-tree cards.
+   This renderer is shared by binary/N-ary trees, tries, heaps, and multi-key nodes. */
+.yv-structure-node { position:relative; display:flex; flex-direction:column; align-items:center; width:max-content; min-width:0; max-width:100%; box-sizing:border-box; }
+.yv-node.yv-structure-node-card {
+  position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:6px; width:max-content; min-width:82px; max-width:min(240px,100%); min-height:48px;
+  margin:0; padding:9px 12px; border:1px solid var(--yv-border-strong,var(--yv-border));
+  border-radius:7px; background:var(--yv-bg); color:var(--yv-text);
+  box-shadow:0 3px 0 color-mix(in srgb,var(--yv-border-strong,var(--yv-border)),transparent 45%);
+  text-align:center; overflow-wrap:anywhere; white-space:normal;
+}
+.yv-structure-node-main { display:flex; flex-direction:column; align-items:center; gap:3px; min-width:0; max-width:100%; }
+.yv-structure-node-value { font:650 14px/1.25 ui-monospace,SFMono-Regular,Menlo,monospace; overflow-wrap:anywhere; }
+.yv-structure-node-identity { color:var(--yv-muted); font:10px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; }
+.yv-structure-node-card:has(+ .yv-universal-children)::after {
+  content:""; position:absolute; left:50%; bottom:-13px; height:13px;
+  border-left:1.5px solid var(--yv-tree-line,var(--yv-border-strong,#78879a)); transform:translateX(-.75px);
 }
