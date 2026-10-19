@@ -4539,7 +4539,12 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
       '.yv-binary-children', '.yv-binary-branch', '.yv-binary-edge-label',
       '.yv-binary-edge-status', '.yv-binary-pointer-labels',
       '.yv-tree-reference-labels', '.yv-tree-reference-label',
-      '.yv-universal-children', '.yv-universal-branch', '.yv-universal-edge-label',
+      '.yv-structure-node', '.yv-structure-node-card', '.yv-structure-node-main',
+      '.yv-structure-node-value', '.yv-structure-node-identity', '.yv-structure-node-heading',
+      '.yv-structure-node-depth-badge', '.yv-nested-structure-children', '.yv-nested-structure-edge',
+      '.yv-nested-structure-edge-heading', '.yv-nested-structure-edge-label', '.yv-nested-structure-edge-content',
+      '.yv-nested-structure-edge-removed', '.yv-structure-depth-0', '.yv-structure-depth-1',
+      '.yv-structure-depth-2', '.yv-structure-depth-3', '.yv-structure-depth-4',
       '.yv-node-key-cells', '.yv-node-key-cell', '.yv-tree-node-metadata', '.yv-tree-metadata-chip',
     ];
     const rules: string[] = [];
