@@ -1314,7 +1314,14 @@ function HeapTreeView({
               <div className="yv-heap-node-wrap" key={key}>
                 <div data-heap-index={heapIndex} data-collection-item-key={key}
                   className={"yv-heap-node " + collectionItemMotionClass(value, item, heapIndex, state)}>
-                  <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
+                  <DataValue
+                  value={item}
+                  state={state}
+                  source={source}
+                  depth={depth + 1}
+                  seen={seen}
+                  nestedArrayItem={hasNestedItems && (isArraySnapshot(item) || Array.isArray(item))}
+                />
                 </div>
                 <div className="yv-cell-index">[{heapIndex}]</div>
               </div>
@@ -3917,7 +3924,8 @@ function DataValue({
   name,
   depth = 0,
   seen = new Set<string>(),
-  resolveObjects = true
+  resolveObjects = true,
+  nestedArrayItem = false
 }: {
   value: unknown;
   state?: TraceState;
@@ -3926,6 +3934,8 @@ function DataValue({
   depth?: number;
   seen?: Set<string>;
   resolveObjects?: boolean;
+  /** Prevent a one-dimensional array stored inside a collection from being mistaken for a matrix row. */
+  nestedArrayItem?: boolean;
 }) {
   if (isPlainObject(value) && typeof value.$ref === 'string' &&
       (typeof value.$arrayId === 'string' || typeof value.$mapId === 'string' || typeof value.$collectionId === 'string')) {
@@ -3954,7 +3964,7 @@ function DataValue({
   if (isArraySnapshot(value)) {
     return (
       <>
-        <ArrayView value={value.values} state={state} source={source} arrayName={name} depth={depth} seen={seen}/>
+        <ArrayView value={value.values} state={state} source={source} arrayName={name} depth={depth} seen={seen} nestedItems={nestedArrayItem}/>
         {value.truncated === true && (
           <div className="yv-truncated">
             Showing first {value.values.length} of {String(value.length ?? '?')} items.
@@ -3964,7 +3974,7 @@ function DataValue({
     );
   }
 
-  if (Array.isArray(value)) return <ArrayView value={value} state={state} source={source} arrayName={name} depth={depth} seen={seen}/>;
+  if (Array.isArray(value)) return <ArrayView value={value} state={state} source={source} arrayName={name} depth={depth} seen={seen} nestedItems={nestedArrayItem}/>;
   if (isPlainObject(value)) {
     if (looksTreeNode(value)) return <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects??{}} state={state}/></div>;
     if (looksListNode(value)) return <LinkedListView root={value} objects={state?.objects??{}} variables={state?.variables??{}} state={state}/>;
