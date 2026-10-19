@@ -2200,16 +2200,16 @@
   position: relative; z-index: 1; display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 5px; width: max-content;
   min-width: 58px; max-width: min(280px, calc(100vw - 56px)); min-height: 58px;
-  margin: 0; padding: 9px 13px; border: 2px solid #4338CA; border-radius: 999px;
-  background: var(--yv-bg); color: var(--yv-text);
-  box-shadow: 0 2px 0 color-mix(in srgb, #4338CA, transparent 78%);
+  margin: 0; padding: 9px 13px; border: 2px solid #FFA116; border-radius: 999px;
+  background: color-mix(in srgb, #FFA116 8%, var(--yv-bg)); color: var(--yv-text);
+  box-shadow: 0 2px 0 color-mix(in srgb, #FFA116, transparent 68%);
   text-align: center; overflow-wrap: anywhere; white-space: normal;
 }
-.yv-structure-depth-0 > .yv-structure-node-card { background: color-mix(in srgb, #4338CA 7%, var(--yv-bg)); }
-.yv-structure-depth-1 > .yv-structure-node-card { background: color-mix(in srgb, #6366F1 8%, var(--yv-bg)); }
-.yv-structure-depth-2 > .yv-structure-node-card { background: color-mix(in srgb, #818CF8 10%, var(--yv-bg)); }
-.yv-structure-depth-3 > .yv-structure-node-card { background: color-mix(in srgb, #A5B4FC 12%, var(--yv-bg)); }
-.yv-structure-depth-4 > .yv-structure-node-card { background: color-mix(in srgb, #C7D2FE 14%, var(--yv-bg)); }
+.yv-structure-depth-0 > .yv-structure-node-card { background: color-mix(in srgb, #FFA116 13%, var(--yv-bg)); }
+.yv-structure-depth-1 > .yv-structure-node-card { background: color-mix(in srgb, #FFA116 9%, var(--yv-bg)); }
+.yv-structure-depth-2 > .yv-structure-node-card { background: color-mix(in srgb, #FFA116 7%, var(--yv-bg)); }
+.yv-structure-depth-3 > .yv-structure-node-card { background: color-mix(in srgb, #FFA116 5%, var(--yv-bg)); }
+.yv-structure-depth-4 > .yv-structure-node-card { background: color-mix(in srgb, #FFA116 4%, var(--yv-bg)); }
 .yv-structure-node-main { display:flex; flex-direction:column; align-items:center; gap:3px; min-width:0; max-width:100%; }
 .yv-structure-node-heading { display:flex; align-items:center; justify-content:center; gap:5px; min-width:0; }
 .yv-structure-node-value { font:700 14px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; overflow-wrap:anywhere; }
