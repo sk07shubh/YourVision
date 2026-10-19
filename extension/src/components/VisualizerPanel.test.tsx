@@ -2511,3 +2511,22 @@ describe('array and matrix mutation animations', () => {
     expect((html.match(/class="yv-matrix-row-fragment"/g) ?? []).length).toBe(3);
   });
 });
+
+describe('shared universal tree rendering', () => {
+  it('renders an N-ary node with labelled child edges through the shared structure model', () => {
+    const objects = {
+      root: { $objectId: 'root', $type: 'Node', val: 'root', children: [{ $ref: 'a' }, { $ref: 'b' }, { $ref: 'c' }] },
+      a: { $objectId: 'a', $type: 'Node', val: 'A', children: [] },
+      b: { $objectId: 'b', $type: 'Node', val: 'B', children: [] },
+      c: { $objectId: 'c', $type: 'Node', val: 'C', children: [] },
+    };
+    const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={objects} />);
+    expect(html).toContain('data-tree-layout="nary"');
+    expect(html).toContain('data-tree-edge-label="0"');
+    expect(html).toContain('data-tree-edge-label="1"');
+    expect(html).toContain('data-tree-edge-label="2"');
+    expect(html).toContain('>A<');
+    expect(html).toContain('>B<');
+    expect(html).toContain('>C<');
+  });
+});
