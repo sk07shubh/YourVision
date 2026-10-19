@@ -2599,8 +2599,6 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
                 name={arrayName}
                 depth={depth + 1}
                 seen={seen}
-                // Propagate nested context recursively so deeper arrays are not
-                // accidentally classified as matrices.
                 nestedArrayItem={containsNestedCollections}
               />
             </div>
