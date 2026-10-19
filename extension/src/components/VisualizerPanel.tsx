@@ -3802,17 +3802,17 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const entered = Boolean(state && previous && id && session.states.includes(state) &&
     movedPointerTargets.has(id));
   return (
-    <div className={'yv-binary-node' + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '')}
+    <div className={'yv-structure-node' + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '')}
       data-tree-node-id={id} data-tree-changed={changed ? 'true' : undefined} data-tree-entered={entered ? 'true' : undefined}
       data-tree-created={created ? 'true' : undefined} aria-label={'Tree node ' + displayValue(nodeValue(resolved)) + (id ? ', object ' + id : '')}>
-      <div key={(changed || entered || created) ? id + ':' + selectedIndex : id} className="yv-node yv-binary-node-card" style={changed ? { background: 'var(--yv-highlight, #203b5b)' } : undefined}>
-        <div className="yv-binary-node-main">
+      <div key={(changed || entered || created) ? id + ':' + selectedIndex : id} className="yv-node yv-structure-node-card" style={changed ? { background: 'var(--yv-highlight, #203b5b)' } : undefined}>
+        <div className="yv-structure-node-main">
           {keyCells
             ? <span className="yv-node-key-cells" aria-label="Node keys">
                 {keyCells.map((keyValue, index) => <span className="yv-node-key-cell" key={index}>{displayValue(keyValue)}</span>)}
               </span>
-            : <span className="yv-binary-node-value">{displayValue(nodeValue(resolved))}</span>}
-          {nodeIdentity && <span className="yv-binary-node-identity" title={'Object identity: ' + id}>@{nodeIdentity}</span>}
+            : <span className="yv-structure-node-value">{displayValue(nodeValue(resolved))}</span>}
+          {nodeIdentity && <span className="yv-structure-node-identity" title={'Object identity: ' + id}>@{nodeIdentity}</span>}
         </div>
         {created && <span className="yv-binary-node-status is-created">NEW</span>}
         {changed && <span className="yv-binary-node-status is-changed">UPDATED</span>}
