@@ -371,6 +371,25 @@ function debugValue(value: unknown): string {
   try { return JSON.stringify(value, null, 2); } catch { return String(value); }
 }
 
+export function buildDataStructuresSnapshot(state: TraceState | undefined): string {
+  return JSON.stringify({
+    format: 'YourVision Data Structures Snapshot',
+    checkpoint: state ? {
+      sequence: state.sequence ?? null,
+      line: state.line ?? null,
+      method: state.method ?? null,
+      depth: state.depth ?? null,
+      event: state.lastEvent?.type ?? null,
+    } : null,
+    structures: {
+      variables: state?.variables ?? {},
+      arrays: state?.arrays ?? {},
+      dataStructures: state?.dataStructures ?? {},
+      objects: state?.objects ?? {},
+    },
+  }, null, 2);
+}
+
 function buildExecutionPanelTrace(states: TraceState[], source: string): string {
   const lines = source.split(/\r?\n/);
   return states.map((state, index) => {
@@ -4394,6 +4413,55 @@ export function DisjointSetView({ parent, name, state, rank, size, rankName, siz
 }
 
 export function DataStructures({ state, source }: { state?: TraceState; source: string }) {
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
+
+  useEffect(() => {
+    setCopyStatus('idle');
+  }, [state?.sequence, state?.line, state?.lastEvent?.type]);
+
+  const copyCurrentStructures = async () => {
+    if (!state) {
+      setCopyStatus('failed');
+      return;
+    }
+    const snapshot = buildDataStructuresSnapshot(state);
+    try {
+      await navigator.clipboard.writeText(snapshot);
+      setCopyStatus('copied');
+    } catch {
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = snapshot;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        const copied = document.execCommand('copy');
+        textarea.remove();
+        setCopyStatus(copied ? 'copied' : 'failed');
+      } catch {
+        setCopyStatus('failed');
+      }
+    }
+  };
+
+  const copyButton = (
+    <div className="yv-ds-copy-row">
+      <button
+        className="yv-btn"
+        type="button"
+        aria-label="Copy current data structures as JSON"
+        title="Copy the data structures at this execution step as JSON"
+        disabled={!state}
+        onMouseDown={event => event.preventDefault()}
+        onClick={copyCurrentStructures}
+      >
+        {copyStatus === 'copied' ? 'Copied!' : copyStatus === 'failed' ? 'Copy failed' : 'Copy JSON'}
+      </button>
+    </div>
+  );
+
   const namedObjectIds = new Map<string, string[]>();
 
   for (const [name, value] of Object.entries(state?.variables ?? {})) {
@@ -4545,11 +4613,17 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
   const items = [...grouped.values()];
 
   if (!items.length && graphNodeEntries.length === 0 && trieNodeEntries.length === 0 && !dsuParentEntry) {
-    return <div className="yv-empty">Structures appear here as your code creates or mutates them.</div>;
+    return (
+      <div className="yv-ds-list">
+        {copyButton}
+        <div className="yv-empty">Structures appear here as your code creates or mutates them.</div>
+      </div>
+    );
   }
 
   return (
     <div className="yv-ds-list">
+      {copyButton}
       {items.map(({ names, value }) => {
         const uniqueNames = [...new Set(names)];
         const primaryName = uniqueNames[0] ?? 'value';
