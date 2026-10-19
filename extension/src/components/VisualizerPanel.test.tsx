@@ -1807,6 +1807,56 @@ describe('execution visualization feature matrix', () => {
     ]);
   });
 
+  it('renders structured map-value updates as visual before/after snapshots', () => {
+    const previous = state({
+      sequence: 120,
+      dataStructures: {
+        groups: {
+          $mapId: 'execution-map-list',
+          $type: 'java.util.HashMap',
+          entries: [{
+            key: 'aet',
+            value: {
+              $collectionId: 'execution-list',
+              $type: 'java.util.ArrayList',
+              $kind: 'list',
+              values: ['eat'],
+              size: 1,
+            },
+          }],
+        },
+      },
+    });
+    const current = state({
+      sequence: 121,
+      dataStructures: {
+        groups: {
+          $mapId: 'execution-map-list',
+          $type: 'java.util.HashMap',
+          entries: [{
+            key: 'aet',
+            value: {
+              $collectionId: 'execution-list',
+              $type: 'java.util.ArrayList',
+              $kind: 'list',
+              values: ['eat', 'tea'],
+              size: 2,
+            },
+          }],
+        },
+      },
+    });
+
+    const html = markup(dataStructureResults(current, previous, 'groups.get("aet").add("tea");'));
+    expect(html).toContain('yv-ds-result-structured-values');
+    expect(html).toContain('yv-ds-result-snapshot-label">Before');
+    expect(html).toContain('yv-ds-result-snapshot-label">After');
+    expect(html).toContain('eat');
+    expect(html).toContain('tea');
+    expect(html).not.toContain('yv-ds-result-old');
+    expect(html).not.toContain('$collectionId');
+  });
+
   it('renders map, array, and collection operations into the execution result', () => {
     const previous = state({
       arrays: {
