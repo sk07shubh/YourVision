@@ -2104,6 +2104,81 @@ describe('array and matrix mutation animations', () => {
     expect(html).toContain('Empty matrix · 0 rows');
   });
 
+  it('renders an int[] nested in a list as an indexed inner group, not a matrix', () => {
+    const html = renderToStaticMarkup(
+      <ArrayView value={[ [4, 5], [8] ]} state={state()} source="for (int[] row : rows)" arrayName="rows" nestedItems />,
+    );
+    expect(html).toContain('yv-array-nested-collections');
+    expect(html).not.toContain('yv-matrix');
+    expect(html).toContain('class="yv-cell-index">0</div>');
+    expect(html).toContain('class="yv-cell-index">1</div>');
+  });
+
+  it('renders a plain String array with the standard one-dimensional cell layout', () => {
+    const html = renderToStaticMarkup(
+      <ArrayView value={['alpha', 'beta']} state={state()} source="String[] words" arrayName="words" />,
+    );
+    expect(html).toContain('yv-array');
+    expect(html).toContain('alpha');
+    expect(html).toContain('beta');
+    expect(html).not.toContain('yv-array-nested-collections');
+    expect(html).not.toContain('yv-matrix');
+  });
+  it('renders nested String arrays as compact indexed groups with normal string leaf values', () => {
+    const html = renderToStaticMarkup(
+      <ArrayView
+        value={[["alpha", "beta"], ["gamma"]]}
+        state={state()}
+        source="for (String[] row : words)"
+        arrayName="words"
+        nestedItems
+      />,
+    );
+    expect(html).toContain('yv-array-nested-collections');
+    expect(html).toContain('alpha');
+    expect(html).toContain('beta');
+    expect(html).toContain('gamma');
+    expect(html).not.toContain('yv-matrix');
+    expect((html.match(/class="yv-cell-index">/g) ?? []).length).toBeGreaterThanOrEqual(5);
+  });
+
+  it('keeps three-dimensional arrays grouped recursively instead of converting inner levels to matrices', () => {
+    const html = renderToStaticMarkup(
+      <ArrayView
+        value={[[["a"], ["b", "c"]], [["d"]]]}
+        state={state()}
+        source="for (String[][] group : words)"
+        arrayName="words"
+        nestedItems
+      />,
+    );
+    expect(html).toContain('yv-array-nested-collections');
+    for (const value of ['a', 'b', 'c', 'd']) expect(html).toContain(value);
+    expect(html).not.toContain('yv-matrix');
+    expect((html.match(/yv-array-nested-collections/g) ?? []).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('renders nested collection snapshots with String leaves using the same compact backing layout', () => {
+    const html = renderToStaticMarkup(
+      <ArrayView
+        value={[
+          { $collectionId: 'inner-1', $type: 'java.util.ArrayList', $kind: 'list', values: ['alpha', 'beta'] },
+          { $collectionId: 'inner-2', $type: 'java.util.ArrayList', $kind: 'list', values: ['gamma'] },
+        ]}
+        state={state()}
+        source="for (List<String> row : words)"
+        arrayName="words"
+        nestedItems
+      />,
+    );
+    expect(html).toContain('yv-array-nested-collections');
+    expect(html).toContain('alpha');
+    expect(html).toContain('beta');
+    expect(html).toContain('gamma');
+    expect(html).toContain('yv-list-view');
+    expect(html).not.toContain('yv-matrix');
+  });
+
   it('preserves jagged matrix rows instead of inventing missing values', () => {
     const html = renderToStaticMarkup(
       <ArrayView value={[[1, 2, 3], [4], []]} state={state()} source="" arrayName="matrix" />,

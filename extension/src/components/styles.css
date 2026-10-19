@@ -951,9 +951,8 @@
   word-break: normal;
 }
 
-/* Nested collections (e.g. List<List<Integer>>) are a compact grid rather
-   than one unbounded horizontal row of full-width collection cards. */
-/* Inline nested-list visualizer: outer index -> dashed inner container -> values. */
+/* Nested collections keep their existing outer grouping, while inner values
+   reuse the same neutral cell treatment as a normal 1D array. */
 .yv-array-nested-collections {
   display: flex !important;
   flex-flow: row nowrap;
@@ -995,7 +994,7 @@
 .yv-array-nested-collections .yv-collection-backing-title {
   display: none;
 }
-/* Inner list / array is the green dashed group from the reference design. */
+/* Dashed boundary communicates nesting; it does not recolor inner cells. */
 .yv-array-nested-collections .yv-collection-backing {
   display: block;
   box-sizing: border-box;
@@ -1003,9 +1002,9 @@
   max-width: none;
   min-width: 0;
   padding: 6px;
-  border: 2px dashed var(--yv-success, #2cbb5d);
+  border: 2px dashed var(--yv-border);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--yv-panel, #282828), transparent 10%);
+  background: transparent;
 }
 .yv-array-nested-collections .yv-collection-backing .yv-array,
 .yv-array-nested-collections .yv-cell-value > .yv-array {
@@ -1030,20 +1029,12 @@
 .yv-array-nested-collections .yv-collection-backing .yv-cell-value,
 .yv-array-nested-collections .yv-cell-value > .yv-array .yv-cell-value {
   min-width: 36px;
-  min-height: 44px;
   box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  border-color: var(--yv-accent, #ffa116);
-  background: var(--yv-accent, #ffa116);
-  color: var(--yv-bg, #1a1a1a);
-  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .yv-array-nested-collections .yv-collection-backing .yv-cell-index,
 .yv-array-nested-collections .yv-cell-value > .yv-array .yv-cell-index {
-  color: var(--yv-muted, #a8a8a8);
+  color: var(--yv-muted);
   text-align: center;
 }
 .yv-array-nested-collections > .yv-cell > .yv-cell-index {
@@ -1052,31 +1043,8 @@
   font-weight: 700;
   text-align: center;
 }
-/* Keep the existing read/write/range feedback visible on nested values. */
-.yv-array-nested-collections .yv-collection-backing .yv-cell-value.yv-cell-read,
-.yv-array-nested-collections .yv-cell-value > .yv-array .yv-cell-value.yv-cell-read {
-  border-color: color-mix(in srgb, #3b82f6, var(--yv-border) 35%);
-  background: color-mix(in srgb, #3b82f6, var(--yv-elevated) 93%);
-  animation: yv-array-read-pulse 420ms ease-out;
-}
-.yv-array-nested-collections .yv-collection-backing .yv-cell-value.yv-cell-written,
-.yv-array-nested-collections .yv-cell-value > .yv-array .yv-cell-value.yv-cell-written {
-  border-color: color-mix(in srgb, var(--yv-success), var(--yv-border) 22%);
-  background: color-mix(in srgb, var(--yv-success), var(--yv-elevated) 89%);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--yv-success), transparent 30%);
-  animation: yv-array-write-pulse 520ms cubic-bezier(.2, .75, .25, 1);
-}
-.yv-array-nested-collections .yv-collection-backing .yv-cell-value.yv-cell-range,
-.yv-array-nested-collections .yv-cell-value > .yv-array .yv-cell-value.yv-cell-range {
-  border-bottom-color: color-mix(in srgb, #3b82f6, var(--yv-border) 20%);
-  background: color-mix(in srgb, #3b82f6, var(--yv-elevated) 96%);
-}
-.yv-array-nested-collections .yv-cell-value {
-  overflow-wrap: anywhere;
-}
-/* Apply the same compact inline design to nested Java ArrayLists.
-   The outer ArrayList uses CollectionView (not ArrayView), so it needs its
-   own nested-layout hook rather than relying on .yv-array-nested-collections. */
+/* Apply the compact outer grouping to nested Java lists without changing
+   the standard 1D-array colors of their inner cells. */
 .yv-collection-nested-inline {
   box-sizing: border-box;
   width: max-content;
@@ -1143,9 +1111,9 @@
   max-width: none;
   min-width: 0;
   padding: 6px;
-  border: 2px dashed var(--yv-success, #2cbb5d);
+  border: 2px dashed var(--yv-border);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--yv-panel, #282828), transparent 10%);
+  background: transparent;
 }
 .yv-collection-nested-inline > .yv-list-view > .yv-list-slot > .yv-list-cell > .yv-collection > .yv-list-view > .yv-list-slot {
   display: flex;
@@ -1162,20 +1130,57 @@
   justify-content: center;
   box-sizing: border-box;
   min-width: 36px;
-  min-height: 44px;
-  padding: 0 6px;
-  border: 1px solid var(--yv-accent, #ffa116);
-  border-radius: 6px;
-  background: var(--yv-accent, #ffa116);
-  color: var(--yv-bg, #1a1a1a);
-  font-weight: 700;
+  min-height: 34px;
+  padding: 7px 6px;
+  border: 1px solid var(--yv-border);
+  border-radius: 0;
+  background: var(--yv-elevated);
+  color: var(--yv-text);
+  font: 13px ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .yv-collection-nested-inline > .yv-list-view > .yv-list-slot > .yv-list-cell > .yv-collection > .yv-list-view > .yv-list-slot > .yv-cell-index {
-  color: var(--yv-muted, #a8a8a8);
+  color: var(--yv-muted);
   text-align: center;
 }
 .yv-collection-nested-inline .yv-list-pointer-row {
   display: none;
+}
+
+/* Primitive arrays nested directly in a list use the normal 1D-array cells;
+   only the dashed boundary is added to indicate the nested group. */
+.yv-collection-nested-inline > .yv-list-view > .yv-list-slot > .yv-list-cell > .yv-array {
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: flex-start;
+  gap: 4px;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: none;
+  min-width: 0;
+  padding: 6px;
+  border: 2px dashed var(--yv-border);
+  border-radius: 8px;
+  background: transparent;
+}
+.yv-collection-nested-inline > .yv-list-view > .yv-list-slot > .yv-list-cell > .yv-array > .yv-pointer-layer {
+  display: none;
+}
+.yv-collection-nested-inline > .yv-list-view > .yv-list-slot > .yv-list-cell > .yv-array > .yv-cell {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.yv-collection-nested-inline > .yv-list-view > .yv-list-slot > .yv-list-cell > .yv-array > .yv-cell > .yv-cell-value {
+  min-width: 36px;
+  box-sizing: border-box;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.yv-collection-nested-inline > .yv-list-view > .yv-list-slot > .yv-list-cell > .yv-array > .yv-cell > .yv-cell-index {
+  color: var(--yv-muted);
+  text-align: center;
 }
 
 @media (max-width: 900px) {

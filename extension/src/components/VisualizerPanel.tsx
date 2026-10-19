@@ -1314,7 +1314,13 @@ function HeapTreeView({
               <div className="yv-heap-node-wrap" key={key}>
                 <div data-heap-index={heapIndex} data-collection-item-key={key}
                   className={"yv-heap-node " + collectionItemMotionClass(value, item, heapIndex, state)}>
-                  <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
+                  <DataValue
+                  value={item}
+                  state={state}
+                  source={source}
+                  depth={depth + 1}
+                  seen={seen}
+                />
                 </div>
                 <div className="yv-cell-index">[{heapIndex}]</div>
               </div>
@@ -1507,7 +1513,7 @@ function CollectionView({
               data-collection-item-key={collectionItemReactKey(item, index, value.values)}>
               <div className="yv-list-pointer-row" aria-hidden="true">{pointersAt(index).map(pointer => <span key={pointer.name} className="yv-list-pointer">{pointer.name}</span>)}</div>
               <div className={"yv-list-cell " + collectionItemMotionClass(value, item, index, state)}>
-                <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
+                <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen} nestedArrayItem={hasNestedItems && (isArraySnapshot(item) || Array.isArray(item))}/>
               </div>
               <div className="yv-cell-index">{index}</div>
             </div>
@@ -2586,7 +2592,15 @@ export function ArrayView({ value, state, source, arrayName, depth = 0, seen = n
             className={`yv-cell-value ${rangeStart >= 0 && index >= rangeStart && index <= rangeEnd ? 'yv-cell-range ' : ''}${rangeStart >= 0 && index === rangeStart ? 'yv-cell-range-start ' : ''}${rangeEnd >= 0 && index === rangeEnd && rangeEnd !== rangeStart ? 'yv-cell-range-end ' : ''}${changed.has(index) ? 'yv-cell-written ' : ''}${accessed.has(index) ? 'yv-cell-read ' : ''}${compared.has(index) ? 'yv-cell-compared ' : ''}${accumulated.has(index) && !copied.has(index) ? 'yv-cell-accumulated ' : ''}${copied.has(index) ? 'yv-cell-copied ' : ''}${rotated.has(index) ? 'yv-cell-rotated-' + rotated.get(index) + ' ' : ''}${swapped.has(index) ? 'yv-cell-swapped' : ''}`}
           >
             <div className={`yv-array-cell-content ${swapped.has(index) ? 'yv-array-cell-content-swapped' : ''}${rotated.has(index) ? ' yv-array-cell-content-rotate-' + rotated.get(index) : shifted.has(index) ? ' yv-array-cell-content-shift-' + shifted.get(index) : ''}`}>
-              <DataValue value={item} state={state} source={source} name={arrayName} depth={depth + 1} seen={seen}/>
+              <DataValue
+                value={item}
+                state={state}
+                source={source}
+                name={arrayName}
+                depth={depth + 1}
+                seen={seen}
+                nestedArrayItem={containsNestedCollections}
+              />
             </div>
           </div>
           <div className="yv-cell-index">{index}</div>
@@ -3917,7 +3931,8 @@ function DataValue({
   name,
   depth = 0,
   seen = new Set<string>(),
-  resolveObjects = true
+  resolveObjects = true,
+  nestedArrayItem = false
 }: {
   value: unknown;
   state?: TraceState;
@@ -3926,6 +3941,8 @@ function DataValue({
   depth?: number;
   seen?: Set<string>;
   resolveObjects?: boolean;
+  /** Prevent a one-dimensional array stored inside a collection from being mistaken for a matrix row. */
+  nestedArrayItem?: boolean;
 }) {
   if (isPlainObject(value) && typeof value.$ref === 'string' &&
       (typeof value.$arrayId === 'string' || typeof value.$mapId === 'string' || typeof value.$collectionId === 'string')) {
@@ -3954,7 +3971,7 @@ function DataValue({
   if (isArraySnapshot(value)) {
     return (
       <>
-        <ArrayView value={value.values} state={state} source={source} arrayName={name} depth={depth} seen={seen}/>
+        <ArrayView value={value.values} state={state} source={source} arrayName={name} depth={depth} seen={seen} nestedItems={nestedArrayItem}/>
         {value.truncated === true && (
           <div className="yv-truncated">
             Showing first {value.values.length} of {String(value.length ?? '?')} items.
@@ -3964,7 +3981,7 @@ function DataValue({
     );
   }
 
-  if (Array.isArray(value)) return <ArrayView value={value} state={state} source={source} arrayName={name} depth={depth} seen={seen}/>;
+  if (Array.isArray(value)) return <ArrayView value={value} state={state} source={source} arrayName={name} depth={depth} seen={seen} nestedItems={nestedArrayItem}/>;
   if (isPlainObject(value)) {
     if (looksTreeNode(value)) return <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects??{}} state={state}/></div>;
     if (looksListNode(value)) return <LinkedListView root={value} objects={state?.objects??{}} variables={state?.variables??{}} state={state}/>;
