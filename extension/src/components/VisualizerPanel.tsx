@@ -3798,7 +3798,8 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
         </span>}
       </div>
       {genericChildEdges.length > 0 && (
-        <div className="yv-universal-children" data-tree-layout="nary">
+        <div className="yv-universal-children" data-tree-layout="nary"
+          style={{ gridTemplateColumns: `repeat(${genericChildEdges.length}, minmax(88px, 1fr))`, ['--yv-child-count' as string]: genericChildEdges.length } as CSSProperties}>
           {genericChildEdges.map((edge, index) => {
             const childEntered = movedPointerTargets.has(edge.target);
             return (
@@ -4492,6 +4493,7 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
       '.yv-binary-children', '.yv-binary-branch', '.yv-binary-edge-label',
       '.yv-binary-edge-status', '.yv-binary-pointer-labels',
       '.yv-tree-reference-labels', '.yv-tree-reference-label',
+      '.yv-universal-children', '.yv-universal-branch', '.yv-universal-edge-label',
     ];
     const rules: string[] = [];
     const rulePattern = /([^{}]+)\{([^{}]*)\}/g;
