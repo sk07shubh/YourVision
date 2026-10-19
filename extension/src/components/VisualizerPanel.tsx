@@ -4148,8 +4148,8 @@ function isStructuralObject(value: unknown): value is Obj {
   const fields = objectFields(value);
   const type = objectType(value);
   return /ListNode|TreeNode/i.test(type) ||
-    ('next' in fields && ('val' in fields || 'value' in fields)) ||
-    (('left' in fields || 'right' in fields) && ('val' in fields || 'value' in fields));
+    looksTreeNode(value) ||
+    ('next' in fields && ('val' in fields || 'value' in fields));
 }
 
 function stringBuilderText(value: unknown): string | undefined {
