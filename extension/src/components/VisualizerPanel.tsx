@@ -9,6 +9,7 @@ import type { TraceState } from '../types/trace';
 import { buildObjectStructureModel } from './treeModel';
 import visualizerPanelSource from './VisualizerPanel.tsx?raw';
 import visualizerStylesSource from './styles.css?raw';
+import treeModelSource from './treeModel.ts?raw';
 
 type Obj = Record<string, unknown>;
 
@@ -4454,6 +4455,7 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
       "import type { TraceState } from '../types/trace';",
       "import { sessionStore } from '../state/store';",
       "import { displayValue, stableStringify, isPlainObject } from '../utils/value';",
+      "import { buildObjectStructureModel } from './treeModel';",
       "type Obj = Record<string, unknown>;",
       '',
       panel.slice(helpersStart, helpersEnd).trim(),
@@ -4474,6 +4476,7 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
       '.yv-binary-node-value', '.yv-binary-node-identity', '.yv-binary-node-status',
       '.yv-binary-children', '.yv-binary-branch', '.yv-binary-edge-label',
       '.yv-binary-edge-status', '.yv-binary-pointer-labels',
+      '.yv-tree-reference-labels', '.yv-tree-reference-label',
     ];
     const rules: string[] = [];
     const rulePattern = /([^{}]+)\{([^{}]*)\}/g;
@@ -4507,6 +4510,9 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
       '===== Binary Tree Visualization: minimal review bundle =====',
       '===== Required rendering code and dependencies =====',
       requiredCode,
+      '',
+      '===== Shared node-and-edge model =====',
+      treeModelSource,
       '',
       '===== CSS used by the tree renderer =====',
       [...new Set(rules)].join('\n'),
