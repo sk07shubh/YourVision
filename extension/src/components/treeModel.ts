@@ -5,6 +5,7 @@ export interface StructureNode {
   value: unknown;
   type?: string;
   fields: Record<string, unknown>;
+  snapshot: Record<string, unknown>;
   metadata: Record<string, unknown>;
 }
 
@@ -157,6 +158,7 @@ export function buildObjectStructureModel(
       value: defaultValue(fields),
       type: typeof value.$type === 'string' ? value.$type : undefined,
       fields,
+      snapshot: value,
       metadata: Object.fromEntries(Object.entries(fields).filter(([key]) =>
         !['left', 'right', 'children', ...referenceFields].includes(key)
       )),
@@ -265,6 +267,7 @@ export function buildHeapStructureModel(values: unknown[]): StructureModel {
     value,
     type: 'HeapNode',
     fields: { value, index },
+    snapshot: { value, index },
     metadata: { index },
   }));
   const edges: StructureEdge[] = [];
