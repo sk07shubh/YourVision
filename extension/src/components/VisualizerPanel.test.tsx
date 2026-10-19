@@ -2530,3 +2530,17 @@ describe('shared universal tree rendering', () => {
     expect(html).toContain('>C<');
   });
 });
+
+
+describe('multi-key tree node rendering', () => {
+  it('renders B-tree keys as separate cells and exposes balancing metadata', () => {
+    const objects = {
+      root: { $objectId: 'btree-root', $type: 'BTreeNode', keys: [10, 20], children: [] },
+    };
+    const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'btree-root' }} objects={objects} />);
+    expect(html).toContain('yv-node-key-cells');
+    expect(html).toContain('yv-node-key-cell');
+    expect(html).toContain('>10<');
+    expect(html).toContain('>20<');
+  });
+});
