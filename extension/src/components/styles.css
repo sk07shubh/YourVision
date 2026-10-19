@@ -2159,3 +2159,9 @@
     padding-top: 22px;
   }
 }
+
+/* Align the parent stem endpoint exactly with the horizontal child rail. */
+.yv-binary-node > .yv-binary-node-card:has(+ .yv-binary-children)::after {
+  bottom: -12px;
+  height: 12px;
+}
