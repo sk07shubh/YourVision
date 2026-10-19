@@ -91,6 +91,179 @@ describe('synchronized function invocation tree', () => {
     expect(historical.get('call-1')?.status).toBe('active');
   });
 
+  it('captures a nested call return value for its compact preview', () => {
+    const states = [
+      state({ invocationId: 'solve-call', lastEvent: { type: 'METHOD_ENTER', method: 'solve', data: {
+        invocationId: 'solve-call', declaringType: 'Solution', parameterTypes: ['int'], returnType: 'int', variables: { n: 4 },
+      } } }),
+      state({ invocationId: 'helper-call', parentInvocationId: 'solve-call', lastEvent: { type: 'METHOD_ENTER', method: 'helper', data: {
+        invocationId: 'helper-call', parentInvocationId: 'solve-call', parameterTypes: ['int'], returnType: 'int', variables: { x: 4 },
+      } } }),
+      state({ invocationId: 'helper-call', parentInvocationId: 'solve-call', lastEvent: { type: 'METHOD_EXIT', method: 'helper', data: {
+        invocationId: 'helper-call', parentInvocationId: 'solve-call', returnType: 'int', returnValue: 5, returnedVoid: false,
+      } } }),
+    ];
+    const { nodes } = buildInvocationNodes(states);
+    expect(nodes.get('helper-call')?.arguments).toEqual([{ name: 'x', value: 4 }]);
+    expect(nodes.get('helper-call')?.status).toBe('returned');
+    expect(nodes.get('helper-call')?.returnValue).toBe(5);
+    expect(nodes.get('helper-call')?.exitState).toBe(states[2]);
+  });
+
+  it('shows caller expressions mapped to the callee parameters with captured values', () => {
+    const source = [
+      'class Solution {',
+      '  boolean find(int[] nums, int target, int idx) { return false; }',
+      '  boolean solve(int[] arr, int trgt, int index) {',
+      '    return find(arr, trgt, index + 1); // find(wrong, wrong, wrong)',
+      '  }',
+      '}',
+    ].join('\n');
+    const states = [
+      state({ line: 3, invocationId: 'solve-call', lastEvent: { type: 'METHOD_ENTER', method: 'solve', data: {
+        invocationId: 'solve-call', declaringType: 'Solution', parameterTypes: ['int[]', 'int', 'int'], variables: { arr: [2, 5, 8], trgt: 8, index: 3 },
+      } } }),
+      state({ line: 4, invocationId: 'solve-call', lastEvent: { type: 'STEP', method: 'solve', data: { invocationId: 'solve-call', variables: { arr: [2, 5, 8], trgt: 8, index: 3 } } } }),
+      state({ line: 4, invocationId: 'find-call', parentInvocationId: 'solve-call', lastEvent: { type: 'METHOD_ENTER', method: 'find', data: {
+        invocationId: 'find-call', parentInvocationId: 'solve-call', parameterTypes: ['int[]', 'int', 'int'], variables: { nums: [2, 5, 8], target: 8, idx: 4 },
+      } } }),
+    ];
+    const { nodes } = buildInvocationNodes(states, source);
+    expect(nodes.get('find-call')?.signature).toBe('find(arr, trgt, index + 1)');
+    expect(nodes.get('find-call')?.arguments).toEqual([
+      { name: 'nums', expression: 'arr', value: [2, 5, 8] },
+      { name: 'target', expression: 'trgt', value: 8 },
+      { name: 'idx', expression: 'index + 1', value: 4 },
+    ]);
+  });
+
+  it('prefers JVM-captured entry arguments over local snapshots and later mutations', () => {
+    const source = [
+      'class Solution {',
+      '  void helper(int zero, boolean enabled, Object nothing) { zero = 9; }',
+      '  void solve() { helper(0, false, null); }',
+      '}',
+    ].join('\n');
+    const states = [
+      state({
+        line: 3,
+        invocationId: 'solve-call',
+        lastEvent: { type: 'METHOD_ENTER', method: 'solve', data: {
+          invocationId: 'solve-call', declaringType: 'Solution', variables: {},
+        } },
+      }),
+      state({
+        line: 3,
+        invocationId: 'solve-call',
+        lastEvent: { type: 'STEP', method: 'solve', data: {
+          invocationId: 'solve-call', variables: {},
+        } },
+      }),
+      state({
+        line: 2,
+        invocationId: 'helper-call',
+        parentInvocationId: 'solve-call',
+        lastEvent: { type: 'METHOD_ENTER', method: 'helper', data: {
+          invocationId: 'helper-call',
+          parentInvocationId: 'solve-call',
+          parameterTypes: ['int', 'boolean', 'java.lang.Object'],
+          argumentValues: [0, false, null],
+          variables: { zero: 9, enabled: true, nothing: { stale: true } },
+        } },
+      }),
+      state({
+        line: 2,
+        invocationId: 'helper-call',
+        parentInvocationId: 'solve-call',
+        variables: { zero: 9, enabled: true, nothing: { stale: true } },
+        lastEvent: { type: 'STEP', method: 'helper', data: {
+          invocationId: 'helper-call',
+          variables: { zero: 9, enabled: true, nothing: { stale: true } },
+        } },
+      }),
+    ];
+    const { nodes } = buildInvocationNodes(states, source);
+    expect(nodes.get('helper-call')?.arguments).toEqual([
+      { name: 'zero', expression: '0', value: 0 },
+      { name: 'enabled', expression: 'false', value: false },
+      { name: 'nothing', expression: 'null', value: null },
+    ]);
+  });
+
+  it('recovers missing entry arguments from the earliest checkpoint of the same invocation', () => {
+    const source = [
+      'class Solution {',
+      '  void helper(int zero, boolean enabled, Object nothing) { zero = 9; }',
+      '  void solve() { helper(0, false, null); }',
+      '}',
+    ].join('\n');
+    const states = [
+      state({
+        line: 3,
+        invocationId: 'solve-call',
+        lastEvent: { type: 'METHOD_ENTER', method: 'solve', data: {
+          invocationId: 'solve-call', declaringType: 'Solution', variables: {},
+        } },
+      }),
+      state({
+        line: 3,
+        invocationId: 'solve-call',
+        lastEvent: { type: 'STEP', method: 'solve', data: {
+          invocationId: 'solve-call', variables: {},
+        } },
+      }),
+      state({
+        line: 2,
+        invocationId: 'helper-call',
+        parentInvocationId: 'solve-call',
+        variables: {},
+        lastEvent: { type: 'METHOD_ENTER', method: 'helper', data: {
+          invocationId: 'helper-call', parentInvocationId: 'solve-call',
+          parameterTypes: ['int', 'boolean', 'java.lang.Object'], variables: {},
+        } },
+      }),
+      state({
+        line: 2,
+        invocationId: 'helper-call',
+        parentInvocationId: 'solve-call',
+        variables: { zero: 0, enabled: false, nothing: null },
+        lastEvent: { type: 'STEP', method: 'helper', data: {
+          invocationId: 'helper-call', variables: { zero: 0, enabled: false, nothing: null },
+        } },
+      }),
+      state({
+        line: 2,
+        invocationId: 'helper-call',
+        parentInvocationId: 'solve-call',
+        variables: { zero: 9, enabled: false, nothing: null },
+        lastEvent: { type: 'STEP', method: 'helper', data: {
+          invocationId: 'helper-call', variables: { zero: 9, enabled: false, nothing: null },
+        } },
+      }),
+    ];
+    const { nodes } = buildInvocationNodes(states, source);
+    expect(nodes.get('helper-call')?.signature).toBe('helper(0, false, null)');
+    expect(nodes.get('helper-call')?.arguments).toEqual([
+      { name: 'zero', expression: '0', value: 0 },
+      { name: 'enabled', expression: 'false', value: false },
+      { name: 'nothing', expression: 'null', value: null },
+    ]);
+  });
+
+  it('keeps the source variable name for a returned collection', () => {
+    const source = 'class Solution { int[] solve(int[] nums) { return nums; } }';
+    const states = [
+      state({ invocationId: 'solve-call', line: 1, lastEvent: { type: 'METHOD_ENTER', method: 'solve', data: {
+        invocationId: 'solve-call', declaringType: 'Solution', parameterTypes: ['int[]'], returnType: 'int[]', variables: { nums: [2, 7, 11] },
+      } } }),
+      state({ invocationId: 'solve-call', line: 1, lastEvent: { type: 'METHOD_EXIT', method: 'solve', data: {
+        invocationId: 'solve-call', returnType: 'int[]', returnValue: [2, 7, 11], returnedVoid: false,
+      } } }),
+    ];
+    const { nodes } = buildInvocationNodes(states, source);
+    expect(nodes.get('solve-call')?.returnValueName).toBe('nums');
+  });
+
   it('uses the checkpoint parent id when the event payload omits it', () => {
     const states = [
       state({

@@ -4612,6 +4612,133 @@ function parseClassFieldDeclarations(source: string): ClassFieldDeclaration[] {
   return declarations.filter((item, index, all) => all.findIndex(candidate => candidate.name === item.name) === index);
 }
 
+function splitCallArguments(source: string, method: string, line: number): string[] {
+  const lines = source.split(/\r?\n/);
+  if (!Number.isFinite(line) || line < 1 || line > lines.length) return [];
+
+  // Search every occurrence in the source rather than only the first match in a
+  // small window. A declaration may precede the real call in that same window,
+  // and multiline calls can extend beyond an arbitrary window boundary.
+  const candidates: Array<{ distance: number; span: number; args: string[] }> = [];
+
+  // Keep offsets and newlines stable while hiding comments and string contents
+  // from call-name matching. Parse the actual argument text from the original source.
+  const searchable = source.split('');
+  let quote = '';
+  let escaped = false;
+  let lineComment = false;
+  let blockComment = false;
+  for (let i = 0; i < source.length; i += 1) {
+    const ch = source[i]!;
+    const next = source[i + 1] ?? '';
+    if (lineComment) {
+      if (ch === '\n' || ch === '\r') lineComment = false;
+      else searchable[i] = ' ';
+      continue;
+    }
+    if (blockComment) {
+      if (ch === '*' && next === '/') {
+        searchable[i] = ' ';
+        if (i + 1 < searchable.length) searchable[i + 1] = ' ';
+        i += 1;
+        blockComment = false;
+      } else if (ch !== '\n' && ch !== '\r') {
+        searchable[i] = ' ';
+      }
+      continue;
+    }
+    if (quote) {
+      searchable[i] = ' ';
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '/' && next === '/') {
+      searchable[i] = ' ';
+      if (i + 1 < searchable.length) searchable[i + 1] = ' ';
+      i += 1;
+      lineComment = true;
+    } else if (ch === '/' && next === '*') {
+      searchable[i] = ' ';
+      if (i + 1 < searchable.length) searchable[i + 1] = ' ';
+      i += 1;
+      blockComment = true;
+    } else if (ch === '"' || ch === "'") {
+      searchable[i] = ' ';
+      quote = ch;
+    }
+  }
+
+  const searchableSource = searchable.join('');
+  const pattern = new RegExp('\\b' + method + '\\s*\\(', 'g');
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(searchableSource)) !== null) {
+    const open = source.indexOf('(', match.index);
+    let depth = 0;
+    let quote = '';
+    let escaped = false;
+    let close = -1;
+
+    for (let i = open; i < source.length; i += 1) {
+      const ch = source[i]!;
+      if (quote) {
+        if (escaped) escaped = false;
+        else if (ch === '\\') escaped = true;
+        else if (ch === quote) quote = '';
+        continue;
+      }
+      if (ch === '"' || ch === "'") { quote = ch; continue; }
+      if (ch === '(') depth += 1;
+      else if (ch === ')') {
+        depth -= 1;
+        if (depth === 0) { close = i; break; }
+      }
+    }
+    if (close < 0) continue;
+
+    const after = source.slice(close + 1);
+    // Exclude method declarations, including declarations with a throws clause.
+    if (/^\s*(?:throws\b[^{};]*)?\s*\{/.test(after)) continue;
+
+    const before = source.slice(0, match.index);
+    const callLine = before.split(/\r?\n/).length;
+    const raw = source.slice(open + 1, close);
+    const args: string[] = [];
+    let startArg = 0;
+    let parens = 0, brackets = 0, braces = 0;
+    quote = ''; escaped = false;
+
+    for (let i = 0; i < raw.length; i += 1) {
+      const ch = raw[i]!;
+      if (quote) {
+        if (escaped) escaped = false;
+        else if (ch === '\\') escaped = true;
+        else if (ch === quote) quote = '';
+        continue;
+      }
+      if (ch === '"' || ch === "'") { quote = ch; continue; }
+      if (ch === '(') parens += 1;
+      else if (ch === ')') parens -= 1;
+      else if (ch === '[') brackets += 1;
+      else if (ch === ']') brackets -= 1;
+      else if (ch === '{') braces += 1;
+      else if (ch === '}') braces -= 1;
+      else if (ch === ',' && parens === 0 && brackets === 0 && braces === 0) {
+        args.push(raw.slice(startArg, i).trim());
+        startArg = i + 1;
+      }
+    }
+    if (raw.trim()) args.push(raw.slice(startArg).trim());
+    candidates.push({ distance: Math.abs(callLine - line), span: close - open, args });
+  }
+
+  // Exact-line matches win. If nested calls of the same method share a line,
+  // the innermost expression is entered first by Java, so prefer its shorter span.
+  candidates.sort((a, b) => a.distance - b.distance || a.span - b.span);
+  return candidates[0]?.args ?? [];
+}
 type InvocationNode = {
   id: string;
   parentId: string;
@@ -4620,10 +4747,12 @@ type InvocationNode = {
   entryIndex: number;
   status: 'active' | 'returned' | 'void' | 'exceptional';
   returnValue?: unknown;
+  returnValueName?: string;
   returnType?: string;
   frameVariables: Record<string, unknown>;
-  arguments: Array<{ name: string; value: unknown }>;
+  arguments: Array<{ name: string; value: unknown; expression?: string }>;
   entryState?: TraceState;
+  exitState?: TraceState;
   children: string[];
 };
 
@@ -4670,16 +4799,34 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
         ...(isPlainObject(states[index]?.variables) ? states[index].variables : {}),
         ...(isPlainObject(data.variables) ? data.variables : {})
       };
-      const argumentNames = rawParams.map((_type, index) =>
+      const argumentCount = Math.max(rawParams.length, parameterNames.length);
+      const argumentNames = Array.from({ length: argumentCount }, (_unused, index) =>
         parameterNames[index] && parameterNames[index] !== 'this'
           ? parameterNames[index]
           : 'arg' + (index + 1)
       );
-      const argumentsList = argumentNames.map(name => ({
+      // These values are captured directly from StackFrame.getArgumentValues()
+      // by the Java tracer, so they remain correct even when JDI cannot expose
+      // parameter names/locals at the method-entry location.
+      const capturedArgumentValues = Array.isArray(data.argumentValues)
+        ? data.argumentValues
+        : [];
+      const parentCallLine = (() => {
+        for (let previous = index - 1; previous >= 0; previous -= 1) {
+          const prior = states[previous];
+          if (prior?.invocationId === parentId && typeof prior.line === 'number') return prior.line;
+        }
+        return typeof states[index - 1]?.line === 'number' ? states[index - 1].line : undefined;
+      })();
+      const callExpressions = parentCallLine === undefined ? [] : splitCallArguments(source, method, parentCallLine);
+      const argumentsList = argumentNames.map((name, argumentIndex) => ({
         name,
-        value: Object.prototype.hasOwnProperty.call(entryVariables, name) ? entryVariables[name] : undefined
+        expression: callExpressions[argumentIndex] || name,
+        value: argumentIndex < capturedArgumentValues.length
+          ? capturedArgumentValues[argumentIndex]
+          : Object.prototype.hasOwnProperty.call(entryVariables, name) ? entryVariables[name] : undefined
       }));
-      const signature = `${method}(${argumentNames.join(', ')})`;
+      const signature = `${method}(${argumentsList.map(argument => argument.expression ?? argument.name).join(', ')})`;
       const returnType = typeof data.returnType === 'string' ? displayType(data.returnType) : undefined;
       const root = nodes.get('root');
       if (root && typeof data.declaringType === 'string' && data.declaringType) {
@@ -4692,8 +4839,13 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
       const node = nodes.get(data.invocationId);
       if (!node) continue;
       node.status = data.exceptional === true ? 'exceptional' : data.returnedVoid === true ? 'void' : 'returned';
+      node.exitState = states[index];
       if (Object.prototype.hasOwnProperty.call(data, 'returnValue')) node.returnValue = data.returnValue;
       else if (data.hasReturnValue === true) node.returnValue = null;
+      const exitLine = states[index]?.line;
+      const returnStatement = typeof exitLine === 'number' ? source.split(/\r?\n/)[exitLine - 1] : undefined;
+      const returnedVariable = returnStatement?.match(/\breturn\s+(?:this\.)?([A-Za-z_$][\w$]*)\s*;/);
+      if (returnedVariable?.[1]) node.returnValueName = returnedVariable[1];
       if (typeof data.returnType === 'string') node.returnType = data.returnType;
     }
 
@@ -4710,8 +4862,30 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
       ? states[index].invocationId
       : typeof data.invocationId === 'string' ? data.invocationId : undefined;
     const checkpointNode = checkpointId ? nodes.get(checkpointId) : undefined;
-    if (checkpointNode && event?.type !== 'METHOD_EXIT' && isPlainObject(data.variables)) {
-      checkpointNode.frameVariables = data.variables;
+    if (checkpointNode && event?.type !== 'METHOD_EXIT') {
+      // State snapshots and event payloads are not always populated at the same
+      // checkpoint. Prefer event frame variables when present, while also
+      // accepting the normalized state snapshot as a fallback.
+      const snapshot = {
+        ...(isPlainObject(states[index]?.variables) ? states[index].variables : {}),
+        ...(isPlainObject(data.variables) ? data.variables : {}),
+      };
+      if (Object.keys(snapshot).length > 0) {
+        checkpointNode.frameVariables = snapshot;
+
+        // METHOD_ENTER can arrive before JDI exposes every parameter in the
+        // local-variable table. Fill only missing values from the earliest later
+        // snapshot for this exact invocation. Never replace captured values
+        // (including null, 0, false, or empty collections) with later mutations.
+        checkpointNode.arguments = checkpointNode.arguments.map(argument => {
+          if (argument.value !== undefined ||
+              !Object.prototype.hasOwnProperty.call(snapshot, argument.name) ||
+              snapshot[argument.name] === undefined) {
+            return argument;
+          }
+          return { ...argument, value: snapshot[argument.name] };
+        });
+      }
     }
   }
   // Resolve relationships only after every invocation in this checkpoint prefix is known.
@@ -4731,7 +4905,7 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
 }
 
 function InvocationTree({ states, currentIndex, onSelect, source }: { states: TraceState[]; currentIndex: number; onSelect: (index: number) => void; source: string }) {
-  const [openArguments, setOpenArguments] = useState<{ node: InvocationNode; anchor: HTMLElement } | null>(null);
+  const [openArguments, setOpenArguments] = useState<{ node: InvocationNode; anchor: HTMLElement; kind?: 'arguments' | 'return' } | null>(null);
   const [argumentPopoverPosition, setArgumentPopoverPosition] = useState<{ left: number; top: number; maxHeight: number } | null>(null);
   const argumentCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const argumentPopoverRef = useRef<HTMLDivElement | null>(null);
@@ -4799,10 +4973,10 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
     window.addEventListener('scroll', updateArgumentPopoverPosition, true);
     return () => { window.removeEventListener('resize', updateArgumentPopoverPosition); window.removeEventListener('scroll', updateArgumentPopoverPosition, true); };
   }, [openArguments, updateArgumentPopoverPosition]);
-  const openArgumentPreview = (node: InvocationNode, anchor: HTMLElement) => {
+  const openArgumentPreview = (node: InvocationNode, anchor: HTMLElement, kind: 'arguments' | 'return' = 'arguments') => {
     if (argumentCloseTimer.current) clearTimeout(argumentCloseTimer.current);
     argumentCloseTimer.current = null;
-    setOpenArguments({ node, anchor });
+    setOpenArguments({ node, anchor, kind });
   };
   const scheduleArgumentPreviewClose = () => {
     if (argumentCloseTimer.current) clearTimeout(argumentCloseTimer.current);
@@ -4855,17 +5029,17 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
                 className="yv-tree-arguments-trigger"
                 aria-label={`Preview all arguments passed to ${node.method}`}
                 aria-haspopup="true"
-                aria-expanded={openArguments?.node.id === node.id}
+                aria-expanded={openArguments?.node.id === node.id && (openArguments.kind ?? 'arguments') === 'arguments'}
                 onMouseEnter={event => openArgumentPreview(node, event.currentTarget)}
                 onMouseLeave={scheduleArgumentPreviewClose}
                 onFocus={event => openArgumentPreview(node, event.currentTarget)}
                 onBlur={scheduleArgumentPreviewClose}
-                onClick={event => { event.stopPropagation(); if (openArguments?.node.id === node.id) setOpenArguments(null); else openArgumentPreview(node, event.currentTarget); }}
+                onClick={event => { event.stopPropagation(); if (openArguments?.node.id === node.id && (openArguments.kind ?? 'arguments') === 'arguments') setOpenArguments(null); else openArgumentPreview(node, event.currentTarget, 'arguments'); }}
                 onKeyDown={event => { event.stopPropagation(); if (event.key === "Escape") setOpenArguments(null); }}
               >
                 ({node.arguments.map((argument, argumentIndex) => (
                   <span className="yv-tree-argument-name" key={argument.name}>
-                    {argument.name}{argumentIndex < node.arguments.length - 1 ? ', ' : ''}
+                    {argument.expression ?? argument.name}{argumentIndex < node.arguments.length - 1 ? ', ' : ''}
                   </span>
                 ))})
               </button>
@@ -4890,7 +5064,27 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
               onKeyDown={event => { event.stopPropagation(); if (event.key === "Escape") setOpenClassContext(null); }}
             >Class context</button>
           </span>
-        ) : <span className="yv-tree-outcome">{result}</span>}
+        ) : (
+          <span className="yv-tree-outcome">
+            {node.status === 'returned' ? (
+              <span className="yv-tree-return-value">
+                <button
+                  type="button"
+                  className="yv-tree-arguments-trigger yv-tree-return-trigger"
+                  aria-label={`Preview return value from ${node.method}`}
+                  aria-haspopup="true"
+                  aria-expanded={openArguments?.node.id === node.id && openArguments.kind === 'return'}
+                  onMouseEnter={event => openArgumentPreview(node, event.currentTarget, 'return')}
+                  onMouseLeave={scheduleArgumentPreviewClose}
+                  onFocus={event => openArgumentPreview(node, event.currentTarget, 'return')}
+                  onBlur={scheduleArgumentPreviewClose}
+                  onClick={event => { event.stopPropagation(); if (openArguments?.node.id === node.id && openArguments.kind === 'return') setOpenArguments(null); else openArgumentPreview(node, event.currentTarget, 'return'); }}
+                  onKeyDown={event => { event.stopPropagation(); if (event.key === "Escape") setOpenArguments(null); }}
+                >{node.returnValueName ?? 'return'}</button>
+              </span>
+            ) : result}
+          </span>
+        )}
       </div>
       {node.children.length > 0 && <div className="yv-tree-children">{node.children.map(child => renderNode(child, depth + 1))}</div>}
     </div>;
@@ -4905,16 +5099,23 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
         ref={argumentPopoverRef}
         className="yv-tree-arguments-popover yv-tree-arguments-popover-portal"
         role="region"
-        aria-label={`Arguments for ${openArguments.node.method}`}
+        aria-label={openArguments.kind === 'return' ? `Return value from ${openArguments.node.method}` : `Arguments for ${openArguments.node.method}`}
         style={{ left: argumentPopoverPosition.left, top: argumentPopoverPosition.top, maxHeight: argumentPopoverPosition.maxHeight }}
         onMouseEnter={() => { if (argumentCloseTimer.current) clearTimeout(argumentCloseTimer.current); argumentCloseTimer.current = null; }}
         onMouseLeave={scheduleArgumentPreviewClose}
         onFocus={() => { if (argumentCloseTimer.current) clearTimeout(argumentCloseTimer.current); argumentCloseTimer.current = null; }}
         onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) scheduleArgumentPreviewClose(); }}
       >
-        {openArguments.node.arguments.map(argument => (
+        {openArguments.kind === 'return' ? (
+          <span className="yv-tree-argument-preview">
+            <strong className="yv-tree-argument-label">{openArguments.node.returnValueName ?? "return"}</strong>
+            <span className="yv-tree-argument-value">
+              <DataValue value={openArguments.node.returnValue} state={openArguments.node.exitState ?? openArguments.node.entryState} source={source} name={openArguments.node.returnValueName ?? "return"} />
+            </span>
+          </span>
+        ) : openArguments.node.arguments.map(argument => (
           <span className="yv-tree-argument-preview" key={argument.name}>
-            <strong className="yv-tree-argument-label">{argument.name}</strong>
+            <strong className="yv-tree-argument-label">{argument.expression && argument.expression !== argument.name ? <>{argument.expression} <span aria-hidden="true">→</span> {argument.name}</> : argument.name}</strong>
             <span className="yv-tree-argument-value">
               {argument.value === undefined
                 ? <span className="yv-code">Value not captured</span>

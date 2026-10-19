@@ -844,7 +844,7 @@
 .yv-tree-node.exceptional { border-color:#874343; }
 .yv-tree-method { display:block; width:max-content; max-width:100%; overflow-wrap:normal; white-space:normal; font-size:11px; font-weight:600; padding:2px 0 6px; border-bottom:1px solid #465160; }
 .yv-tree-outcome { display:block; width:max-content; max-width:100%; box-sizing:border-box; color:#a4adba; font-size:10px; overflow-wrap:anywhere; border-top:1px solid #465160; padding:6px 0 2px; }
-.yv-tree-children { margin:0 0 4px 13px; padding-left:10px; border-left:1px solid #48515e; }
+.yv-tree-children { margin:0 0 4px 13px; padding-left:10px; border-left: none; }
 @media (prefers-reduced-motion: reduce) { .yv-workspace-tree { transition:none; } }
 @media (max-width:680px) {
   .yv-workspace.tree-open { flex-direction:column; }
@@ -929,7 +929,7 @@
   max-width: none;
   margin: 0 0 4px 13px;
   padding-left: 10px;
-  border-left: 2px solid #596575;
+  border-left: none;
 }
 .yv-tree-children > .yv-tree-branch {
   width: max-content;
@@ -1355,6 +1355,12 @@
   background: var(--yv-depth-bg, #171c35);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 3px 10px rgba(0,0,0,.13);
 }
+/* The running invocation highlights its actual outer card, not an inset outline. */
+.yv-workspace.tree-open .yv-tree-branch:has(> .yv-tree-node.selected) {
+  border: 2px solid #f8fafc;
+  background: #303746;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.16), 0 4px 14px rgba(0,0,0,.24);
+}
 .yv-workspace.tree-open .yv-tree-branch.depth-0 {
   --yv-depth-bg: #171d3c;
   --yv-depth-border: #818cf8;
@@ -1414,9 +1420,9 @@
   background: rgba(255,255,255,.055);
 }
 .yv-workspace.tree-open .yv-tree-node.selected {
-  background: rgba(251,191,36,.13);
-  box-shadow: inset 3px 0 #fbbf24, 0 0 0 1px rgba(251,191,36,.8);
-  color: #fff7d6;
+  background: transparent;
+  box-shadow: none;
+  color: #ffffff;
 }
 .yv-workspace.tree-open .yv-tree-method {
   box-sizing: border-box;
@@ -1456,8 +1462,6 @@
   max-width: none;
   margin: 7px 0 0 5px;
   padding: 8px 0 0 10px;
-  border-top: 1px solid color-mix(in srgb, var(--yv-depth-border, #818cf8), transparent 50%);
-  border-left: 2px solid color-mix(in srgb, var(--yv-depth-border, #818cf8), transparent 22%);
 }
 .yv-workspace.tree-open .yv-tree-children > .yv-tree-branch {
   width: max-content;
@@ -1503,8 +1507,6 @@
   max-width: 100%;
   margin: 8px 0 0;
   padding: 8px 0 0 10px;
-  border-top: 1px solid color-mix(in srgb, var(--yv-depth-border, #818cf8), transparent 50%);
-  border-left: 2px solid color-mix(in srgb, var(--yv-depth-border, #818cf8), transparent 22%);
 }
 .yv-workspace.tree-open .yv-tree-children > .yv-tree-branch {
   flex: 0 0 auto;
@@ -1834,3 +1836,14 @@
 @media(prefers-reduced-motion:reduce){.yv-dsu-changed>.yv-dsu-node,.yv-dsu-created>.yv-dsu-node,.yv-dsu-field-changed{animation:none}}
 
 @media(prefers-reduced-motion:reduce){.yv-tree-node-entered>.yv-node,.yv-tree-node-created>.yv-node,.yv-tree-node-changed>.yv-node,.yv-tree-edge-changed,.yv-tree-edge-traversed{animation:none}}
+
+/* Return values use the same compact hover/focus preview as arguments. */
+.yv-tree-return-value {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+.yv-tree-return-trigger {
+  color: var(--yv-accent, #93c5fd);
+}
