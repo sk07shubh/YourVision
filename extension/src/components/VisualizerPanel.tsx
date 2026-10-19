@@ -6,7 +6,7 @@ import { sessionStore } from '../state/store';
 import { displayValue, stableStringify, isPlainObject } from '../utils/value';
 import { highlightEditorLine, clearEditorExecutionMarker } from '../leetcode/editor-overlay';
 import type { TraceState } from '../types/trace';
-import { buildObjectStructureModel } from './treeModel';
+import { buildHeapStructureModel, buildObjectStructureModel } from './treeModel';
 import visualizerPanelSource from './VisualizerPanel.tsx?raw';
 import visualizerStylesSource from './styles.css?raw';
 import treeModelSource from './treeModel.ts?raw';
@@ -1286,6 +1286,7 @@ function HeapTreeView({
   depth: number;
   seen: Set<string>;
 }) {
+  const heapModel = useMemo(() => buildHeapStructureModel(value.values), [value.values]);
   const treeRef = useRef<HTMLDivElement | null>(null);
   const [geometry, setGeometry] = useState<{ width: number; height: number; paths: string; signature: string }>({
     width: 0, height: 0, paths: '', signature: ''
@@ -1316,10 +1317,12 @@ function HeapTreeView({
         });
       }
       const paths: string[] = [];
-      for (const [index, child] of centers) {
-        if (index === 0) continue;
-        const parent = centers.get(Math.floor((index - 1) / 2));
-        if (!parent) continue;
+      for (const edge of heapModel.edges) {
+        const parentIndex = Number(edge.source.slice('heap:'.length));
+        const childIndex = Number(edge.target.slice('heap:'.length));
+        const parent = centers.get(parentIndex);
+        const child = centers.get(childIndex);
+        if (!parent || !child) continue;
         paths.push(`M ${parent.x.toFixed(2)} ${parent.bottom.toFixed(2)} L ${child.x.toFixed(2)} ${child.top.toFixed(2)}`);
       }
       const pathData = paths.join(' ');
