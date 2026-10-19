@@ -2362,6 +2362,15 @@
   animation: yv-tree-metadata-change 720ms ease-out both;
   outline: 1px solid #FFA116;
 }
+.yv-tree-reference-changed {
+  color: #FFA116 !important;
+  border-color: #FFA116 !important;
+  animation: yv-tree-metadata-change 720ms ease-out both;
+}
+.yv-tree-reference-changed strong {
+  font-size: 9px;
+  letter-spacing: .04em;
+}
 .yv-binary-tree-edge.yv-tree-edge-added > .yv-binary-tree-edge-content {
   transform-origin: center top;
   animation: yv-tree-child-reveal 420ms cubic-bezier(.2,.8,.25,1) both;
@@ -2440,6 +2449,7 @@
   .yv-structure-node.yv-tree-node-entered > .yv-structure-node-card,
   .yv-tree-node-child-removed > .yv-structure-node-card,
   .yv-tree-metadata-changed,
+  .yv-tree-reference-changed,
   .yv-binary-tree-edge.yv-tree-edge-added > .yv-binary-tree-edge-content,
   .yv-binary-tree-edge.yv-binary-tree-edge-removed,
   .yv-tree-connectors line.yv-tree-connector-added,
