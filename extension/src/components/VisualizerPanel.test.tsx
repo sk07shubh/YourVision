@@ -580,6 +580,10 @@ describe('binary-tree visualization', () => {
     expect(html).toContain('data-tree-node-id="t1"');
     expect(html).toContain('data-tree-node-id="t2"');
     expect(html).toContain('data-tree-node-id="t3"');
+    expect(html).toContain('yv-binary-node');
+    expect(html).toContain('yv-binary-children');
+    expect(html).toContain('@t1');
+    expect(html).toContain('@t2');
     expect(html).toContain('data-tree-edge="left"');
     expect(html).toContain('data-tree-edge="right"');
     expect(html).toContain('LEFT');
@@ -610,6 +614,9 @@ describe('binary-tree visualization', () => {
       expect(html).toContain('data-tree-node-id="t2" data-tree-changed="true" data-tree-entered="true"');
       expect(html).toContain('yv-tree-node-entered');
       expect(html).toContain('yv-tree-node-changed');
+      expect(html).toContain('UPDATED');
+      expect(html).toContain('CURRENT');
+      expect(html).toContain('current');
     } finally {
       sessionStore.set(priorSession);
     }
@@ -636,6 +643,7 @@ describe('binary-tree visualization', () => {
       const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 't1' }} objects={current.objects} state={current} />);
       expect(html).toContain('data-tree-edge="left"');
       expect(html).toContain('data-tree-edge-status="removed"');
+      expect(html).toContain('REMOVED');
       expect(html).toContain('class="yv-null">null</span>');
     } finally {
       sessionStore.set(priorSession);
