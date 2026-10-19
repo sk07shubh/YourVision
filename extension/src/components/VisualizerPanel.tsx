@@ -3784,7 +3784,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const genericChildEdges = model.edges.filter(edge => edge.kind === 'child' && edge.source === modelNodeId);
   const currentChildSlots = new Set(genericChildEdges.map(edge => (edge.label ?? '').toLowerCase()));
   const removedChildEdges = Object.entries(previousFields).flatMap(([fieldName, previousValue]) => {
-    if (previousValue == null || !/^(left|right|children|child\\d+|firstChild|secondChild)$/i.test(fieldName)) return [];
+    if (previousValue == null || !/^(left|right|children|child\d+|firstChild|secondChild)$/i.test(fieldName)) return [];
     const currentValue = fields[fieldName];
     const previousTarget = graphReferenceId(previousValue, previousObjects);
     const currentTarget = graphReferenceId(currentValue, objects);
