@@ -4456,7 +4456,7 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
     for (const match of css.matchAll(rulePattern)) {
       const selector = match[1]!.trim();
       if (selector.startsWith('@keyframes') || selector.startsWith('@media')) continue;
-      if (selectors.some(needle => selector.split(',').some(part => part.trim() === needle))) {
+      if (selector.split(',').some(part => selectors.some(needle => { const rule = part.trim(); return rule === needle || rule.startsWith(needle + ' ') || rule.startsWith(needle + '>') || rule.startsWith(needle + ':') || rule.startsWith(needle + '['); }))) {
         rules.push(selector + ' {' + match[2]!.trim() + '}');
       }
     }
