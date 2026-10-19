@@ -1858,3 +1858,203 @@
 .yv-ds-result-snapshot .yv-collection,.yv-ds-result-snapshot .yv-array,.yv-ds-result-snapshot .yv-map{max-width:100%;min-width:0}
 .yv-ds-result-structured-values>.yv-ds-result-transition{align-self:center;flex:0 0 auto}
 @media(max-width:520px){.yv-ds-result-structured-values{flex-direction:column}.yv-ds-result-structured-values>.yv-ds-result-transition{align-self:center;transform:rotate(90deg)}}
+
+
+/* Binary-tree renderer: isolated from the similarly named recursion/function tree. */
+.yv-binary-node {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: max-content;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.yv-node.yv-binary-node-card {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: max-content;
+  min-width: 76px;
+  max-width: min(220px, 100%);
+  min-height: 54px;
+  padding: 8px 10px;
+  margin: 0;
+  border: 1px solid var(--yv-border);
+  border-radius: 10px;
+  background: var(--yv-elevated);
+  color: var(--yv-text);
+  box-shadow: 0 2px 8px var(--yv-shadow, rgba(0,0,0,.12));
+  text-align: center;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  z-index: 1;
+}
+.yv-binary-node-card:has(+ .yv-binary-children)::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -20px;
+  height: 20px;
+  border-left: 1px solid var(--yv-border);
+}
+.yv-binary-node-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  max-width: 100%;
+}
+.yv-binary-node-value {
+  font: 600 14px/1.25 ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-wrap: anywhere;
+}
+.yv-binary-node-identity {
+  color: var(--yv-muted);
+  font: 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.yv-binary-node-status {
+  border-radius: 4px;
+  padding: 2px 5px;
+  font: 700 9px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .045em;
+}
+.yv-binary-node-status.is-created {
+  color: var(--yv-success, #4ade80);
+  background: color-mix(in srgb, var(--yv-success, #4ade80), transparent 88%);
+}
+.yv-binary-node-status.is-changed {
+  color: var(--yv-accent, #65a9ff);
+  background: color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 88%);
+}
+.yv-binary-node-status.is-current {
+  color: var(--yv-warning, #fbbf24);
+  background: color-mix(in srgb, var(--yv-warning, #fbbf24), transparent 88%);
+}
+.yv-binary-node.yv-tree-node-entered > .yv-binary-node-card {
+  border-color: var(--yv-accent, #65a9ff);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 72%);
+  animation: yv-graph-node-entered 420ms ease-out both;
+}
+.yv-binary-node.yv-tree-node-changed > .yv-binary-node-card {
+  border-color: var(--yv-accent, #65a9ff);
+  animation: yv-graph-node-changed 420ms ease-out both;
+}
+.yv-binary-node.yv-tree-node-created > .yv-binary-node-card {
+  border-color: var(--yv-success, #4ade80);
+  animation: yv-graph-node-created 360ms cubic-bezier(.2,.8,.2,1) both;
+}
+.yv-binary-children {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(92px, max-content) minmax(92px, max-content);
+  justify-content: center;
+  align-items: start;
+  gap: clamp(12px, 2vw, 28px);
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding-top: 20px;
+}
+.yv-binary-children::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  left: 25%;
+  right: 25%;
+  border-top: 1px solid var(--yv-border);
+}
+.yv-binary-branch {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  padding-top: 4px;
+  box-sizing: border-box;
+}
+.yv-binary-branch::before {
+  content: "";
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  height: 17px;
+  border-left: 1px solid var(--yv-border);
+}
+.yv-binary-edge-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--yv-muted);
+  font: 700 9px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .06em;
+}
+.yv-binary-edge-status {
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 8px;
+  letter-spacing: 0;
+}
+.yv-binary-edge-status.is-added {
+  color: var(--yv-success, #4ade80);
+  background: color-mix(in srgb, var(--yv-success, #4ade80), transparent 88%);
+}
+.yv-binary-edge-status.is-removed {
+  color: var(--yv-warning, #fbbf24);
+  background: color-mix(in srgb, var(--yv-warning, #fbbf24), transparent 88%);
+}
+.yv-binary-edge-status.is-rewired {
+  color: var(--yv-accent, #65a9ff);
+  background: color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 88%);
+}
+.yv-binary-edge-status.is-traversed {
+  color: var(--yv-accent, #65a9ff);
+}
+.yv-binary-branch.yv-tree-edge-changed {
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 94%);
+  animation: yv-tree-edge-change 460ms ease-out both;
+}
+.yv-binary-branch.yv-tree-edge-changed[data-tree-edge-status="removed"] {
+  background: color-mix(in srgb, var(--yv-warning, #fbbf24), transparent 93%);
+}
+.yv-binary-branch.yv-tree-edge-traversed {
+  background: color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 95%);
+  border-radius: 8px;
+}
+.yv-binary-pointer-labels {
+  justify-content: center;
+  max-width: 100%;
+}
+.yv-binary-pointer-labels .yv-tree-pointer-label {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.yv-binary-node > .yv-null {
+  padding: 6px 8px;
+  border: 1px dashed var(--yv-border);
+  border-radius: 6px;
+  background: var(--yv-bg);
+}
+@media (max-width: 520px) {
+  .yv-binary-children { gap: 8px; grid-template-columns: minmax(76px, max-content) minmax(76px, max-content); }
+  .yv-node.yv-binary-node-card { min-width: 64px; padding: 7px 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-binary-node.yv-tree-node-entered > .yv-binary-node-card,
+  .yv-binary-node.yv-tree-node-changed > .yv-binary-node-card,
+  .yv-binary-node.yv-tree-node-created > .yv-binary-node-card,
+  .yv-binary-branch.yv-tree-edge-changed { animation: none; }
+}
