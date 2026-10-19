@@ -2165,7 +2165,7 @@ describe('array and matrix mutation animations', () => {
     expect(html).toContain('alpha');
     expect(html).toContain('beta');
     expect(html).toContain('gamma');
-    expect(html).toContain('yv-collection-backing');
+    expect(html).toContain('yv-list-view');
     expect(html).not.toContain('yv-matrix');
   });
 
