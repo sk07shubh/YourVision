@@ -3776,22 +3776,11 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   if (id) nextSeen.add(id);
   const fields = objectFields(resolved);
   const previousNode = id ? previousObjects[id] : undefined;
-  const previousFields = isPlainObject(previousNode) ? objectFields(previousNode) : {};
   const hasPreviousSnapshot = Boolean(state && previous && session.states.includes(state) && previousNode !== undefined);
   const changed = Boolean(hasPreviousSnapshot && stableStringify(previousNode) !== stableStringify(resolved));
   const created = Boolean(state && previous && session.states.includes(state) && id && previousNode === undefined);
-  const leftBefore = hasPreviousSnapshot ? graphReferenceId(previousFields.left, previousObjects) : undefined;
-  const leftAfter = graphReferenceId(fields.left, objects);
-  const rightBefore = hasPreviousSnapshot ? graphReferenceId(previousFields.right, previousObjects) : undefined;
-  const rightAfter = graphReferenceId(fields.right, objects);
-  const leftEdgeChanged = Boolean(hasPreviousSnapshot && leftBefore !== leftAfter);
-  const rightEdgeChanged = Boolean(hasPreviousSnapshot && rightBefore !== rightAfter);
-  // Keep the branch row for the removal step even if its last child vanished,
-  // so the changed edge can still show the transition to null.
   const modelNodeId = id ?? model.nodes.find(node => node.fields === fields)?.id;
   const genericChildEdges = model.edges.filter(edge => edge.kind === 'child' && edge.source === modelNodeId);
-  const edgeStatus = (before: string | null | undefined, after: string | null | undefined) =>
-    before == null ? 'added' : after == null ? 'removed' : 'rewired';
   const movedPointerTargets = new Set<string>();
   if (state && previous && session.states.includes(state)) {
     for (const [name, currentValue] of Object.entries(state.variables)) {
@@ -3809,7 +3798,6 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     ['color', 'bf', 'balanceFactor', 'height', 'weight', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord'].includes(name) &&
     (typeof metadataValue === 'string' || typeof metadataValue === 'number' || typeof metadataValue === 'boolean')
   );
-  const modelChildEdges = model.edges.filter(edge => edge.kind === 'child' && edge.source === modelNodeId);
   const modelReferenceEdges = model.edges.filter(edge => edge.kind === 'reference' && edge.source === modelNodeId);
   const entered = Boolean(state && previous && id && session.states.includes(state) &&
     movedPointerTargets.has(id));
