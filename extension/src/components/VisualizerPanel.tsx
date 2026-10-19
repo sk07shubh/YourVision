@@ -3788,7 +3788,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const rightEdgeChanged = Boolean(hasPreviousSnapshot && rightBefore !== rightAfter);
   // Keep the branch row for the removal step even if its last child vanished,
   // so the changed edge can still show the transition to null.
-  const genericChildEdges = model.edges.filter(edge => edge.kind === 'child' && edge.source === id && edge.slot !== 'left' && edge.slot !== 'right');
+  const genericChildEdges = model.edges.filter(edge => edge.kind === 'child' && edge.source === modelNodeId && edge.slot !== 'left' && edge.slot !== 'right');
   const hasChildren = fields.left != null || fields.right != null || leftEdgeChanged || rightEdgeChanged;
   const edgeStatus = (before: string | null | undefined, after: string | null | undefined) =>
     before == null ? 'added' : after == null ? 'removed' : 'rewired';
@@ -3809,8 +3809,9 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     ['color', 'bf', 'balanceFactor', 'height', 'weight', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord'].includes(name) &&
     (typeof metadataValue === 'string' || typeof metadataValue === 'number' || typeof metadataValue === 'boolean')
   );
-  const modelChildEdges = model.edges.filter(edge => edge.kind === 'child' && edge.source === id);
-  const modelReferenceEdges = model.edges.filter(edge => edge.kind === 'reference' && edge.source === id);
+  const modelNodeId = id ?? model.nodes.find(node => node.fields === fields)?.id;
+  const modelChildEdges = model.edges.filter(edge => edge.kind === 'child' && edge.source === modelNodeId);
+  const modelReferenceEdges = model.edges.filter(edge => edge.kind === 'reference' && edge.source === modelNodeId);
   const leftChildId = modelChildEdges.find(edge => edge.slot === 'left')?.target ?? graphReferenceId(fields.left, objects);
   const rightChildId = modelChildEdges.find(edge => edge.slot === 'right')?.target ?? graphReferenceId(fields.right, objects);
   const leftTraversal = Boolean(leftChildId && movedPointerTargets.has(leftChildId));
@@ -3856,7 +3857,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
                   {edge.metadata.weight !== undefined && <span className="yv-tree-metadata-chip">w={displayValue(edge.metadata.weight)}</span>}
                   {childEntered && <span className="yv-binary-edge-status is-traversed">VISITED</span>}
                 </div>
-                <TreeNodeView value={{ $ref: edge.target }} objects={objects} depth={depth + 1} seen={nextSeen} state={state} structureModel={model} />
+                <TreeNodeView value={model.nodes.find(node => node.id === edge.target)?.snapshot ?? { $ref: edge.target }} objects={objects} depth={depth + 1} seen={nextSeen} state={state} structureModel={model} />
               </div>
             );
           })}
