@@ -3778,7 +3778,9 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
           <span className="yv-binary-node-value">{displayValue(nodeValue(resolved))}</span>
           {nodeIdentity && <span className="yv-binary-node-identity" title={'Object identity: ' + id}>@{nodeIdentity}</span>}
         </div>
-        {(created || changed || entered) && <span className={'yv-binary-node-status' + (created ? ' is-created' : changed ? ' is-changed' : ' is-current')}>{created ? 'NEW' : changed ? 'UPDATED' : 'CURRENT'}</span>}
+        {created && <span className="yv-binary-node-status is-created">NEW</span>}
+        {changed && <span className="yv-binary-node-status is-changed">UPDATED</span>}
+        {entered && <span className="yv-binary-node-status is-current">CURRENT</span>}
         {pointerNames.length > 0 && <span className="yv-tree-pointer-labels yv-binary-pointer-labels" aria-label="Variables pointing to this node">
           {pointerNames.map(pointerName => <span className="yv-tree-pointer-label" key={pointerName} title={pointerName + ' points to this node'}>{pointerName}</span>)}
         </span>}
