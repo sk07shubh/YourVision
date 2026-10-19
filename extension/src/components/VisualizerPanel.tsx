@@ -3843,7 +3843,11 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const nodeValueChanged = Boolean(hasPreviousSnapshot && valueChanged(nodeValue(previousNode!), nodeValue(resolved)));
   const changedMetadataNames = Object.keys(fields).filter(name =>
     ['color', 'bf', 'balanceFactor', 'height', 'weight', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord'].includes(name) &&
-    hasPreviousSnapshot && valueChangedFn(previousFields[name], fields[name])
+    hasPreviousSnapshot && valueChanged(previousFields[name], fields[name])
+  );
+  const changedReferenceNames = ['parent', 'next', 'prev', 'thread', 'random'].filter(name =>
+    hasPreviousSnapshot &&
+    graphReferenceId(previousFields[name], previousObjects) !== graphReferenceId(fields[name], objects)
   );
   const removedChildEdges = Object.entries(previousFields).flatMap(([fieldName, previousValue]) => {
     if (previousValue == null || !/^(left|right|children|child\d+|firstChild|secondChild)$/i.test(fieldName)) return [];
@@ -3905,7 +3909,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
           {nodeMetadata.map(([name, metadataValue]) => <span className={'yv-tree-metadata-chip' + (changedMetadataNames.includes(name) ? ' yv-tree-metadata-changed' : '')} key={name}>{name}={displayValue(metadataValue)}</span>)}
         </span>}
         {modelReferenceEdges.length > 0 && <span className="yv-tree-reference-labels" aria-label="Additional object references">
-          {modelReferenceEdges.map(edge => <span className="yv-tree-reference-label" key={edge.id} title={edge.label + ' references object ' + edge.target}>{edge.label} → @{edge.target.length > 8 ? edge.target.slice(-6) : edge.target}</span>)}
+          {modelReferenceEdges.map(edge => <span className={'yv-tree-reference-label' + (changedReferenceNames.includes(edge.label ?? '') ? ' yv-tree-reference-changed' : '')} key={edge.id} title={edge.label + ' references object ' + edge.target}>{edge.label} → @{edge.target.length > 8 ? edge.target.slice(-6) : edge.target}{changedReferenceNames.includes(edge.label ?? '') && <strong> REWIRED</strong>}</span>)}
         </span>}
       </div>
       {(genericChildEdges.length > 0 || removedChildEdges.length > 0) && (
