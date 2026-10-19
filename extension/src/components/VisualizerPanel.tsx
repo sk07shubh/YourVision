@@ -3763,7 +3763,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     referenceFields: ['parent', 'next', 'prev', 'thread', 'random'],
   });
   const treeNodeRef = useRef<HTMLDivElement | null>(null);
-  const [treeConnectorLines, setTreeConnectorLines] = useState<Array<{ x1: number; y1: number; x2: number; y2: number; target: string }>>([]);
+  const [treeConnectorLines, setTreeConnectorLines] = useState<Array<{ x1: number; y1: number; x2: number; y2: number; rootWidth: number; rootHeight: number; target: string }>>([]);
   useLayoutEffect(() => {
     const root = treeNodeRef.current;
     if (!root) return;
@@ -3787,6 +3787,8 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
           y1: startY,
           x2: childRect.left + childRect.width / 2 - rootRect.left,
           y2: childRect.top - rootRect.top,
+          rootWidth: rootRect.width,
+          rootHeight: rootRect.height,
           target: edge.dataset.treeEdgeTarget ?? edge.dataset.treeEdgeLabel ?? 'child',
         }];
       });
@@ -3794,7 +3796,8 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
         if (previousLines.length === lines.length && previousLines.every((line, index) => {
           const next = lines[index];
           return next && Math.abs(line.x1 - next.x1) < 0.5 && Math.abs(line.y1 - next.y1) < 0.5 &&
-            Math.abs(line.x2 - next.x2) < 0.5 && Math.abs(line.y2 - next.y2) < 0.5 && line.target === next.target;
+            Math.abs(line.x2 - next.x2) < 0.5 && Math.abs(line.y2 - next.y2) < 0.5 &&
+            Math.abs(line.rootWidth - next.rootWidth) < 0.5 && Math.abs(line.rootHeight - next.rootHeight) < 0.5 && line.target === next.target;
         })) return previousLines;
         return lines;
       });
@@ -3924,7 +3927,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
         </div>
       )}
       {treeConnectorLines.length > 0 && (
-        <svg className="yv-tree-connectors" aria-hidden="true" focusable="false">
+        <svg className="yv-tree-connectors" viewBox={`0 0 ${treeConnectorLines[0]?.rootWidth ?? 1} ${treeConnectorLines[0]?.rootHeight ?? 1}`} preserveAspectRatio="none" aria-hidden="true" focusable="false">
           {treeConnectorLines.map((line) => (
             <line key={line.target} x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} />
           ))}
