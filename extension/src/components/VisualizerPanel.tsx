@@ -3762,6 +3762,53 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const model = structureModel ?? buildObjectStructureModel(value, objects, {
     referenceFields: ['parent', 'next', 'prev', 'thread', 'random'],
   });
+  const treeNodeRef = useRef<HTMLDivElement | null>(null);
+  const [treeConnectorLines, setTreeConnectorLines] = useState<Array<{ x1: number; y1: number; x2: number; y2: number; target: string }>>([]);
+  useLayoutEffect(() => {
+    const root = treeNodeRef.current;
+    if (!root) return;
+    const updateConnectors = () => {
+      const rootRect = root.getBoundingClientRect();
+      const parentCard = root.querySelector<HTMLElement>(':scope > .yv-structure-node-card');
+      if (!parentCard) {
+        setTreeConnectorLines([]);
+        return;
+      }
+      const parentRect = parentCard.getBoundingClientRect();
+      const startX = parentRect.left + parentRect.width / 2 - rootRect.left;
+      const startY = parentRect.bottom - rootRect.top;
+      const edges = Array.from(root.querySelectorAll<HTMLElement>(':scope > .yv-binary-tree-children > .yv-binary-tree-edge'));
+      const lines = edges.flatMap((edge) => {
+        const childCard = edge.querySelector<HTMLElement>(':scope > .yv-binary-tree-edge-content > .yv-structure-node > .yv-structure-node-card');
+        if (!childCard) return [];
+        const childRect = childCard.getBoundingClientRect();
+        return [{
+          x1: startX,
+          y1: startY,
+          x2: childRect.left + childRect.width / 2 - rootRect.left,
+          y2: childRect.top - rootRect.top,
+          target: edge.dataset.treeEdgeTarget ?? edge.dataset.treeEdgeLabel ?? 'child',
+        }];
+      });
+      setTreeConnectorLines((previousLines) => {
+        if (previousLines.length === lines.length && previousLines.every((line, index) => {
+          const next = lines[index];
+          return next && Math.abs(line.x1 - next.x1) < 0.5 && Math.abs(line.y1 - next.y1) < 0.5 &&
+            Math.abs(line.x2 - next.x2) < 0.5 && Math.abs(line.y2 - next.y2) < 0.5 && line.target === next.target;
+        })) return previousLines;
+        return lines;
+      });
+    };
+    updateConnectors();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateConnectors) : undefined;
+    observer?.observe(root);
+    root.querySelectorAll<HTMLElement>('.yv-structure-node-card, .yv-binary-tree-edge').forEach((element) => observer?.observe(element));
+    window.addEventListener('resize', updateConnectors);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', updateConnectors);
+    };
+  }, [value, objects, depth, state, structureModel]);
   const session = sessionStore.get();
   const selectedIndex = state ? session.states.indexOf(state) : -1;
   const previous = selectedIndex > 0 ? session.states[selectedIndex - 1] : undefined;
@@ -3815,7 +3862,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     movedPointerTargets.has(id));
   const depthClass = 'yv-structure-depth-' + Math.min(depth, 4);
   return (
-    <div className={'yv-structure-node ' + depthClass + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '')}
+    <div ref={treeNodeRef} className={'yv-structure-node ' + depthClass + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '')}
       data-tree-node-id={id} data-tree-depth={depth} data-tree-layout="binary-tree"
       data-tree-changed={changed ? 'true' : undefined} data-tree-entered={entered ? 'true' : undefined}
       data-tree-created={created ? 'true' : undefined} aria-label={'Tree node ' + displayValue(nodeValue(resolved)) + (id ? ', object ' + id : '')}>
@@ -3875,6 +3922,13 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
             </div>
           ))}
         </div>
+      )}
+      {treeConnectorLines.length > 0 && (
+        <svg className="yv-tree-connectors" aria-hidden="true" focusable="false">
+          {treeConnectorLines.map((line) => (
+            <line key={line.target} x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} />
+          ))}
+        </svg>
       )}
     </div>
   );
