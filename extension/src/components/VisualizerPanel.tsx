@@ -3776,11 +3776,23 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   if (id) nextSeen.add(id);
   const fields = objectFields(resolved);
   const previousNode = id ? previousObjects[id] : undefined;
+  const previousFields = isPlainObject(previousNode) ? objectFields(previousNode) : {};
   const hasPreviousSnapshot = Boolean(state && previous && session.states.includes(state) && previousNode !== undefined);
   const changed = Boolean(hasPreviousSnapshot && stableStringify(previousNode) !== stableStringify(resolved));
   const created = Boolean(state && previous && session.states.includes(state) && id && previousNode === undefined);
   const modelNodeId = id ?? model.nodes.find(node => node.fields === fields)?.id;
   const genericChildEdges = model.edges.filter(edge => edge.kind === 'child' && edge.source === modelNodeId);
+  const currentChildSlots = new Set(genericChildEdges.map(edge => (edge.label ?? '').toLowerCase()));
+  const removedChildEdges = Object.entries(previousFields).flatMap(([fieldName, previousValue]) => {
+    if (previousValue == null || !/^(left|right|children|child\\d+|firstChild|secondChild)$/i.test(fieldName)) return [];
+    const currentValue = fields[fieldName];
+    const previousTarget = graphReferenceId(previousValue, previousObjects);
+    const currentTarget = graphReferenceId(currentValue, objects);
+    if (currentValue != null && (!previousTarget || currentTarget === previousTarget)) return [];
+    const label = fieldName.toUpperCase();
+    if (currentChildSlots.has(label.toLowerCase())) return [];
+    return [{ fieldName, label, target: previousTarget }];
+  });
   const movedPointerTargets = new Set<string>();
   if (state && previous && session.states.includes(state)) {
     for (const [name, currentValue] of Object.entries(state.variables)) {
@@ -3852,6 +3864,17 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
               </div>
             );
           })}
+          {removedChildEdges.map(edge => (
+            <div key={'removed:' + edge.fieldName} className="yv-nested-structure-edge yv-nested-structure-edge-removed"
+              data-tree-edge={edge.fieldName.toLowerCase()} data-tree-edge-label={edge.label}
+              data-tree-edge-target={edge.target ?? undefined} data-tree-edge-status="removed">
+              <div className="yv-nested-structure-edge-heading">
+                <span className="yv-nested-structure-edge-label">{edge.label}</span>
+                <span className="yv-binary-edge-status is-removed">REMOVED</span>
+              </div>
+              <div className="yv-nested-structure-edge-content"><span className="yv-null">null</span></div>
+            </div>
+          ))}
         </div>
       )}
     </div>
