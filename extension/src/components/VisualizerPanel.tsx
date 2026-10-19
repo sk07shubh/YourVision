@@ -2992,7 +2992,7 @@ function resolveRef(value: unknown, objects: Record<string,unknown>): unknown {
   if (typeof value.$objectId==='string') return objects[value.$objectId] ?? value;
   return value;
 }
-function nodeValue(value: Obj): unknown { const f=objectFields(value); return f.val ?? f.value ?? f.data ?? '?'; }
+function nodeValue(value: Obj): unknown { const f=objectFields(value); return f.val ?? f.value ?? f.data ?? f.keys ?? '?'; }
 
 function looksGraphNode(value: Obj): boolean {
   return 'neighbors' in objectFields(value);
@@ -3804,6 +3804,11 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     .filter(([, pointerValue]) => graphReferenceId(pointerValue, objects) === id)
     .map(([pointerName]) => pointerName);
   const nodeIdentity = id ? (id.length > 18 ? id.slice(0, 15) + '…' : id) : undefined;
+  const keyCells = Array.isArray(fields.keys) ? fields.keys : undefined;
+  const nodeMetadata = Object.entries(fields).filter(([name, metadataValue]) =>
+    ['color', 'bf', 'balanceFactor', 'height', 'weight', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord'].includes(name) &&
+    (typeof metadataValue === 'string' || typeof metadataValue === 'number' || typeof metadataValue === 'boolean')
+  );
   const modelChildEdges = model.edges.filter(edge => edge.kind === 'child' && edge.source === id);
   const modelReferenceEdges = model.edges.filter(edge => edge.kind === 'reference' && edge.source === id);
   const leftChildId = modelChildEdges.find(edge => edge.slot === 'left')?.target ?? graphReferenceId(fields.left, objects);
@@ -3818,7 +3823,11 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
       data-tree-created={created ? 'true' : undefined} aria-label={'Tree node ' + displayValue(nodeValue(resolved)) + (id ? ', object ' + id : '')}>
       <div key={(changed || entered || created) ? id + ':' + selectedIndex : id} className="yv-node yv-binary-node-card" style={changed ? { background: 'var(--yv-highlight, #203b5b)' } : undefined}>
         <div className="yv-binary-node-main">
-          <span className="yv-binary-node-value">{displayValue(nodeValue(resolved))}</span>
+          {keyCells
+            ? <span className="yv-node-key-cells" aria-label="Node keys">
+                {keyCells.map((keyValue, index) => <span className="yv-node-key-cell" key={index}>{displayValue(keyValue)}</span>)}
+              </span>
+            : <span className="yv-binary-node-value">{displayValue(nodeValue(resolved))}</span>}
           {nodeIdentity && <span className="yv-binary-node-identity" title={'Object identity: ' + id}>@{nodeIdentity}</span>}
         </div>
         {created && <span className="yv-binary-node-status is-created">NEW</span>}
@@ -3826,6 +3835,9 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
         {entered && <span className="yv-binary-node-status is-current">CURRENT</span>}
         {pointerNames.length > 0 && <span className="yv-tree-pointer-labels yv-binary-pointer-labels" aria-label="Variables pointing to this node">
           {pointerNames.map(pointerName => <span className="yv-tree-pointer-label" key={pointerName} title={pointerName + ' points to this node'}>{pointerName}</span>)}
+        </span>}
+        {nodeMetadata.length > 0 && <span className="yv-tree-node-metadata" aria-label="Node metadata">
+          {nodeMetadata.map(([name, metadataValue]) => <span className="yv-tree-metadata-chip" key={name}>{name}={displayValue(metadataValue)}</span>)}
         </span>}
         {modelReferenceEdges.length > 0 && <span className="yv-tree-reference-labels" aria-label="Additional object references">
           {modelReferenceEdges.map(edge => <span className="yv-tree-reference-label" key={edge.id} title={edge.label + ' references object ' + edge.target}>{edge.label} → @{edge.target.length > 8 ? edge.target.slice(-6) : edge.target}</span>)}
@@ -3841,6 +3853,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
                 data-tree-edge="child" data-tree-edge-label={edge.label ?? String(index)} data-tree-edge-target={edge.target}>
                 <div className="yv-tree-edge-label yv-universal-edge-label">
                   {edge.label ?? String(index)}
+                  {edge.metadata.weight !== undefined && <span className="yv-tree-metadata-chip">w={displayValue(edge.metadata.weight)}</span>}
                   {childEntered && <span className="yv-binary-edge-status is-traversed">VISITED</span>}
                 </div>
                 <TreeNodeView value={{ $ref: edge.target }} objects={objects} depth={depth + 1} seen={nextSeen} state={state} structureModel={model} />
@@ -3854,7 +3867,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
           <div key={(leftEdgeChanged || leftTraversal) ? 'left:' + id + ':' + selectedIndex : 'left:' + id} data-tree-edge="left" className={['yv-binary-branch', leftEdgeChanged ? 'yv-tree-edge-changed' : '', leftTraversal ? 'yv-tree-edge-traversed' : ''].filter(Boolean).join(' ')}
             data-tree-edge-status={leftEdgeChanged ? edgeStatus(leftBefore, leftAfter) : undefined}
             data-tree-edge-traversed={leftTraversal ? 'true' : undefined}>
-            <div className="yv-tree-edge-label yv-binary-edge-label"><span>LEFT</span>{leftEdgeChanged && <span className={'yv-binary-edge-status is-' + edgeStatus(leftBefore, leftAfter)}>{edgeStatus(leftBefore, leftAfter).toUpperCase()}</span>}{leftTraversal && <span className="yv-binary-edge-status is-traversed">VISITED</span>}</div>
+            <div className="yv-tree-edge-label yv-binary-edge-label"><span>LEFT</span>{modelChildEdges.find(edge => edge.slot === 'left')?.metadata.weight !== undefined && <span className="yv-tree-metadata-chip">w={displayValue(modelChildEdges.find(edge => edge.slot === 'left')?.metadata.weight)}</span>}{leftEdgeChanged && <span className={'yv-binary-edge-status is-' + edgeStatus(leftBefore, leftAfter)}>{edgeStatus(leftBefore, leftAfter).toUpperCase()}</span>}{leftTraversal && <span className="yv-binary-edge-status is-traversed">VISITED</span>}</div>
             {fields.left != null
               ? <TreeNodeView value={fields.left} objects={objects} depth={depth + 1} seen={nextSeen} state={state} structureModel={model} />
               : <span className="yv-null">null</span>}
@@ -3862,7 +3875,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
           <div key={(rightEdgeChanged || rightTraversal) ? 'right:' + id + ':' + selectedIndex : 'right:' + id} data-tree-edge="right" className={['yv-binary-branch', rightEdgeChanged ? 'yv-tree-edge-changed' : '', rightTraversal ? 'yv-tree-edge-traversed' : ''].filter(Boolean).join(' ')}
             data-tree-edge-status={rightEdgeChanged ? edgeStatus(rightBefore, rightAfter) : undefined}
             data-tree-edge-traversed={rightTraversal ? 'true' : undefined}>
-            <div className="yv-tree-edge-label yv-binary-edge-label"><span>RIGHT</span>{rightEdgeChanged && <span className={'yv-binary-edge-status is-' + edgeStatus(rightBefore, rightAfter)}>{edgeStatus(rightBefore, rightAfter).toUpperCase()}</span>}{rightTraversal && <span className="yv-binary-edge-status is-traversed">VISITED</span>}</div>
+            <div className="yv-tree-edge-label yv-binary-edge-label"><span>RIGHT</span>{modelChildEdges.find(edge => edge.slot === 'right')?.metadata.weight !== undefined && <span className="yv-tree-metadata-chip">w={displayValue(modelChildEdges.find(edge => edge.slot === 'right')?.metadata.weight)}</span>}{rightEdgeChanged && <span className={'yv-binary-edge-status is-' + edgeStatus(rightBefore, rightAfter)}>{edgeStatus(rightBefore, rightAfter).toUpperCase()}</span>}{rightTraversal && <span className="yv-binary-edge-status is-traversed">VISITED</span>}</div>
             {fields.right != null
               ? <TreeNodeView value={fields.right} objects={objects} depth={depth + 1} seen={nextSeen} state={state} structureModel={model} />
               : <span className="yv-null">null</span>}
@@ -4532,6 +4545,7 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
       '.yv-binary-edge-status', '.yv-binary-pointer-labels',
       '.yv-tree-reference-labels', '.yv-tree-reference-label',
       '.yv-universal-children', '.yv-universal-branch', '.yv-universal-edge-label',
+      '.yv-node-key-cells', '.yv-node-key-cell', '.yv-tree-node-metadata', '.yv-tree-metadata-chip',
     ];
     const rules: string[] = [];
     const rulePattern = /([^{}]+)\{([^{}]*)\}/g;
