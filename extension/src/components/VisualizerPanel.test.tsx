@@ -582,7 +582,9 @@ describe('universal tree visualization', () => {
     expect(html).toContain('data-tree-node-id="t3"');
     expect(html).toContain('yv-structure-node');
     expect(html).toContain('yv-structure-node-card');
-    expect(html).toContain('yv-universal-children');
+    expect(html).toContain('yv-nested-structure-children');
+    expect(html).toContain('data-tree-layout=\"nested\"');
+    expect(html).not.toContain('yv-universal-children');
     expect(html).not.toContain('yv-binary-children');
     expect(html).toContain('@t1');
     expect(html).toContain('@t2');
