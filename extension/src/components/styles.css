@@ -2165,3 +2165,26 @@
   bottom: -12px;
   height: 12px;
 }
+
+
+/* Additional references are visible without competing with structural branches. */
+.yv-tree-reference-labels {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3px;
+  max-width: 240px;
+  margin-top: 3px;
+}
+.yv-tree-reference-label {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 2px 5px;
+  border: 1px dashed var(--yv-border-strong, #78879a);
+  border-radius: 5px;
+  color: var(--yv-muted);
+  background: var(--yv-bg);
+  font: 10px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: nowrap;
+}
