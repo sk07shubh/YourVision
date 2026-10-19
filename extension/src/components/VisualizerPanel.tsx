@@ -2770,6 +2770,18 @@ function mapReorderedKeys(
   return moved;
 }
 
+function isStructuredMapValue(value: unknown): boolean {
+  return isMapSnapshot(value) ||
+    isCollectionSnapshot(value) ||
+    isArraySnapshot(value) ||
+    Array.isArray(value) ||
+    (isPlainObject(value) && (
+      typeof value.$objectId === 'string' ||
+      typeof value.$ref === 'string' ||
+      isPlainObject(value.fields)
+    ));
+}
+
 function MapView({
   value,
   state,
@@ -2873,7 +2885,8 @@ function MapView({
               </div>
 
               <div className="yv-map-value">
-                {change?.kind === 'update' ? (
+                {change?.kind === 'update' &&
+                  !(isStructuredMapValue(change.before) && isStructuredMapValue(entry.value)) ? (
                   <>
                     <span className="yv-old-value">
                       <DataValue value={change.before} state={state} source={source} depth={depth + 1} seen={seen} resolveObjects={false}/>
