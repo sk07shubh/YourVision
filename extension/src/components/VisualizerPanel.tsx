@@ -2977,7 +2977,7 @@ function objectFields(value: Obj): Obj {
 }
 function objectType(value: Obj): string { return typeof value.$type==='string'?value.$type:''; }
 function looksListNode(value: Obj): boolean { const f=objectFields(value); return /ListNode/i.test(objectType(value)) || ('next' in f && ('val' in f || 'value' in f)); }
-function looksTreeNode(value: Obj): boolean { const f=objectFields(value); return /TreeNode/i.test(objectType(value)) || (('left' in f || 'right' in f) && ('val' in f || 'value' in f)); }
+function looksTreeNode(value: Obj): boolean { const f=objectFields(value); return /TreeNode/i.test(objectType(value)) || (((('left' in f || 'right' in f) || ('children' in f && ('val' in f || 'value' in f || 'data' in f)))) && ('val' in f || 'value' in f || 'data' in f)); }
 function resolveRef(value: unknown, objects: Record<string,unknown>): unknown {
   if (!isPlainObject(value)) return value;
   if (typeof value.$ref==='string') return objects[value.$ref] ?? value;
@@ -3726,9 +3726,6 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   structureModel?: ReturnType<typeof buildObjectStructureModel>;
 }) {
   const model = structureModel ?? buildObjectStructureModel(value, objects, {
-    getChildren: (_node, fields) => (['left', 'right'] as const).flatMap(slot =>
-      fields[slot] == null ? [] : [{ target: fields[slot], label: slot.toUpperCase(), slot }]
-    ),
     referenceFields: ['parent', 'next', 'prev', 'thread', 'random'],
   });
   const session = sessionStore.get();
@@ -3757,6 +3754,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const rightEdgeChanged = Boolean(hasPreviousSnapshot && rightBefore !== rightAfter);
   // Keep the branch row for the removal step even if its last child vanished,
   // so the changed edge can still show the transition to null.
+  const genericChildEdges = model.edges.filter(edge => edge.kind === 'child' && edge.source === id && edge.slot !== 'left' && edge.slot !== 'right');
   const hasChildren = fields.left != null || fields.right != null || leftEdgeChanged || rightEdgeChanged;
   const edgeStatus = (before: string | null | undefined, after: string | null | undefined) =>
     before == null ? 'added' : after == null ? 'removed' : 'rewired';
@@ -3799,6 +3797,23 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
           {modelReferenceEdges.map(edge => <span className="yv-tree-reference-label" key={edge.id} title={edge.label + ' references object ' + edge.target}>{edge.label} → @{edge.target.length > 8 ? edge.target.slice(-6) : edge.target}</span>)}
         </span>}
       </div>
+      {genericChildEdges.length > 0 && (
+        <div className="yv-universal-children" data-tree-layout="nary">
+          {genericChildEdges.map((edge, index) => {
+            const childEntered = movedPointerTargets.has(edge.target);
+            return (
+              <div key={edge.id} className={'yv-universal-branch' + (childEntered ? ' yv-tree-edge-traversed' : '')}
+                data-tree-edge="child" data-tree-edge-label={edge.label ?? String(index)} data-tree-edge-target={edge.target}>
+                <div className="yv-tree-edge-label yv-universal-edge-label">
+                  {edge.label ?? String(index)}
+                  {childEntered && <span className="yv-binary-edge-status is-traversed">VISITED</span>}
+                </div>
+                <TreeNodeView value={{ $ref: edge.target }} objects={objects} depth={depth + 1} seen={nextSeen} state={state} structureModel={model} />
+              </div>
+            );
+          })}
+        </div>
+      )}
       {hasChildren && (
         <div className="yv-binary-children">
           <div key={(leftEdgeChanged || leftTraversal) ? 'left:' + id + ':' + selectedIndex : 'left:' + id} data-tree-edge="left" className={['yv-binary-branch', leftEdgeChanged ? 'yv-tree-edge-changed' : '', leftTraversal ? 'yv-tree-edge-traversed' : ''].filter(Boolean).join(' ')}
