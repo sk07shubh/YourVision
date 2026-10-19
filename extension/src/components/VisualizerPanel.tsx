@@ -4422,12 +4422,70 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
   }, [state?.sequence, state?.line, state?.lastEvent?.type]);
 
   const copyVisualizationSource = async () => {
-    const source = [
-      '===== extension/src/components/VisualizerPanel.tsx =====',
-      visualizerPanelSource,
+    const panel = visualizerPanelSource;
+    const helpersStart = panel.indexOf('function objectFields(value: Obj): Obj {');
+    const helpersEnd = panel.indexOf('function looksGraphNode(value: Obj): boolean {', helpersStart);
+    const referenceStart = panel.indexOf('function graphReferenceId(value: unknown, objects: Record<string, unknown>): string | undefined {');
+    const referenceEnd = panel.indexOf('function looksTrieNode(value: Obj): boolean {', referenceStart);
+    const treeStart = panel.indexOf('export function TreeNodeView(');
+    const treeEnd = panel.indexOf('function linkedListReturnText(', treeStart);
+
+    const requiredCode = [
+      "import type { TraceState } from '../types/trace';",
+      "import { sessionStore } from '../state/store';",
+      "import { displayValue, stableStringify, isPlainObject } from '../utils/value';",
+      "type Obj = Record<string, unknown>;",
       '',
-      '===== extension/src/components/styles.css =====',
-      visualizerStylesSource,
+      panel.slice(helpersStart, helpersEnd).trim(),
+      '',
+      panel.slice(referenceStart, referenceEnd).trim(),
+      '',
+      panel.slice(treeStart, treeEnd).trim(),
+    ].join('\n');
+
+    const css = visualizerStylesSource;
+    const selectors = [
+      '.yv-node', '.yv-tree', '.yv-tree-node', '.yv-tree-children',
+      '.yv-null', '.yv-tree-cycle', '.yv-tree-edge-label',
+      '.yv-tree-node-entered', '.yv-tree-node-changed', '.yv-tree-node-created',
+      '.yv-tree-edge-changed', '.yv-tree-pointer-labels', '.yv-tree-pointer-label',
+      '.yv-tree-edge-traversed',
+    ];
+    const rules: string[] = [];
+    const rulePattern = /([^{}]+)\\{([^{}]*)\\}/g;
+    for (const match of css.matchAll(rulePattern)) {
+      const selector = match[1]!.trim();
+      if (selector.startsWith('@keyframes') || selector.startsWith('@media')) continue;
+      if (selectors.some(needle => selector.split(',').some(part => part.trim() === needle))) {
+        rules.push(selector + ' {' + match[2]!.trim() + '}');
+      }
+    }
+    const keyframes = [
+      'yv-graph-node-entered', 'yv-graph-node-changed', 'yv-graph-node-created',
+      'yv-tree-edge-change', 'yv-tree-edge-traverse',
+    ];
+    for (const name of keyframes) {
+      const start = css.indexOf('@keyframes ' + name);
+      if (start < 0) continue;
+      const open = css.indexOf('{', start);
+      if (open < 0) continue;
+      let depth = 0;
+      for (let i = open; i < css.length; i += 1) {
+        if (css[i] === '{') depth += 1;
+        if (css[i] === '}') depth -= 1;
+        if (depth === 0) {
+          rules.push(css.slice(start, i + 1).trim());
+          break;
+        }
+      }
+    }
+    const source = [
+      '===== Binary Tree Visualization: minimal review bundle =====',
+      '===== Required rendering code and dependencies =====',
+      requiredCode,
+      '',
+      '===== CSS used by the tree renderer =====',
+      [...new Set(rules)].join('\n'),
     ].join('\n');
     try {
       await navigator.clipboard.writeText(source);
