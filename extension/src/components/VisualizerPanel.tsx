@@ -3087,6 +3087,31 @@ export function TrieView({ objects, variables = {}, source = '', state }: {
   })));
   const roots = nodes.filter(node => !childIds.has(node.id));
   const rootNodes = roots.length ? roots : nodes.slice(0, 1);
+  // Adapt trie-labelled edges into the same node/edge model used by binary
+  // and N-ary trees. The synthetic root only represents a forest in the model;
+  // it is never rendered as a trie node.
+  const trieModelRootId = '__yv_trie_model_root__';
+  const trieModelRoot = { $objectId: trieModelRootId, $type: 'YourVisionModelRoot', val: 'root',
+    children: rootNodes.map(node => ({ $ref: node.id })) };
+  const trieModel = buildObjectStructureModel({ $ref: trieModelRootId },
+    { ...objects, [trieModelRootId]: trieModelRoot }, {
+      referenceFields: [],
+      getChildren: (value, fields) => {
+        if (value.$objectId === trieModelRootId) {
+          return rootNodes.map(node => ({ target: { $ref: node.id }, label: node.id, slot: node.id }));
+        }
+        return trieChildEntries(value, source).map(child => ({
+          target: child.target, label: child.label, slot: child.label,
+        }));
+      },
+    });
+  const trieChildEdges = new Map<string, Array<{ id: string; target: string; label?: string }>>();
+  for (const edge of trieModel.edges) {
+    if (edge.kind !== 'child' || edge.source === trieModelRootId) continue;
+    const list = trieChildEdges.get(edge.source) ?? [];
+    list.push(edge);
+    trieChildEdges.set(edge.source, list);
+  }
   const pointerNames = new Map<string, string[]>();
   for (const [name, value] of Object.entries(variables)) {
     const directId = graphReferenceId(value, objects);
@@ -3147,14 +3172,15 @@ export function TrieView({ objects, variables = {}, source = '', state }: {
           <div style={{ color: 'var(--yv-muted, #8b9bb4)', fontSize: 10 }}>{id}</div>
           {pointers.map(pointer => <div key={pointer} style={{ color: 'var(--yv-accent, #65a9ff)', fontSize: 10 }}>{pointer}</div>)}
         </div>
-        {(node.children.length > 0 || removedChildren.length > 0) && (
+        {((trieChildEdges.get(id)?.length ?? 0) > 0 || removedChildren.length > 0) && (
           <div className="yv-trie-children" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 10, flexWrap: 'wrap',
             borderTop: '1px solid var(--yv-border, #334155)', paddingTop: 8 }}>
-            {node.children.map((child, index) => {
-              const childId = graphReferenceId(child.target, objects);
-              if (!childId || !byId.has(childId)) return <span key={child.label + ':' + index} className="yv-code">[{child.label}] unresolved</span>;
-              return <div key={child.label + ':' + childId + ':' + index} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                {renderNode(childId, child.label, depth + 1, nextPath)}
+            {(trieChildEdges.get(id) ?? []).map((edge, index) => {
+              const childId = edge.target;
+              const label = edge.label ?? String(index);
+              if (!byId.has(childId)) return <span key={edge.id} className="yv-code">[{label}] unresolved</span>;
+              return <div key={edge.id} data-trie-edge-id={edge.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                {renderNode(childId, label, depth + 1, nextPath)}
               </div>;
             })}
             {removedChildren.map((child, index) => (
