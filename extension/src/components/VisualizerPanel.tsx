@@ -6,6 +6,8 @@ import { sessionStore } from '../state/store';
 import { displayValue, stableStringify, isPlainObject } from '../utils/value';
 import { highlightEditorLine, clearEditorExecutionMarker } from '../leetcode/editor-overlay';
 import type { TraceState } from '../types/trace';
+import visualizerPanelSource from './VisualizerPanel.tsx?raw';
+import visualizerStylesSource from './styles.css?raw';
 
 type Obj = Record<string, unknown>;
 
@@ -4419,19 +4421,21 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
     setCopyStatus('idle');
   }, [state?.sequence, state?.line, state?.lastEvent?.type]);
 
-  const copyCurrentStructures = async () => {
-    if (!state) {
-      setCopyStatus('failed');
-      return;
-    }
-    const snapshot = buildDataStructuresSnapshot(state);
+  const copyVisualizationSource = async () => {
+    const source = [
+      '===== extension/src/components/VisualizerPanel.tsx =====',
+      visualizerPanelSource,
+      '',
+      '===== extension/src/components/styles.css =====',
+      visualizerStylesSource,
+    ].join('\n');
     try {
-      await navigator.clipboard.writeText(snapshot);
+      await navigator.clipboard.writeText(source);
       setCopyStatus('copied');
     } catch {
       try {
         const textarea = document.createElement('textarea');
-        textarea.value = snapshot;
+        textarea.value = source;
         textarea.setAttribute('readonly', '');
         textarea.style.position = 'fixed';
         textarea.style.opacity = '0';
@@ -4451,13 +4455,12 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
       <button
         className="yv-btn"
         type="button"
-        aria-label="Copy current data structures as JSON"
-        title="Copy the data structures at this execution step as JSON"
-        disabled={!state}
+        aria-label="Copy visualization source code"
+        title="Copy the visualization component and styles so they can be shared for review"
         onMouseDown={event => event.preventDefault()}
-        onClick={copyCurrentStructures}
+        onClick={copyVisualizationSource}
       >
-        {copyStatus === 'copied' ? 'Copied!' : copyStatus === 'failed' ? 'Copy failed' : 'Copy JSON'}
+        {copyStatus === 'copied' ? 'Copied!' : copyStatus === 'failed' ? 'Copy failed' : 'Copy Visualization Code'}
       </button>
     </div>
   );
