@@ -567,7 +567,7 @@ describe('linked-list graph visualization', () => {
   });
 });
 
-describe('binary-tree visualization', () => {
+describe('universal tree visualization', () => {
   it('labels left and right branches and keeps stable node ids', () => {
     const html = renderToStaticMarkup(<TreeNodeView
       value={{ $objectId: 't1' }}
@@ -580,12 +580,14 @@ describe('binary-tree visualization', () => {
     expect(html).toContain('data-tree-node-id="t1"');
     expect(html).toContain('data-tree-node-id="t2"');
     expect(html).toContain('data-tree-node-id="t3"');
-    expect(html).toContain('yv-binary-node');
-    expect(html).toContain('yv-binary-children');
+    expect(html).toContain('yv-structure-node');
+    expect(html).toContain('yv-structure-node-card');
+    expect(html).toContain('yv-universal-children');
+    expect(html).not.toContain('yv-binary-children');
     expect(html).toContain('@t1');
     expect(html).toContain('@t2');
-    expect(html).toContain('data-tree-edge="left"');
-    expect(html).toContain('data-tree-edge="right"');
+    expect(html).toContain('data-tree-edge-label="LEFT"');
+    expect(html).toContain('data-tree-edge-label="RIGHT"');
     expect(html).toContain('LEFT');
     expect(html).toContain('RIGHT');
   });
