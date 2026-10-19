@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildObjectStructureModel } from './treeModel';
+import { buildHeapStructureModel, buildObjectStructureModel } from './treeModel';
 
 describe('shared object structure model', () => {
   it('normalizes binary children into labelled child edges while preserving object IDs', () => {
@@ -51,5 +51,20 @@ describe('shared object structure model', () => {
     expect(model.kind).toBe('graph');
     expect(model.nodes.map(node => node.id).sort()).toEqual(['a', 'b']);
     expect(model.edges.filter(edge => edge.kind === 'child')).toHaveLength(3);
+  });
+});
+
+
+describe('heap adapter for the shared structure model', () => {
+  it('derives parent-child edges from heap indices without changing the array values', () => {
+    const model = buildHeapStructureModel([9, 5, 7, 1]);
+    expect(model.kind).toBe('tree');
+    expect(model.roots).toEqual(['heap:0']);
+    expect(model.nodes.map(node => node.value)).toEqual([9, 5, 7, 1]);
+    expect(model.edges.map(edge => [edge.source, edge.target, edge.slot])).toEqual([
+      ['heap:0', 'heap:1', 'left'],
+      ['heap:0', 'heap:2', 'right'],
+      ['heap:1', 'heap:3', 'left'],
+    ]);
   });
 });
