@@ -3845,7 +3845,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
           {modelReferenceEdges.map(edge => <span className="yv-tree-reference-label" key={edge.id} title={edge.label + ' references object ' + edge.target}>{edge.label} → @{edge.target.length > 8 ? edge.target.slice(-6) : edge.target}</span>)}
         </span>}
       </div>
-      {genericChildEdges.length > 0 && (
+      {(genericChildEdges.length > 0 || removedChildEdges.length > 0) && (
         <div className="yv-nested-structure-children" data-tree-children="nested">
           {genericChildEdges.map((edge, index) => {
             const childEntered = movedPointerTargets.has(edge.target);
