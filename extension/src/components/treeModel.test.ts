@@ -68,3 +68,18 @@ describe('heap adapter for the shared structure model', () => {
     ]);
   });
 });
+
+
+describe('extended tree node metadata', () => {
+  it('preserves B-tree key arrays and weights on child edges', () => {
+    const objects = {
+      root: { $objectId: 'root', $type: 'BTreeNode', keys: [10, 20], children: [{ $ref: 'a' }, { $ref: 'b' }, { $ref: 'c' }], weights: [2, 4, 6] },
+      a: { $objectId: 'a', val: 5 },
+      b: { $objectId: 'b', val: 15 },
+      c: { $objectId: 'c', val: 30 },
+    };
+    const model = buildObjectStructureModel({ $ref: 'root' }, objects);
+    expect(model.nodes[0]?.value).toEqual([10, 20]);
+    expect(model.edges.filter(edge => edge.kind === 'child').map(edge => edge.metadata.weight)).toEqual([2, 4, 6]);
+  });
+});
