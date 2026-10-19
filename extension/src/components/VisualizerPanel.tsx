@@ -3801,17 +3801,23 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const modelReferenceEdges = model.edges.filter(edge => edge.kind === 'reference' && edge.source === modelNodeId);
   const entered = Boolean(state && previous && id && session.states.includes(state) &&
     movedPointerTargets.has(id));
+  const depthClass = 'yv-structure-depth-' + Math.min(depth, 4);
   return (
-    <div className={'yv-structure-node' + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '')}
-      data-tree-node-id={id} data-tree-changed={changed ? 'true' : undefined} data-tree-entered={entered ? 'true' : undefined}
+    <div className={'yv-structure-node ' + depthClass + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '')}
+      data-tree-node-id={id} data-tree-depth={depth} data-tree-layout="nested"
+      data-tree-changed={changed ? 'true' : undefined} data-tree-entered={entered ? 'true' : undefined}
       data-tree-created={created ? 'true' : undefined} aria-label={'Tree node ' + displayValue(nodeValue(resolved)) + (id ? ', object ' + id : '')}>
-      <div key={(changed || entered || created) ? id + ':' + selectedIndex : id} className="yv-node yv-structure-node-card" style={changed ? { background: 'var(--yv-highlight, #203b5b)' } : undefined}>
+      <div key={(changed || entered || created) ? id + ':' + selectedIndex : id} className="yv-node yv-structure-node-card"
+        style={changed ? { background: 'var(--yv-highlight, #203b5b)' } : undefined}>
         <div className="yv-structure-node-main">
-          {keyCells
-            ? <span className="yv-node-key-cells" aria-label="Node keys">
-                {keyCells.map((keyValue, index) => <span className="yv-node-key-cell" key={index}>{displayValue(keyValue)}</span>)}
-              </span>
-            : <span className="yv-structure-node-value">{displayValue(nodeValue(resolved))}</span>}
+          <span className="yv-structure-node-heading">
+            <span className="yv-structure-node-depth-badge">{depth + 1}</span>
+            {keyCells
+              ? <span className="yv-node-key-cells" aria-label="Node keys">
+                  {keyCells.map((keyValue, index) => <span className="yv-node-key-cell" key={index}>{displayValue(keyValue)}</span>)}
+                </span>
+              : <span className="yv-structure-node-value">{displayValue(nodeValue(resolved))}</span>}
+          </span>
           {nodeIdentity && <span className="yv-structure-node-identity" title={'Object identity: ' + id}>@{nodeIdentity}</span>}
         </div>
         {created && <span className="yv-binary-node-status is-created">NEW</span>}
@@ -3828,25 +3834,26 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
         </span>}
       </div>
       {genericChildEdges.length > 0 && (
-        <div className="yv-universal-children" data-tree-layout="nary"
-          style={{ gridTemplateColumns: `repeat(${genericChildEdges.length}, minmax(88px, 1fr))`, ['--yv-child-count' as string]: genericChildEdges.length } as CSSProperties}>
+        <div className="yv-nested-structure-children" data-tree-children="nested">
           {genericChildEdges.map((edge, index) => {
             const childEntered = movedPointerTargets.has(edge.target);
+            const edgeLabel = edge.label ?? String(index);
             return (
-              <div key={edge.id} className={'yv-universal-branch' + (childEntered ? ' yv-tree-edge-traversed' : '')}
-                data-tree-edge="child" data-tree-edge-label={edge.label ?? String(index)} data-tree-edge-target={edge.target}>
-                <div className="yv-tree-edge-label yv-universal-edge-label">
-                  {edge.label ?? String(index)}
+              <div key={edge.id} className={'yv-nested-structure-edge' + (childEntered ? ' yv-tree-edge-traversed' : '')}
+                data-tree-edge={edgeLabel.toLowerCase()} data-tree-edge-label={edgeLabel} data-tree-edge-target={edge.target}>
+                <div className="yv-nested-structure-edge-heading">
+                  <span className="yv-nested-structure-edge-label">{edgeLabel}</span>
                   {edge.metadata.weight !== undefined && <span className="yv-tree-metadata-chip">w={displayValue(edge.metadata.weight)}</span>}
                   {childEntered && <span className="yv-binary-edge-status is-traversed">VISITED</span>}
                 </div>
-                <TreeNodeView value={model.nodes.find(node => node.id === edge.target)?.snapshot ?? { $ref: edge.target }} objects={objects} depth={depth + 1} seen={nextSeen} state={state} structureModel={model} />
+                <div className="yv-nested-structure-edge-content">
+                  <TreeNodeView value={model.nodes.find(node => node.id === edge.target)?.snapshot ?? { $ref: edge.target }} objects={objects} depth={depth + 1} seen={nextSeen} state={state} structureModel={model} />
+                </div>
               </div>
             );
           })}
         </div>
       )}
-
     </div>
   );
 }
