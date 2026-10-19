@@ -2525,9 +2525,9 @@ describe('shared universal tree rendering', () => {
     expect(html).toContain('data-tree-edge-label="0"');
     expect(html).toContain('data-tree-edge-label="1"');
     expect(html).toContain('data-tree-edge-label="2"');
-    expect(html).toContain('>A<');
-    expect(html).toContain('>B<');
-    expect(html).toContain('>C<');
+    expect(html).toContain('>A</span>');
+    expect(html).toContain('>B</span>');
+    expect(html).toContain('>C</span>');
   });
 });
 
@@ -2540,7 +2540,7 @@ describe('multi-key tree node rendering', () => {
     const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'btree-root' }} objects={objects} />);
     expect(html).toContain('yv-node-key-cells');
     expect(html).toContain('yv-node-key-cell');
-    expect(html).toContain('>10<');
-    expect(html).toContain('>20<');
+    expect(html).toContain('>10</span>');
+    expect(html).toContain('>20</span>');
   });
 });
