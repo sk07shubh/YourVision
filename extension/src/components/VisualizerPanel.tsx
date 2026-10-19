@@ -1489,11 +1489,14 @@ function CollectionView({
   }
 
   if (kind === 'list' || kind === 'arrayList' || /^(ArrayList|Vector|CopyOnWriteArrayList)$/.test(type)) {
+    const hasNestedItems = value.values.some(item =>
+      isCollectionSnapshot(item) || isArraySnapshot(item) || Array.isArray(item)
+    );
     const listIndexNames = collectionIndexVariableNames(source, name);
     const listPointers = pointerTargets(state, value.values.length, listIndexNames, name, source);
     const pointersAt = (index: number) => listPointers.filter(pointer => pointer.index === index);
     return (
-      <div className="yv-collection" ref={collectionRootRef} data-collection-emptied={emptiedThisStep ? 'true' : undefined}>
+      <div className={`yv-collection ${hasNestedItems ? 'yv-collection-nested-inline' : ''}`} ref={collectionRootRef} data-collection-emptied={emptiedThisStep ? 'true' : undefined}>
         <div className="yv-collection-meta">
           <span>{type}</span>
           <span>INDEXED ORDER · {itemCount} items</span>
