@@ -3835,12 +3835,14 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const currentChildSlots = new Set(genericChildEdges.map(edge => (edge.label ?? '').toLowerCase()));
   const previousChildTargets = new Set(Object.entries(previousFields)
     .filter(([fieldName, previousValue]) => previousValue != null && /^(left|right|children|child\\d+|firstChild|secondChild)$/i.test(fieldName))
-    .map(([, previousValue]) => graphReferenceId(previousValue, previousObjects))
+    .flatMap(([fieldName, previousValue]) => fieldName.toLowerCase() === 'children' && Array.isArray(previousValue)
+      ? previousValue.map(child => graphReferenceId(child, previousObjects))
+      : [graphReferenceId(previousValue, previousObjects)])
     .filter((target): target is string => Boolean(target)));
   const addedChildTargets = new Set(genericChildEdges
     .filter(edge => Boolean(previous && session.states.includes(state!)) && !previousChildTargets.has(edge.target))
     .map(edge => edge.target));
-  const nodeValueChanged = Boolean(hasPreviousSnapshot && valueChanged(nodeValue(previousNode!), nodeValue(resolved)));
+  const nodeValueChanged = Boolean(hasPreviousSnapshot && valueChanged(nodeValue(previousFields), nodeValue(resolved)));
   const changedMetadataNames = Object.keys(fields).filter(name =>
     ['color', 'bf', 'balanceFactor', 'height', 'weight', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord'].includes(name) &&
     hasPreviousSnapshot && valueChanged(previousFields[name], fields[name])
