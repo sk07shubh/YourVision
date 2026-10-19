@@ -2114,6 +2114,16 @@ describe('array and matrix mutation animations', () => {
     expect(html).toContain('class="yv-cell-index">1</div>');
   });
 
+  it('renders a plain String array with the standard one-dimensional cell layout', () => {
+    const html = renderToStaticMarkup(
+      <ArrayView value={['alpha', 'beta']} state={state()} source="String[] words" arrayName="words" />,
+    );
+    expect(html).toContain('yv-array');
+    expect(html).toContain('alpha');
+    expect(html).toContain('beta');
+    expect(html).not.toContain('yv-array-nested-collections');
+    expect(html).not.toContain('yv-matrix');
+  });
   it('renders nested String arrays as compact indexed groups with normal string leaf values', () => {
     const html = renderToStaticMarkup(
       <ArrayView
