@@ -2058,3 +2058,104 @@
   .yv-binary-node.yv-tree-node-created > .yv-binary-node-card,
   .yv-binary-branch.yv-tree-edge-changed { animation: none; }
 }
+
+
+/* Binary tree connectors: continuous, high-contrast elbow branches. */
+.yv-binary-node {
+  --yv-tree-line: var(--yv-border-strong, #78879a);
+  --yv-tree-line-width: 1.5px;
+}
+.yv-binary-node > .yv-binary-children {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(76px, max-content) minmax(76px, max-content);
+  justify-content: center;
+  align-items: start;
+  column-gap: clamp(14px, 2vw, 30px);
+  row-gap: 0;
+  width: max-content;
+  max-width: none;
+  min-width: 0;
+  box-sizing: border-box;
+  padding-top: 24px;
+  margin-top: 0;
+}
+/* One continuous horizontal rail; vertical stems meet it and the node cards. */
+.yv-binary-node > .yv-binary-children::before {
+  content: "";
+  position: absolute;
+  top: 11px;
+  left: 25%;
+  right: 25%;
+  border-top: var(--yv-tree-line-width) solid var(--yv-tree-line);
+  opacity: .95;
+}
+.yv-binary-node > .yv-binary-children > .yv-binary-branch {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: none;
+  padding: 12px 2px 0;
+  box-sizing: border-box;
+}
+/* Each child stem reaches the horizontal rail and starts at the child's centre. */
+.yv-binary-node > .yv-binary-children > .yv-binary-branch::before {
+  content: "";
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  height: 24px;
+  border-left: var(--yv-tree-line-width) solid var(--yv-tree-line);
+  transform: translateX(-.75px);
+  opacity: .95;
+}
+/* The parent stem visually touches the centre of the rail. */
+.yv-binary-node > .yv-binary-node-card:has(+ .yv-binary-children)::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  left: 50%;
+  bottom: -25px;
+  height: 25px;
+  border-left: var(--yv-tree-line-width) solid var(--yv-tree-line);
+  transform: translateX(-.75px);
+}
+/* Keep labels above the connector rail, not in the line path. */
+.yv-binary-edge-label {
+  position: relative;
+  z-index: 1;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--yv-bg, #151922);
+}
+/* Highlight the actual branch while preserving the geometry of its connector. */
+.yv-binary-node > .yv-binary-children > .yv-binary-branch.yv-tree-edge-changed {
+  background: color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 92%);
+  border-radius: 8px;
+}
+.yv-binary-node > .yv-binary-children > .yv-binary-branch.yv-tree-edge-changed::before {
+  border-left-color: var(--yv-accent, #65a9ff);
+  border-left-width: 2px;
+  opacity: 1;
+}
+.yv-binary-node > .yv-binary-children > .yv-binary-branch.yv-tree-edge-changed[data-tree-edge-status="removed"]::before {
+  border-left-color: var(--yv-warning, #fbbf24);
+}
+.yv-binary-node > .yv-binary-children > .yv-binary-branch.yv-tree-edge-traversed::before {
+  border-left-color: var(--yv-accent, #65a9ff);
+  border-left-width: 2px;
+  opacity: 1;
+}
+.yv-binary-node > .yv-binary-children > .yv-binary-branch > .yv-binary-node {
+  align-self: center;
+}
+@media (max-width: 520px) {
+  .yv-binary-node > .yv-binary-children {
+    grid-template-columns: minmax(60px, max-content) minmax(60px, max-content);
+    column-gap: 10px;
+    padding-top: 22px;
+  }
+}
