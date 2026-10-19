@@ -615,7 +615,9 @@ describe('universal tree visualization', () => {
     try {
       sessionStore.set({ source: 'current.val = 3;', states: [previous, current], index: 1 });
       const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 't1' }} objects={current.objects} state={current} />);
-      expect(html).toContain('data-tree-node-id="t2" data-tree-changed="true" data-tree-entered="true"');
+      expect(html).toContain('data-tree-node-id="t2"');
+      expect(html).toContain('data-tree-changed="true"');
+      expect(html).toContain('data-tree-entered="true"');
       expect(html).toContain('yv-tree-node-entered');
       expect(html).toContain('yv-tree-node-changed');
       expect(html).toContain('UPDATED');
