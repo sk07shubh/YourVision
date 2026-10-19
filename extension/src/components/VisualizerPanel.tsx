@@ -3833,6 +3833,18 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const modelNodeId = id ?? model.nodes.find(node => node.fields === fields)?.id;
   const genericChildEdges = model.edges.filter(edge => edge.kind === 'child' && edge.source === modelNodeId);
   const currentChildSlots = new Set(genericChildEdges.map(edge => (edge.label ?? '').toLowerCase()));
+  const previousChildTargets = new Set(Object.entries(previousFields)
+    .filter(([fieldName, previousValue]) => previousValue != null && /^(left|right|children|child\\d+|firstChild|secondChild)$/i.test(fieldName))
+    .map(([, previousValue]) => graphReferenceId(previousValue, previousObjects))
+    .filter((target): target is string => Boolean(target)));
+  const addedChildTargets = new Set(genericChildEdges
+    .filter(edge => Boolean(previous && session.states.includes(state!)) && !previousChildTargets.has(edge.target))
+    .map(edge => edge.target));
+  const nodeValueChanged = Boolean(hasPreviousSnapshot && valueChanged(nodeValue(previousNode!), nodeValue(resolved)));
+  const changedMetadataNames = Object.keys(fields).filter(name =>
+    ['color', 'bf', 'balanceFactor', 'height', 'weight', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord'].includes(name) &&
+    hasPreviousSnapshot && valueChangedFn(previousFields[name], fields[name])
+  );
   const removedChildEdges = Object.entries(previousFields).flatMap(([fieldName, previousValue]) => {
     if (previousValue == null || !/^(left|right|children|child\d+|firstChild|secondChild)$/i.test(fieldName)) return [];
     const currentValue = fields[fieldName];
@@ -3865,12 +3877,11 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     movedPointerTargets.has(id));
   const depthClass = 'yv-structure-depth-' + Math.min(depth, 4);
   return (
-    <div ref={treeNodeRef} className={'yv-structure-node ' + depthClass + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '')}
+    <div ref={treeNodeRef} className={'yv-structure-node ' + depthClass + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '') + (nodeValueChanged ? ' yv-tree-node-value-changed' : '') + (removedChildEdges.length ? ' yv-tree-node-child-removed' : '')}
       data-tree-node-id={id} data-tree-depth={depth} data-tree-layout="binary-tree"
       data-tree-changed={changed ? 'true' : undefined} data-tree-entered={entered ? 'true' : undefined}
       data-tree-created={created ? 'true' : undefined} aria-label={'Tree node ' + displayValue(nodeValue(resolved)) + (id ? ', object ' + id : '')}>
-      <div key={(changed || entered || created) ? id + ':' + selectedIndex : id} className="yv-node yv-structure-node-card"
-        style={changed ? { background: 'var(--yv-highlight, #203b5b)' } : undefined}>
+      <div key={(changed || entered || created || nodeValueChanged) ? id + ':' + selectedIndex : id} className="yv-node yv-structure-node-card">
         <div className="yv-structure-node-main">
           <span className="yv-structure-node-heading">
             {keyCells
@@ -3881,14 +3892,17 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
           </span>
           {nodeIdentity && <span className="yv-structure-node-identity" title={'Object identity: ' + id}>@{nodeIdentity}</span>}
         </div>
-        {created && <span className="yv-binary-node-status is-created">NEW</span>}
-        {changed && <span className="yv-binary-node-status is-changed">UPDATED</span>}
-        {entered && <span className="yv-binary-node-status is-current">CURRENT</span>}
+        {created && <span className="yv-binary-node-status is-created yv-tree-operation-badge">NODE CREATED</span>}
+        {nodeValueChanged && <span className="yv-binary-node-status is-changed yv-tree-operation-badge yv-tree-value-delta" title="Value changed between adjacent execution snapshots">
+          {compactValue(nodeValue(previousNode!))} → {compactValue(nodeValue(resolved))}
+        </span>}
+        {changed && !nodeValueChanged && <span className="yv-binary-node-status is-changed yv-tree-operation-badge">NODE UPDATED</span>}
+        {entered && <span className="yv-binary-node-status is-current yv-tree-operation-badge">VISITED</span>}
         {pointerNames.length > 0 && <span className="yv-tree-pointer-labels yv-binary-pointer-labels" aria-label="Variables pointing to this node">
           {pointerNames.map(pointerName => <span className="yv-tree-pointer-label" key={pointerName} title={pointerName + ' points to this node'}>{pointerName}</span>)}
         </span>}
         {nodeMetadata.length > 0 && <span className="yv-tree-node-metadata" aria-label="Node metadata">
-          {nodeMetadata.map(([name, metadataValue]) => <span className="yv-tree-metadata-chip" key={name}>{name}={displayValue(metadataValue)}</span>)}
+          {nodeMetadata.map(([name, metadataValue]) => <span className={'yv-tree-metadata-chip' + (changedMetadataNames.includes(name) ? ' yv-tree-metadata-changed' : '')} key={name}>{name}={displayValue(metadataValue)}</span>)}
         </span>}
         {modelReferenceEdges.length > 0 && <span className="yv-tree-reference-labels" aria-label="Additional object references">
           {modelReferenceEdges.map(edge => <span className="yv-tree-reference-label" key={edge.id} title={edge.label + ' references object ' + edge.target}>{edge.label} → @{edge.target.length > 8 ? edge.target.slice(-6) : edge.target}</span>)}
@@ -3899,13 +3913,15 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
           {genericChildEdges.map((edge, index) => {
             const childEntered = movedPointerTargets.has(edge.target);
             const edgeLabel = edge.label ?? String(index);
+            const childAdded = addedChildTargets.has(edge.target);
             return (
-              <div key={edge.id} className={'yv-binary-tree-edge' + (childEntered ? ' yv-tree-edge-traversed' : '')}
+              <div key={edge.id} className={'yv-binary-tree-edge' + (childEntered ? ' yv-tree-edge-traversed' : '') + (childAdded ? ' yv-tree-edge-added' : '')}
                 data-tree-edge={edgeLabel.toLowerCase()} data-tree-edge-label={edgeLabel} data-tree-edge-target={edge.target}>
                 <div className="yv-binary-tree-edge-heading">
                   <span className="yv-binary-tree-edge-label">{edgeLabel}</span>
                   {edge.metadata.weight !== undefined && <span className="yv-tree-metadata-chip">w={displayValue(edge.metadata.weight)}</span>}
-                  {childEntered && <span className="yv-binary-edge-status is-traversed">VISITED</span>}
+                  {childAdded && <span className="yv-binary-edge-status is-added yv-tree-operation-badge">ADDED</span>}
+                  {childEntered && <span className="yv-binary-edge-status is-traversed yv-tree-operation-badge">TRAVERSED</span>}
                 </div>
                 <div className="yv-binary-tree-edge-content">
                   <TreeNodeView value={model.nodes.find(node => node.id === edge.target)?.snapshot ?? { $ref: edge.target }} objects={objects} depth={depth + 1} seen={nextSeen} state={state} structureModel={model} />
@@ -3929,7 +3945,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
       {treeConnectorLines.length > 0 && (
         <svg className="yv-tree-connectors" viewBox={`0 0 ${treeConnectorLines[0]?.rootWidth ?? 1} ${treeConnectorLines[0]?.rootHeight ?? 1}`} preserveAspectRatio="none" aria-hidden="true" focusable="false">
           {treeConnectorLines.map((line) => (
-            <line key={line.target} x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} />
+            <line key={line.target} className={(addedChildTargets.has(line.target) ? 'yv-tree-connector-added ' : '') + (movedPointerTargets.has(line.target) ? 'yv-tree-connector-traversed' : '')} x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} />
           ))}
         </svg>
       )}
