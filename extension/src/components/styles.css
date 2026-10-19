@@ -2261,3 +2261,44 @@
 @media (max-width: 520px) {
   .yv-universal-children { column-gap: 8px; }
 }
+
+
+/* Extensible node metadata and multi-key node cells share the same card. */
+.yv-node-key-cells {
+  display: inline-flex;
+  align-items: stretch;
+  justify-content: center;
+  border: 1px solid var(--yv-border-strong, #78879a);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--yv-elevated);
+}
+.yv-node-key-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  padding: 5px 7px;
+  font: 600 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.yv-node-key-cell + .yv-node-key-cell {
+  border-left: 1px solid var(--yv-border-strong, #78879a);
+}
+.yv-tree-node-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3px;
+  margin-top: 3px;
+}
+.yv-tree-metadata-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 5px;
+  border: 1px solid color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 72%);
+  border-radius: 4px;
+  color: var(--yv-accent, #65a9ff);
+  background: color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 94%);
+  font: 10px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: nowrap;
+}
