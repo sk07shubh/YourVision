@@ -121,12 +121,21 @@ export function buildObjectStructureModel(
   const expanded = new Set<string>();
   const active = new Set<string>();
   let anonymousSequence = 0;
+  const anonymousIds = new WeakMap<object, string>();
 
   const ensureNode = (raw: unknown): StructureNode | undefined => {
     const value = resolveObject(raw, objects);
     if (!value) return undefined;
     const knownId = identityOf(value) ?? identityOf(raw);
-    const id = knownId ?? `anonymous:${anonymousSequence++}`;
+    let anonymousId: string | undefined;
+    if (!knownId) {
+      anonymousId = anonymousIds.get(value);
+      if (!anonymousId) {
+        anonymousId = `anonymous:${anonymousSequence++}`;
+        anonymousIds.set(value, anonymousId);
+      }
+    }
+    const id = knownId ?? anonymousId!;
     const existing = nodes.get(id);
     if (existing) return existing;
     if (nodes.size >= maxNodes) return undefined;
@@ -205,7 +214,9 @@ export function buildObjectStructureModel(
     edge.source === edge.target || reaches(edge.target, edge.source, edgeList)
   ));
   const hasSharedChild = [...childParentCounts.values()].some(count => count > 1);
-  const kind = hasCycle || hasSharedChild || edgeList.some(edge => edge.kind === 'reference')
+  // Extra pointer edges are metadata about the object graph; they do not
+  // change the hierarchical layout into a graph layout by themselves.
+  const kind = hasCycle || hasSharedChild
     ? 'graph'
     : roots.length > 1 ? 'forest' : 'tree';
 
