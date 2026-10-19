@@ -3762,6 +3762,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const pointerNames = Object.entries(state?.variables ?? {})
     .filter(([, pointerValue]) => graphReferenceId(pointerValue, objects) === id)
     .map(([pointerName]) => pointerName);
+  const nodeIdentity = id ? (id.length > 18 ? id.slice(0, 15) + '…' : id) : undefined;
   const leftChildId = graphReferenceId(fields.left, objects);
   const rightChildId = graphReferenceId(fields.right, objects);
   const leftTraversal = Boolean(leftChildId && movedPointerTargets.has(leftChildId));
@@ -3769,29 +3770,33 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const entered = Boolean(state && previous && id && session.states.includes(state) &&
     movedPointerTargets.has(id));
   return (
-    <div className={'yv-tree-node' + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '')}
+    <div className={'yv-binary-node' + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '')}
       data-tree-node-id={id} data-tree-changed={changed ? 'true' : undefined} data-tree-entered={entered ? 'true' : undefined}
-      data-tree-created={created ? 'true' : undefined}>
-      <div key={(changed || entered || created) ? id + ':' + selectedIndex : id} className="yv-node" style={changed ? { background: 'var(--yv-highlight, #203b5b)' } : undefined}>
-        <span>{displayValue(nodeValue(resolved))}</span>
-        {pointerNames.length > 0 && <span className="yv-tree-pointer-labels">
-          {pointerNames.map(pointerName => <span className="yv-tree-pointer-label" key={pointerName}>{pointerName}</span>)}
+      data-tree-created={created ? 'true' : undefined} aria-label={'Tree node ' + displayValue(nodeValue(resolved)) + (id ? ', object ' + id : '')}>
+      <div key={(changed || entered || created) ? id + ':' + selectedIndex : id} className="yv-node yv-binary-node-card" style={changed ? { background: 'var(--yv-highlight, #203b5b)' } : undefined}>
+        <div className="yv-binary-node-main">
+          <span className="yv-binary-node-value">{displayValue(nodeValue(resolved))}</span>
+          {nodeIdentity && <span className="yv-binary-node-identity" title={'Object identity: ' + id}>@{nodeIdentity}</span>}
+        </div>
+        {(created || changed || entered) && <span className={'yv-binary-node-status' + (created ? ' is-created' : changed ? ' is-changed' : ' is-current')}>{created ? 'NEW' : changed ? 'UPDATED' : 'CURRENT'}</span>}
+        {pointerNames.length > 0 && <span className="yv-tree-pointer-labels yv-binary-pointer-labels" aria-label="Variables pointing to this node">
+          {pointerNames.map(pointerName => <span className="yv-tree-pointer-label" key={pointerName} title={pointerName + ' points to this node'}>{pointerName}</span>)}
         </span>}
       </div>
       {hasChildren && (
-        <div className="yv-tree-children">
-          <div key={(leftEdgeChanged || leftTraversal) ? 'left:' + id + ':' + selectedIndex : 'left:' + id} data-tree-edge="left" className={[leftEdgeChanged ? 'yv-tree-edge-changed' : '', leftTraversal ? 'yv-tree-edge-traversed' : ''].filter(Boolean).join(' ')}
+        <div className="yv-binary-children">
+          <div key={(leftEdgeChanged || leftTraversal) ? 'left:' + id + ':' + selectedIndex : 'left:' + id} data-tree-edge="left" className={['yv-binary-branch', leftEdgeChanged ? 'yv-tree-edge-changed' : '', leftTraversal ? 'yv-tree-edge-traversed' : ''].filter(Boolean).join(' ')}
             data-tree-edge-status={leftEdgeChanged ? edgeStatus(leftBefore, leftAfter) : undefined}
             data-tree-edge-traversed={leftTraversal ? 'true' : undefined}>
-            <div className="yv-tree-edge-label">LEFT</div>
+            <div className="yv-tree-edge-label yv-binary-edge-label"><span>LEFT</span>{leftEdgeChanged && <span className={'yv-binary-edge-status is-' + edgeStatus(leftBefore, leftAfter)}>{edgeStatus(leftBefore, leftAfter).toUpperCase()}</span>}{leftTraversal && <span className="yv-binary-edge-status is-traversed">VISITED</span>}</div>
             {fields.left != null
               ? <TreeNodeView value={fields.left} objects={objects} depth={depth + 1} seen={nextSeen} state={state} />
               : <span className="yv-null">null</span>}
           </div>
-          <div key={(rightEdgeChanged || rightTraversal) ? 'right:' + id + ':' + selectedIndex : 'right:' + id} data-tree-edge="right" className={[rightEdgeChanged ? 'yv-tree-edge-changed' : '', rightTraversal ? 'yv-tree-edge-traversed' : ''].filter(Boolean).join(' ')}
+          <div key={(rightEdgeChanged || rightTraversal) ? 'right:' + id + ':' + selectedIndex : 'right:' + id} data-tree-edge="right" className={['yv-binary-branch', rightEdgeChanged ? 'yv-tree-edge-changed' : '', rightTraversal ? 'yv-tree-edge-traversed' : ''].filter(Boolean).join(' ')}
             data-tree-edge-status={rightEdgeChanged ? edgeStatus(rightBefore, rightAfter) : undefined}
             data-tree-edge-traversed={rightTraversal ? 'true' : undefined}>
-            <div className="yv-tree-edge-label">RIGHT</div>
+            <div className="yv-tree-edge-label yv-binary-edge-label"><span>RIGHT</span>{rightEdgeChanged && <span className={'yv-binary-edge-status is-' + edgeStatus(rightBefore, rightAfter)}>{edgeStatus(rightBefore, rightAfter).toUpperCase()}</span>}{rightTraversal && <span className="yv-binary-edge-status is-traversed">VISITED</span>}</div>
             {fields.right != null
               ? <TreeNodeView value={fields.right} objects={objects} depth={depth + 1} seen={nextSeen} state={state} />
               : <span className="yv-null">null</span>}
