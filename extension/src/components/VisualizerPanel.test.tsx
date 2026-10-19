@@ -1941,6 +1941,66 @@ describe('execution visualization feature matrix', () => {
     }
   });
 
+  it('renders structured map value updates in place instead of replacing the whole value', () => {
+    const previousSession = sessionStore.get();
+    const beforeList = {
+      $collectionId: 'map-value-list',
+      $type: 'java.util.ArrayList',
+      $kind: 'list',
+      values: ['eat'],
+      size: 1,
+    };
+    const afterList = {
+      $collectionId: 'map-value-list',
+      $type: 'java.util.ArrayList',
+      $kind: 'list',
+      values: ['eat', 'tea'],
+      size: 2,
+    };
+    const previous = state({
+      sequence: 87,
+      dataStructures: {
+        groups: {
+          $mapId: 'map-list-value',
+          $type: 'java.util.HashMap',
+          entries: [{ key: 'aet', value: beforeList }],
+          size: 1,
+        },
+      },
+    });
+    const current = state({
+      sequence: 88,
+      dataStructures: {
+        groups: {
+          $mapId: 'map-list-value',
+          $type: 'java.util.HashMap',
+          entries: [{ key: 'aet', value: afterList }],
+          size: 1,
+        },
+      },
+      lastEvent: {
+        type: 'STEP',
+        line: 13,
+        data: {
+          mapId: 'map-list-value',
+          changes: [{ kind: 'update', key: 'aet', before: beforeList, after: afterList }],
+        },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'groups.get("aet").add("tea");', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source='groups.get("aet").add("tea");' />);
+      const map = html.split('data-map-id="map-list-value"')[1] ?? '';
+      expect(map).toContain('aet');
+      expect(map).toContain('eat');
+      expect(map).toContain('tea');
+      expect(map).not.toContain('yv-old-value');
+      expect(map).not.toContain('yv-map-arrow');
+    } finally {
+      sessionStore.set(previousSession);
+    }
+  });
+
   it('finds previous map snapshots in variables when a map alias moves into data structures', () => {
     const previousSession = sessionStore.get();
     const previous = state({
