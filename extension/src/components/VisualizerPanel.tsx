@@ -3816,14 +3816,13 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const depthClass = 'yv-structure-depth-' + Math.min(depth, 4);
   return (
     <div className={'yv-structure-node ' + depthClass + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '')}
-      data-tree-node-id={id} data-tree-depth={depth} data-tree-layout="nested"
+      data-tree-node-id={id} data-tree-depth={depth} data-tree-layout="binary-tree"
       data-tree-changed={changed ? 'true' : undefined} data-tree-entered={entered ? 'true' : undefined}
       data-tree-created={created ? 'true' : undefined} aria-label={'Tree node ' + displayValue(nodeValue(resolved)) + (id ? ', object ' + id : '')}>
       <div key={(changed || entered || created) ? id + ':' + selectedIndex : id} className="yv-node yv-structure-node-card"
         style={changed ? { background: 'var(--yv-highlight, #203b5b)' } : undefined}>
         <div className="yv-structure-node-main">
           <span className="yv-structure-node-heading">
-            <span className="yv-structure-node-depth-badge">{depth + 1}</span>
             {keyCells
               ? <span className="yv-node-key-cells" aria-label="Node keys">
                   {keyCells.map((keyValue, index) => <span className="yv-node-key-cell" key={index}>{displayValue(keyValue)}</span>)}
@@ -3846,33 +3845,33 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
         </span>}
       </div>
       {(genericChildEdges.length > 0 || removedChildEdges.length > 0) && (
-        <div className="yv-nested-structure-children" data-tree-children="nested">
+        <div className="yv-binary-tree-children" data-tree-children="binary-tree">
           {genericChildEdges.map((edge, index) => {
             const childEntered = movedPointerTargets.has(edge.target);
             const edgeLabel = edge.label ?? String(index);
             return (
-              <div key={edge.id} className={'yv-nested-structure-edge' + (childEntered ? ' yv-tree-edge-traversed' : '')}
+              <div key={edge.id} className={'yv-binary-tree-edge' + (childEntered ? ' yv-tree-edge-traversed' : '')}
                 data-tree-edge={edgeLabel.toLowerCase()} data-tree-edge-label={edgeLabel} data-tree-edge-target={edge.target}>
-                <div className="yv-nested-structure-edge-heading">
-                  <span className="yv-nested-structure-edge-label">{edgeLabel}</span>
+                <div className="yv-binary-tree-edge-heading">
+                  <span className="yv-binary-tree-edge-label">{edgeLabel}</span>
                   {edge.metadata.weight !== undefined && <span className="yv-tree-metadata-chip">w={displayValue(edge.metadata.weight)}</span>}
                   {childEntered && <span className="yv-binary-edge-status is-traversed">VISITED</span>}
                 </div>
-                <div className="yv-nested-structure-edge-content">
+                <div className="yv-binary-tree-edge-content">
                   <TreeNodeView value={model.nodes.find(node => node.id === edge.target)?.snapshot ?? { $ref: edge.target }} objects={objects} depth={depth + 1} seen={nextSeen} state={state} structureModel={model} />
                 </div>
               </div>
             );
           })}
           {removedChildEdges.map(edge => (
-            <div key={'removed:' + edge.fieldName} className="yv-nested-structure-edge yv-nested-structure-edge-removed"
+            <div key={'removed:' + edge.fieldName} className="yv-binary-tree-edge yv-binary-tree-edge-removed"
               data-tree-edge={edge.fieldName.toLowerCase()} data-tree-edge-label={edge.label}
               data-tree-edge-target={edge.target ?? undefined} data-tree-edge-status="removed">
-              <div className="yv-nested-structure-edge-heading">
-                <span className="yv-nested-structure-edge-label">{edge.label}</span>
+              <div className="yv-binary-tree-edge-heading">
+                <span className="yv-binary-tree-edge-label">{edge.label}</span>
                 <span className="yv-binary-edge-status is-removed">REMOVED</span>
               </div>
-              <div className="yv-nested-structure-edge-content"><span className="yv-null">null</span></div>
+              <div className="yv-binary-tree-edge-content"><span className="yv-null">null</span></div>
             </div>
           ))}
         </div>
@@ -4541,9 +4540,9 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
       '.yv-tree-reference-labels', '.yv-tree-reference-label',
       '.yv-structure-node', '.yv-structure-node-card', '.yv-structure-node-main',
       '.yv-structure-node-value', '.yv-structure-node-identity', '.yv-structure-node-heading',
-      '.yv-structure-node-depth-badge', '.yv-nested-structure-children', '.yv-nested-structure-edge',
-      '.yv-nested-structure-edge-heading', '.yv-nested-structure-edge-label', '.yv-nested-structure-edge-content',
-      '.yv-nested-structure-edge-removed', '.yv-structure-depth-0', '.yv-structure-depth-1',
+      '.yv-structure-node-depth-badge', '.yv-binary-tree-children', '.yv-binary-tree-edge',
+      '.yv-binary-tree-edge-heading', '.yv-binary-tree-edge-label', '.yv-binary-tree-edge-content',
+      '.yv-binary-tree-edge-removed', '.yv-structure-depth-0', '.yv-structure-depth-1',
       '.yv-structure-depth-2', '.yv-structure-depth-3', '.yv-structure-depth-4',
       '.yv-node-key-cells', '.yv-node-key-cell', '.yv-tree-node-metadata', '.yv-tree-metadata-chip',
     ];
