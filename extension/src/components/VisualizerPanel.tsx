@@ -1432,7 +1432,7 @@ function CollectionView({
           {[...value.values].reverse().map((item, index) => (
             <div className={"yv-stack-cell " + collectionItemMotionClass(value, item, value.values.length - 1 - index, state) + (sameLengthTopReplacement && index === 0 ? ' yv-stack-top-updated' : '')} key={collectionItemReactKey(item, value.values.length - 1 - index, value.values)} data-collection-item-key={collectionItemReactKey(item, value.values.length - 1 - index, value.values)}>
               <span className="yv-stack-position">{index === 0 ? 'TOP' : ''}</span>
-              <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen} nestedArrayItem={hasNestedItems && (isArraySnapshot(item) || Array.isArray(item))}/>
+              <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
             </div>
           ))}
           {!value.values.length && <div className="yv-empty">Empty stack</div>}
@@ -1513,7 +1513,7 @@ function CollectionView({
               data-collection-item-key={collectionItemReactKey(item, index, value.values)}>
               <div className="yv-list-pointer-row" aria-hidden="true">{pointersAt(index).map(pointer => <span key={pointer.name} className="yv-list-pointer">{pointer.name}</span>)}</div>
               <div className={"yv-list-cell " + collectionItemMotionClass(value, item, index, state)}>
-                <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
+                <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen} nestedArrayItem={hasNestedItems && (isArraySnapshot(item) || Array.isArray(item))}/>
               </div>
               <div className="yv-cell-index">{index}</div>
             </div>
