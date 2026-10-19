@@ -68,12 +68,24 @@ function resolveObject(value: unknown, objects: Record<string, unknown>): Record
 function defaultChildren(_value: RecordValue, fields: RecordValue): ChildEdgeDescriptor[] {
   const children: ChildEdgeDescriptor[] = [];
   for (const field of ['left', 'right']) {
-    if (fields[field] != null) children.push({ target: fields[field], label: field.toUpperCase(), slot: field });
+    if (fields[field] == null) continue;
+    const weight = fields[field + 'Weight'] ?? fields[field + 'EdgeWeight'];
+    children.push({
+      target: fields[field],
+      label: field.toUpperCase(),
+      slot: field,
+      metadata: weight === undefined ? {} : { weight },
+    });
   }
 
   if (Array.isArray(fields.children)) {
     fields.children.forEach((target, index) => {
-      if (target != null) children.push({ target, label: String(index), slot: index });
+      if (target == null) return;
+      const weights = Array.isArray(fields.weights) ? fields.weights : undefined;
+      children.push({
+        target, label: String(index), slot: index,
+        metadata: weights && weights[index] !== undefined ? { weight: weights[index] } : {},
+      });
     });
   } else if (isRecord(fields.children)) {
     const childContainer = fields.children;
@@ -85,7 +97,7 @@ function defaultChildren(_value: RecordValue, fields: RecordValue): ChildEdgeDes
       childContainer.entries.forEach((entry) => {
         if (!isRecord(entry) || entry.value == null) return;
         const label = String(entry.key);
-        children.push({ target: entry.value, label, slot: label });
+        children.push({ target: entry.value, label, slot: label, metadata: entry.weight === undefined ? {} : { weight: entry.weight } });
       });
     } else {
       for (const [label, target] of Object.entries(childContainer)) {
@@ -97,7 +109,7 @@ function defaultChildren(_value: RecordValue, fields: RecordValue): ChildEdgeDes
 }
 
 function defaultValue(fields: RecordValue): unknown {
-  return fields.val ?? fields.value ?? fields.data ?? fields.key ?? '?';
+  return fields.val ?? fields.value ?? fields.data ?? fields.keys ?? fields.key ?? '?';
 }
 
 /**
