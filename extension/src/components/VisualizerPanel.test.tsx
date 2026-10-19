@@ -2104,6 +2104,16 @@ describe('array and matrix mutation animations', () => {
     expect(html).toContain('Empty matrix · 0 rows');
   });
 
+  it('renders an int[] nested in a list as an indexed inner group, not a matrix', () => {
+    const html = renderToStaticMarkup(
+      <ArrayView value={[ [4, 5], [8] ]} state={state()} source="for (int[] row : rows)" arrayName="rows" nestedItems />,
+    );
+    expect(html).toContain('yv-array-nested-collections');
+    expect(html).not.toContain('yv-matrix');
+    expect(html).toContain('class="yv-cell-index">0</div>');
+    expect(html).toContain('class="yv-cell-index">1</div>');
+  });
+
   it('preserves jagged matrix rows instead of inventing missing values', () => {
     const html = renderToStaticMarkup(
       <ArrayView value={[[1, 2, 3], [4], []]} state={state()} source="" arrayName="matrix" />,
