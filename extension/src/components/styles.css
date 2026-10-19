@@ -2345,6 +2345,10 @@
   animation: yv-tree-value-update 680ms ease-out both;
   border-color: #FFA116;
 }
+.yv-structure-node.yv-tree-node-changed:not(.yv-tree-node-value-changed):not(.yv-tree-node-created) > .yv-structure-node-card {
+  animation: yv-tree-value-update 620ms ease-out both;
+  border-color: #FFA116;
+}
 .yv-structure-node.yv-tree-node-entered > .yv-structure-node-card {
   animation: yv-tree-node-visit 620ms ease-out both;
   border-color: #FFA116;
@@ -2446,6 +2450,7 @@
   .yv-tree-operation-badge,
   .yv-structure-node.yv-tree-node-created > .yv-structure-node-card,
   .yv-structure-node.yv-tree-node-value-changed > .yv-structure-node-card,
+  .yv-structure-node.yv-tree-node-changed:not(.yv-tree-node-value-changed):not(.yv-tree-node-created) > .yv-structure-node-card,
   .yv-structure-node.yv-tree-node-entered > .yv-structure-node-card,
   .yv-tree-node-child-removed > .yv-structure-node-card,
   .yv-tree-metadata-changed,
