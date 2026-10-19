@@ -4455,13 +4455,17 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
       '.yv-tree-node-entered', '.yv-tree-node-changed', '.yv-tree-node-created',
       '.yv-tree-edge-changed', '.yv-tree-pointer-labels', '.yv-tree-pointer-label',
       '.yv-tree-edge-traversed',
+      '.yv-binary-node', '.yv-binary-node-card', '.yv-binary-node-main',
+      '.yv-binary-node-value', '.yv-binary-node-identity', '.yv-binary-node-status',
+      '.yv-binary-children', '.yv-binary-branch', '.yv-binary-edge-label',
+      '.yv-binary-edge-status', '.yv-binary-pointer-labels',
     ];
     const rules: string[] = [];
     const rulePattern = /([^{}]+)\{([^{}]*)\}/g;
     for (const match of css.matchAll(rulePattern)) {
       const selector = match[1]!.trim();
       if (selector.startsWith('@keyframes') || selector.startsWith('@media')) continue;
-      if (selector.split(',').some(part => selectors.some(needle => { const rule = part.trim(); return rule === needle || rule.startsWith(needle + ' ') || rule.startsWith(needle + '>') || rule.startsWith(needle + ':') || rule.startsWith(needle + '['); }))) {
+      if (selector.split(',').some(part => selectors.some(needle => { const rule = part.trim(); return rule === needle || rule.startsWith(needle + ' ') || rule.startsWith(needle + '>') || rule.startsWith(needle + ':') || rule.startsWith(needle + '[') || rule.startsWith(needle + '.'); }))) {
         rules.push(selector + ' {' + match[2]!.trim() + '}');
       }
     }
