@@ -4115,9 +4115,13 @@ function DataValue({
 
   if (Array.isArray(value)) return <ArrayView value={value} state={state} source={source} arrayName={name} depth={depth} seen={seen} nestedItems={nestedArrayItem}/>;
   if (isPlainObject(value)) {
-    if (looksTreeNode(value)) return <div className="yv-tree"><TreeNodeView value={value} objects={state?.objects??{}} state={state}/></div>;
-    if (looksListNode(value)) return <LinkedListView root={value} objects={state?.objects??{}} variables={state?.variables??{}} state={state}/>;
     const resolved = resolveObjects ? resolveRef(value, state?.objects ?? {}) : value;
+    if (isPlainObject(resolved) && looksTreeNode(resolved)) {
+      return <div className="yv-tree"><TreeNodeView value={resolved} objects={state?.objects ?? {}} state={state}/></div>;
+    }
+    if (isPlainObject(resolved) && looksListNode(resolved)) {
+      return <LinkedListView root={resolved} objects={state?.objects ?? {}} variables={state?.variables ?? {}} state={state}/>;
+    }
     if (isPlainObject(resolved)) {
       return <ObjectView value={resolved} state={state} source={source} depth={depth} seen={seen}/>;
     }
