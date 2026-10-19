@@ -244,3 +244,31 @@ function reaches(from: string, target: string, edges: StructureEdge[]): boolean 
   }
   return false;
 }
+
+
+/** Adapt a heap's flat array representation to the shared node/edge contract. */
+export function buildHeapStructureModel(values: unknown[]): StructureModel {
+  const nodes: StructureNode[] = values.map((value, index) => ({
+    id: `heap:${index}`,
+    value,
+    type: 'HeapNode',
+    fields: { value, index },
+    metadata: { index },
+  }));
+  const edges: StructureEdge[] = [];
+  for (let parent = 0; parent < values.length; parent += 1) {
+    for (const [slot, child] of [['left', parent * 2 + 1], ['right', parent * 2 + 2]] as const) {
+      if (child >= values.length) continue;
+      edges.push({
+        id: `child:heap:${parent}:${slot}:heap:${child}`,
+        source: `heap:${parent}`,
+        target: `heap:${child}`,
+        kind: 'child',
+        label: slot.toUpperCase(),
+        slot,
+        metadata: { parentIndex: parent, childIndex: child },
+      });
+    }
+  }
+  return { kind: values.length ? 'tree' : 'forest', roots: values.length ? ['heap:0'] : [], nodes, edges };
+}
