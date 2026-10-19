@@ -3835,9 +3835,17 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const currentChildSlots = new Set(genericChildEdges.map(edge => (edge.label ?? '').toLowerCase()));
   const previousChildTargets = new Set(Object.entries(previousFields)
     .filter(([fieldName, previousValue]) => previousValue != null && /^(left|right|children|child\\d+|firstChild|secondChild)$/i.test(fieldName))
-    .flatMap(([fieldName, previousValue]) => fieldName.toLowerCase() === 'children' && Array.isArray(previousValue)
-      ? previousValue.map(child => graphReferenceId(child, previousObjects))
-      : [graphReferenceId(previousValue, previousObjects)])
+    .flatMap(([fieldName, previousValue]) => {
+      if (fieldName.toLowerCase() !== 'children') return [graphReferenceId(previousValue, previousObjects)];
+      const childValues = Array.isArray(previousValue)
+        ? previousValue
+        : isPlainObject(previousValue) && Array.isArray(previousValue.values)
+          ? previousValue.values
+          : isPlainObject(previousValue) && Array.isArray(previousValue.entries)
+            ? previousValue.entries.filter(isPlainObject).map(entry => entry.value)
+            : isPlainObject(previousValue) ? Object.values(previousValue) : [];
+      return childValues.map(child => graphReferenceId(child, previousObjects));
+    })
     .filter((target): target is string => Boolean(target)));
   const addedChildTargets = new Set(genericChildEdges
     .filter(edge => Boolean(previous && session.states.includes(state!)) && !previousChildTargets.has(edge.target))
