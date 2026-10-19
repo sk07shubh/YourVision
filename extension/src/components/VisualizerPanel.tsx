@@ -3908,7 +3908,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
         </div>
         {created && <span className="yv-binary-node-status is-created yv-tree-operation-badge">NODE CREATED</span>}
         {nodeValueChanged && <span className="yv-binary-node-status is-changed yv-tree-operation-badge yv-tree-value-delta" title="Value changed between adjacent execution snapshots">
-          {compactValue(nodeValue(previousNode!))} → {compactValue(nodeValue(resolved))}
+          {compactValue(nodeValue(previousFields))} → {compactValue(nodeValue(resolved))}
         </span>}
         {changed && !nodeValueChanged && <span className="yv-binary-node-status is-changed yv-tree-operation-badge">NODE UPDATED</span>}
         {entered && <span className="yv-binary-node-status is-current yv-tree-operation-badge">VISITED</span>}
