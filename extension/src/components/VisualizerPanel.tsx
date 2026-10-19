@@ -3789,8 +3789,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   // Keep the branch row for the removal step even if its last child vanished,
   // so the changed edge can still show the transition to null.
   const modelNodeId = id ?? model.nodes.find(node => node.fields === fields)?.id;
-  const genericChildEdges = model.edges.filter(edge => edge.kind === 'child' && edge.source === modelNodeId && edge.slot !== 'left' && edge.slot !== 'right');
-  const hasChildren = fields.left != null || fields.right != null || leftEdgeChanged || rightEdgeChanged;
+  const genericChildEdges = model.edges.filter(edge => edge.kind === 'child' && edge.source === modelNodeId);
   const edgeStatus = (before: string | null | undefined, after: string | null | undefined) =>
     before == null ? 'added' : after == null ? 'removed' : 'rewired';
   const movedPointerTargets = new Set<string>();
@@ -3812,10 +3811,6 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   );
   const modelChildEdges = model.edges.filter(edge => edge.kind === 'child' && edge.source === modelNodeId);
   const modelReferenceEdges = model.edges.filter(edge => edge.kind === 'reference' && edge.source === modelNodeId);
-  const leftChildId = modelChildEdges.find(edge => edge.slot === 'left')?.target ?? graphReferenceId(fields.left, objects);
-  const rightChildId = modelChildEdges.find(edge => edge.slot === 'right')?.target ?? graphReferenceId(fields.right, objects);
-  const leftTraversal = Boolean(leftChildId && movedPointerTargets.has(leftChildId));
-  const rightTraversal = Boolean(rightChildId && movedPointerTargets.has(rightChildId));
   const entered = Boolean(state && previous && id && session.states.includes(state) &&
     movedPointerTargets.has(id));
   return (
@@ -3863,26 +3858,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
           })}
         </div>
       )}
-      {hasChildren && (
-        <div className="yv-binary-children">
-          <div key={(leftEdgeChanged || leftTraversal) ? 'left:' + id + ':' + selectedIndex : 'left:' + id} data-tree-edge="left" className={['yv-binary-branch', leftEdgeChanged ? 'yv-tree-edge-changed' : '', leftTraversal ? 'yv-tree-edge-traversed' : ''].filter(Boolean).join(' ')}
-            data-tree-edge-status={leftEdgeChanged ? edgeStatus(leftBefore, leftAfter) : undefined}
-            data-tree-edge-traversed={leftTraversal ? 'true' : undefined}>
-            <div className="yv-tree-edge-label yv-binary-edge-label"><span>LEFT</span>{modelChildEdges.find(edge => edge.slot === 'left')?.metadata.weight !== undefined && <span className="yv-tree-metadata-chip">w={displayValue(modelChildEdges.find(edge => edge.slot === 'left')?.metadata.weight)}</span>}{leftEdgeChanged && <span className={'yv-binary-edge-status is-' + edgeStatus(leftBefore, leftAfter)}>{edgeStatus(leftBefore, leftAfter).toUpperCase()}</span>}{leftTraversal && <span className="yv-binary-edge-status is-traversed">VISITED</span>}</div>
-            {fields.left != null
-              ? <TreeNodeView value={fields.left} objects={objects} depth={depth + 1} seen={nextSeen} state={state} structureModel={model} />
-              : <span className="yv-null">null</span>}
-          </div>
-          <div key={(rightEdgeChanged || rightTraversal) ? 'right:' + id + ':' + selectedIndex : 'right:' + id} data-tree-edge="right" className={['yv-binary-branch', rightEdgeChanged ? 'yv-tree-edge-changed' : '', rightTraversal ? 'yv-tree-edge-traversed' : ''].filter(Boolean).join(' ')}
-            data-tree-edge-status={rightEdgeChanged ? edgeStatus(rightBefore, rightAfter) : undefined}
-            data-tree-edge-traversed={rightTraversal ? 'true' : undefined}>
-            <div className="yv-tree-edge-label yv-binary-edge-label"><span>RIGHT</span>{modelChildEdges.find(edge => edge.slot === 'right')?.metadata.weight !== undefined && <span className="yv-tree-metadata-chip">w={displayValue(modelChildEdges.find(edge => edge.slot === 'right')?.metadata.weight)}</span>}{rightEdgeChanged && <span className={'yv-binary-edge-status is-' + edgeStatus(rightBefore, rightAfter)}>{edgeStatus(rightBefore, rightAfter).toUpperCase()}</span>}{rightTraversal && <span className="yv-binary-edge-status is-traversed">VISITED</span>}</div>
-            {fields.right != null
-              ? <TreeNodeView value={fields.right} objects={objects} depth={depth + 1} seen={nextSeen} state={state} structureModel={model} />
-              : <span className="yv-null">null</span>}
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }
