@@ -1320,7 +1320,6 @@ function HeapTreeView({
                   source={source}
                   depth={depth + 1}
                   seen={seen}
-                  nestedArrayItem={hasNestedItems && (isArraySnapshot(item) || Array.isArray(item))}
                 />
                 </div>
                 <div className="yv-cell-index">[{heapIndex}]</div>
@@ -1433,7 +1432,7 @@ function CollectionView({
           {[...value.values].reverse().map((item, index) => (
             <div className={"yv-stack-cell " + collectionItemMotionClass(value, item, value.values.length - 1 - index, state) + (sameLengthTopReplacement && index === 0 ? ' yv-stack-top-updated' : '')} key={collectionItemReactKey(item, value.values.length - 1 - index, value.values)} data-collection-item-key={collectionItemReactKey(item, value.values.length - 1 - index, value.values)}>
               <span className="yv-stack-position">{index === 0 ? 'TOP' : ''}</span>
-              <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen}/>
+              <DataValue value={item} state={state} source={source} depth={depth + 1} seen={seen} nestedArrayItem={hasNestedItems && (isArraySnapshot(item) || Array.isArray(item))}/>
             </div>
           ))}
           {!value.values.length && <div className="yv-empty">Empty stack</div>}
