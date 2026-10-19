@@ -27,6 +27,7 @@ import {
   TreeNodeView,
   LinkedListView,
   StringView,
+  buildDataStructuresSnapshot,
 } from './VisualizerPanel';
 
 function state(patch: Partial<TraceState> = {}): TraceState {
@@ -318,6 +319,37 @@ describe('synchronized function invocation tree', () => {
 });
 
 describe('design-class instance state visualization', () => {
+  it('exports the selected checkpoint as a complete data-structure JSON snapshot', () => {
+    const current = state({
+      sequence: 7,
+      line: 12,
+      method: 'solve',
+      variables: { root: { $objectId: 'tree-root' }, label: 'current' },
+      arrays: { nums: { $arrayId: 'nums-1', values: [1, 2, 3] } },
+      dataStructures: {
+        adjacency: { $mapId: 'graph-map', $type: 'HashMap', entries: [{ key: 1, value: [2, 3] }] },
+      },
+      objects: {
+        'tree-root': { $objectId: 'tree-root', $type: 'TreeNode', fields: { val: 1, left: null, right: null } },
+      },
+      lastEvent: { type: 'STEP', method: 'solve', data: {} },
+    });
+    const snapshot = JSON.parse(buildDataStructuresSnapshot(current));
+    expect(snapshot.format).toBe('YourVision Data Structures Snapshot');
+    expect(snapshot.checkpoint).toMatchObject({ sequence: 7, line: 12, method: 'solve', event: 'STEP' });
+    expect(snapshot.structures.arrays.nums.values).toEqual([1, 2, 3]);
+    expect(snapshot.structures.dataStructures.adjacency.entries[0].value).toEqual([2, 3]);
+    expect(snapshot.structures.objects['tree-root'].fields).toEqual({ val: 1, left: null, right: null });
+    expect(snapshot.structures.variables.root.$objectId).toBe('tree-root');
+    expect(snapshot.structures.variables.label).toBe('current');
+  });
+
+  it('renders the copy action in the Data Structures section, including the empty state', () => {
+    const html = renderToStaticMarkup(<DataStructures state={state()} source="" />);
+    expect(html).toContain('Copy current data structures as JSON');
+    expect(html).toContain('Copy JSON');
+  });
+
   it('renders structural fields on this as first-class data structures', () => {
     const cache = {
       $mapId: 'cache-map',
