@@ -1847,3 +1847,14 @@
 .yv-tree-return-trigger {
   color: var(--yv-accent, #93c5fd);
 }
+
+
+/* Structured data-structure updates get compact before/after previews instead of serialized metadata. */
+.yv-ds-result-structured{align-items:flex-start;flex-wrap:wrap;white-space:normal;row-gap:6px}
+.yv-ds-result-structured-values{display:flex;align-items:stretch;gap:8px;flex:1 1 100%;min-width:0;margin-top:3px}
+.yv-ds-result-snapshot{display:flex;flex:1 1 0;flex-direction:column;gap:5px;min-width:0;max-width:100%;padding:7px;border:1px solid var(--yv-border);border-radius:7px;background:var(--yv-panel);overflow:hidden}
+.yv-ds-result-snapshot.is-current{border-color:color-mix(in srgb,var(--yv-accent),transparent 42%)}
+.yv-ds-result-snapshot-label{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--yv-muted)}
+.yv-ds-result-snapshot .yv-collection,.yv-ds-result-snapshot .yv-array,.yv-ds-result-snapshot .yv-map{max-width:100%;min-width:0}
+.yv-ds-result-structured-values>.yv-ds-result-transition{align-self:center;flex:0 0 auto}
+@media(max-width:520px){.yv-ds-result-structured-values{flex-direction:column}.yv-ds-result-structured-values>.yv-ds-result-transition{align-self:center;transform:rotate(90deg)}}
