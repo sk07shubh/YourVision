@@ -6,6 +6,7 @@ import { sessionStore } from '../state/store';
 import { displayValue, stableStringify, isPlainObject } from '../utils/value';
 import { highlightEditorLine, clearEditorExecutionMarker } from '../leetcode/editor-overlay';
 import type { TraceState } from '../types/trace';
+import { buildObjectStructureModel } from './treeModel';
 import visualizerPanelSource from './VisualizerPanel.tsx?raw';
 import visualizerStylesSource from './styles.css?raw';
 
@@ -3715,13 +3716,20 @@ export function LinkedListView({
   );
 }
 
-export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>(), state }: {
+export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>(), state, structureModel }: {
   value: unknown;
   objects: Record<string, unknown>;
   depth?: number;
   seen?: Set<string>;
   state?: TraceState;
+  structureModel?: ReturnType<typeof buildObjectStructureModel>;
 }) {
+  const model = structureModel ?? buildObjectStructureModel(value, objects, {
+    getChildren: (_node, fields) => (['left', 'right'] as const).flatMap(slot =>
+      fields[slot] == null ? [] : [{ target: fields[slot], label: slot.toUpperCase(), slot }]
+    ),
+    referenceFields: ['parent', 'next', 'prev', 'thread', 'random'],
+  });
   const session = sessionStore.get();
   const selectedIndex = state ? session.states.indexOf(state) : -1;
   const previous = selectedIndex > 0 ? session.states[selectedIndex - 1] : undefined;
@@ -3763,8 +3771,10 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     .filter(([, pointerValue]) => graphReferenceId(pointerValue, objects) === id)
     .map(([pointerName]) => pointerName);
   const nodeIdentity = id ? (id.length > 18 ? id.slice(0, 15) + '…' : id) : undefined;
-  const leftChildId = graphReferenceId(fields.left, objects);
-  const rightChildId = graphReferenceId(fields.right, objects);
+  const modelChildEdges = model.edges.filter(edge => edge.kind === 'child' && edge.source === id);
+  const modelReferenceEdges = model.edges.filter(edge => edge.kind === 'reference' && edge.source === id);
+  const leftChildId = modelChildEdges.find(edge => edge.slot === 'left')?.target ?? graphReferenceId(fields.left, objects);
+  const rightChildId = modelChildEdges.find(edge => edge.slot === 'right')?.target ?? graphReferenceId(fields.right, objects);
   const leftTraversal = Boolean(leftChildId && movedPointerTargets.has(leftChildId));
   const rightTraversal = Boolean(rightChildId && movedPointerTargets.has(rightChildId));
   const entered = Boolean(state && previous && id && session.states.includes(state) &&
@@ -3784,6 +3794,9 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
         {pointerNames.length > 0 && <span className="yv-tree-pointer-labels yv-binary-pointer-labels" aria-label="Variables pointing to this node">
           {pointerNames.map(pointerName => <span className="yv-tree-pointer-label" key={pointerName} title={pointerName + ' points to this node'}>{pointerName}</span>)}
         </span>}
+        {modelReferenceEdges.length > 0 && <span className="yv-tree-reference-labels" aria-label="Additional object references">
+          {modelReferenceEdges.map(edge => <span className="yv-tree-reference-label" key={edge.id} title={edge.label + ' references object ' + edge.target}>{edge.label} → @{edge.target.length > 8 ? edge.target.slice(-6) : edge.target}</span>)}
+        </span>}
       </div>
       {hasChildren && (
         <div className="yv-binary-children">
@@ -3792,7 +3805,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
             data-tree-edge-traversed={leftTraversal ? 'true' : undefined}>
             <div className="yv-tree-edge-label yv-binary-edge-label"><span>LEFT</span>{leftEdgeChanged && <span className={'yv-binary-edge-status is-' + edgeStatus(leftBefore, leftAfter)}>{edgeStatus(leftBefore, leftAfter).toUpperCase()}</span>}{leftTraversal && <span className="yv-binary-edge-status is-traversed">VISITED</span>}</div>
             {fields.left != null
-              ? <TreeNodeView value={fields.left} objects={objects} depth={depth + 1} seen={nextSeen} state={state} />
+              ? <TreeNodeView value={fields.left} objects={objects} depth={depth + 1} seen={nextSeen} state={state} structureModel={model} />
               : <span className="yv-null">null</span>}
           </div>
           <div key={(rightEdgeChanged || rightTraversal) ? 'right:' + id + ':' + selectedIndex : 'right:' + id} data-tree-edge="right" className={['yv-binary-branch', rightEdgeChanged ? 'yv-tree-edge-changed' : '', rightTraversal ? 'yv-tree-edge-traversed' : ''].filter(Boolean).join(' ')}
@@ -3800,7 +3813,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
             data-tree-edge-traversed={rightTraversal ? 'true' : undefined}>
             <div className="yv-tree-edge-label yv-binary-edge-label"><span>RIGHT</span>{rightEdgeChanged && <span className={'yv-binary-edge-status is-' + edgeStatus(rightBefore, rightAfter)}>{edgeStatus(rightBefore, rightAfter).toUpperCase()}</span>}{rightTraversal && <span className="yv-binary-edge-status is-traversed">VISITED</span>}</div>
             {fields.right != null
-              ? <TreeNodeView value={fields.right} objects={objects} depth={depth + 1} seen={nextSeen} state={state} />
+              ? <TreeNodeView value={fields.right} objects={objects} depth={depth + 1} seen={nextSeen} state={state} structureModel={model} />
               : <span className="yv-null">null</span>}
           </div>
         </div>
