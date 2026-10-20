@@ -2668,7 +2668,7 @@
 
 /* Graph visualization: responsive canvas with a synchronized node inspector. */
 .yv-graph-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start;min-width:0}
-.yv-graph-canvas{position:relative;width:100%;max-width:900px;aspect-ratio:15/8;min-height:190px;margin:0 auto;overflow:visible;isolation:isolate}
+.yv-graph-canvas{position:relative;width:100%;max-width:900px;aspect-ratio:15/8;margin:0 auto;overflow:visible;isolation:isolate}
 .yv-graph-canvas>.yv-graph-node{font-size:clamp(10px,1.8vw,12px)!important;overflow-wrap:anywhere;line-height:1.2;transition:box-shadow 140ms ease,border-color 140ms ease,background 140ms ease}
 .yv-graph-canvas>.yv-graph-node:focus-visible{outline:2px solid var(--yv-accent,#65a9ff);outline-offset:3px}
 .yv-graph-canvas>.yv-graph-node-selected{border-color:var(--yv-accent,#65a9ff)!important}
@@ -2689,7 +2689,7 @@
 .yv-graph-neighbor:disabled{opacity:.5;cursor:default}
 .yv-graph-no-neighbors{font-size:11px;color:var(--yv-muted)}
 @media(min-width:720px){.yv-graph-layout{grid-template-columns:minmax(0,1fr) minmax(190px,250px);gap:14px}.yv-graph-canvas{grid-column:auto}.yv-graph-inspector{grid-column:auto}}
-@media(max-width:480px){.yv-graph-canvas{min-height:170px}.yv-graph-inspector{padding:9px}.yv-graph-neighbor{padding:5px 6px}}
+@media(max-width:480px){.yv-graph-inspector{padding:9px}.yv-graph-neighbor{padding:5px 6px}}
 @media(prefers-reduced-motion:reduce){.yv-graph-canvas>.yv-graph-node{transition:none}}
 
 .yv-graph-legend{display:flex;flex-wrap:wrap;align-items:center;gap:7px 12px;margin:0 0 10px;color:var(--yv-muted);font-size:10px}
