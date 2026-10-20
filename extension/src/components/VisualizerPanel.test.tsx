@@ -658,6 +658,35 @@ describe('universal tree visualization', () => {
   });
 
 
+
+  it('marks a previously captured unlinked object as attached', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 191,
+      objects: {
+        t1: { $objectId: 't1', $type: 'TreeNode', fields: { val: 1, left: null, right: null } },
+        t2: { $objectId: 't2', $type: 'TreeNode', fields: { val: 2, left: null, right: null } },
+      },
+    });
+    const current = state({
+      sequence: 192,
+      objects: {
+        t1: { $objectId: 't1', $type: 'TreeNode', fields: { val: 1, left: { $ref: 't2' }, right: null } },
+        t2: { $objectId: 't2', $type: 'TreeNode', fields: { val: 2, left: null, right: null } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'root.left = node;', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 't1' }} objects={current.objects} state={current} />);
+      expect(html).toContain('yv-tree-edge-added');
+      expect(html).toContain('is-attached');
+      expect(html).toContain('ATTACHED');
+      expect(html).not.toContain('is-added yv-tree-operation-badge">ADDED');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
   it('marks an existing child linked under a different parent as reparented', () => {
     const priorSession = sessionStore.get();
     const previous = state({
