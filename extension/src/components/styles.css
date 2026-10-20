@@ -2559,8 +2559,8 @@
   .yv-structure-node.yv-tree-node-pointed > .yv-structure-node-card {
     outline-offset: 2px;
   }
-  .yv-tree-connectors line.yv-tree-connector-trail,
-  .yv-tree-connectors line.yv-tree-connector-reparented {
+  .yv-tree-connectors path.yv-tree-connector-trail,
+  .yv-tree-connectors path.yv-tree-connector-reparented {
     animation: none !important;
   }
 }
