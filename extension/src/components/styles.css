@@ -1857,6 +1857,14 @@
 .yv-tree-return-trigger {
   color: var(--yv-accent, #93c5fd);
 }
+.yv-tree-return-scalar {
+  display: inline-block;
+  max-width: 180px;
+  color: #e5edf8;
+  font: 600 11px/1.25 ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-wrap: anywhere;
+  vertical-align: middle;
+}
 
 
 /* Structured data-structure updates get compact before/after previews instead of serialized metadata. */
