@@ -2198,12 +2198,23 @@
 }
 .yv-node.yv-structure-node-card {
   position: relative; z-index: 1; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 5px; width: max-content;
-  min-width: 58px; max-width: min(280px, calc(100vw - 56px)); min-height: 58px;
-  margin: 0; padding: 9px 13px; border: 2px solid #FFA116; border-radius: 999px;
+  align-items: center; justify-content: center; gap: 4px;
+  box-sizing: border-box; flex: 0 0 112px; width: 112px; height: 112px;
+  min-width: 112px; max-width: 112px; min-height: 112px;
+  margin: 0; padding: 8px; border: 2px solid #FFA116; border-radius: 16px;
   background: color-mix(in srgb, #FFA116 8%, var(--yv-bg)); color: var(--yv-text);
   box-shadow: 0 2px 0 color-mix(in srgb, #FFA116, transparent 68%);
-  text-align: center; overflow-wrap: anywhere; white-space: normal;
+  text-align: center; overflow: visible; overflow-wrap: anywhere; white-space: normal;
+}
+.yv-structure-node-card .yv-tree-operation-badge {
+  max-width: 100%; padding: 2px 4px; font-size: 8px; line-height: 1.15;
+  white-space: normal; overflow-wrap: anywhere; text-align: center;
+}
+.yv-structure-node-card .yv-tree-node-metadata {
+  justify-content: center; max-width: 100%; flex-wrap: wrap;
+}
+.yv-structure-node-card .yv-tree-metadata-chip {
+  white-space: normal; overflow-wrap: anywhere; font-size: 8px; padding: 1px 3px;
 }
 .yv-structure-depth-0 > .yv-structure-node-card { background: color-mix(in srgb, #FFA116 13%, var(--yv-bg)); }
 .yv-structure-depth-1 > .yv-structure-node-card { background: color-mix(in srgb, #FFA116 9%, var(--yv-bg)); }
@@ -2233,7 +2244,7 @@
   pointer-events: none;
   z-index: 0;
 }
-.yv-structure-node > .yv-tree-connectors line {
+.yv-structure-node > .yv-tree-connectors path {
   fill: none;
   stroke: #FFA116;
   stroke-width: 3;
@@ -2285,7 +2296,7 @@
 .yv-structure-node.yv-tree-node-created > .yv-structure-node-card { border-style:dashed; }
 @media (max-width: 520px) {
   .yv-binary-tree-children { column-gap: 12px; }
-  .yv-node.yv-structure-node-card { min-width: 48px; min-height: 48px; padding: 7px 9px; }
+  .yv-node.yv-structure-node-card { flex-basis: 104px; width: 104px; height: 104px; min-width: 104px; max-width: 104px; min-height: 104px; padding: 7px; }
 }
 
 /* Extensible node metadata and multi-key node cells share the same card. */
@@ -2533,13 +2544,13 @@
   color: #FFA116;
   border-color: color-mix(in srgb, #FFA116, transparent 35%);
 }
-.yv-tree-connectors line.yv-tree-connector-trail {
+.yv-tree-connectors path.yv-tree-connector-trail {
   stroke: #FFA116;
   stroke-width: 3;
   stroke-dasharray: 3 5;
   opacity: .9;
 }
-.yv-tree-connectors line.yv-tree-connector-reparented {
+.yv-tree-connectors path.yv-tree-connector-reparented {
   stroke: #B79CFF;
   stroke-width: 3.5;
   stroke-dasharray: 5 4;
