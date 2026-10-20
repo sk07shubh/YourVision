@@ -98,7 +98,7 @@ describe('synchronized function invocation tree', () => {
       '  int solve(int n) { return helper(n); }',
       '  int helper(int x) { return x + 1; }',
       '}',
-    ].join('\\n');
+    ].join('\n');
     const states = [
       state({ line: 2, invocationId: 'solve-call', lastEvent: { type: 'METHOD_ENTER', method: 'solve', data: {
         invocationId: 'solve-call', declaringType: 'Solution', parameterTypes: ['int'], returnType: 'int', variables: { n: 4 },
