@@ -3802,12 +3802,17 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
         return lines;
       });
     };
+    // Measure once during the commit and again on the next animation frame.
+    // A checkpoint can reposition siblings without resizing them, so
+    // ResizeObserver alone is not enough to keep SVG edges aligned.
     updateConnectors();
+    const layoutFrame = window.requestAnimationFrame(updateConnectors);
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateConnectors) : undefined;
     observer?.observe(root);
     root.querySelectorAll<HTMLElement>('.yv-structure-node-card, .yv-binary-tree-edge').forEach((element) => observer?.observe(element));
     window.addEventListener('resize', updateConnectors);
     return () => {
+      window.cancelAnimationFrame(layoutFrame);
       observer?.disconnect();
       window.removeEventListener('resize', updateConnectors);
     };
