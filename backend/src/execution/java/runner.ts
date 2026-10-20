@@ -231,6 +231,12 @@ const TREE_NODE_FILE = fileURLToPath(
         import.meta.url
     )
 );
+const GRAPH_NODE_FILE = fileURLToPath(
+    new URL(
+        "./LeetCodeGraphNode.java",
+        import.meta.url
+    )
+);
 function prepareJavaSource(source: string): string {
     const standardImport =
         "import java.util.*;";
@@ -261,7 +267,7 @@ function prepareJavaSource(source: string): string {
 function declaresType(source: string, typeName: string): boolean {
     // LeetCode snippets sometimes include the commented-out type definition
     // in their problem boilerplate. It must not suppress our compatibility
-    // type, or ordinary references to ListNode/TreeNode fail at javac time.
+    // type, or ordinary references to ListNode/TreeNode/Node fail at javac time.
     const code = source
         .replace(/\/\*[\s\S]*?\*\//g, " ")
         .replace(/\/\/[^\r\n]*/g, " ");
@@ -405,6 +411,8 @@ await fs.writeFile(
             declaresType(preparedSource, "ListNode");
         const declaresTreeNode =
             declaresType(preparedSource, "TreeNode");
+        const declaresGraphNode =
+            declaresType(preparedSource, "Node");
 
         if (!declaresListNode) {
             await fs.copyFile(
@@ -417,6 +425,13 @@ await fs.writeFile(
             await fs.copyFile(
                 TREE_NODE_FILE,
                 path.join(tempDir, "LeetCodeTreeNode.java")
+            );
+        }
+
+        if (!declaresGraphNode) {
+            await fs.copyFile(
+                GRAPH_NODE_FILE,
+                path.join(tempDir, "LeetCodeGraphNode.java")
             );
         }
         try {
@@ -435,6 +450,9 @@ await fs.writeFile(
                     ...(declaresTreeNode
                         ? []
                         : [path.join(tempDir, "LeetCodeTreeNode.java")]),
+                    ...(declaresGraphNode
+                        ? []
+                        : [path.join(tempDir, "LeetCodeGraphNode.java")]),
                     runtimePath,
                     tracerPath
                 ],
