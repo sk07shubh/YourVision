@@ -2664,3 +2664,30 @@
   overflow: visible;
 }
 
+
+
+/* Graph visualization: responsive canvas with a synchronized node inspector. */
+.yv-graph-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start;min-width:0}
+.yv-graph-canvas{position:relative;width:100%;max-width:900px;aspect-ratio:15/8;min-height:190px;margin:0 auto;overflow:visible;isolation:isolate}
+.yv-graph-canvas>.yv-graph-node{font-size:clamp(10px,1.8vw,12px)!important;overflow-wrap:anywhere;line-height:1.2;transition:box-shadow 140ms ease,border-color 140ms ease,background 140ms ease}
+.yv-graph-canvas>.yv-graph-node:focus-visible{outline:2px solid var(--yv-accent,#65a9ff);outline-offset:3px}
+.yv-graph-canvas>.yv-graph-node-selected{border-color:var(--yv-accent,#65a9ff)!important}
+.yv-graph-inspector{width:100%;max-width:900px;margin:0 auto;border:1px solid var(--yv-border);border-radius:10px;background:var(--yv-elevated,var(--yv-panel));padding:12px;min-width:0}
+.yv-graph-inspector-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:10px;border-bottom:1px solid var(--yv-border)}
+.yv-graph-inspector-heading>div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.yv-graph-inspector-heading strong{font-size:16px;color:var(--yv-text);overflow-wrap:anywhere}
+.yv-graph-inspector-kicker,.yv-graph-neighbors>span:first-child{font:10px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;color:var(--yv-muted)}
+.yv-graph-inspector-heading code,.yv-graph-neighbor code{font:10px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--yv-muted);overflow-wrap:anywhere}
+.yv-graph-inspector-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px 0}
+.yv-graph-inspector-field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.yv-graph-inspector-field span{font-size:11px;color:var(--yv-muted)}
+.yv-graph-inspector-field strong{font-size:13px;color:var(--yv-text)}
+.yv-graph-neighbors{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding-top:9px;border-top:1px solid var(--yv-border)}
+.yv-graph-neighbors>span:first-child{width:100%;margin-bottom:2px}
+.yv-graph-neighbor{display:inline-flex;align-items:center;gap:8px;max-width:100%;padding:6px 8px;border:1px solid var(--yv-border);border-radius:7px;background:var(--yv-panel);color:var(--yv-text);cursor:pointer}
+.yv-graph-neighbor:hover:not(:disabled){border-color:var(--yv-accent)}
+.yv-graph-neighbor:disabled{opacity:.5;cursor:default}
+.yv-graph-no-neighbors{font-size:11px;color:var(--yv-muted)}
+@media(min-width:720px){.yv-graph-layout{grid-template-columns:minmax(0,1fr) minmax(190px,250px);gap:14px}.yv-graph-canvas{grid-column:auto}.yv-graph-inspector{grid-column:auto}}
+@media(max-width:480px){.yv-graph-canvas{min-height:170px}.yv-graph-inspector{padding:9px}.yv-graph-neighbor{padding:5px 6px}}
+@media(prefers-reduced-motion:reduce){.yv-graph-canvas>.yv-graph-node{transition:none}}
