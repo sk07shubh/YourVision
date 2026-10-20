@@ -480,7 +480,7 @@ await fs.writeFile(
                     isTimeout(error)
                         ? "Java compilation timed out"
                         : (error.stderr?.trim()
-                            ? `Java compilation failed: ${error.stderr.trim().split(/\\r?\\n/).slice(-8).join(" | ")}`
+                            ? `Java compilation failed: ${error.stderr.trim().split(/\r?\n/).slice(-8).join(" | ")}`
                             : "Java compilation failed")
             };
         }
