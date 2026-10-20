@@ -2664,3 +2664,61 @@
   overflow: visible;
 }
 
+
+
+/* Tree visualization polish: keep labels compact and connectors visually subordinate. */
+.yv-structure-node-card {
+  gap: 3px;
+  padding: 7px;
+  border-radius: 14px;
+  box-shadow: 0 1px 0 color-mix(in srgb, #FFA116, transparent 78%);
+}
+.yv-structure-node-value {
+  font-size: 1.12em;
+  line-height: 1.15;
+}
+.yv-structure-node-identity {
+  font-size: 10px;
+  opacity: .68;
+}
+.yv-structure-node-card .yv-tree-operation-badge {
+  max-width: 100%;
+  font-size: 8px;
+  line-height: 1.15;
+  letter-spacing: .025em;
+}
+.yv-binary-tree-edge-heading {
+  gap: 3px;
+  max-width: calc(100% + 16px);
+}
+.yv-binary-tree-edge-label {
+  font-size: 10px;
+  line-height: 1.2;
+}
+.yv-binary-edge-status.is-added,
+.yv-binary-edge-status.is-attached,
+.yv-binary-edge-status.is-reparented {
+  white-space: nowrap;
+}
+.yv-tree-connectors path.yv-tree-connector-added {
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: yv-tree-connector-draw 420ms ease-out forwards;
+}
+.yv-tree-connectors path.yv-tree-connector-traversed {
+  stroke: #FFA116;
+  stroke-width: 4;
+  stroke-dasharray: 7 5;
+  animation: yv-tree-connector-traverse 680ms ease-out both;
+}
+.yv-structure-node[data-tree-layout="graph"] > .yv-binary-tree-children {
+  justify-content: start;
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-tree-connectors path,
+  .yv-structure-node-card,
+  .yv-tree-operation-badge {
+    animation: none !important;
+    transition: none !important;
+  }
+}
