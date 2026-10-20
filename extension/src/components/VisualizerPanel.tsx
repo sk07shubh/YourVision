@@ -3802,12 +3802,17 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
         return lines;
       });
     };
+    // Measure once during the commit and again on the next animation frame.
+    // A checkpoint can reposition siblings without resizing them, so
+    // ResizeObserver alone is not enough to keep SVG edges aligned.
     updateConnectors();
+    const layoutFrame = window.requestAnimationFrame(updateConnectors);
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateConnectors) : undefined;
     observer?.observe(root);
     root.querySelectorAll<HTMLElement>('.yv-structure-node-card, .yv-binary-tree-edge').forEach((element) => observer?.observe(element));
     window.addEventListener('resize', updateConnectors);
     return () => {
+      window.cancelAnimationFrame(layoutFrame);
       observer?.disconnect();
       window.removeEventListener('resize', updateConnectors);
     };
@@ -3817,14 +3822,20 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const previous = selectedIndex > 0 ? session.states[selectedIndex - 1] : undefined;
   const previousObjects = previous?.objects ?? {};
   const resolved = resolveRef(value, objects);
+  const id = isPlainObject(resolved)
+    ? (typeof resolved.$objectId === 'string' ? resolved.$objectId
+      : isPlainObject(value) && typeof value.$ref === 'string' ? value.$ref : undefined)
+    : undefined;
+  // Do not translate individual cards between snapshots. The SVG connectors are
+  // measured in the tree's layout coordinate space; a card-only transform moves
+  // the card without moving its connector, making every edge appear detached.
   if (!isPlainObject(resolved)) return null;
   if (depth > 12) return <span className="yv-code">…</span>;
-  const id = typeof resolved.$objectId === 'string' ? resolved.$objectId
-    : isPlainObject(value) && typeof value.$ref === 'string' ? value.$ref : undefined;
-  if (id && seen.has(id)) return <span className="yv-code yv-tree-cycle" data-tree-cycle-to={id}>↻ {displayValue(nodeValue(resolved))}</span>;
+  if (id && seen.has(id)) return <span className="yv-code yv-tree-cycle" data-tree-cycle-to={id} title={'Cycle back to ' + id}>↻ {displayValue(nodeValue(resolved))}</span>;
   const nextSeen = new Set(seen);
   if (id) nextSeen.add(id);
   const fields = objectFields(resolved);
+  const isNaryTree = 'children' in fields && !('left' in fields) && !('right' in fields);
   const previousNode = id ? previousObjects[id] : undefined;
   const previousFields = isPlainObject(previousNode) ? objectFields(previousNode) : {};
   const hasPreviousSnapshot = Boolean(state && previous && session.states.includes(state) && previousNode !== undefined);
@@ -3833,23 +3844,12 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const modelNodeId = id ?? model.nodes.find(node => node.fields === fields)?.id;
   const genericChildEdges = model.edges.filter(edge => edge.kind === 'child' && edge.source === modelNodeId);
   const currentChildSlots = new Set(genericChildEdges.map(edge => (edge.label ?? '').toLowerCase()));
-  const previousChildTargets = new Set(Object.entries(previousFields)
-    .filter(([fieldName, previousValue]) => previousValue != null && /^(left|right|children|child\d+|firstChild|secondChild)$/i.test(fieldName))
-    .flatMap(([fieldName, previousValue]) => {
-      if (fieldName.toLowerCase() !== 'children') return [graphReferenceId(previousValue, previousObjects)];
-      const childValues = Array.isArray(previousValue)
-        ? previousValue
-        : isPlainObject(previousValue) && Array.isArray(previousValue.values)
-          ? previousValue.values
-          : isPlainObject(previousValue) && Array.isArray(previousValue.entries)
-            ? previousValue.entries.filter(isPlainObject).map(entry => entry.value)
-            : isPlainObject(previousValue) ? Object.values(previousValue) : [];
-      return childValues.map(child => graphReferenceId(child, previousObjects));
-    })
-    .filter((target): target is string => Boolean(target)));
+  const hasSnapshotPair = Boolean(state && previous && session.states.includes(state));
+  const previousChildTargets = new Set(childTargetsOf(previousFields, previousObjects));
   const addedChildTargets = new Set(genericChildEdges
-    .filter(edge => Boolean(previous && session.states.includes(state!)) && !previousChildTargets.has(edge.target))
+    .filter(edge => hasSnapshotPair && !previousChildTargets.has(edge.target))
     .map(edge => edge.target));
+  const previousParents = hasSnapshotPair ? parentsByChild(previousObjects) : undefined;
   const nodeValueChanged = Boolean(hasPreviousSnapshot && valueChanged(nodeValue(previousFields), nodeValue(resolved)));
   const changedMetadataNames = Object.keys(fields).filter(name =>
     ['color', 'bf', 'balanceFactor', 'height', 'weight', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord'].includes(name) &&
@@ -3867,7 +3867,8 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     if (currentValue != null && (!previousTarget || currentTarget === previousTarget)) return [];
     const label = fieldName.toUpperCase();
     if (currentChildSlots.has(label.toLowerCase())) return [];
-    return [{ fieldName, label, target: previousTarget }];
+    const detached = Boolean(previousTarget && objects[previousTarget] !== undefined);
+    return [{ fieldName, label, target: previousTarget, detached }];
   });
   const movedPointerTargets = new Set<string>();
   if (state && previous && session.states.includes(state)) {
@@ -3880,6 +3881,9 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const pointerNames = Object.entries(state?.variables ?? {})
     .filter(([, pointerValue]) => graphReferenceId(pointerValue, objects) === id)
     .map(([pointerName]) => pointerName);
+  const trail = selectedIndex >= 0 ? visitTrailFor(session.states, selectedIndex) : undefined;
+  const trailOrders = id ? trail?.orders.get(id) : undefined;
+  const pointed = pointerNames.length > 0;
   const nodeIdentity = id ? (id.length > 18 ? id.slice(0, 15) + '…' : id) : undefined;
   const keyCells = Array.isArray(fields.keys) ? fields.keys : undefined;
   const nodeMetadata = Object.entries(fields).filter(([name, metadataValue]) =>
@@ -3887,14 +3891,13 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     (typeof metadataValue === 'string' || typeof metadataValue === 'number' || typeof metadataValue === 'boolean')
   );
   const modelReferenceEdges = model.edges.filter(edge => edge.kind === 'reference' && edge.source === modelNodeId);
-  const entered = Boolean(state && previous && id && session.states.includes(state) &&
-    movedPointerTargets.has(id));
+  const entered = Boolean(hasSnapshotPair && id && movedPointerTargets.has(id));
   const depthClass = 'yv-structure-depth-' + Math.min(depth, 4);
   return (
-    <div ref={treeNodeRef} className={'yv-structure-node ' + depthClass + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '') + (nodeValueChanged ? ' yv-tree-node-value-changed' : '') + (removedChildEdges.length ? ' yv-tree-node-child-removed' : '')}
-      data-tree-node-id={id} data-tree-depth={depth} data-tree-layout="binary-tree"
+    <div ref={treeNodeRef} className={'yv-structure-node ' + depthClass + (pointed ? ' yv-tree-node-pointed' : '') + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '') + (nodeValueChanged ? ' yv-tree-node-value-changed' : '') + (removedChildEdges.length ? ' yv-tree-node-child-removed' : '')}
+      data-tree-node-id={id} data-tree-depth={depth} data-tree-layout={isNaryTree ? 'nary' : 'binary-tree'}
       data-tree-changed={changed ? 'true' : undefined} data-tree-entered={entered ? 'true' : undefined}
-      data-tree-created={created ? 'true' : undefined} aria-label={'Tree node ' + displayValue(nodeValue(resolved)) + (id ? ', object ' + id : '')}>
+      data-tree-created={created ? 'true' : undefined} aria-label={'Tree node ' + displayValue(nodeValue(resolved)) + (id ? ', object ' + id : '') + (pointed ? ', pointed to by ' + pointerNames.join(', ') : '')}>
       <div key={(changed || entered || created || nodeValueChanged) ? id + ':' + selectedIndex : id} className="yv-node yv-structure-node-card">
         <div className="yv-structure-node-main">
           <span className="yv-structure-node-heading">
@@ -3906,6 +3909,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
           </span>
           {nodeIdentity && <span className="yv-structure-node-identity" title={'Object identity: ' + id}>@{nodeIdentity}</span>}
         </div>
+        {trailOrders && trailOrders.length > 0 && <span className="yv-tree-trail-order" title={'Visit order: ' + trailOrders.join(', ')}>{trailOrders.slice(-3).join('·')}</span>}
         {created && <span className="yv-binary-node-status is-created yv-tree-operation-badge">NODE CREATED</span>}
         {nodeValueChanged && <span className="yv-binary-node-status is-changed yv-tree-operation-badge yv-tree-value-delta" title="Value changed between adjacent execution snapshots">
           {compactValue(nodeValue(previousFields))} → {compactValue(nodeValue(resolved))}
@@ -3923,18 +3927,25 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
         </span>}
       </div>
       {(genericChildEdges.length > 0 || removedChildEdges.length > 0) && (
-        <div className="yv-binary-tree-children" data-tree-children="binary-tree">
+        <div className={'yv-binary-tree-children' + (isNaryTree ? ' yv-nary-tree-children' : '')} data-tree-children={isNaryTree ? 'nary' : 'binary-tree'} style={isNaryTree ? { gridTemplateColumns: 'repeat(' + genericChildEdges.length + ', minmax(110px, max-content))' } : undefined}>
           {genericChildEdges.map((edge, index) => {
             const childEntered = movedPointerTargets.has(edge.target);
             const edgeLabel = edge.label ?? String(index);
             const childAdded = addedChildTargets.has(edge.target);
+            const existedBefore = previousObjects[edge.target] !== undefined;
+            const previousParent = previousParents?.get(edge.target);
+            const reparented = Boolean(childAdded && existedBefore && previousParent !== undefined && previousParent !== modelNodeId);
+            const attached = Boolean(childAdded && existedBefore && !reparented);
+            const onTrail = Boolean(id && trail?.hops.has(id + '>' + edge.target));
             return (
-              <div key={edge.id} className={'yv-binary-tree-edge' + (childEntered ? ' yv-tree-edge-traversed' : '') + (childAdded ? ' yv-tree-edge-added' : '')}
+              <div key={edge.id} className={'yv-binary-tree-edge' + (childEntered ? ' yv-tree-edge-traversed' : '') + (childAdded ? ' yv-tree-edge-added' : '') + (reparented ? ' yv-tree-edge-reparented' : '') + (onTrail ? ' yv-tree-edge-trail' : '')}
                 data-tree-edge={edgeLabel.toLowerCase()} data-tree-edge-label={edgeLabel} data-tree-edge-target={edge.target}>
                 <div className="yv-binary-tree-edge-heading">
                   <span className="yv-binary-tree-edge-label">{edgeLabel}</span>
                   {edge.metadata.weight !== undefined && <span className="yv-tree-metadata-chip">w={displayValue(edge.metadata.weight)}</span>}
-                  {childAdded && <span className="yv-binary-edge-status is-added yv-tree-operation-badge">ADDED</span>}
+                  {childAdded && !existedBefore && <span className="yv-binary-edge-status is-added yv-tree-operation-badge">ADDED</span>}
+                  {attached && <span className="yv-binary-edge-status is-attached yv-tree-operation-badge" title="Existing object linked here">ATTACHED</span>}
+                  {reparented && <span className="yv-binary-edge-status is-reparented yv-tree-operation-badge" title={'Previously under ' + previousParent}>REPARENTED</span>}
                   {childEntered && <span className="yv-binary-edge-status is-traversed yv-tree-operation-badge">TRAVERSED</span>}
                 </div>
                 <div className="yv-binary-tree-edge-content">
@@ -3946,10 +3957,13 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
           {removedChildEdges.map(edge => (
             <div key={'removed:' + edge.fieldName} className="yv-binary-tree-edge yv-binary-tree-edge-removed"
               data-tree-edge={edge.fieldName.toLowerCase()} data-tree-edge-label={edge.label}
-              data-tree-edge-target={edge.target ?? undefined} data-tree-edge-status="removed">
+              data-tree-edge-target={edge.target ?? undefined} data-tree-edge-status={edge.detached ? 'detached' : 'removed'}>
               <div className="yv-binary-tree-edge-heading">
                 <span className="yv-binary-tree-edge-label">{edge.label}</span>
-                <span className="yv-binary-edge-status is-removed">REMOVED</span>
+                <span className={'yv-binary-edge-status yv-tree-operation-badge ' + (edge.detached ? 'is-detached' : 'is-removed')}
+                  title={edge.detached ? 'Link cleared; the object is still captured elsewhere' : 'Link cleared; the object is no longer captured'}>
+                  {edge.detached ? 'DETACHED' : 'REMOVED'}
+                </span>
               </div>
               <div className="yv-binary-tree-edge-content"><span className="yv-null">null</span></div>
             </div>
@@ -3958,14 +3972,77 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
       )}
       {treeConnectorLines.length > 0 && (
         <svg className="yv-tree-connectors" viewBox={`0 0 ${treeConnectorLines[0]?.rootWidth ?? 1} ${treeConnectorLines[0]?.rootHeight ?? 1}`} preserveAspectRatio="none" aria-hidden="true" focusable="false">
-          {treeConnectorLines.map((line) => (
-            <line key={line.target} className={(addedChildTargets.has(line.target) ? 'yv-tree-connector-added ' : '') + (movedPointerTargets.has(line.target) ? 'yv-tree-connector-traversed' : '')} x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} />
-          ))}
+          {treeConnectorLines.map((line) => {
+            const classes = [
+              addedChildTargets.has(line.target) && 'yv-tree-connector-added',
+              movedPointerTargets.has(line.target) && 'yv-tree-connector-traversed',
+              !movedPointerTargets.has(line.target) && id && trail?.hops.has(id + '>' + line.target) && 'yv-tree-connector-trail',
+              addedChildTargets.has(line.target) && previousParents?.get(line.target) !== undefined && previousParents.get(line.target) !== modelNodeId && 'yv-tree-connector-reparented',
+            ].filter(Boolean).join(' ');
+            const branchY = line.y1 + Math.max(16, (line.y2 - line.y1) / 2);
+            return <path key={line.target} className={classes || undefined} pathLength={1}
+              d={`M ${line.x1} ${line.y1} V ${branchY} H ${line.x2} V ${line.y2}`} />;
+          })}
         </svg>
       )}
     </div>
   );
 }
+const TREE_CHILD_FIELD = /^(left|right|children|child\d+|firstChild|secondChild)$/i;
+function childTargetsOf(fields: Obj, objs: Record<string, unknown>): string[] {
+  return Object.entries(fields)
+    .filter(([fieldName, fieldValue]) => fieldValue != null && TREE_CHILD_FIELD.test(fieldName))
+    .flatMap(([fieldName, fieldValue]) => {
+      if (fieldName.toLowerCase() !== 'children') return [graphReferenceId(fieldValue, objs)];
+      const values = Array.isArray(fieldValue) ? fieldValue
+        : isPlainObject(fieldValue) && Array.isArray(fieldValue.values) ? fieldValue.values
+        : isPlainObject(fieldValue) && Array.isArray(fieldValue.entries) ? fieldValue.entries.filter(isPlainObject).map(entry => entry.value)
+        : isPlainObject(fieldValue) ? Object.values(fieldValue) : [];
+      return values.map(child => graphReferenceId(child, objs));
+    })
+    .filter((target): target is string => Boolean(target));
+}
+const treeParentCache = new WeakMap<object, Map<string, string>>();
+function parentsByChild(objs: Record<string, unknown>): Map<string, string> {
+  const cached = treeParentCache.get(objs);
+  if (cached) return cached;
+  const parents = new Map<string, string>();
+  for (const [parentId, raw] of Object.entries(objs)) {
+    if (!isPlainObject(raw)) continue;
+    for (const childId of childTargetsOf(objectFields(raw), objs)) if (!parents.has(childId)) parents.set(childId, parentId);
+  }
+  treeParentCache.set(objs, parents);
+  return parents;
+}
+
+
+const visitTrailCache = new WeakMap<object, { index: number; value: { orders: Map<string, number[]>; hops: Set<string> } }>();
+function visitTrailFor(states: TraceState[], index: number) {
+  const cached = visitTrailCache.get(states);
+  if (cached && cached.index === index) return cached.value;
+  const orders = new Map<string, number[]>();
+  const hops = new Set<string>();
+  let last: string | undefined;
+  let count = 0;
+  for (let i = 1; i <= index && i < states.length; i += 1) {
+    const before = states[i - 1]!;
+    const after = states[i]!;
+    for (const [name, pointerValue] of Object.entries(after.variables ?? {})) {
+      const target = graphReferenceId(pointerValue, after.objects ?? {});
+      if (!target || target === graphReferenceId(before.variables?.[name], before.objects ?? {}) || target === last) continue;
+      count += 1;
+      const order = orders.get(target) ?? [];
+      order.push(count);
+      orders.set(target, order);
+      if (last) hops.add(last + '>' + target);
+      last = target;
+    }
+  }
+  const value = { orders, hops };
+  visitTrailCache.set(states, { index, value });
+  return value;
+}
+
 function linkedListReturnText(root: unknown, objects: Record<string, unknown>): string | undefined {
   if (!isPlainObject(root) || !looksListNode(root)) return undefined;
 
@@ -4889,7 +4966,9 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
         return (
           <div className="yv-ds" key={kind === 'Linked List' ? 'Linked List → runtime graph' : title}>
             <div className="yv-ds-title">{title}</div>
-            <DataValue value={value} state={state} source={source} name={uniqueNames.join(' / ')}/>
+            <div className="yv-ds-visualization">
+              <DataValue value={value} state={state} source={source} name={uniqueNames.join(' / ')}/>
+            </div>
           </div>
         );
       })}
@@ -5116,6 +5195,30 @@ type InvocationNode = {
   children: string[];
 };
 
+// Primitive results are useful enough to read inline. Complex values retain the
+// existing hover/click preview so arrays and returned object graphs stay inspectable.
+function shouldPreviewInvocationReturn(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'boolean' || typeof value === 'number' || typeof value === 'bigint') return false;
+  if (typeof value === 'string') return value.length > 28;
+  return typeof value === 'object';
+}
+
+function invocationReturnLabel(node: InvocationNode): string {
+  const value = node.returnValue;
+  if (!shouldPreviewInvocationReturn(value)) return displayValue(value);
+  if (node.returnValueName) return node.returnValueName;
+  if (isPlainObject(value)) {
+    if (typeof value.$ref === 'string') return value.$ref;
+    if (typeof value.$type === 'string') return value.$type.split('.').pop() ?? value.$type;
+    if (typeof value.$objectId === 'string') return value.$objectId;
+  }
+  if (Array.isArray(value) || isArraySnapshot(value)) return 'array';
+  if (isMapSnapshot(value)) return 'map';
+  if (isCollectionSnapshot(value)) return structureType(value, 'collection').toLowerCase();
+  return node.returnType?.replace(/^.*\./, '') ?? 'object';
+}
+
 export function buildInvocationNodes(states: TraceState[], source = ''): { nodes: Map<string, InvocationNode>; currentId?: string } {
   const nodes = new Map<string, InvocationNode>();
   nodes.set('root', { id: 'root', parentId: '', method: 'Solution', signature: 'Solution', entryIndex: 0, status: 'active', frameVariables: {}, arguments: [], children: [] });
@@ -5138,7 +5241,10 @@ export function buildInvocationNodes(states: TraceState[], source = ''): { nodes
       // Only read parameter names from a method declaration, never a call site such as
       // helper(this). The old substring search could mistake that call for the declaration.
       const escapedMethod = method.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
-      const declarationPattern = new RegExp('\\b(?:(?:public|private|protected)\\s+)?(?:(?:static|final|synchronized)\\s+)*[\\w.$<>?,\\[\\] ]+?\\s+' + escapedMethod + '\\s*\\(([^)]*)\\)');
+      // Anchor the signature to a declaration boundary and require an opening
+      // body brace. Otherwise "return helper(n);" can be mistaken for a method
+      // declaration whose return type is the keyword "return".
+      const declarationPattern = new RegExp('(?:^|[;{}]\\s*)(?:(?:public|private|protected|static|final|synchronized|native|abstract)\\s+)*[\\w.$<>?,\\[\\] ]+?\\s+' + escapedMethod + '\\s*\\(([^)]*)\\)\\s*(?:throws\\s+[^\\{]+)?\\{', 'm');
       const declarationMatch = source.match(declarationPattern);
       // The runtime can report framework/JVM implementation entries as method events.
       // The visual tree represents calls into methods declared in the submitted solution,
@@ -5367,7 +5473,7 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
       <div
         role="button"
         tabIndex={0}
-        className={`yv-tree-node ${selected ? 'selected' : ''} ${node.status} ${id === 'root' ? 'class-context-node' : ''}`}
+        className={`yv-tree-node ${selected ? 'selected current-function' : ''} ${node.status} ${id === 'root' ? 'class-context-node' : ''}`}
         style={{ '--yv-tree-depth': depth } as CSSProperties}
         onClick={() => onSelect(node.entryIndex)}
         onKeyDown={event => {
@@ -5427,21 +5533,23 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
         ) : (
           <span className="yv-tree-outcome">
             {node.status === 'returned' ? (
-              <span className="yv-tree-return-value">
-                <button
-                  type="button"
-                  className="yv-tree-arguments-trigger yv-tree-return-trigger"
-                  aria-label={`Preview return value from ${node.method}`}
-                  aria-haspopup="true"
-                  aria-expanded={openArguments?.node.id === node.id && openArguments.kind === 'return'}
-                  onMouseEnter={event => openArgumentPreview(node, event.currentTarget, 'return')}
-                  onMouseLeave={scheduleArgumentPreviewClose}
-                  onFocus={event => openArgumentPreview(node, event.currentTarget, 'return')}
-                  onBlur={scheduleArgumentPreviewClose}
-                  onClick={event => { event.stopPropagation(); if (openArguments?.node.id === node.id && openArguments.kind === 'return') setOpenArguments(null); else openArgumentPreview(node, event.currentTarget, 'return'); }}
-                  onKeyDown={event => { event.stopPropagation(); if (event.key === "Escape") setOpenArguments(null); }}
-                >{node.returnValueName ?? 'return'}</button>
-              </span>
+              shouldPreviewInvocationReturn(node.returnValue) ? (
+                <span className="yv-tree-return-value">
+                  <button
+                    type="button"
+                    className="yv-tree-arguments-trigger yv-tree-return-trigger"
+                    aria-label={`Preview returned value from ${node.method}`}
+                    aria-haspopup="true"
+                    aria-expanded={openArguments?.node.id === node.id && openArguments.kind === 'return'}
+                    onMouseEnter={event => openArgumentPreview(node, event.currentTarget, 'return')}
+                    onMouseLeave={scheduleArgumentPreviewClose}
+                    onFocus={event => openArgumentPreview(node, event.currentTarget, 'return')}
+                    onBlur={scheduleArgumentPreviewClose}
+                    onClick={event => { event.stopPropagation(); if (openArguments?.node.id === node.id && openArguments.kind === 'return') setOpenArguments(null); else openArgumentPreview(node, event.currentTarget, 'return'); }}
+                    onKeyDown={event => { event.stopPropagation(); if (event.key === "Escape") setOpenArguments(null); }}
+                  >{invocationReturnLabel(node)}</button>
+                </span>
+              ) : <span className="yv-tree-return-scalar">{invocationReturnLabel(node)}</span>
             ) : result}
           </span>
         )}

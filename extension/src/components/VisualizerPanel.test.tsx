@@ -93,19 +93,25 @@ describe('synchronized function invocation tree', () => {
   });
 
   it('captures a nested call return value for its compact preview', () => {
+    const source = [
+      'class Solution {',
+      '  int solve(int n) { return helper(n); }',
+      '  int helper(int x) { return x + 1; }',
+      '}',
+    ].join('\n');
     const states = [
-      state({ invocationId: 'solve-call', lastEvent: { type: 'METHOD_ENTER', method: 'solve', data: {
+      state({ line: 2, invocationId: 'solve-call', lastEvent: { type: 'METHOD_ENTER', method: 'solve', data: {
         invocationId: 'solve-call', declaringType: 'Solution', parameterTypes: ['int'], returnType: 'int', variables: { n: 4 },
       } } }),
-      state({ invocationId: 'helper-call', parentInvocationId: 'solve-call', lastEvent: { type: 'METHOD_ENTER', method: 'helper', data: {
+      state({ line: 3, invocationId: 'helper-call', parentInvocationId: 'solve-call', lastEvent: { type: 'METHOD_ENTER', method: 'helper', data: {
         invocationId: 'helper-call', parentInvocationId: 'solve-call', parameterTypes: ['int'], returnType: 'int', variables: { x: 4 },
       } } }),
-      state({ invocationId: 'helper-call', parentInvocationId: 'solve-call', lastEvent: { type: 'METHOD_EXIT', method: 'helper', data: {
+      state({ line: 3, invocationId: 'helper-call', parentInvocationId: 'solve-call', lastEvent: { type: 'METHOD_EXIT', method: 'helper', data: {
         invocationId: 'helper-call', parentInvocationId: 'solve-call', returnType: 'int', returnValue: 5, returnedVoid: false,
       } } }),
     ];
-    const { nodes } = buildInvocationNodes(states);
-    expect(nodes.get('helper-call')?.arguments).toEqual([{ name: 'x', value: 4 }]);
+    const { nodes } = buildInvocationNodes(states, source);
+    expect(nodes.get('helper-call')?.arguments).toEqual([{ name: 'x', expression: 'n', value: 4 }]);
     expect(nodes.get('helper-call')?.status).toBe('returned');
     expect(nodes.get('helper-call')?.returnValue).toBe(5);
     expect(nodes.get('helper-call')?.exitState).toBe(states[2]);
@@ -621,15 +627,15 @@ describe('universal tree visualization', () => {
       expect(html).toContain('data-tree-entered="true"');
       expect(html).toContain('yv-tree-node-entered');
       expect(html).toContain('yv-tree-node-changed');
-      expect(html).toContain('UPDATED');
-      expect(html).toContain('CURRENT');
+      expect(html).toContain('2 → 3');
+      expect(html).toContain('VISITED');
       expect(html).toContain('current');
     } finally {
       sessionStore.set(priorSession);
     }
   });
 
-  it('keeps the removed-child cue when the last child is detached', () => {
+  it('distinguishes a detached child link when the object remains captured', () => {
     const priorSession = sessionStore.get();
     const previous = state({
       sequence: 117,
@@ -649,9 +655,90 @@ describe('universal tree visualization', () => {
       sessionStore.set({ source: 'root.left = null;', states: [previous, current], index: 1 });
       const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 't1' }} objects={current.objects} state={current} />);
       expect(html).toContain('data-tree-edge="left"');
-      expect(html).toContain('data-tree-edge-status="removed"');
-      expect(html).toContain('REMOVED');
+      expect(html).toContain('data-tree-edge-status="detached"');
+      expect(html).toContain('DETACHED');
       expect(html).toContain('class="yv-null">null</span>');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+
+
+  it('marks a previously captured unlinked object as attached', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 191,
+      objects: {
+        t1: { $objectId: 't1', $type: 'TreeNode', fields: { val: 1, left: null, right: null } },
+        t2: { $objectId: 't2', $type: 'TreeNode', fields: { val: 2, left: null, right: null } },
+      },
+    });
+    const current = state({
+      sequence: 192,
+      objects: {
+        t1: { $objectId: 't1', $type: 'TreeNode', fields: { val: 1, left: { $ref: 't2' }, right: null } },
+        t2: { $objectId: 't2', $type: 'TreeNode', fields: { val: 2, left: null, right: null } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'root.left = node;', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 't1' }} objects={current.objects} state={current} />);
+      expect(html).toContain('yv-tree-edge-added');
+      expect(html).toContain('is-attached');
+      expect(html).toContain('ATTACHED');
+      expect(html).not.toContain('is-added yv-tree-operation-badge">ADDED');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('marks an existing child linked under a different parent as reparented', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 201,
+      objects: {
+        t1: { $objectId: 't1', $type: 'TreeNode', fields: { val: 1, left: { $ref: 't2' }, right: { $ref: 't3' } } },
+        t2: { $objectId: 't2', $type: 'TreeNode', fields: { val: 2, left: null, right: null } },
+        t3: { $objectId: 't3', $type: 'TreeNode', fields: { val: 3, left: null, right: null } },
+      },
+    });
+    const current = state({
+      sequence: 202,
+      objects: {
+        t1: { $objectId: 't1', $type: 'TreeNode', fields: { val: 1, left: null, right: { $ref: 't3' } } },
+        t2: { $objectId: 't2', $type: 'TreeNode', fields: { val: 2, left: null, right: null } },
+        t3: { $objectId: 't3', $type: 'TreeNode', fields: { val: 3, left: { $ref: 't2' }, right: null } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 't3.left = t2;', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 't1' }} objects={current.objects} state={current} />);
+      expect(html).toContain('yv-tree-edge-reparented');
+      expect(html).toContain('data-tree-edge-status="detached"');
+      expect(html).toContain('REPARENTED');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+
+  it('shows visit order and a trail between successive pointer targets', () => {
+    const priorSession = sessionStore.get();
+    const tree = {
+      t1: { $objectId: 't1', $type: 'TreeNode', fields: { val: 1, left: { $ref: 't2' }, right: null } },
+      t2: { $objectId: 't2', $type: 'TreeNode', fields: { val: 2, left: { $ref: 't3' }, right: null } },
+      t3: { $objectId: 't3', $type: 'TreeNode', fields: { val: 3, left: null, right: null } },
+    };
+    const previous = state({ sequence: 301, variables: { current: { $objectId: 't1' } }, objects: tree });
+    const middle = state({ sequence: 302, variables: { current: { $objectId: 't2' } }, objects: tree });
+    const current = state({ sequence: 303, variables: { current: { $objectId: 't3' } }, objects: tree });
+    try {
+      sessionStore.set({ source: 'current = current.left;', states: [previous, middle, current], index: 2 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 't1' }} objects={current.objects} state={current} />);
+      expect(html).toContain('yv-tree-trail-order');
+      expect(html).toContain('title="Visit order: 2"');
+      expect(html).toContain('yv-tree-edge-trail');
     } finally {
       sessionStore.set(priorSession);
     }
@@ -2542,7 +2629,7 @@ describe('shared universal tree rendering', () => {
 describe('multi-key tree node rendering', () => {
   it('renders B-tree keys as separate cells and exposes balancing metadata', () => {
     const objects = {
-      root: { $objectId: 'btree-root', $type: 'BTreeNode', keys: [10, 20], children: [] },
+      'btree-root': { $objectId: 'btree-root', $type: 'BTreeNode', keys: [10, 20], children: [] },
     };
     const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'btree-root' }} objects={objects} />);
     expect(html).toContain('yv-node-key-cells');

@@ -840,6 +840,43 @@
 .yv-tree-node { display:flex; flex-direction:column; gap:5px; align-items:flex-start; width:max-content; max-width:100%; min-width:max-content; text-align:left; padding:9px 10px; margin:0 0 5px; border:1px solid #596575; border-radius:8px; background:#1a1e25; color:#e8ebf0; cursor:pointer; }
 .yv-tree-node:hover { border-color:#667386; background:#202630; }
 .yv-tree-node.selected { border-color:#f59e0b; box-shadow:inset 3px 0 #f59e0b; background:#282219; }
+/* High-contrast current execution frame: distinct from hover, return, and status colors. */
+.yv-tree-node.current-function {
+  position: relative;
+  border: 1px solid #FF4D8D;
+  background: linear-gradient(105deg, rgba(255,77,141,.14), rgba(15,23,42,.98) 72%);
+  color: #FFF1F6;
+  box-shadow: inset 4px 0 #FF4D8D, 0 0 0 1px rgba(255,77,141,.3), 0 0 16px rgba(255,77,141,.16);
+}
+.yv-tree-node.current-function::after {
+  content: "CURRENT";
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  padding: 2px 5px;
+  border: 1px solid rgba(255,179,205,.5);
+  border-radius: 4px;
+  background: #4A142A;
+  color: #FFB3CD;
+  font: 700 8px/1.2 ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: .08em;
+  pointer-events: none;
+}
+.yv-tree-node.current-function .yv-tree-depth {
+  color: #FF8FB5;
+  opacity: 1 !important;
+}
+.yv-tree-node.current-function .yv-tree-method {
+  border-bottom-color: rgba(255,179,205,.38);
+}
+.yv-tree-node.current-function .yv-tree-outcome {
+  color: #FFD6E4;
+  border-top-color: rgba(255,179,205,.3);
+}
+.yv-tree-node.current-function:hover {
+  border-color: #FF8FB5;
+  background: linear-gradient(105deg, rgba(255,77,141,.2), rgba(15,23,42,.98) 72%);
+}
 .yv-tree-node.returned,.yv-tree-node.void { border-color:#2f6551; }
 .yv-tree-node.exceptional { border-color:#874343; }
 .yv-tree-method { display:block; width:max-content; max-width:100%; overflow-wrap:normal; white-space:normal; font-size:11px; font-weight:600; padding:2px 0 6px; border-bottom:1px solid #465160; }
@@ -1647,11 +1684,11 @@
   display: none;
   box-sizing: border-box;
   width: max-content;
-  min-width: min(190px, calc(100vw - 32px));
-  max-width: min(680px, calc(100vw - 16px));
+  min-width: 0;
+  max-width: min(340px, calc(100vw - 16px));
   max-height: min(42dvh, 360px);
   margin-top: 0;
-  padding: 8px;
+  padding: 5px;
   overflow: auto;
   overscroll-behavior: contain;
   border: 1px solid color-mix(in srgb, var(--yv-depth-border, #60a5fa), transparent 32%);
@@ -1668,7 +1705,7 @@
 .yv-tree-arguments:focus-within .yv-tree-arguments-popover {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 5px;
 }
 
 /* Portal preview escapes both the scrolling viewport and the rounded panel. */
@@ -1679,10 +1716,20 @@
      portal visible independently of its now-non-ancestor hover trigger. */
   display: flex !important;
   flex-direction: column;
-  gap: 9px;
+  gap: 5px;
+  box-sizing: border-box;
   width: max-content;
-  min-width: min(190px, calc(100vw - 16px));
-  max-width: min(680px, calc(100vw - 16px));
+  min-width: 0;
+  max-width: min(340px, calc(100vw - 16px));
+  padding: 5px;
+  border: 1px solid color-mix(in srgb, var(--yv-depth-border, #60a5fa), transparent 32%);
+  border-radius: 8px;
+  background: #0b1220;
+  color: #e5edf8;
+  box-shadow: 0 8px 24px rgba(0,0,0,.32);
+  font-size: 11px;
+  font-weight: 400;
+  white-space: normal;
   margin: 0;
   overflow: auto;
   overscroll-behavior: contain;
@@ -1846,6 +1893,14 @@
 }
 .yv-tree-return-trigger {
   color: var(--yv-accent, #93c5fd);
+}
+.yv-tree-return-scalar {
+  display: inline-block;
+  max-width: 180px;
+  color: #e5edf8;
+  font: 600 11px/1.25 ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-wrap: anywhere;
+  vertical-align: middle;
 }
 
 
@@ -2198,12 +2253,23 @@
 }
 .yv-node.yv-structure-node-card {
   position: relative; z-index: 1; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 5px; width: max-content;
-  min-width: 58px; max-width: min(280px, calc(100vw - 56px)); min-height: 58px;
-  margin: 0; padding: 9px 13px; border: 2px solid #FFA116; border-radius: 999px;
+  align-items: center; justify-content: center; gap: 4px;
+  box-sizing: border-box; flex: 0 0 112px; width: 112px; height: 112px;
+  min-width: 112px; max-width: 112px; min-height: 112px;
+  margin: 0; padding: 8px; border: 2px solid #FFA116; border-radius: 16px;
   background: color-mix(in srgb, #FFA116 8%, var(--yv-bg)); color: var(--yv-text);
   box-shadow: 0 2px 0 color-mix(in srgb, #FFA116, transparent 68%);
-  text-align: center; overflow-wrap: anywhere; white-space: normal;
+  text-align: center; overflow: visible; overflow-wrap: anywhere; white-space: normal;
+}
+.yv-structure-node-card .yv-tree-operation-badge {
+  max-width: 100%; padding: 2px 4px; font-size: 8px; line-height: 1.15;
+  white-space: normal; overflow-wrap: anywhere; text-align: center;
+}
+.yv-structure-node-card .yv-tree-node-metadata {
+  justify-content: center; max-width: 100%; flex-wrap: wrap;
+}
+.yv-structure-node-card .yv-tree-metadata-chip {
+  white-space: normal; overflow-wrap: anywhere; font-size: 8px; padding: 1px 3px;
 }
 .yv-structure-depth-0 > .yv-structure-node-card { background: color-mix(in srgb, #FFA116 13%, var(--yv-bg)); }
 .yv-structure-depth-1 > .yv-structure-node-card { background: color-mix(in srgb, #FFA116 9%, var(--yv-bg)); }
@@ -2233,7 +2299,7 @@
   pointer-events: none;
   z-index: 0;
 }
-.yv-structure-node > .yv-tree-connectors line {
+.yv-structure-node > .yv-tree-connectors path {
   fill: none;
   stroke: #FFA116;
   stroke-width: 3;
@@ -2285,7 +2351,7 @@
 .yv-structure-node.yv-tree-node-created > .yv-structure-node-card { border-style:dashed; }
 @media (max-width: 520px) {
   .yv-binary-tree-children { column-gap: 12px; }
-  .yv-node.yv-structure-node-card { min-width: 48px; min-height: 48px; padding: 7px 9px; }
+  .yv-node.yv-structure-node-card { flex-basis: 104px; width: 104px; height: 104px; min-width: 104px; max-width: 104px; min-height: 104px; padding: 7px; }
 }
 
 /* Extensible node metadata and multi-key node cells share the same card. */
@@ -2463,3 +2529,138 @@
     transform: none !important;
   }
 }
+
+
+/* Structural tree changes stay attached to their real parent/child slots. */
+.yv-binary-tree-edge.yv-tree-edge-reparented > .yv-binary-tree-edge-heading .yv-binary-tree-edge-label {
+  color: #B79CFF;
+  border-color: color-mix(in srgb, #B79CFF, transparent 30%);
+}
+.yv-binary-edge-status.is-attached {
+  color: #4DA3FF;
+  border-color: color-mix(in srgb, #4DA3FF, transparent 40%);
+  background: color-mix(in srgb, #4DA3FF, var(--yv-bg) 90%);
+}
+.yv-binary-edge-status.is-reparented {
+  color: #B79CFF;
+  border-color: color-mix(in srgb, #B79CFF, transparent 35%);
+  background: color-mix(in srgb, #B79CFF, var(--yv-bg) 90%);
+}
+.yv-binary-edge-status.is-detached {
+  color: #FFC01E;
+  border-color: color-mix(in srgb, #FFC01E, transparent 35%);
+  background: color-mix(in srgb, #FFC01E, var(--yv-bg) 90%);
+}
+.yv-binary-edge-status.is-removed {
+  color: #FF375F;
+  border-color: color-mix(in srgb, #FF375F, transparent 35%);
+  background: color-mix(in srgb, #FF375F, var(--yv-bg) 90%);
+}
+.yv-binary-tree-edge.yv-tree-edge-reparented > .yv-binary-tree-edge-content {
+  outline: 1px dashed color-mix(in srgb, #B79CFF, transparent 20%);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+.yv-binary-tree-edge-removed .yv-binary-tree-edge-content {
+  transform-origin: center top;
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-binary-tree-edge.yv-tree-edge-reparented > .yv-binary-tree-edge-content {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+
+/* Current pointer targets remain obvious even when no animation is playing. */
+.yv-structure-node.yv-tree-node-pointed > .yv-structure-node-card {
+  outline: 2px solid color-mix(in srgb, #FFA116, transparent 24%);
+  outline-offset: 3px;
+}
+.yv-tree-trail-order {
+  position: absolute;
+  top: -7px;
+  right: -5px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 19px;
+  min-height: 19px;
+  padding: 2px 5px;
+  border: 1px solid color-mix(in srgb, #FFA116, transparent 25%);
+  border-radius: 999px;
+  color: #FFA116;
+  background: var(--yv-bg);
+  font: 700 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+.yv-binary-tree-edge.yv-tree-edge-trail > .yv-binary-tree-edge-heading .yv-binary-tree-edge-label {
+  color: #FFA116;
+  border-color: color-mix(in srgb, #FFA116, transparent 35%);
+}
+.yv-tree-connectors path.yv-tree-connector-trail {
+  stroke: #FFA116;
+  stroke-width: 3;
+  stroke-dasharray: 3 5;
+  opacity: .9;
+}
+.yv-tree-connectors path.yv-tree-connector-reparented {
+  stroke: #B79CFF;
+  stroke-width: 3.5;
+  stroke-dasharray: 5 4;
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-structure-node.yv-tree-node-pointed > .yv-structure-node-card {
+    outline-offset: 2px;
+  }
+  .yv-tree-connectors path.yv-tree-connector-trail,
+  .yv-tree-connectors path.yv-tree-connector-reparented {
+    animation: none !important;
+  }
+}
+
+/* Tree content needs its own horizontal scroller. Putting overflow-x:auto on
+   .yv-ds also clips overflow vertically (visible computes to auto), cutting
+   tree nodes/connectors against the card edge. Keep the card unclipped and
+   scroll only the inner visualization, with room for the outermost strokes. */
+.yv-ds:has(.yv-structure-node) {
+  overflow: visible;
+  min-width: 0;
+}
+.yv-ds-visualization:has(.yv-structure-node) {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 18px 18px 22px;
+}
+.yv-ds-visualization > .yv-tree {
+  /* The wrapper is the sole scroll container. A second overflow:auto here
+     clips node outlines and the absolutely-positioned depth/pointer badges. */
+  overflow: visible;
+  width: max-content;
+  min-width: 100%;
+  padding: 8px 6px 10px;
+}
+
+/* Argument/return previews should show a compact, complete tree rather than
+   a full-size visualization clipped by the popover boundary. */
+.yv-tree-arguments-popover-portal .yv-tree-argument-value {
+  max-width: min(320px, calc(100vw - 32px));
+  overflow: auto;
+  padding: 3px;
+  box-sizing: border-box;
+}
+.yv-tree-arguments-popover-portal .yv-tree-argument-value > .yv-tree {
+  zoom: 0.58;
+  width: max-content;
+  max-width: none;
+  overflow: visible;
+}
+.yv-tree-arguments-popover-portal .yv-tree-argument-value .yv-ds-visualization {
+  max-width: none;
+  overflow: visible;
+}
+
