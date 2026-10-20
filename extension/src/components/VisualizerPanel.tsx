@@ -5195,6 +5195,30 @@ type InvocationNode = {
   children: string[];
 };
 
+// Primitive results are useful enough to read inline. Complex values retain the
+// existing hover/click preview so arrays and returned object graphs stay inspectable.
+function shouldPreviewInvocationReturn(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'boolean' || typeof value === 'number' || typeof value === 'bigint') return false;
+  if (typeof value === 'string') return value.length > 28;
+  return typeof value === 'object';
+}
+
+function invocationReturnLabel(node: InvocationNode): string {
+  const value = node.returnValue;
+  if (!shouldPreviewInvocationReturn(value)) return displayValue(value);
+  if (node.returnValueName) return node.returnValueName;
+  if (isPlainObject(value)) {
+    if (typeof value.$ref === 'string') return value.$ref;
+    if (typeof value.$type === 'string') return value.$type.split('.').pop() ?? value.$type;
+    if (typeof value.$objectId === 'string') return value.$objectId;
+  }
+  if (Array.isArray(value) || isArraySnapshot(value)) return 'array';
+  if (isMapSnapshot(value)) return 'map';
+  if (isCollectionSnapshot(value)) return structureType(value, 'collection').toLowerCase();
+  return node.returnType?.replace(/^.*\./, '') ?? 'object';
+}
+
 export function buildInvocationNodes(states: TraceState[], source = ''): { nodes: Map<string, InvocationNode>; currentId?: string } {
   const nodes = new Map<string, InvocationNode>();
   nodes.set('root', { id: 'root', parentId: '', method: 'Solution', signature: 'Solution', entryIndex: 0, status: 'active', frameVariables: {}, arguments: [], children: [] });
@@ -5509,21 +5533,23 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
         ) : (
           <span className="yv-tree-outcome">
             {node.status === 'returned' ? (
-              <span className="yv-tree-return-value">
-                <button
-                  type="button"
-                  className="yv-tree-arguments-trigger yv-tree-return-trigger"
-                  aria-label={`Preview return value from ${node.method}`}
-                  aria-haspopup="true"
-                  aria-expanded={openArguments?.node.id === node.id && openArguments.kind === 'return'}
-                  onMouseEnter={event => openArgumentPreview(node, event.currentTarget, 'return')}
-                  onMouseLeave={scheduleArgumentPreviewClose}
-                  onFocus={event => openArgumentPreview(node, event.currentTarget, 'return')}
-                  onBlur={scheduleArgumentPreviewClose}
-                  onClick={event => { event.stopPropagation(); if (openArguments?.node.id === node.id && openArguments.kind === 'return') setOpenArguments(null); else openArgumentPreview(node, event.currentTarget, 'return'); }}
-                  onKeyDown={event => { event.stopPropagation(); if (event.key === "Escape") setOpenArguments(null); }}
-                >{node.returnValueName ?? 'return'}</button>
-              </span>
+              shouldPreviewInvocationReturn(node.returnValue) ? (
+                <span className="yv-tree-return-value">
+                  <button
+                    type="button"
+                    className="yv-tree-arguments-trigger yv-tree-return-trigger"
+                    aria-label={`Preview returned value from ${node.method}`}
+                    aria-haspopup="true"
+                    aria-expanded={openArguments?.node.id === node.id && openArguments.kind === 'return'}
+                    onMouseEnter={event => openArgumentPreview(node, event.currentTarget, 'return')}
+                    onMouseLeave={scheduleArgumentPreviewClose}
+                    onFocus={event => openArgumentPreview(node, event.currentTarget, 'return')}
+                    onBlur={scheduleArgumentPreviewClose}
+                    onClick={event => { event.stopPropagation(); if (openArguments?.node.id === node.id && openArguments.kind === 'return') setOpenArguments(null); else openArgumentPreview(node, event.currentTarget, 'return'); }}
+                    onKeyDown={event => { event.stopPropagation(); if (event.key === "Escape") setOpenArguments(null); }}
+                  >{invocationReturnLabel(node)}</button>
+                </span>
+              ) : <span className="yv-tree-return-scalar">{invocationReturnLabel(node)}</span>
             ) : result}
           </span>
         )}
