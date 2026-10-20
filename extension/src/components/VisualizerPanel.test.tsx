@@ -686,7 +686,7 @@ describe('universal tree visualization', () => {
       const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 't1' }} objects={current.objects} state={current} />);
       expect(html).toContain('yv-tree-edge-added');
       expect(html).toContain('is-attached');
-      expect(html).toContain('ATTACHED');
+      expect(html).toContain('LINKED');
       expect(html).not.toContain('is-added yv-tree-operation-badge">ADDED');
     } finally {
       sessionStore.set(priorSession);
