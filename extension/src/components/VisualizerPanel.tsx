@@ -3861,14 +3861,16 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   );
   const removedChildEdges = Object.entries(previousFields).flatMap(([fieldName, previousValue]) => {
     if (previousValue == null || !/^(left|right|children|child\d+|firstChild|secondChild)$/i.test(fieldName)) return [];
-    const currentValue = fields[fieldName];
-    const previousTarget = graphReferenceId(previousValue, previousObjects);
-    const currentTarget = graphReferenceId(currentValue, objects);
-    if (currentValue != null && (!previousTarget || currentTarget === previousTarget)) return [];
-    const label = fieldName.toUpperCase();
-    if (currentChildSlots.has(label.toLowerCase())) return [];
-    const detached = Boolean(previousTarget && objects[previousTarget] !== undefined);
-    return [{ fieldName, label, target: previousTarget, detached }];
+    const currentTargets = new Set(childTargetsOf({ [fieldName]: fields[fieldName] }, objects));
+    const previousTargets = fieldName.toLowerCase() === 'children'
+      ? childTargetsOf({ [fieldName]: previousValue }, previousObjects)
+      : [graphReferenceId(previousValue, previousObjects)].filter((target): target is string => Boolean(target));
+    return previousTargets.flatMap((target, index) => {
+      if (currentTargets.has(target)) return [];
+      const label = fieldName.toLowerCase() === 'children' ? String(index) : fieldName.toUpperCase();
+      if (currentChildSlots.has(label.toLowerCase())) return [];
+      return [{ fieldName: fieldName + ':' + target, label, target, detached: objects[target] !== undefined }];
+    });
   });
   const movedPointerTargets = new Set<string>();
   if (state && previous && session.states.includes(state)) {
@@ -3910,7 +3912,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
           {nodeIdentity && <span className="yv-structure-node-identity" title={'Object identity: ' + id}>@{nodeIdentity}</span>}
         </div>
         {trailOrders && trailOrders.length > 0 && <span className="yv-tree-trail-order" title={'Visit order: ' + trailOrders.join(', ')}>{trailOrders.slice(-3).join('·')}</span>}
-        {created && <span className="yv-binary-node-status is-created yv-tree-operation-badge">NODE CREATED</span>}
+        {created && <span className="yv-binary-node-status is-created yv-tree-operation-badge" title="This object identity first appears in the current execution snapshot">NEW NODE</span>}
         {nodeValueChanged && <span className="yv-binary-node-status is-changed yv-tree-operation-badge yv-tree-value-delta" title="Value changed between adjacent execution snapshots">
           {compactValue(nodeValue(previousFields))} → {compactValue(nodeValue(resolved))}
         </span>}
@@ -3943,8 +3945,8 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
                 <div className="yv-binary-tree-edge-heading">
                   <span className="yv-binary-tree-edge-label">{edgeLabel}</span>
                   {edge.metadata.weight !== undefined && <span className="yv-tree-metadata-chip">w={displayValue(edge.metadata.weight)}</span>}
-                  {childAdded && !existedBefore && <span className="yv-binary-edge-status is-added yv-tree-operation-badge">ADDED</span>}
-                  {attached && <span className="yv-binary-edge-status is-attached yv-tree-operation-badge" title="Existing object linked here">ATTACHED</span>}
+                  {childAdded && !existedBefore && <span className="yv-binary-edge-status is-added yv-tree-operation-badge" title="This child relationship appears in the current snapshot">LINK ADDED</span>}
+                  {attached && <span className="yv-binary-edge-status is-attached yv-tree-operation-badge" title="An existing object was linked here; the object itself was not newly created">LINKED</span>}
                   {reparented && <span className="yv-binary-edge-status is-reparented yv-tree-operation-badge" title={'Previously under ' + previousParent}>REPARENTED</span>}
                   {childEntered && <span className="yv-binary-edge-status is-traversed yv-tree-operation-badge">TRAVERSED</span>}
                 </div>
@@ -3993,14 +3995,16 @@ function childTargetsOf(fields: Obj, objs: Record<string, unknown>): string[] {
   return Object.entries(fields)
     .filter(([fieldName, fieldValue]) => fieldValue != null && TREE_CHILD_FIELD.test(fieldName))
     .flatMap(([fieldName, fieldValue]) => {
-      if (fieldName.toLowerCase() !== 'children') return [graphReferenceId(fieldValue, objs)];
+      if (fieldName.toLowerCase() !== 'children') {
+        const target = graphReferenceId(fieldValue, objs);
+        return target ? [target] : [];
+      }
       const values = Array.isArray(fieldValue) ? fieldValue
         : isPlainObject(fieldValue) && Array.isArray(fieldValue.values) ? fieldValue.values
         : isPlainObject(fieldValue) && Array.isArray(fieldValue.entries) ? fieldValue.entries.filter(isPlainObject).map(entry => entry.value)
         : isPlainObject(fieldValue) ? Object.values(fieldValue) : [];
-      return values.map(child => graphReferenceId(child, objs));
-    })
-    .filter((target): target is string => Boolean(target));
+      return values.map(child => graphReferenceId(child, objs)).filter((target): target is string => Boolean(target));
+    });
 }
 const treeParentCache = new WeakMap<object, Map<string, string>>();
 function parentsByChild(objs: Record<string, unknown>): Map<string, string> {
