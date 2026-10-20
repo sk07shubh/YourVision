@@ -2691,3 +2691,13 @@
 @media(min-width:720px){.yv-graph-layout{grid-template-columns:minmax(0,1fr) minmax(190px,250px);gap:14px}.yv-graph-canvas{grid-column:auto}.yv-graph-inspector{grid-column:auto}}
 @media(max-width:480px){.yv-graph-canvas{min-height:170px}.yv-graph-inspector{padding:9px}.yv-graph-neighbor{padding:5px 6px}}
 @media(prefers-reduced-motion:reduce){.yv-graph-canvas>.yv-graph-node{transition:none}}
+
+.yv-graph-legend{display:flex;flex-wrap:wrap;align-items:center;gap:7px 12px;margin:0 0 10px;color:var(--yv-muted);font-size:10px}
+.yv-graph-legend>span{display:inline-flex;align-items:center;gap:5px}
+.yv-graph-legend-dot{display:inline-block;width:8px;height:8px;border:1px solid var(--yv-muted);border-radius:50%;background:var(--yv-panel)}
+.yv-graph-legend-selected{border:2px solid var(--yv-accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--yv-accent),transparent 75%)}
+.yv-graph-legend-entered{background:var(--yv-accent);border-color:var(--yv-accent)}
+.yv-graph-legend-created{background:var(--yv-success,#4ade80);border-color:var(--yv-success,#4ade80)}
+.yv-graph-legend-line{display:inline-block;width:15px;height:0;border-top:1.5px solid var(--yv-muted)}
+.yv-graph-node-status{padding:1px 4px;border-radius:4px;background:color-mix(in srgb,var(--yv-accent),transparent 86%);color:var(--yv-accent);font-size:9px}
+.yv-graph-node-status-created{background:color-mix(in srgb,var(--yv-success,#4ade80),transparent 84%);color:var(--yv-success,#4ade80)}
