@@ -4709,14 +4709,21 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
 
   const copyVisualizationSource = async () => {
     const panel = visualizerPanelSource;
+    const graphActive = Object.values(state?.objects ?? {}).some(value =>
+      isPlainObject(value) && looksGraphNode(value)
+    );
     const helpersStart = panel.indexOf('function objectFields(value: Obj): Obj {');
     const helpersEnd = panel.indexOf('function looksGraphNode(value: Obj): boolean {', helpersStart);
+    const graphHelpersStart = helpersEnd;
+    const graphHelpersEnd = panel.indexOf('function looksTrieNode(value: Obj): boolean {', graphHelpersStart);
     const referenceStart = panel.indexOf('function graphReferenceId(value: unknown, objects: Record<string, unknown>): string | undefined {');
     const referenceEnd = panel.indexOf('function looksTrieNode(value: Obj): boolean {', referenceStart);
+    const graphStart = panel.indexOf('function GraphView(');
+    const graphEnd = panel.indexOf('export function LinkedListView(', graphStart);
     const treeStart = panel.indexOf('export function TreeNodeView(');
     const treeEnd = panel.indexOf('function linkedListReturnText(', treeStart);
 
-    const requiredCode = [
+    const sharedImports = [
       "import type { TraceState } from '../types/trace';",
       "import { sessionStore } from '../state/store';",
       "import { displayValue, stableStringify, isPlainObject } from '../utils/value';",
@@ -4725,13 +4732,23 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
       '',
       panel.slice(helpersStart, helpersEnd).trim(),
       '',
-      panel.slice(referenceStart, referenceEnd).trim(),
-      '',
-      panel.slice(treeStart, treeEnd).trim(),
-    ].join('\n');
+    ];
+    const requiredCode = graphActive
+      ? [
+          ...sharedImports,
+          panel.slice(graphHelpersStart, graphHelpersEnd).trim(),
+          '',
+          panel.slice(graphStart, graphEnd).trim(),
+        ].join('\n')
+      : [
+          ...sharedImports,
+          panel.slice(referenceStart, referenceEnd).trim(),
+          '',
+          panel.slice(treeStart, treeEnd).trim(),
+        ].join('\n');
 
     const css = visualizerStylesSource;
-    const selectors = [
+    const treeSelectors = [
       '.yv-node', '.yv-tree', '.yv-tree-node', '.yv-tree-children',
       '.yv-null', '.yv-tree-cycle', '.yv-tree-edge-label',
       '.yv-tree-node-entered', '.yv-tree-node-changed', '.yv-tree-node-created',
@@ -4750,43 +4767,57 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
       '.yv-structure-depth-2', '.yv-structure-depth-3', '.yv-structure-depth-4',
       '.yv-node-key-cells', '.yv-node-key-cell', '.yv-tree-node-metadata', '.yv-tree-metadata-chip',
     ];
+    const graphSelectors = [
+      '.yv-graph', '.yv-graph-canvas', '.yv-graph-node', '.yv-graph-node-card',
+      '.yv-graph-node-entered', '.yv-graph-node-changed', '.yv-graph-node-created',
+      '.yv-graph-edge', '.yv-graph-edge-label', '.yv-graph-node-label',
+      '.yv-graph-state-legend', '.yv-graph-status-chip',
+    ];
+    const selectors = graphActive ? graphSelectors : treeSelectors;
     const rules: string[] = [];
     const rulePattern = /([^{}]+)\{([^{}]*)\}/g;
     for (const match of css.matchAll(rulePattern)) {
       const selector = match[1]!.trim();
       if (selector.startsWith('@keyframes') || selector.startsWith('@media')) continue;
-      if (selector.split(',').some(part => selectors.some(needle => { const rule = part.trim(); return rule === needle || rule.startsWith(needle + ' ') || rule.startsWith(needle + '>') || rule.startsWith(needle + ':') || rule.startsWith(needle + '[') || rule.startsWith(needle + '.'); }))) {
+      if (selector.split(',').some(part => selectors.some(needle => {
+        const rule = part.trim();
+        return rule === needle || rule.startsWith(needle + ' ') || rule.startsWith(needle + '>') ||
+          rule.startsWith(needle + ':') || rule.startsWith(needle + '[') || rule.startsWith(needle + '.');
+      }))) {
         rules.push(selector + ' {' + match[2]!.trim() + '}');
       }
     }
-    const keyframes = [
-      'yv-graph-node-entered', 'yv-graph-node-changed', 'yv-graph-node-created',
-      'yv-tree-edge-change', 'yv-tree-edge-traverse',
-    ];
+    const keyframes = graphActive
+      ? ['yv-graph-node-entered', 'yv-graph-node-changed', 'yv-graph-node-created']
+      : ['yv-tree-edge-change', 'yv-tree-edge-traverse'];
     for (const name of keyframes) {
-      const start = css.indexOf('@keyframes ' + name);
-      if (start < 0) continue;
-      const open = css.indexOf('{', start);
+      const keyframeStart = css.indexOf('@keyframes ' + name);
+      if (keyframeStart < 0) continue;
+      const open = css.indexOf('{', keyframeStart);
       if (open < 0) continue;
       let depth = 0;
       for (let i = open; i < css.length; i += 1) {
         if (css[i] === '{') depth += 1;
         if (css[i] === '}') depth -= 1;
         if (depth === 0) {
-          rules.push(css.slice(start, i + 1).trim());
+          rules.push(css.slice(keyframeStart, i + 1).trim());
           break;
         }
       }
     }
+    const label = graphActive ? 'Graph' : 'Tree';
+    const modelSource = graphActive
+      ? '===== Graph object snapshot model ====='
+      : '===== Shared node-and-edge model =====';
     const source = [
-      '===== Binary Tree Visualization: minimal review bundle =====',
+      '===== ' + label + ' Visualization: minimal review bundle =====',
       '===== Required rendering code and dependencies =====',
       requiredCode,
       '',
-      '===== Shared node-and-edge model =====',
+      modelSource,
       treeModelSource,
       '',
-      '===== CSS used by the tree renderer =====',
+      '===== CSS used by the ' + label.toLowerCase() + ' renderer =====',
       [...new Set(rules)].join('\n'),
     ].join('\n');
     try {
