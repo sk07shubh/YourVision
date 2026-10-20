@@ -902,6 +902,8 @@ describe('graph data structure visualization', () => {
     expect(html).toContain('data-graph-edge-from="g1" data-graph-edge-to="g2"');
     expect(html).toContain('data-graph-edge-from="g2" data-graph-edge-to="g1"');
     expect(html).toContain('data-graph-inspector="g1"');
+    expect(html).toContain('Graph state legend');
+    expect(html).toContain('Visited by pointer');
     expect(html).toContain('CONNECTED TO');
     expect(html).toContain('yv-graph-canvas');
     expect(html).toContain('start');
