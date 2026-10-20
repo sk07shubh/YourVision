@@ -3354,6 +3354,12 @@ export function GraphView({ objects, variables = {}, state }: {
         <span>Adjacency graph</span>
         <span>{nodes.length} nodes · {edges.length} links{nodes.length === 80 ? ' · display limit reached' : ''}</span>
       </div>
+      <div className="yv-graph-legend" aria-label="Graph state legend">
+        <span><i className="yv-graph-legend-dot yv-graph-legend-selected" />Selected</span>
+        <span><i className="yv-graph-legend-dot yv-graph-legend-entered" />Visited by pointer</span>
+        <span><i className="yv-graph-legend-dot yv-graph-legend-created" />Created this step</span>
+        <span><i className="yv-graph-legend-line yv-graph-legend-edge" />Relationship</span>
+      </div>
       <div className="yv-graph-layout">
         <div className="yv-graph-canvas">
           <svg width="100%" height="100%" viewBox="0 0 600 320" preserveAspectRatio="xMidYMid meet" aria-label="Graph links"
@@ -3409,6 +3415,8 @@ export function GraphView({ objects, variables = {}, state }: {
                 boxShadow: selected ? '0 0 0 3px color-mix(in srgb,var(--yv-accent,#65a9ff),transparent 38%)' : entered ? '0 0 0 3px color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 55%)' : changed ? '0 0 0 2px color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 55%)' : '0 2px 8px rgba(0,0,0,.2)', textAlign: 'center', fontSize: 12, zIndex: selected ? 2 : 1, cursor: 'pointer' }}>
               <span>{compactValue(node.label)}</span>
               <span style={{ color: 'var(--yv-accent, #65a9ff)', fontSize: 10 }}>object {node.id}</span>
+              {createdNodeIds.has(node.id) && <span className="yv-graph-node-status yv-graph-node-status-created">created</span>}
+              {!createdNodeIds.has(node.id) && changed && <span className="yv-graph-node-status">updated</span>}
               {pointers.length > 0 && <span style={{ color: 'var(--yv-muted, #8b9bb4)', fontSize: 10 }}>{pointers.join(' · ')}</span>}
             </div>;
           })}
