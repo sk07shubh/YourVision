@@ -4959,7 +4959,9 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
         return (
           <div className="yv-ds" key={kind === 'Linked List' ? 'Linked List → runtime graph' : title}>
             <div className="yv-ds-title">{title}</div>
-            <DataValue value={value} state={state} source={source} name={uniqueNames.join(' / ')}/>
+            <div className="yv-ds-visualization">
+              <DataValue value={value} state={state} source={source} name={uniqueNames.join(' / ')}/>
+            </div>
           </div>
         );
       })}
