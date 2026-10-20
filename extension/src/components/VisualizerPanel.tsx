@@ -3239,7 +3239,12 @@ export function GraphView({ objects, variables = {}, state }: {
     const id = typeof value.$objectId === 'string' ? value.$objectId : key;
     return [{ id, value, label: nodeValue(value), neighbors: graphNeighborValues(value) ?? [] }];
   }).slice(0, 80);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const ids = new Set(nodes.map(node => node.id));
+  const selectedNode = nodes.find(node => node.id === selectedNodeId) ?? nodes[0];
+  const selectedNeighborIds = selectedNode
+    ? selectedNode.neighbors.map(neighbor => graphReferenceId(neighbor, objects)).filter((id): id is string => Boolean(id))
+    : [];
   const positionSession = useRef(session.states[0]);
   const stableGraphPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
   if (positionSession.current !== session.states[0]) {
@@ -3349,9 +3354,9 @@ export function GraphView({ objects, variables = {}, state }: {
         <span>Adjacency graph</span>
         <span>{nodes.length} nodes · {edges.length} links{nodes.length === 80 ? ' · display limit reached' : ''}</span>
       </div>
-      <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
-        <div style={{ position: 'relative', width: 600, height: 320, minWidth: 600, margin: '0 auto' }}>
-          <svg width="600" height="320" viewBox="0 0 600 320" aria-label="Graph links"
+      <div className="yv-graph-layout">
+        <div className="yv-graph-canvas">
+          <svg width="100%" height="100%" viewBox="0 0 600 320" preserveAspectRatio="xMidYMid meet" aria-label="Graph links"
             style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}>
             <defs>
               <marker id="yv-graph-arrow" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
@@ -3387,20 +3392,47 @@ export function GraphView({ objects, variables = {}, state }: {
             const pointers = pointerNames.get(node.id) ?? [];
             const changed = changedNodeIds.has(node.id);
             const entered = enteredNodeIds.has(node.id);
-            return <div key={node.id + ((changed || entered || createdNodeIds.has(node.id)) ? ':' + selectedIndex : '')} className={'yv-graph-node' + (changed ? ' yv-graph-node-changed' : '') + (entered ? ' yv-graph-node-entered' : '') + (createdNodeIds.has(node.id) ? ' yv-graph-node-created' : '')}
-              data-graph-node-id={node.id} data-graph-changed={changed ? 'true' : undefined} data-graph-entered={entered ? 'true' : undefined}
+            const selected = selectedNode?.id === node.id;
+            return <div key={node.id + ((changed || entered || createdNodeIds.has(node.id)) ? ':' + selectedIndex : '')}
+              className={'yv-graph-node' + (selected ? ' yv-graph-node-selected' : '') + (changed ? ' yv-graph-node-changed' : '') + (entered ? ' yv-graph-node-entered' : '') + (createdNodeIds.has(node.id) ? ' yv-graph-node-created' : '')}
+              data-graph-node-id={node.id} data-graph-selected={selected ? 'true' : undefined}
+              data-graph-changed={changed ? 'true' : undefined} data-graph-entered={entered ? 'true' : undefined}
               data-graph-created={createdNodeIds.has(node.id) ? 'true' : undefined}
-              style={{ position: 'absolute', left: point.x - 47, top: point.y - 23, width: 94, minHeight: 46,
+              role="button" tabIndex={0} aria-pressed={selected}
+              aria-label={`Select node ${compactValue(node.label)}`}
+              onClick={() => setSelectedNodeId(node.id)}
+              onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedNodeId(node.id); } }}
+              style={{ position: 'absolute', left: `${(point.x / 600) * 100}%`, top: `${(point.y / 320) * 100}%`, transform: 'translate(-50%, -50%)', width: 'clamp(68px, 15.7%, 94px)', minHeight: 42,
                 boxSizing: 'border-box', display: 'flex', flexDirection: 'column', alignItems: 'center',
                 justifyContent: 'center', gap: 2, padding: '5px 6px', border: '1px solid var(--yv-accent, #65a9ff)',
                 borderRadius: 10, background: changed ? 'var(--yv-highlight, #203b5b)' : 'var(--yv-panel, #101b2d)', color: 'var(--yv-text, #f3f6ff)',
-                boxShadow: entered ? '0 0 0 3px color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 55%)' : changed ? '0 0 0 2px color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 55%)' : '0 2px 8px rgba(0,0,0,.2)', textAlign: 'center', fontSize: 12, zIndex: 1 }}>
+                boxShadow: selected ? '0 0 0 3px color-mix(in srgb,var(--yv-accent,#65a9ff),transparent 38%)' : entered ? '0 0 0 3px color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 55%)' : changed ? '0 0 0 2px color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 55%)' : '0 2px 8px rgba(0,0,0,.2)', textAlign: 'center', fontSize: 12, zIndex: selected ? 2 : 1, cursor: 'pointer' }}>
               <span>{compactValue(node.label)}</span>
-              <span style={{ color: 'var(--yv-accent, #65a9ff)', fontSize: 10 }}>{node.id}</span>
+              <span style={{ color: 'var(--yv-accent, #65a9ff)', fontSize: 10 }}>object {node.id}</span>
               {pointers.length > 0 && <span style={{ color: 'var(--yv-muted, #8b9bb4)', fontSize: 10 }}>{pointers.join(' · ')}</span>}
             </div>;
           })}
         </div>
+        {selectedNode && <aside className="yv-graph-inspector" aria-label="Selected graph node" data-graph-inspector={selectedNode.id}>
+          <div className="yv-graph-inspector-heading">
+            <div><span className="yv-graph-inspector-kicker">SELECTED NODE</span><strong>{compactValue(selectedNode.label)}</strong></div>
+            <code>{selectedNode.id}</code>
+          </div>
+          <div className="yv-graph-inspector-fields">
+            <div className="yv-graph-inspector-field"><span>Value</span><strong>{compactValue(selectedNode.label)}</strong></div>
+            <div className="yv-graph-inspector-field"><span>Neighbors</span><strong>{selectedNeighborIds.length}</strong></div>
+          </div>
+          <div className="yv-graph-neighbors"><span>CONNECTED TO</span>
+            {selectedNeighborIds.length
+              ? selectedNeighborIds.map((id, index) => {
+                const neighbor = nodes.find(candidate => candidate.id === id);
+                return <button type="button" key={id + ':' + index} className="yv-graph-neighbor" onClick={() => setSelectedNodeId(id)} disabled={!neighbor}>
+                  <span>{neighbor ? compactValue(neighbor.label) : id}</span><code>{id}</code>
+                </button>;
+              })
+              : <span className="yv-graph-no-neighbors">No captured neighbors</span>}
+          </div>
+        </aside>}
       </div>
     </div>
   );
