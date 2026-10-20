@@ -66,6 +66,13 @@ Trace a visible bug backwards through rendering, snapshots, enrichment, and runt
 - Enhanced for-each iterator moves above the array. Coordinate labels if multiple pointers overlap and avoid overlap with multiple iterators.
 - For recognized array-like out-of-bounds accesses, optionally show an aligned same-size extra cell with centered cross and no dotted outline, only when type/source confirms array-like semantics.
 
+### Trees
+- Tree node/edge cues are derived only from adjacent captured snapshots and stable object identities.
+- Distinguish a newly created child (**ADDED**), an existing identity newly linked (**ATTACHED**), and an identity linked under a different prior parent (**REPARENTED**).
+- When a child slot is cleared, show **DETACHED** if the object is still present in the current captured heap; show **REMOVED** only when it is no longer captured.
+- Current variable targets remain visibly pointed to; visit-order markers and trail edges are derived from actual pointer changes. Existing identities may glide to their new layout position for adjacent playback steps, respecting reduced-motion preferences.
+- Keep these as in-place tree/edge cues; do not add detached removal overlays or fabricate intermediate execution states.
+
 ### Data structures
 - Stable spatial identity; transitions based on adjacent actual snapshots.
 - Linked lists show every node/value/link; no missing tail values or placeholders when data exists.
@@ -213,3 +220,6 @@ Playwright E2E uses a deterministic LeetCode-shaped fixture and mocked `/visuali
 - 2026-10-16: Fixed Function Tree parent resolution on `feat/synchronized-function-call-tree`. Invocation parent IDs now fall back to the checkpoint state's `parentInvocationId` when omitted from event data, and child links are resolved after collecting the visible trace prefix. This prevents legitimate nested calls from being attached to the root just because the parent metadata lives on the state instead of the event payload. Added a regression test for state-level parent metadata and updated this memory file. Typecheck, tests, build, and live extension rendering have not been run in this session.
 
 - 2026-10-19: Added **Copy JSON** directly to the Data Structures panel on `main`. It copies the currently selected checkpoint metadata plus variables, arrays, data structures, and object snapshots, with clipboard fallback and success/failure feedback. Added regression tests for snapshot contents and button visibility, and styled the action at the top-right of the section. Changes were committed directly to `main` as requested; no local test/typecheck/build/browser verification was run in this session.
+
+
+- 2026-10-20: Started the tree snapshot-animation polish on `feat/tree-snapshot-animation-polish`, branched from live `main`. Updated `VisualizerPanel.tsx` to distinguish attached/reparented children and detached/removed child links, add pointer-target and visit-trail cues, and glide stable node identities between adjacent layouts with reduced-motion support. Updated `styles.css` for the new structural, pointer, and trail cues. Updated `VisualizerPanel.test.tsx` with regression cases for detached links, reparenting, and visit trails. Commits: `ca04d84`, `8cdc85f`, `66dc56c`, `f0bb10b`, `8eabfcc`, `9bb7545`. Verification: **tests, typecheck, build, and browser run have not been executed**; the attempted repository clone failed because this environment could not resolve `github.com`. CI has not yet been confirmed for this branch.
