@@ -2553,3 +2553,16 @@
     animation: none !important;
   }
 }
+
+
+/* Give nested tree visualizations breathing room inside their data-structure card.
+   The card scrolls horizontally, so its vertical overflow also clips in browsers;
+   internal padding keeps node borders and connector endpoints away from that clip edge. */
+.yv-ds:has(.yv-structure-node) {
+  padding: 9px 9px 12px;
+}
+.yv-ds:has(> .yv-structure-node) > .yv-structure-node {
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 16px 16px 20px;
+}
