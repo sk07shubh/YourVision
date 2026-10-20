@@ -4768,10 +4768,15 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
       '.yv-node-key-cells', '.yv-node-key-cell', '.yv-tree-node-metadata', '.yv-tree-metadata-chip',
     ];
     const graphSelectors = [
-      '.yv-graph', '.yv-graph-canvas', '.yv-graph-node', '.yv-graph-node-card',
+      '.yv-graph-canvas', '.yv-graph-layout', '.yv-graph-node',
       '.yv-graph-node-entered', '.yv-graph-node-changed', '.yv-graph-node-created',
-      '.yv-graph-edge', '.yv-graph-edge-label', '.yv-graph-node-label',
-      '.yv-graph-state-legend', '.yv-graph-status-chip',
+      '.yv-graph-node-selected', '.yv-graph-node-status', '.yv-graph-node-status-created',
+      '.yv-graph-edge-added', '.yv-graph-edge-removed', '.yv-graph-edge-traversed',
+      '.yv-graph-neighbor', '.yv-graph-neighbors', '.yv-graph-no-neighbors',
+      '.yv-graph-legend', '.yv-graph-legend-created', '.yv-graph-legend-dot',
+      '.yv-graph-legend-entered', '.yv-graph-legend-line', '.yv-graph-legend-selected',
+      '.yv-graph-inspector', '.yv-graph-inspector-field', '.yv-graph-inspector-fields',
+      '.yv-graph-inspector-heading', '.yv-graph-inspector-kicker', '.yv-linked-graph',
     ];
     const selectors = graphActive ? graphSelectors : treeSelectors;
     const rules: string[] = [];
