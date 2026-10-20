@@ -93,19 +93,25 @@ describe('synchronized function invocation tree', () => {
   });
 
   it('captures a nested call return value for its compact preview', () => {
+    const source = [
+      'class Solution {',
+      '  int solve(int n) { return helper(n); }',
+      '  int helper(int x) { return x + 1; }',
+      '}',
+    ].join('\\n');
     const states = [
-      state({ invocationId: 'solve-call', lastEvent: { type: 'METHOD_ENTER', method: 'solve', data: {
+      state({ line: 2, invocationId: 'solve-call', lastEvent: { type: 'METHOD_ENTER', method: 'solve', data: {
         invocationId: 'solve-call', declaringType: 'Solution', parameterTypes: ['int'], returnType: 'int', variables: { n: 4 },
       } } }),
-      state({ invocationId: 'helper-call', parentInvocationId: 'solve-call', lastEvent: { type: 'METHOD_ENTER', method: 'helper', data: {
+      state({ line: 3, invocationId: 'helper-call', parentInvocationId: 'solve-call', lastEvent: { type: 'METHOD_ENTER', method: 'helper', data: {
         invocationId: 'helper-call', parentInvocationId: 'solve-call', parameterTypes: ['int'], returnType: 'int', variables: { x: 4 },
       } } }),
-      state({ invocationId: 'helper-call', parentInvocationId: 'solve-call', lastEvent: { type: 'METHOD_EXIT', method: 'helper', data: {
+      state({ line: 3, invocationId: 'helper-call', parentInvocationId: 'solve-call', lastEvent: { type: 'METHOD_EXIT', method: 'helper', data: {
         invocationId: 'helper-call', parentInvocationId: 'solve-call', returnType: 'int', returnValue: 5, returnedVoid: false,
       } } }),
     ];
-    const { nodes } = buildInvocationNodes(states);
-    expect(nodes.get('helper-call')?.arguments).toEqual([{ name: 'x', value: 4 }]);
+    const { nodes } = buildInvocationNodes(states, source);
+    expect(nodes.get('helper-call')?.arguments).toEqual([{ name: 'x', expression: 'n', value: 4 }]);
     expect(nodes.get('helper-call')?.status).toBe('returned');
     expect(nodes.get('helper-call')?.returnValue).toBe(5);
     expect(nodes.get('helper-call')?.exitState).toBe(states[2]);
