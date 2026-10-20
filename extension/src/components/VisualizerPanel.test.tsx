@@ -621,8 +621,8 @@ describe('universal tree visualization', () => {
       expect(html).toContain('data-tree-entered="true"');
       expect(html).toContain('yv-tree-node-entered');
       expect(html).toContain('yv-tree-node-changed');
-      expect(html).toContain('UPDATED');
-      expect(html).toContain('CURRENT');
+      expect(html).toContain('2 → 3');
+      expect(html).toContain('VISITED');
       expect(html).toContain('current');
     } finally {
       sessionStore.set(priorSession);
@@ -2623,7 +2623,7 @@ describe('shared universal tree rendering', () => {
 describe('multi-key tree node rendering', () => {
   it('renders B-tree keys as separate cells and exposes balancing metadata', () => {
     const objects = {
-      root: { $objectId: 'btree-root', $type: 'BTreeNode', keys: [10, 20], children: [] },
+      'btree-root': { $objectId: 'btree-root', $type: 'BTreeNode', keys: [10, 20], children: [] },
     };
     const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'btree-root' }} objects={objects} />);
     expect(html).toContain('yv-node-key-cells');
