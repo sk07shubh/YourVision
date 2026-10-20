@@ -3821,9 +3821,9 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     ? (typeof resolved.$objectId === 'string' ? resolved.$objectId
       : isPlainObject(value) && typeof value.$ref === 'string' ? value.$ref : undefined)
     : undefined;
-  useLayoutEffect(() => {
-    glideToNewPosition(treeNodeRef.current, id, selectedIndex);
-  }, [id, selectedIndex, value, objects, state]);
+  // Do not translate individual cards between snapshots. The SVG connectors are
+  // measured in the tree's layout coordinate space; a card-only transform moves
+  // the card without moving its connector, making every edge appear detached.
   if (!isPlainObject(resolved)) return null;
   if (depth > 12) return <span className="yv-code">…</span>;
   if (id && seen.has(id)) return <span className="yv-code yv-tree-cycle" data-tree-cycle-to={id} title={'Cycle back to ' + id}>↻ {displayValue(nodeValue(resolved))}</span>;
@@ -4034,25 +4034,6 @@ function visitTrailFor(states: TraceState[], index: number) {
   const value = { orders, hops };
   visitTrailCache.set(states, { index, value });
   return value;
-}
-
-const treeNodePositions = new Map<string, { x: number; y: number; index: number }>();
-function glideToNewPosition(root: HTMLElement | null, id: string | undefined, index: number) {
-  const card = root?.querySelector<HTMLElement>(':scope > .yv-structure-node-card');
-  if (!card || !id || index < 0) return;
-  const host = card.closest('.yv-tree') ?? document.body;
-  const hostRect = host.getBoundingClientRect();
-  const rect = card.getBoundingClientRect();
-  const x = rect.left - hostRect.left + (host as HTMLElement).scrollLeft;
-  const y = rect.top - hostRect.top + (host as HTMLElement).scrollTop;
-  const before = treeNodePositions.get(id);
-  treeNodePositions.set(id, { x, y, index });
-  if (!before || before.index === index || Math.abs(index - before.index) > 1) return;
-  const dx = before.x - x;
-  const dy = before.y - y;
-  if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
-  if (typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  card.animate([{ transform: 'translate(' + dx + 'px, ' + dy + 'px)' }, { transform: 'none' }], { duration: 560, easing: 'cubic-bezier(.2,.8,.2,1)' });
 }
 
 function linkedListReturnText(root: unknown, objects: Record<string, unknown>): string | undefined {
