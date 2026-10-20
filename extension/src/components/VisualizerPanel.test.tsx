@@ -680,8 +680,30 @@ describe('universal tree visualization', () => {
       sessionStore.set({ source: 't3.left = t2;', states: [previous, current], index: 1 });
       const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 't1' }} objects={current.objects} state={current} />);
       expect(html).toContain('yv-tree-edge-reparented');
-      expect(html).toContain('data-tree-edge-status="removed"');
+      expect(html).toContain('data-tree-edge-status="detached"');
       expect(html).toContain('REPARENTED');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+
+  it('shows visit order and a trail between successive pointer targets', () => {
+    const priorSession = sessionStore.get();
+    const tree = {
+      t1: { $objectId: 't1', $type: 'TreeNode', fields: { val: 1, left: { $ref: 't2' }, right: null } },
+      t2: { $objectId: 't2', $type: 'TreeNode', fields: { val: 2, left: { $ref: 't3' }, right: null } },
+      t3: { $objectId: 't3', $type: 'TreeNode', fields: { val: 3, left: null, right: null } },
+    };
+    const previous = state({ sequence: 301, variables: { current: { $objectId: 't1' } }, objects: tree });
+    const middle = state({ sequence: 302, variables: { current: { $objectId: 't2' } }, objects: tree });
+    const current = state({ sequence: 303, variables: { current: { $objectId: 't3' } }, objects: tree });
+    try {
+      sessionStore.set({ source: 'current = current.left;', states: [previous, middle, current], index: 2 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 't1' }} objects={current.objects} state={current} />);
+      expect(html).toContain('yv-tree-trail-order');
+      expect(html).toContain('title="Visit order: 2"');
+      expect(html).toContain('yv-tree-edge-trail');
     } finally {
       sessionStore.set(priorSession);
     }
