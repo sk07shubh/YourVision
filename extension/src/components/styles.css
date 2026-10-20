@@ -2504,3 +2504,52 @@
     transform: none !important;
   }
 }
+
+
+/* Current pointer targets remain obvious even when no animation is playing. */
+.yv-structure-node.yv-tree-node-pointed > .yv-structure-node-card {
+  outline: 2px solid color-mix(in srgb, #FFA116, transparent 24%);
+  outline-offset: 3px;
+}
+.yv-tree-trail-order {
+  position: absolute;
+  top: -7px;
+  right: -5px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 19px;
+  min-height: 19px;
+  padding: 2px 5px;
+  border: 1px solid color-mix(in srgb, #FFA116, transparent 25%);
+  border-radius: 999px;
+  color: #FFA116;
+  background: var(--yv-bg);
+  font: 700 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+.yv-binary-tree-edge.yv-tree-edge-trail > .yv-binary-tree-edge-heading .yv-binary-tree-edge-label {
+  color: #FFA116;
+  border-color: color-mix(in srgb, #FFA116, transparent 35%);
+}
+.yv-tree-connectors line.yv-tree-connector-trail {
+  stroke: #FFA116;
+  stroke-width: 3;
+  stroke-dasharray: 3 5;
+  opacity: .9;
+}
+.yv-tree-connectors line.yv-tree-connector-reparented {
+  stroke: #B79CFF;
+  stroke-width: 3.5;
+  stroke-dasharray: 5 4;
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-structure-node.yv-tree-node-pointed > .yv-structure-node-card {
+    outline-offset: 2px;
+  }
+  .yv-tree-connectors line.yv-tree-connector-trail,
+  .yv-tree-connectors line.yv-tree-connector-reparented {
+    animation: none !important;
+  }
+}
