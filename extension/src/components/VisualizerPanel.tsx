@@ -3974,7 +3974,9 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
               !movedPointerTargets.has(line.target) && id && trail?.hops.has(id + '>' + line.target) && 'yv-tree-connector-trail',
               addedChildTargets.has(line.target) && previousParents?.get(line.target) !== undefined && previousParents.get(line.target) !== modelNodeId && 'yv-tree-connector-reparented',
             ].filter(Boolean).join(' ');
-            return <line key={line.target} className={classes || undefined} pathLength={1} x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} />;
+            const branchY = line.y1 + Math.max(16, (line.y2 - line.y1) / 2);
+            return <path key={line.target} className={classes || undefined} pathLength={1}
+              d={`M ${line.x1} ${line.y1} V ${branchY} H ${line.x2} V ${line.y2}`} />;
           })}
         </svg>
       )}
