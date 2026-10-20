@@ -3817,11 +3817,16 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const previous = selectedIndex > 0 ? session.states[selectedIndex - 1] : undefined;
   const previousObjects = previous?.objects ?? {};
   const resolved = resolveRef(value, objects);
+  const id = isPlainObject(resolved)
+    ? (typeof resolved.$objectId === 'string' ? resolved.$objectId
+      : isPlainObject(value) && typeof value.$ref === 'string' ? value.$ref : undefined)
+    : undefined;
+  useLayoutEffect(() => {
+    glideToNewPosition(treeNodeRef.current, id, selectedIndex);
+  }, [id, selectedIndex, value, objects, state]);
   if (!isPlainObject(resolved)) return null;
   if (depth > 12) return <span className="yv-code">…</span>;
-  const id = typeof resolved.$objectId === 'string' ? resolved.$objectId
-    : isPlainObject(value) && typeof value.$ref === 'string' ? value.$ref : undefined;
-  if (id && seen.has(id)) return <span className="yv-code yv-tree-cycle" data-tree-cycle-to={id}>↻ {displayValue(nodeValue(resolved))}</span>;
+  if (id && seen.has(id)) return <span className="yv-code yv-tree-cycle" data-tree-cycle-to={id} title={'Cycle back to ' + id}>↻ {displayValue(nodeValue(resolved))}</span>;
   const nextSeen = new Set(seen);
   if (id) nextSeen.add(id);
   const fields = objectFields(resolved);
@@ -3870,6 +3875,9 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const pointerNames = Object.entries(state?.variables ?? {})
     .filter(([, pointerValue]) => graphReferenceId(pointerValue, objects) === id)
     .map(([pointerName]) => pointerName);
+  const trail = selectedIndex >= 0 ? visitTrailFor(session.states, selectedIndex) : undefined;
+  const trailOrders = id ? trail?.orders.get(id) : undefined;
+  const pointed = pointerNames.length > 0;
   const nodeIdentity = id ? (id.length > 18 ? id.slice(0, 15) + '…' : id) : undefined;
   const keyCells = Array.isArray(fields.keys) ? fields.keys : undefined;
   const nodeMetadata = Object.entries(fields).filter(([name, metadataValue]) =>
@@ -3877,14 +3885,13 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     (typeof metadataValue === 'string' || typeof metadataValue === 'number' || typeof metadataValue === 'boolean')
   );
   const modelReferenceEdges = model.edges.filter(edge => edge.kind === 'reference' && edge.source === modelNodeId);
-  const entered = Boolean(state && previous && id && session.states.includes(state) &&
-    movedPointerTargets.has(id));
+  const entered = Boolean(hasSnapshotPair && id && movedPointerTargets.has(id));
   const depthClass = 'yv-structure-depth-' + Math.min(depth, 4);
   return (
-    <div ref={treeNodeRef} className={'yv-structure-node ' + depthClass + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '') + (nodeValueChanged ? ' yv-tree-node-value-changed' : '') + (removedChildEdges.length ? ' yv-tree-node-child-removed' : '')}
+    <div ref={treeNodeRef} className={'yv-structure-node ' + depthClass + (pointed ? ' yv-tree-node-pointed' : '') + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '') + (nodeValueChanged ? ' yv-tree-node-value-changed' : '') + (removedChildEdges.length ? ' yv-tree-node-child-removed' : '')}
       data-tree-node-id={id} data-tree-depth={depth} data-tree-layout="binary-tree"
       data-tree-changed={changed ? 'true' : undefined} data-tree-entered={entered ? 'true' : undefined}
-      data-tree-created={created ? 'true' : undefined} aria-label={'Tree node ' + displayValue(nodeValue(resolved)) + (id ? ', object ' + id : '')}>
+      data-tree-created={created ? 'true' : undefined} aria-label={'Tree node ' + displayValue(nodeValue(resolved)) + (id ? ', object ' + id : '') + (pointed ? ', pointed to by ' + pointerNames.join(', ') : '')}>
       <div key={(changed || entered || created || nodeValueChanged) ? id + ':' + selectedIndex : id} className="yv-node yv-structure-node-card">
         <div className="yv-structure-node-main">
           <span className="yv-structure-node-heading">
@@ -3896,6 +3903,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
           </span>
           {nodeIdentity && <span className="yv-structure-node-identity" title={'Object identity: ' + id}>@{nodeIdentity}</span>}
         </div>
+        {trailOrders && trailOrders.length > 0 && <span className="yv-tree-trail-order" title={'Visit order: ' + trailOrders.join(', ')}>{trailOrders.slice(-3).join('·')}</span>}
         {created && <span className="yv-binary-node-status is-created yv-tree-operation-badge">NODE CREATED</span>}
         {nodeValueChanged && <span className="yv-binary-node-status is-changed yv-tree-operation-badge yv-tree-value-delta" title="Value changed between adjacent execution snapshots">
           {compactValue(nodeValue(previousFields))} → {compactValue(nodeValue(resolved))}
@@ -3922,8 +3930,9 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
             const previousParent = previousParents?.get(edge.target);
             const reparented = Boolean(childAdded && existedBefore && previousParent !== undefined && previousParent !== modelNodeId);
             const attached = Boolean(childAdded && existedBefore && !reparented);
+            const onTrail = Boolean(id && trail?.hops.has(id + '>' + edge.target));
             return (
-              <div key={edge.id} className={'yv-binary-tree-edge' + (childEntered ? ' yv-tree-edge-traversed' : '') + (childAdded ? ' yv-tree-edge-added' : '') + (reparented ? ' yv-tree-edge-reparented' : '')}
+              <div key={edge.id} className={'yv-binary-tree-edge' + (childEntered ? ' yv-tree-edge-traversed' : '') + (childAdded ? ' yv-tree-edge-added' : '') + (reparented ? ' yv-tree-edge-reparented' : '') + (onTrail ? ' yv-tree-edge-trail' : '')}
                 data-tree-edge={edgeLabel.toLowerCase()} data-tree-edge-label={edgeLabel} data-tree-edge-target={edge.target}>
                 <div className="yv-binary-tree-edge-heading">
                   <span className="yv-binary-tree-edge-label">{edgeLabel}</span>
@@ -3957,9 +3966,15 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
       )}
       {treeConnectorLines.length > 0 && (
         <svg className="yv-tree-connectors" viewBox={`0 0 ${treeConnectorLines[0]?.rootWidth ?? 1} ${treeConnectorLines[0]?.rootHeight ?? 1}`} preserveAspectRatio="none" aria-hidden="true" focusable="false">
-          {treeConnectorLines.map((line) => (
-            <line key={line.target} className={(addedChildTargets.has(line.target) ? 'yv-tree-connector-added ' : '') + (movedPointerTargets.has(line.target) ? 'yv-tree-connector-traversed' : '')} x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} />
-          ))}
+          {treeConnectorLines.map((line) => {
+            const classes = [
+              addedChildTargets.has(line.target) && 'yv-tree-connector-added',
+              movedPointerTargets.has(line.target) && 'yv-tree-connector-traversed',
+              !movedPointerTargets.has(line.target) && id && trail?.hops.has(id + '>' + line.target) && 'yv-tree-connector-trail',
+              addedChildTargets.has(line.target) && previousParents?.get(line.target) !== undefined && previousParents.get(line.target) !== modelNodeId && 'yv-tree-connector-reparented',
+            ].filter(Boolean).join(' ');
+            return <line key={line.target} className={classes || undefined} pathLength={1} x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} />;
+          })}
         </svg>
       )}
     </div>
@@ -3990,6 +4005,53 @@ function parentsByChild(objs: Record<string, unknown>): Map<string, string> {
   }
   treeParentCache.set(objs, parents);
   return parents;
+}
+
+
+const visitTrailCache = new WeakMap<object, { index: number; value: { orders: Map<string, number[]>; hops: Set<string> } }>();
+function visitTrailFor(states: TraceState[], index: number) {
+  const cached = visitTrailCache.get(states);
+  if (cached && cached.index === index) return cached.value;
+  const orders = new Map<string, number[]>();
+  const hops = new Set<string>();
+  let last: string | undefined;
+  let count = 0;
+  for (let i = 1; i <= index && i < states.length; i += 1) {
+    const before = states[i - 1]!;
+    const after = states[i]!;
+    for (const [name, pointerValue] of Object.entries(after.variables ?? {})) {
+      const target = graphReferenceId(pointerValue, after.objects ?? {});
+      if (!target || target === graphReferenceId(before.variables?.[name], before.objects ?? {}) || target === last) continue;
+      count += 1;
+      const order = orders.get(target) ?? [];
+      order.push(count);
+      orders.set(target, order);
+      if (last) hops.add(last + '>' + target);
+      last = target;
+    }
+  }
+  const value = { orders, hops };
+  visitTrailCache.set(states, { index, value });
+  return value;
+}
+
+const treeNodePositions = new Map<string, { x: number; y: number; index: number }>();
+function glideToNewPosition(root: HTMLElement | null, id: string | undefined, index: number) {
+  const card = root?.querySelector<HTMLElement>(':scope > .yv-structure-node-card');
+  if (!card || !id || index < 0) return;
+  const host = card.closest('.yv-tree') ?? document.body;
+  const hostRect = host.getBoundingClientRect();
+  const rect = card.getBoundingClientRect();
+  const x = rect.left - hostRect.left + (host as HTMLElement).scrollLeft;
+  const y = rect.top - hostRect.top + (host as HTMLElement).scrollTop;
+  const before = treeNodePositions.get(id);
+  treeNodePositions.set(id, { x, y, index });
+  if (!before || before.index === index || Math.abs(index - before.index) > 1) return;
+  const dx = before.x - x;
+  const dy = before.y - y;
+  if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
+  if (typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  card.animate([{ transform: 'translate(' + dx + 'px, ' + dy + 'px)' }, { transform: 'none' }], { duration: 560, easing: 'cubic-bezier(.2,.8,.2,1)' });
 }
 
 function linkedListReturnText(root: unknown, objects: Record<string, unknown>): string | undefined {
