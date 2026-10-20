@@ -3830,6 +3830,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const nextSeen = new Set(seen);
   if (id) nextSeen.add(id);
   const fields = objectFields(resolved);
+  const isNaryTree = 'children' in fields && !('left' in fields) && !('right' in fields);
   const previousNode = id ? previousObjects[id] : undefined;
   const previousFields = isPlainObject(previousNode) ? objectFields(previousNode) : {};
   const hasPreviousSnapshot = Boolean(state && previous && session.states.includes(state) && previousNode !== undefined);
@@ -3889,7 +3890,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const depthClass = 'yv-structure-depth-' + Math.min(depth, 4);
   return (
     <div ref={treeNodeRef} className={'yv-structure-node ' + depthClass + (pointed ? ' yv-tree-node-pointed' : '') + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '') + (nodeValueChanged ? ' yv-tree-node-value-changed' : '') + (removedChildEdges.length ? ' yv-tree-node-child-removed' : '')}
-      data-tree-node-id={id} data-tree-depth={depth} data-tree-layout="binary-tree"
+      data-tree-node-id={id} data-tree-depth={depth} data-tree-layout={isNaryTree ? 'nary' : 'binary-tree'}
       data-tree-changed={changed ? 'true' : undefined} data-tree-entered={entered ? 'true' : undefined}
       data-tree-created={created ? 'true' : undefined} aria-label={'Tree node ' + displayValue(nodeValue(resolved)) + (id ? ', object ' + id : '') + (pointed ? ', pointed to by ' + pointerNames.join(', ') : '')}>
       <div key={(changed || entered || created || nodeValueChanged) ? id + ':' + selectedIndex : id} className="yv-node yv-structure-node-card">
@@ -3921,7 +3922,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
         </span>}
       </div>
       {(genericChildEdges.length > 0 || removedChildEdges.length > 0) && (
-        <div className="yv-binary-tree-children" data-tree-children="binary-tree">
+        <div className={'yv-binary-tree-children' + (isNaryTree ? ' yv-nary-tree-children' : '')} data-tree-children={isNaryTree ? 'nary' : 'binary-tree'} style={isNaryTree ? { gridTemplateColumns: 'repeat(' + genericChildEdges.length + ', minmax(110px, max-content))' } : undefined}>
           {genericChildEdges.map((edge, index) => {
             const childEntered = movedPointerTargets.has(edge.target);
             const edgeLabel = edge.label ?? String(index);
