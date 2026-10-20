@@ -371,8 +371,11 @@ assert(
     capturedArguments[2] === null,
     "METHOD_ENTER did not preserve exact primitive and null argument values"
 );
+const capturedArrayArgument = Array.isArray(capturedArguments)
+    ? capturedArguments[3]
+    : undefined;
 assert(
-    JSON.stringify(snapshotField(capturedArguments?.[3], "values")) === "[1,2]",
+    JSON.stringify(snapshotField(capturedArrayArgument, "values")) === "[1,2]",
     "METHOD_ENTER did not preserve the entry-time array argument before mutation"
 );
 
