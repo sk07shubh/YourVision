@@ -537,6 +537,12 @@ public class YourVisionRuntime {
                 80
             );
         }
+if (isGraphNodeType(type)) {
+    return text.startsWith("{")
+        ? parseObject(text, type)
+        : parseGraphNode(text, type);
+}
+
 if (isListNodeType(type)) {
     return text.startsWith("{")
         ? parseObject(text, type)
@@ -1490,12 +1496,100 @@ if (isTreeNodeType(type)) {
             this.score = score;
         }
     }
-        private static boolean isListNodeType(Class<?> type) {
+        private static boolean isGraphNodeType(Class<?> type) {
+        return "Node".equals(type.getSimpleName());
+    }
+
+    private static boolean isListNodeType(Class<?> type) {
         return "ListNode".equals(type.getSimpleName());
     }
 
     private static boolean isTreeNodeType(Class<?> type) {
         return "TreeNode".equals(type.getSimpleName());
+    }
+
+    private static ParseResult parseGraphNode(
+        String text,
+        Class<?> type
+    ) {
+        if (!text.startsWith("[") || !text.endsWith("]")) {
+            throw new IllegalArgumentException(
+                "Node input must use adjacency-list syntax [[neighbors...], ...] or object syntax"
+            );
+        }
+
+        List<String> adjacency = splitTopLevel(
+            text.substring(1, text.length() - 1)
+        );
+
+        if (adjacency.isEmpty()) {
+            return new ParseResult(null, 150);
+        }
+
+        Field valField = findField(type, "val");
+        Field neighborsField = findField(type, "neighbors");
+        if (valField == null || neighborsField == null) {
+            throw new IllegalArgumentException(
+                "Node must contain val and neighbors fields"
+            );
+        }
+
+        try {
+            valField.setAccessible(true);
+            neighborsField.setAccessible(true);
+            Constructor<?> constructor = type.getDeclaredConstructor();
+            constructor.setAccessible(true);
+
+            List<Object> nodes = new ArrayList<>();
+            for (int i = 0; i < adjacency.size(); i++) {
+                Object node = constructor.newInstance();
+                valField.set(node, i + 1);
+                neighborsField.set(node, new ArrayList<>());
+                nodes.add(node);
+            }
+
+            for (int i = 0; i < adjacency.size(); i++) {
+                String neighborsText = adjacency.get(i).trim();
+                if (!neighborsText.startsWith("[") || !neighborsText.endsWith("]")) {
+                    throw new IllegalArgumentException(
+                        "Each graph adjacency entry must use [neighbor, ...] syntax"
+                    );
+                }
+
+                List<String> neighborValues = splitTopLevel(
+                    neighborsText.substring(1, neighborsText.length() - 1)
+                );
+                Object node = nodes.get(i);
+                @SuppressWarnings("unchecked")
+                List<Object> neighbors = (List<Object>) neighborsField.get(node);
+
+                for (String neighborText : neighborValues) {
+                    if (neighborText.trim().isEmpty()) continue;
+                    int neighborValue;
+                    try {
+                        neighborValue = Integer.parseInt(neighborText.trim());
+                    } catch (NumberFormatException ex) {
+                        throw new IllegalArgumentException(
+                            "Graph neighbor values must be 1-based integer node labels",
+                            ex
+                        );
+                    }
+                    if (neighborValue < 1 || neighborValue > nodes.size()) {
+                        throw new IllegalArgumentException(
+                            "Graph neighbor " + neighborValue +
+                            " is outside the valid range 1.." + nodes.size()
+                        );
+                    }
+                    neighbors.add(nodes.get(neighborValue - 1));
+                }
+            }
+
+            return new ParseResult(nodes.get(0), 180 + adjacency.size());
+        } catch (IllegalArgumentException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("could not construct graph Node input", ex);
+        }
     }
 
     private static ParseResult parseListNode(

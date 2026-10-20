@@ -231,6 +231,12 @@ const TREE_NODE_FILE = fileURLToPath(
         import.meta.url
     )
 );
+const GRAPH_NODE_FILE = fileURLToPath(
+    new URL(
+        "./LeetCodeGraphNode.java",
+        import.meta.url
+    )
+);
 function prepareJavaSource(source: string): string {
     const standardImport =
         "import java.util.*;";
@@ -405,6 +411,8 @@ await fs.writeFile(
             declaresType(preparedSource, "ListNode");
         const declaresTreeNode =
             declaresType(preparedSource, "TreeNode");
+        const declaresGraphNode =
+            declaresType(preparedSource, "Node");
 
         if (!declaresListNode) {
             await fs.copyFile(
@@ -417,6 +425,13 @@ await fs.writeFile(
             await fs.copyFile(
                 TREE_NODE_FILE,
                 path.join(tempDir, "LeetCodeTreeNode.java")
+            );
+        }
+
+        if (!declaresGraphNode) {
+            await fs.copyFile(
+                GRAPH_NODE_FILE,
+                path.join(tempDir, "LeetCodeGraphNode.java")
             );
         }
         try {
@@ -435,6 +450,9 @@ await fs.writeFile(
                     ...(declaresTreeNode
                         ? []
                         : [path.join(tempDir, "LeetCodeTreeNode.java")]),
+                    ...(declaresGraphNode
+                        ? []
+                        : [path.join(tempDir, "LeetCodeGraphNode.java")]),
                     runtimePath,
                     tracerPath
                 ],
@@ -461,7 +479,9 @@ await fs.writeFile(
                 message:
                     isTimeout(error)
                         ? "Java compilation timed out"
-                        : "Java compilation failed"
+                        : (error.stderr?.trim()
+                            ? `Java compilation failed: ${error.stderr.trim().split(/\r?\n/).slice(-8).join(" | ")}`
+                            : "Java compilation failed")
             };
         }
 
