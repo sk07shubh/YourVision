@@ -629,7 +629,7 @@ describe('universal tree visualization', () => {
     }
   });
 
-  it('keeps the removed-child cue when the last child is detached', () => {
+  it('distinguishes a detached child link when the object remains captured', () => {
     const priorSession = sessionStore.get();
     const previous = state({
       sequence: 117,
@@ -649,9 +649,39 @@ describe('universal tree visualization', () => {
       sessionStore.set({ source: 'root.left = null;', states: [previous, current], index: 1 });
       const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 't1' }} objects={current.objects} state={current} />);
       expect(html).toContain('data-tree-edge="left"');
-      expect(html).toContain('data-tree-edge-status="removed"');
-      expect(html).toContain('REMOVED');
+      expect(html).toContain('data-tree-edge-status="detached"');
+      expect(html).toContain('DETACHED');
       expect(html).toContain('class="yv-null">null</span>');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+
+  it('marks an existing child linked under a different parent as reparented', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 201,
+      objects: {
+        t1: { $objectId: 't1', $type: 'TreeNode', fields: { val: 1, left: { $ref: 't2' }, right: { $ref: 't3' } } },
+        t2: { $objectId: 't2', $type: 'TreeNode', fields: { val: 2, left: null, right: null } },
+        t3: { $objectId: 't3', $type: 'TreeNode', fields: { val: 3, left: null, right: null } },
+      },
+    });
+    const current = state({
+      sequence: 202,
+      objects: {
+        t1: { $objectId: 't1', $type: 'TreeNode', fields: { val: 1, left: null, right: { $ref: 't3' } } },
+        t2: { $objectId: 't2', $type: 'TreeNode', fields: { val: 2, left: null, right: null } },
+        t3: { $objectId: 't3', $type: 'TreeNode', fields: { val: 3, left: { $ref: 't2' }, right: null } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 't3.left = t2;', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 't1' }} objects={current.objects} state={current} />);
+      expect(html).toContain('yv-tree-edge-reparented');
+      expect(html).toContain('data-tree-edge-status="removed"');
+      expect(html).toContain('REPARENTED');
     } finally {
       sessionStore.set(priorSession);
     }
