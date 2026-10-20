@@ -5473,7 +5473,7 @@ function InvocationTree({ states, currentIndex, onSelect, source }: { states: Tr
       <div
         role="button"
         tabIndex={0}
-        className={`yv-tree-node ${selected ? 'selected' : ''} ${node.status} ${id === 'root' ? 'class-context-node' : ''}`}
+        className={`yv-tree-node ${selected ? 'selected current-function' : ''} ${node.status} ${id === 'root' ? 'class-context-node' : ''}`}
         style={{ '--yv-tree-depth': depth } as CSSProperties}
         onClick={() => onSelect(node.entryIndex)}
         onKeyDown={event => {
