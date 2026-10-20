@@ -2571,6 +2571,10 @@
   padding: 18px 18px 22px;
 }
 .yv-ds-visualization > .yv-tree {
+  /* The wrapper is the sole scroll container. A second overflow:auto here
+     clips node outlines and the absolutely-positioned depth/pointer badges. */
+  overflow: visible;
   width: max-content;
   min-width: 100%;
+  padding: 8px 6px 10px;
 }
