@@ -2463,3 +2463,44 @@
     transform: none !important;
   }
 }
+
+
+/* Structural tree changes stay attached to their real parent/child slots. */
+.yv-binary-tree-edge.yv-tree-edge-reparented > .yv-binary-tree-edge-heading .yv-binary-tree-edge-label {
+  color: #B79CFF;
+  border-color: color-mix(in srgb, #B79CFF, transparent 30%);
+}
+.yv-binary-edge-status.is-attached {
+  color: #4DA3FF;
+  border-color: color-mix(in srgb, #4DA3FF, transparent 40%);
+  background: color-mix(in srgb, #4DA3FF, var(--yv-bg) 90%);
+}
+.yv-binary-edge-status.is-reparented {
+  color: #B79CFF;
+  border-color: color-mix(in srgb, #B79CFF, transparent 35%);
+  background: color-mix(in srgb, #B79CFF, var(--yv-bg) 90%);
+}
+.yv-binary-edge-status.is-detached {
+  color: #FFC01E;
+  border-color: color-mix(in srgb, #FFC01E, transparent 35%);
+  background: color-mix(in srgb, #FFC01E, var(--yv-bg) 90%);
+}
+.yv-binary-edge-status.is-removed {
+  color: #FF375F;
+  border-color: color-mix(in srgb, #FF375F, transparent 35%);
+  background: color-mix(in srgb, #FF375F, var(--yv-bg) 90%);
+}
+.yv-binary-tree-edge.yv-tree-edge-reparented > .yv-binary-tree-edge-content {
+  outline: 1px dashed color-mix(in srgb, #B79CFF, transparent 20%);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+.yv-binary-tree-edge-removed .yv-binary-tree-edge-content {
+  transform-origin: center top;
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-binary-tree-edge.yv-tree-edge-reparented > .yv-binary-tree-edge-content {
+    animation: none !important;
+    transform: none !important;
+  }
+}
