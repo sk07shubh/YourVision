@@ -3833,23 +3833,12 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const modelNodeId = id ?? model.nodes.find(node => node.fields === fields)?.id;
   const genericChildEdges = model.edges.filter(edge => edge.kind === 'child' && edge.source === modelNodeId);
   const currentChildSlots = new Set(genericChildEdges.map(edge => (edge.label ?? '').toLowerCase()));
-  const previousChildTargets = new Set(Object.entries(previousFields)
-    .filter(([fieldName, previousValue]) => previousValue != null && /^(left|right|children|child\d+|firstChild|secondChild)$/i.test(fieldName))
-    .flatMap(([fieldName, previousValue]) => {
-      if (fieldName.toLowerCase() !== 'children') return [graphReferenceId(previousValue, previousObjects)];
-      const childValues = Array.isArray(previousValue)
-        ? previousValue
-        : isPlainObject(previousValue) && Array.isArray(previousValue.values)
-          ? previousValue.values
-          : isPlainObject(previousValue) && Array.isArray(previousValue.entries)
-            ? previousValue.entries.filter(isPlainObject).map(entry => entry.value)
-            : isPlainObject(previousValue) ? Object.values(previousValue) : [];
-      return childValues.map(child => graphReferenceId(child, previousObjects));
-    })
-    .filter((target): target is string => Boolean(target)));
+  const hasSnapshotPair = Boolean(state && previous && session.states.includes(state));
+  const previousChildTargets = new Set(childTargetsOf(previousFields, previousObjects));
   const addedChildTargets = new Set(genericChildEdges
-    .filter(edge => Boolean(previous && session.states.includes(state!)) && !previousChildTargets.has(edge.target))
+    .filter(edge => hasSnapshotPair && !previousChildTargets.has(edge.target))
     .map(edge => edge.target));
+  const previousParents = hasSnapshotPair ? parentsByChild(previousObjects) : undefined;
   const nodeValueChanged = Boolean(hasPreviousSnapshot && valueChanged(nodeValue(previousFields), nodeValue(resolved)));
   const changedMetadataNames = Object.keys(fields).filter(name =>
     ['color', 'bf', 'balanceFactor', 'height', 'weight', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord'].includes(name) &&
@@ -3867,7 +3856,8 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     if (currentValue != null && (!previousTarget || currentTarget === previousTarget)) return [];
     const label = fieldName.toUpperCase();
     if (currentChildSlots.has(label.toLowerCase())) return [];
-    return [{ fieldName, label, target: previousTarget }];
+    const detached = Boolean(previousTarget && objects[previousTarget] !== undefined);
+    return [{ fieldName, label, target: previousTarget, detached }];
   });
   const movedPointerTargets = new Set<string>();
   if (state && previous && session.states.includes(state)) {
@@ -3928,13 +3918,19 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
             const childEntered = movedPointerTargets.has(edge.target);
             const edgeLabel = edge.label ?? String(index);
             const childAdded = addedChildTargets.has(edge.target);
+            const existedBefore = previousObjects[edge.target] !== undefined;
+            const previousParent = previousParents?.get(edge.target);
+            const reparented = Boolean(childAdded && existedBefore && previousParent !== undefined && previousParent !== modelNodeId);
+            const attached = Boolean(childAdded && existedBefore && !reparented);
             return (
-              <div key={edge.id} className={'yv-binary-tree-edge' + (childEntered ? ' yv-tree-edge-traversed' : '') + (childAdded ? ' yv-tree-edge-added' : '')}
+              <div key={edge.id} className={'yv-binary-tree-edge' + (childEntered ? ' yv-tree-edge-traversed' : '') + (childAdded ? ' yv-tree-edge-added' : '') + (reparented ? ' yv-tree-edge-reparented' : '')}
                 data-tree-edge={edgeLabel.toLowerCase()} data-tree-edge-label={edgeLabel} data-tree-edge-target={edge.target}>
                 <div className="yv-binary-tree-edge-heading">
                   <span className="yv-binary-tree-edge-label">{edgeLabel}</span>
                   {edge.metadata.weight !== undefined && <span className="yv-tree-metadata-chip">w={displayValue(edge.metadata.weight)}</span>}
-                  {childAdded && <span className="yv-binary-edge-status is-added yv-tree-operation-badge">ADDED</span>}
+                  {childAdded && !existedBefore && <span className="yv-binary-edge-status is-added yv-tree-operation-badge">ADDED</span>}
+                  {attached && <span className="yv-binary-edge-status is-attached yv-tree-operation-badge" title="Existing object linked here">ATTACHED</span>}
+                  {reparented && <span className="yv-binary-edge-status is-reparented yv-tree-operation-badge" title={'Previously under ' + previousParent}>REPARENTED</span>}
                   {childEntered && <span className="yv-binary-edge-status is-traversed yv-tree-operation-badge">TRAVERSED</span>}
                 </div>
                 <div className="yv-binary-tree-edge-content">
@@ -3946,10 +3942,13 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
           {removedChildEdges.map(edge => (
             <div key={'removed:' + edge.fieldName} className="yv-binary-tree-edge yv-binary-tree-edge-removed"
               data-tree-edge={edge.fieldName.toLowerCase()} data-tree-edge-label={edge.label}
-              data-tree-edge-target={edge.target ?? undefined} data-tree-edge-status="removed">
+              data-tree-edge-target={edge.target ?? undefined} data-tree-edge-status={edge.detached ? 'detached' : 'removed'}>
               <div className="yv-binary-tree-edge-heading">
                 <span className="yv-binary-tree-edge-label">{edge.label}</span>
-                <span className="yv-binary-edge-status is-removed">REMOVED</span>
+                <span className={'yv-binary-edge-status yv-tree-operation-badge ' + (edge.detached ? 'is-detached' : 'is-removed')}
+                  title={edge.detached ? 'Link cleared; the object is still captured elsewhere' : 'Link cleared; the object is no longer captured'}>
+                  {edge.detached ? 'DETACHED' : 'REMOVED'}
+                </span>
               </div>
               <div className="yv-binary-tree-edge-content"><span className="yv-null">null</span></div>
             </div>
@@ -3966,6 +3965,33 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     </div>
   );
 }
+const TREE_CHILD_FIELD = /^(left|right|children|child\d+|firstChild|secondChild)$/i;
+function childTargetsOf(fields: Obj, objs: Record<string, unknown>): string[] {
+  return Object.entries(fields)
+    .filter(([fieldName, fieldValue]) => fieldValue != null && TREE_CHILD_FIELD.test(fieldName))
+    .flatMap(([fieldName, fieldValue]) => {
+      if (fieldName.toLowerCase() !== 'children') return [graphReferenceId(fieldValue, objs)];
+      const values = Array.isArray(fieldValue) ? fieldValue
+        : isPlainObject(fieldValue) && Array.isArray(fieldValue.values) ? fieldValue.values
+        : isPlainObject(fieldValue) && Array.isArray(fieldValue.entries) ? fieldValue.entries.filter(isPlainObject).map(entry => entry.value)
+        : isPlainObject(fieldValue) ? Object.values(fieldValue) : [];
+      return values.map(child => graphReferenceId(child, objs));
+    })
+    .filter((target): target is string => Boolean(target));
+}
+const treeParentCache = new WeakMap<object, Map<string, string>>();
+function parentsByChild(objs: Record<string, unknown>): Map<string, string> {
+  const cached = treeParentCache.get(objs);
+  if (cached) return cached;
+  const parents = new Map<string, string>();
+  for (const [parentId, raw] of Object.entries(objs)) {
+    if (!isPlainObject(raw)) continue;
+    for (const childId of childTargetsOf(objectFields(raw), objs)) if (!parents.has(childId)) parents.set(childId, parentId);
+  }
+  treeParentCache.set(objs, parents);
+  return parents;
+}
+
 function linkedListReturnText(root: unknown, objects: Record<string, unknown>): string | undefined {
   if (!isPlainObject(root) || !looksListNode(root)) return undefined;
 
