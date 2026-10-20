@@ -1647,11 +1647,11 @@
   display: none;
   box-sizing: border-box;
   width: max-content;
-  min-width: min(190px, calc(100vw - 32px));
-  max-width: min(680px, calc(100vw - 16px));
+  min-width: 0;
+  max-width: min(340px, calc(100vw - 16px));
   max-height: min(42dvh, 360px);
   margin-top: 0;
-  padding: 8px;
+  padding: 5px;
   overflow: auto;
   overscroll-behavior: contain;
   border: 1px solid color-mix(in srgb, var(--yv-depth-border, #60a5fa), transparent 32%);
@@ -1668,7 +1668,7 @@
 .yv-tree-arguments:focus-within .yv-tree-arguments-popover {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 5px;
 }
 
 /* Portal preview escapes both the scrolling viewport and the rounded panel. */
@@ -1679,10 +1679,20 @@
      portal visible independently of its now-non-ancestor hover trigger. */
   display: flex !important;
   flex-direction: column;
-  gap: 9px;
+  gap: 5px;
+  box-sizing: border-box;
   width: max-content;
-  min-width: min(190px, calc(100vw - 16px));
-  max-width: min(680px, calc(100vw - 16px));
+  min-width: 0;
+  max-width: min(340px, calc(100vw - 16px));
+  padding: 5px;
+  border: 1px solid color-mix(in srgb, var(--yv-depth-border, #60a5fa), transparent 32%);
+  border-radius: 8px;
+  background: #0b1220;
+  color: #e5edf8;
+  box-shadow: 0 8px 24px rgba(0,0,0,.32);
+  font-size: 11px;
+  font-weight: 400;
+  white-space: normal;
   margin: 0;
   overflow: auto;
   overscroll-behavior: contain;
