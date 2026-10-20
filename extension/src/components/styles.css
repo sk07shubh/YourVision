@@ -2599,3 +2599,23 @@
   min-width: 100%;
   padding: 8px 6px 10px;
 }
+
+/* Argument/return previews should show a compact, complete tree rather than
+   a full-size visualization clipped by the popover boundary. */
+.yv-tree-arguments-popover-portal .yv-tree-argument-value {
+  max-width: min(320px, calc(100vw - 32px));
+  overflow: auto;
+  padding: 3px;
+  box-sizing: border-box;
+}
+.yv-tree-arguments-popover-portal .yv-tree-argument-value > .yv-tree {
+  zoom: 0.58;
+  width: max-content;
+  max-width: none;
+  overflow: visible;
+}
+.yv-tree-arguments-popover-portal .yv-tree-argument-value .yv-ds-visualization {
+  max-width: none;
+  overflow: visible;
+}
+
