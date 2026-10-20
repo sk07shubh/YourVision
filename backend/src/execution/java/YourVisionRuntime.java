@@ -549,6 +549,12 @@ if (isTreeNodeType(type)) {
         : parseTreeNode(text, type);
 }
 
+if (isGraphNodeType(type)) {
+    return text.startsWith("{")
+        ? parseObject(text, type)
+        : parseGraphNode(text, type);
+}
+
         if (type.isArray()) {
             if (
                 !text.startsWith("[") ||
@@ -1496,6 +1502,100 @@ if (isTreeNodeType(type)) {
 
     private static boolean isTreeNodeType(Class<?> type) {
         return "TreeNode".equals(type.getSimpleName());
+    }
+
+    private static boolean isGraphNodeType(Class<?> type) {
+        return "Node".equals(type.getSimpleName()) &&
+            findField(type, "val") != null &&
+            findField(type, "neighbors") != null;
+    }
+
+    private static ParseResult parseGraphNode(
+        String text,
+        Class<?> type
+    ) {
+        if (text.startsWith("{") && text.endsWith("}")) {
+            return parseObject(text, type);
+        }
+
+        if (!text.startsWith("[") || !text.endsWith("]")) {
+            throw new IllegalArgumentException(
+                "Node input must use adjacency-list [..] or object syntax"
+            );
+        }
+
+        List<String> adjacency = splitTopLevel(
+            text.substring(1, text.length() - 1)
+        );
+
+        if (adjacency.isEmpty() ||
+            (adjacency.size() == 1 && adjacency.get(0).trim().isEmpty())) {
+            return new ParseResult(null, 130);
+        }
+
+        try {
+            Constructor<?> constructor = type.getDeclaredConstructor();
+            constructor.setAccessible(true);
+            Field valField = findField(type, "val");
+            Field neighborsField = findField(type, "neighbors");
+
+            if (valField == null || neighborsField == null) {
+                throw new IllegalArgumentException(
+                    "Node must contain val and neighbors fields"
+                );
+            }
+
+            valField.setAccessible(true);
+            neighborsField.setAccessible(true);
+
+            List<Object> nodes = new ArrayList<>();
+            List<List<String>> neighborIndexes = new ArrayList<>();
+
+            for (int i = 0; i < adjacency.size(); i++) {
+                Object node = constructor.newInstance();
+                ParseResult value = parseValue(String.valueOf(i + 1), valField.getType());
+                valField.set(node, value.value);
+                nodes.add(node);
+
+                String row = adjacency.get(i).trim();
+                if (!row.startsWith("[") || !row.endsWith("]")) {
+                    throw new IllegalArgumentException(
+                        "each Node adjacency entry must use [..] syntax"
+                    );
+                }
+
+                List<String> indexes = splitTopLevel(
+                    row.substring(1, row.length() - 1)
+                );
+                if (indexes.size() == 1 && indexes.get(0).trim().isEmpty()) {
+                    indexes = new ArrayList<>();
+                }
+                neighborIndexes.add(indexes);
+            }
+
+            for (int i = 0; i < nodes.size(); i++) {
+                List<Object> neighbors = new ArrayList<>();
+                for (String indexText : neighborIndexes.get(i)) {
+                    int neighborIndex = Integer.parseInt(indexText.trim());
+                    if (neighborIndex < 1 || neighborIndex > nodes.size()) {
+                        throw new IllegalArgumentException(
+                            "Node neighbor index out of range: " + neighborIndex
+                        );
+                    }
+                    neighbors.add(nodes.get(neighborIndex - 1));
+                }
+                neighborsField.set(nodes.get(i), neighbors);
+            }
+
+            return new ParseResult(nodes.get(0), 160 + adjacency.size());
+        } catch (IllegalArgumentException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new IllegalArgumentException(
+                "could not construct graph Node input",
+                ex
+            );
+        }
     }
 
     private static ParseResult parseListNode(
