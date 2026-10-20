@@ -843,10 +843,10 @@
 /* High-contrast current execution frame: distinct from hover, return, and status colors. */
 .yv-tree-node.current-function {
   position: relative;
-  border: 1px solid #22d3ee;
-  background: linear-gradient(105deg, rgba(8,145,178,.24), rgba(15,23,42,.98) 72%);
-  color: #f0fdff;
-  box-shadow: inset 4px 0 #22d3ee, 0 0 0 1px rgba(34,211,238,.32), 0 0 16px rgba(34,211,238,.2);
+  border: 1px solid #FF4D8D;
+  background: linear-gradient(105deg, rgba(255,77,141,.14), rgba(15,23,42,.98) 72%);
+  color: #FFF1F6;
+  box-shadow: inset 4px 0 #FF4D8D, 0 0 0 1px rgba(255,77,141,.3), 0 0 16px rgba(255,77,141,.16);
 }
 .yv-tree-node.current-function::after {
   content: "CURRENT";
@@ -854,28 +854,28 @@
   top: 7px;
   right: 8px;
   padding: 2px 5px;
-  border: 1px solid rgba(103,232,249,.55);
+  border: 1px solid rgba(255,179,205,.5);
   border-radius: 4px;
-  background: #083344;
-  color: #a5f3fc;
+  background: #4A142A;
+  color: #FFB3CD;
   font: 700 8px/1.2 ui-sans-serif, system-ui, sans-serif;
   letter-spacing: .08em;
   pointer-events: none;
 }
 .yv-tree-node.current-function .yv-tree-depth {
-  color: #67e8f9;
+  color: #FF8FB5;
   opacity: 1 !important;
 }
 .yv-tree-node.current-function .yv-tree-method {
-  border-bottom-color: rgba(103,232,249,.38);
+  border-bottom-color: rgba(255,179,205,.38);
 }
 .yv-tree-node.current-function .yv-tree-outcome {
-  color: #cffafe;
-  border-top-color: rgba(103,232,249,.3);
+  color: #FFD6E4;
+  border-top-color: rgba(255,179,205,.3);
 }
 .yv-tree-node.current-function:hover {
-  border-color: #67e8f9;
-  background: linear-gradient(105deg, rgba(8,145,178,.3), rgba(15,23,42,.98) 72%);
+  border-color: #FF8FB5;
+  background: linear-gradient(105deg, rgba(255,77,141,.2), rgba(15,23,42,.98) 72%);
 }
 .yv-tree-node.returned,.yv-tree-node.void { border-color:#2f6551; }
 .yv-tree-node.exceptional { border-color:#874343; }
