@@ -3336,25 +3336,88 @@ export function GraphView({ objects, variables = {}, state }: {
   const stablePositions = stableGraphPositions.current;
   const visibleGraphNodeIds = new Set(nodes.map(node => node.id));
   for (const id of stablePositions.keys()) if (!visibleGraphNodeIds.has(id)) stablePositions.delete(id);
-  // Use a roomy grid: center spacing exceeds the node footprint, and the
-  // scrollable stage grows instead of compressing an arbitrary graph into 600×320.
-  const slots = Array.from({ length: 80 }, (_, index) => ({
-    x: 70 + (index % 10) * 130,
-    y: 45 + Math.floor(index / 10) * 100,
-  }));
+
+  // Separate disconnected object graphs into their own visual cards. This is
+  // especially important for Clone Graph: the input and its deep copy have
+  // equal values but must never look like one shared object network.
+  const graphNeighborsById = new Map(nodes.map(node => [node.id, new Set<string>()]));
   for (const node of nodes) {
-    if (stablePositions.has(node.id)) continue;
-    const occupied = new Set([...stablePositions.values()].map(point => point.x + ':' + point.y));
-    const preferred = slots.find(point => !occupied.has(point.x + ':' + point.y));
-    stablePositions.set(node.id, preferred ?? { x: 70, y: 45 });
+    for (const neighbor of node.neighbors) {
+      const target = graphReferenceId(neighbor, objects);
+      if (!target || !graphNeighborsById.has(target)) continue;
+      graphNeighborsById.get(node.id)?.add(target);
+      graphNeighborsById.get(target)?.add(node.id);
+    }
+  }
+  const graphComponents: Array<{ id: string; nodes: typeof nodes }> = [];
+  const visitedGraphNodeIds = new Set<string>();
+  for (const node of nodes) {
+    if (visitedGraphNodeIds.has(node.id)) continue;
+    const pending = [node.id];
+    const componentNodes: typeof nodes = [];
+    visitedGraphNodeIds.add(node.id);
+    while (pending.length) {
+      const id = pending.pop()!;
+      const componentNode = nodes.find(candidate => candidate.id === id);
+      if (componentNode) componentNodes.push(componentNode);
+      for (const neighborId of graphNeighborsById.get(id) ?? []) {
+        if (visitedGraphNodeIds.has(neighborId)) continue;
+        visitedGraphNodeIds.add(neighborId);
+        pending.push(neighborId);
+      }
+    }
+    graphComponents.push({ id: node.id, nodes: componentNodes });
+  }
+  const graphComponentIndexByNodeId = new Map<string, number>();
+  graphComponents.forEach((component, componentIndex) => {
+    component.nodes.forEach(node => graphComponentIndexByNodeId.set(node.id, componentIndex));
+  });
+  const cloneGraphParameter = session.source.match(/cloneGraph\\s*\\(\\s*([A-Za-z_$][\\w$]*)/)?.[1];
+  const originalGraphRootId = cloneGraphParameter
+    ? graphReferenceId(variables[cloneGraphParameter], objects)
+    : undefined;
+  const isCloneGraphTrace = Boolean(cloneGraphParameter && graphComponents.length > 1);
+  const graphComponentTitles = graphComponents.map((component, componentIndex) => {
+    if (isCloneGraphTrace && component.nodes.some(node => node.id === originalGraphRootId)) return 'Original graph';
+    if (isCloneGraphTrace) return graphComponents.filter(candidate =>
+      !candidate.nodes.some(node => node.id === originalGraphRootId)).length === 1
+      ? 'Cloned graph'
+      : 'Cloned graph · part ' + (componentIndex + 1);
+    return graphComponents.length > 1 ? 'Graph ' + (componentIndex + 1) : 'Graph';
+  });
+
+  // Keep each component's node positions stable while reserving its own card.
+  // A card is 620px wide; the canvas itself remains horizontally scrollable.
+  const componentWidth = 620;
+  for (const [componentIndex, component] of graphComponents.entries()) {
+    const componentIds = new Set(component.nodes.map(node => node.id));
+    const occupied = new Set([...stablePositions.entries()]
+      .filter(([id]) => componentIds.has(id))
+      .map(([, point]) => (point.x - componentIndex * componentWidth) + ':' + point.y));
+    const slots = Array.from({ length: 80 }, (_, index) => ({
+      x: 70 + (index % 4) * 130,
+      y: 65 + Math.floor(index / 4) * 100,
+    }));
+    for (const node of component.nodes) {
+      if (stablePositions.has(node.id)) continue;
+      const preferred = slots.find(point => !occupied.has(point.x + ':' + point.y));
+      const local = preferred ?? { x: 70, y: 65 };
+      stablePositions.set(node.id, { x: componentIndex * componentWidth + local.x, y: local.y });
+      occupied.add(local.x + ':' + local.y);
+    }
   }
   const positions = new Map<string, { x: number; y: number }>();
   for (const node of nodes) {
     const position = stablePositions.get(node.id);
     if (position) positions.set(node.id, position);
   }
-  const graphWidth = Math.max(600, Math.max(1, nodes.length ? Math.max(...[...positions.values()].map(point => point.x)) : 0) + 90);
-  const graphHeight = Math.max(320, Math.max(1, nodes.length ? Math.max(...[...positions.values()].map(point => point.y)) : 0) + 65);
+  const graphWidth = Math.max(600, graphComponents.length * componentWidth);
+  const graphHeight = Math.max(320, Math.max(1, nodes.length ? Math.max(...[...positions.values()].map(point => point.y)) : 0) + 70);
+  const graphComponentCards = graphComponents.map((component, componentIndex) => {
+    const localY = component.nodes.reduce((max, node) => Math.max(max, positions.get(node.id)?.y ?? 65), 65);
+    return { index: componentIndex, title: graphComponentTitles[componentIndex], x: componentIndex * componentWidth + 8,
+      y: 10, width: componentWidth - 16, height: Math.max(150, localY + 48) };
+  });
   const traversedEdgePairs = new Set<string>();
   if (previous) {
     for (const [name, currentValue] of Object.entries(variables)) {
@@ -3443,6 +3506,11 @@ export function GraphView({ objects, variables = {}, state }: {
         <div className="yv-graph-canvas" data-graph-zoom={zoom}><div className="yv-graph-stage" style={{ width: `${graphWidth}px`, height: `${graphHeight}px`, transform: `scale(${zoom})`, transformOrigin: "top left" }}>
           <svg width={graphWidth} height={graphHeight} viewBox={`0 0 ${graphWidth} ${graphHeight}`} preserveAspectRatio="xMidYMid meet" aria-label="Graph links"
             style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}>
+            {graphComponentCards.map(card => <g key={card.index} data-graph-component={card.index} data-graph-component-title={card.title}>
+              <rect x={card.x} y={card.y} width={card.width} height={card.height} rx="12"
+                fill="var(--yv-elevated, var(--yv-panel, #101b2d))" stroke="var(--yv-border, #334155)" strokeWidth="1.5" />
+              <text x={card.x + 16} y={card.y + 23} fill="var(--yv-text, #f3f6ff)" fontSize="13" fontWeight="600">{card.title}</text>
+            </g>)}
             <defs>
               <marker id={`yv-graph-arrow-${graphInstanceId}`} markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
                 <path d="M0,0 L7,3.5 L0,7 z" fill="var(--yv-muted, #8b9bb4)" />
@@ -3488,10 +3556,15 @@ export function GraphView({ objects, variables = {}, state }: {
             const changed = changedNodeIds.has(node.id);
             const entered = enteredNodeIds.has(node.id);
             const selected = selectedNode?.id === node.id;
+            const paired = Boolean(isCloneGraphTrace && selectedNode && selectedNode.id !== node.id &&
+              graphComponentIndexByNodeId.get(selectedNode.id) !== graphComponentIndexByNodeId.get(node.id) &&
+              compactValue(selectedNode.label) === compactValue(node.label));
             const removed = node.removed;
             return <div key={node.id + ((changed || entered || createdNodeIds.has(node.id)) ? ':' + selectedIndex : '')}
-              className={'yv-graph-node' + (selected ? ' yv-graph-node-selected' : '') + (changed ? ' yv-graph-node-changed' : '') + (entered ? ' yv-graph-node-entered' : '') + (createdNodeIds.has(node.id) ? ' yv-graph-node-created' : '') + (removed ? ' yv-graph-node-removed' : '')}
+              className={'yv-graph-node' + (paired ? ' yv-graph-node-paired' : '') + (selected ? ' yv-graph-node-selected' : '') + (changed ? ' yv-graph-node-changed' : '') + (entered ? ' yv-graph-node-entered' : '') + (createdNodeIds.has(node.id) ? ' yv-graph-node-created' : '') + (removed ? ' yv-graph-node-removed' : '')}
               data-graph-node-id={node.id} data-graph-selected={selected ? 'true' : undefined}
+              data-graph-paired={paired ? 'true' : undefined}
+              data-graph-component={graphComponentIndexByNodeId.get(node.id)}
               data-graph-changed={changed ? 'true' : undefined} data-graph-entered={entered ? 'true' : undefined}
               data-graph-created={createdNodeIds.has(node.id) ? 'true' : undefined}
               role="button" tabIndex={0} aria-pressed={selected}
