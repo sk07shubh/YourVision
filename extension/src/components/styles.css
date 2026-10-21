@@ -2747,3 +2747,10 @@
   .yv-graph-inspector {grid-column:1;max-width:none}
   .yv-graph-canvas {max-height:55vh}
 }
+
+.yv-graph-stage>.yv-graph-node {max-height:88px;overflow:hidden;line-height:1.2;overflow-wrap:anywhere}
+.yv-graph-inspector-object-fields {display:flex;flex-direction:column;gap:7px;padding:10px 0;border-bottom:1px solid var(--yv-border)}
+.yv-graph-inspector-object-fields>.yv-graph-inspector-field {display:grid;grid-template-columns:minmax(62px,.7fr) minmax(0,1.3fr);gap:8px}
+.yv-graph-inspector-object-fields .yv-graph-inspector-field strong {overflow-wrap:anywhere;word-break:break-word}
+.yv-graph-node-status-removed {background:color-mix(in srgb,var(--yv-warning,#f59e0b),transparent 84%);color:var(--yv-warning,#f59e0b)}
+.yv-graph-stage>.yv-graph-node:focus-visible {outline:2px solid var(--yv-accent,#65a9ff);outline-offset:3px}
