@@ -3496,8 +3496,7 @@ export function GraphView({ objects, variables = {}, state }: {
                 data-graph-edge-from={edge.from} data-graph-edge-to={edge.to}
                 data-graph-edge-status={edge.status} data-graph-edge-parallel-index={edge.parallelIndex ?? 0}
                 d={`M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`}
-                fill="none" stroke={stroke} strokeDasharray={edge.status === 'removed' ? '4 3' : undefined}
-                opacity={edge.status === 'removed' ? 0.65 : 1} strokeWidth={edge.status === 'traversed' ? 2.5 : 1.5} markerEnd={`url(#yv-graph-arrow-${graphInstanceId})`} />;
+                fill="none" markerEnd={`url(#yv-graph-arrow-${graphInstanceId})`} />;
             })}
           </svg>
           {nodes.map(node => {
