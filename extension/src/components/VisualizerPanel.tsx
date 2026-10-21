@@ -92,22 +92,22 @@ export function eventEffects(state?: TraceState): ExecutionEffect[] {
           : '';
         effects.push({
           kind: 'change',
-          text: name + indices + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
+          text: name + indices + '  ' + executionValueSummary(change.before) + '  →  ' + executionValueSummary(change.after)
         });
       }
     } else if (eventType === 'MAP_WRITE') {
       const changes = Array.isArray(eventData.changes) ? eventData.changes : [];
       for (const change of changes.slice(0, 3)) {
         if (!isPlainObject(change)) continue;
-        const key = compactValue(change.key);
+        const key = executionValueSummary(change.key);
         if (change.kind === 'insert') {
-          effects.push({ kind: 'structural', text: key + '  →  ' + compactValue(change.after) });
+          effects.push({ kind: 'structural', text: key + '  →  ' + executionValueSummary(change.after) });
         } else if (change.kind === 'delete') {
           effects.push({ kind: 'structural', text: key + '  removed' });
         } else {
           effects.push({
             kind: 'change',
-            text: key + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
+            text: key + '  ' + executionValueSummary(change.before) + '  →  ' + executionValueSummary(change.after)
           });
         }
       }
@@ -192,7 +192,7 @@ export function eventEffects(state?: TraceState): ExecutionEffect[] {
       const fields = Array.isArray(change.fields) ? change.fields.join('.') : 'field';
       effects.push({
         kind: 'change',
-        text: fields + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
+        text: fields + '  ' + executionValueSummary(change.before) + '  →  ' + executionValueSummary(change.after)
       });
     }
   }
@@ -207,7 +207,7 @@ export function eventEffects(state?: TraceState): ExecutionEffect[] {
       const name = typeof data.name === 'string' ? data.name : 'array';
       effects.push({
         kind: 'change',
-        text: name + indices + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
+        text: name + indices + '  ' + executionValueSummary(change.before) + '  →  ' + executionValueSummary(change.after)
       });
     }
   }
@@ -216,15 +216,15 @@ export function eventEffects(state?: TraceState): ExecutionEffect[] {
     const changes = Array.isArray(data.changes) ? data.changes : [];
     for (const change of changes.slice(0, 3)) {
       if (!isPlainObject(change)) continue;
-      const key = compactValue(change.key);
+      const key = executionValueSummary(change.key);
       if (change.kind === 'insert') {
-        effects.push({ kind: 'structural', text: key + '  →  ' + compactValue(change.after) });
+        effects.push({ kind: 'structural', text: key + '  →  ' + executionValueSummary(change.after) });
       } else if (change.kind === 'delete') {
         effects.push({ kind: 'structural', text: key + '  removed' });
       } else {
         effects.push({
           kind: 'change',
-          text: key + '  ' + compactValue(change.before) + '  →  ' + compactValue(change.after)
+          text: key + '  ' + executionValueSummary(change.before) + '  →  ' + executionValueSummary(change.after)
         });
       }
     }
@@ -906,7 +906,7 @@ export function dataStructureResults(current?: TraceState, previous?: TraceState
     const bm = asMapSnapshot(oldValue), am = asMapSnapshot(value);
     if (bm && am && bm.$mapId === am.$mapId) {
       for (const change of compareMapEntries(bm.entries,am.entries)) {
-        const key=compactValue(change.key);
+        const key=executionValueSummary(change.key);
         if(change.kind==='insert') add('map-i-'+name+'-'+key,name,'Put',change.after,'Key: '+key,undefined,true);
         else if(change.kind==='update') add('map-u-'+name+'-'+key,name,'Update',change.after,'Key: '+key,change.before,true);
         else add('map-r-'+name+'-'+key,name,'Remove',change.before,'Key: '+key);
@@ -946,7 +946,7 @@ export function dataStructureResults(current?: TraceState, previous?: TraceState
       const changes=Array.isArray(d.changes)?d.changes:[];
       for(const change of changes){
         if(!isPlainObject(change)) continue;
-        const key=compactValue(change.key);
+        const key=executionValueSummary(change.key);
         if(change.kind==='insert') add('map-i-' + name + '-' + key,name,'Put',change.after,'Key: '+key,undefined,true);
         else if(change.kind==='update') add('map-u-' + name + '-' + key,name,'Update',change.after,'Key: '+key,change.before,true);
         else if(change.kind==='delete') add('map-r-' + name + '-' + key,name,'Remove',change.before,'Key: '+key);
