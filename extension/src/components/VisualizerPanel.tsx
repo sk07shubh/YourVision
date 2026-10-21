@@ -2942,13 +2942,13 @@ function MapView({
                   !(isStructuredMapValue(change.before) && isStructuredMapValue(entry.value)) ? (
                   <>
                     <span className="yv-old-value">
-                      <DataValue value={change.before} state={state} source={source} depth={depth + 1} seen={seen} resolveObjects={false}/>
+                      <CompactDataValue value={change.before} state={state} source={source} depth={depth + 1} seen={seen} resolveObjects={false}/>
                     </span>
-                    <span className="yv-map-arrow">→</span>
-                    <DataValue value={entry.value} state={state} source={source} depth={depth + 1} seen={seen}/>
+                    <span className="yv-map-arrow" aria-label="changed to">→</span>
+                    <CompactDataValue value={entry.value} state={state} source={source} depth={depth + 1} seen={seen}/>
                   </>
                 ) : (
-                  <DataValue value={entry.value} state={state} source={source} depth={depth + 1} seen={seen}/>
+                  <CompactDataValue value={entry.value} state={state} source={source} depth={depth + 1} seen={seen}/>
                 )}
 
                 {change?.kind === 'insert' && (
@@ -4264,6 +4264,63 @@ function ObjectView({
         </div>
       ))}
     </div>
+  );
+}
+
+function compactValueSummary(value: unknown, state?: TraceState): string | undefined {
+  if (isMapSnapshot(value)) return `Map · ${value.entries.length} entries`;
+  if (isCollectionSnapshot(value)) {
+    const type = typeof value.$type === 'string' ? value.$type.split('.').pop() : 'Collection';
+    const count = Array.isArray(value.values) ? value.values.length : 0;
+    return `${type} · ${count} items`;
+  }
+  if (isArraySnapshot(value)) return `Array · ${String(value.length ?? value.values.length)} items`;
+  if (Array.isArray(value)) return `Array · ${value.length} items`;
+  if (!isPlainObject(value)) return undefined;
+  if (typeof value.$stringValue === 'string') return undefined;
+  if (typeof value.$ref === 'string') {
+    const target = state?.objects?.[value.$ref];
+    if (isPlainObject(target)) {
+      const fields = objectFields(target);
+      if ('neighbors' in fields) return `Node ${compactValue(fields.val ?? fields.value ?? fields.data ?? '?')} · ${value.$ref}`;
+      const type = typeof target.$type === 'string' ? target.$type.split('.').pop() : 'Object';
+      return `${type} · ${value.$ref}`;
+    }
+    return `Reference · ${value.$ref}`;
+  }
+  if (typeof value.$objectId === 'string') {
+    const fields = objectFields(value);
+    if ('neighbors' in fields) return `Node ${compactValue(fields.val ?? fields.value ?? fields.data ?? '?')} · ${value.$objectId}`;
+    const type = typeof value.$type === 'string' ? value.$type.split('.').pop() : 'Object';
+    return `${type} · ${value.$objectId}`;
+  }
+  if (isMapSnapshot(value) || isCollectionSnapshot(value) || isArraySnapshot(value)) return undefined;
+  if (isPlainObject(value.fields)) {
+    const type = typeof value.$type === 'string' ? value.$type.split('.').pop() : 'Object';
+    const id = typeof value.$objectId === 'string' ? ` · ${value.$objectId}` : '';
+    return `${type}${id}`;
+  }
+  return undefined;
+}
+
+function CompactDataValue({
+  value, state, source, depth, seen, resolveObjects = true
+}: {
+  value: unknown; state?: TraceState; source: string; depth: number; seen: Set<string>; resolveObjects?: boolean;
+}) {
+  const summary = compactValueSummary(value, state);
+  if (!summary) return <DataValue value={value} state={state} source={source} depth={depth} seen={seen} resolveObjects={resolveObjects}/>;
+  const resolved = resolveObjects && isPlainObject(value) ? resolveRef(value, state?.objects ?? {}) : value;
+  return (
+    <details className="yv-compact-value">
+      <summary title="Expand value details">
+        <span className="yv-compact-value-summary">{summary}</span>
+        <span className="yv-compact-value-toggle" aria-hidden="true">Details</span>
+      </summary>
+      <div className="yv-compact-value-details">
+        <DataValue value={resolved} state={state} source={source} depth={depth} seen={seen} resolveObjects={false}/>
+      </div>
+    </details>
   );
 }
 
