@@ -3342,8 +3342,10 @@ export function GraphView({ objects, variables = {}, state }: {
   const selectedFields = selectedNode ? Object.entries(objectFields(selectedNode.value)).filter(([key]) => key !== 'neighbors') : [];
   const positionSession = useRef(session.states[0]);
   const stableGraphPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const layoutSignature = useRef('');
   if (positionSession.current !== session.states[0]) {
     stableGraphPositions.current.clear();
+    layoutSignature.current = '';
     positionSession.current = session.states[0];
   }
   const stablePositions = stableGraphPositions.current;
@@ -3355,9 +3357,8 @@ export function GraphView({ objects, variables = {}, state }: {
     node.id + ':' + (node.removed ? 'removed' : node.neighbors
       .map(neighbor => graphReferenceId(neighbor, objects) ?? '?').join(','))
   ).join('|');
-  const layoutSignature = useRef('');
   if (layoutSignature.current !== layoutSignatureValue) {
-    const nodeIndex = new Map(nodes.map((node, index) => [node.id, index]));
+    const nodeIndex = new Map(nodes.map((node, index) => [node.id, index] as [string, number]));
     for (const [index, node] of nodes.entries()) {
       if (stablePositions.has(node.id)) continue;
       const linked = node.neighbors
@@ -3384,7 +3385,7 @@ export function GraphView({ objects, variables = {}, state }: {
     }
     const edgesForLayout = [...layoutEdges].map(pair => JSON.parse(pair) as [string, string]);
     for (let iteration = 0; iteration < 90; iteration += 1) {
-      const forces = new Map(nodes.map(node => [node.id, { x: 0, y: 0 }]));
+      const forces = new Map<string, { x: number; y: number }>(nodes.map(node => [node.id, { x: 0, y: 0 }] as [string, { x: number; y: number }]));
       // Repel vertices to create readable spacing even when many nodes are connected.
       for (let i = 0; i < nodes.length; i += 1) {
         for (let j = i + 1; j < nodes.length; j += 1) {
