@@ -2869,6 +2869,20 @@ function MapView({
   const deleted = changes.filter(
     change => change.kind === 'delete'
   );
+  useEffect(() => {
+    const syncSelection = (event: Event) => {
+      const selectedId = (event as CustomEvent<string>).detail;
+      const table = mapTableRef.current;
+      if (!table) return;
+      table.querySelectorAll<HTMLElement>('[data-graph-reference-id]').forEach(row => {
+        const selected = row.dataset.graphReferenceId === selectedId;
+        row.classList.toggle('yv-map-graph-linked-selected', selected);
+        row.setAttribute('aria-current', selected ? 'true' : 'false');
+      });
+    };
+    window.addEventListener('yv-graph-node-selected', syncSelection);
+    return () => window.removeEventListener('yv-graph-node-selected', syncSelection);
+  }, []);
   const mapTableRef = useRef<HTMLDivElement | null>(null);
   const previousMapRowRects = useRef<Map<string, DOMRect>>(new Map());
   const mapRowAnimations = useRef<WeakMap<HTMLElement, Animation>>(new WeakMap());
@@ -2932,6 +2946,11 @@ function MapView({
               className={`yv-map-row ${change ? `yv-map-${change.kind}` : ''}${reorderedKeys.has(mapKeySignature(entry.key)) ? ' yv-map-reordered' : ''}`}
               key={mapKeySignature(entry.key)} data-map-key-identity={mapKeySignature(entry.key)}
               data-map-reordered={reorderedKeys.has(mapKeySignature(entry.key)) ? 'true' : undefined}
+              data-graph-reference-id={graphReferenceId(entry.value, state?.objects ?? {})}
+              onClick={() => {
+                const graphId = graphReferenceId(entry.value, state?.objects ?? {});
+                if (graphId) window.dispatchEvent(new CustomEvent('yv-graph-node-selected', { detail: graphId }));
+              }}
             >
               <div className="yv-map-key">
                 <DataValue value={entry.key} state={state} source={source} depth={depth + 1} seen={seen}/>
@@ -3240,6 +3259,17 @@ export function GraphView({ objects, variables = {}, state }: {
     return [{ id, value, label: nodeValue(value), neighbors: graphNeighborValues(value) ?? [] }];
   }).slice(0, 80);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  useEffect(() => {
+    const syncSelection = (event: Event) => {
+      const id = (event as CustomEvent<string>).detail;
+      if (typeof id === 'string' && nodes.some(node => node.id === id)) setSelectedNodeId(id);
+    };
+    window.addEventListener('yv-graph-node-selected', syncSelection);
+    return () => window.removeEventListener('yv-graph-node-selected', syncSelection);
+  }, [nodes.map(node => node.id).join('|')]);
+  useEffect(() => {
+    if (selectedNodeId) window.dispatchEvent(new CustomEvent('yv-graph-node-selected', { detail: selectedNodeId }));
+  }, [selectedNodeId]);
   const ids = new Set(nodes.map(node => node.id));
   const selectedNode = nodes.find(node => node.id === selectedNodeId) ?? nodes[0];
   const selectedNeighborIds = selectedNode
