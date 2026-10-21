@@ -3155,7 +3155,6 @@ export function TrieView({ objects, variables = {}, source = '', state }: {
     list.push(edge);
     trieChildEdges.set(edge.source, list);
   }
-  const directedEdgePairs = new Set([...edges, ...removedEdges].map(edge => edgePairKey(edge.from, edge.to)));
   const pointerNames = new Map<string, string[]>();
   for (const [name, value] of Object.entries(variables)) {
     const directId = graphReferenceId(value, objects);
@@ -3409,6 +3408,7 @@ export function GraphView({ objects, variables = {}, state }: {
     if (occurrence < (currentEdgeCounts.get(pair) ?? 0)) return [];
     return [{ key: 'removed:' + edge.key, from: edge.from, to: edge.to, parallelIndex: occurrence, status: 'removed' as const }];
   });
+  const directedEdgePairs = new Set([...edges, ...removedEdges].map(edge => edgePairKey(edge.from, edge.to)));
   const pointerNames = new Map<string, string[]>();
   for (const [name, value] of Object.entries(variables)) {
     const id = graphReferenceId(value, objects);
