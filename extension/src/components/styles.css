@@ -34,6 +34,9 @@
 .yv-map-meta span:last-child{font-size:10px}
 .yv-map-table{border:1px solid var(--yv-border);border-radius:7px;overflow:hidden}
 .yv-map-header,.yv-map-row{display:grid;grid-template-columns:minmax(70px,.8fr) minmax(100px,1.2fr)}
+.yv-map-table-scroll{max-height:320px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-gutter:stable;}
+.yv-map-table-scroll .yv-map-header{position:sticky;top:0;z-index:2;box-shadow:0 1px 0 var(--yv-border)}
+.yv-map-table-scroll:focus-visible{outline:2px solid var(--yv-accent);outline-offset:2px}
 .yv-map-header{background:var(--yv-elevated);color:var(--yv-muted);font-size:11px;font-weight:600}
 .yv-map-header>div,.yv-map-row>div{padding:7px 8px;min-width:0}
 .yv-map-header>div+div,.yv-map-row>div+div{border-left:1px solid var(--yv-border)}
