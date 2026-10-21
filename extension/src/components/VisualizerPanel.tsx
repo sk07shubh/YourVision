@@ -3317,7 +3317,7 @@ export function GraphView({ objects, variables = {}, state }: {
   const omittedNodeCount = Math.max(0, allNodes.length + previousGraphNodes.length - nodes.length);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [hoverId, setHoverId] = useState<string | undefined>(undefined);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(1);\n  const graphCanvasRef = useRef<HTMLDivElement | null>(null);
   const graphInstanceId = useId().replace(/:/g, '');
   useEffect(() => {
     const syncSelection = (event: Event) => {
@@ -3348,25 +3348,95 @@ export function GraphView({ objects, variables = {}, state }: {
   const stablePositions = stableGraphPositions.current;
   const visibleGraphNodeIds = new Set(nodes.map(node => node.id));
   for (const id of stablePositions.keys()) if (!visibleGraphNodeIds.has(id)) stablePositions.delete(id);
-  // Use a roomy grid: center spacing exceeds the node footprint, and the
-  // scrollable stage grows instead of compressing an arbitrary graph into 600×320.
-  const slots = Array.from({ length: 80 }, (_, index) => ({
-    x: 70 + (index % 10) * 130,
-    y: 45 + Math.floor(index / 10) * 100,
-  }));
-  for (const node of nodes) {
-    if (stablePositions.has(node.id)) continue;
-    const occupied = new Set([...stablePositions.values()].map(point => point.x + ':' + point.y));
-    const preferred = slots.find(point => !occupied.has(point.x + ':' + point.y));
-    stablePositions.set(node.id, preferred ?? { x: 70, y: 45 });
+  // Use a topology-aware force layout rather than assigning nodes to grid slots.
+  // Existing coordinates seed each new snapshot so execution-step changes remain stable.
+  const layoutSignatureValue = nodes.map(node =>
+    node.id + ':' + (node.removed ? 'removed' : node.neighbors
+      .map(neighbor => graphReferenceId(neighbor, objects) ?? '?').join(','))
+  ).join('|');
+  const layoutSignature = useRef('');
+  if (layoutSignature.current !== layoutSignatureValue) {
+    const nodeIndex = new Map(nodes.map((node, index) => [node.id, index]));
+    for (const [index, node] of nodes.entries()) {
+      if (stablePositions.has(node.id)) continue;
+      const linked = node.neighbors
+        .map(neighbor => graphReferenceId(neighbor, objects))
+        .filter((id): id is string => Boolean(id && stablePositions.has(id)))
+        .map(id => stablePositions.get(id)!);
+      const angle = index * 2.399963229728653;
+      if (linked.length) {
+        const center = linked.reduce((sum, point) => ({ x: sum.x + point.x / linked.length, y: sum.y + point.y / linked.length }), { x: 0, y: 0 });
+        stablePositions.set(node.id, { x: center.x + Math.cos(angle) * (115 + (index % 3) * 16), y: center.y + Math.sin(angle) * (100 + (index % 3) * 16) });
+      } else {
+        const radius = 75 + Math.sqrt(index + 1) * 58;
+        stablePositions.set(node.id, { x: 360 + Math.cos(angle) * radius, y: 260 + Math.sin(angle) * radius });
+      }
+    }
+    const layoutEdges = new Set<string>();
+    for (const node of nodes) {
+      for (const neighbor of node.neighbors) {
+        const target = graphReferenceId(neighbor, objects);
+        if (!target || target === node.id || !nodeIndex.has(target)) continue;
+        const pair = [node.id, target].sort();
+        layoutEdges.add(JSON.stringify(pair));
+      }
+    }
+    const edgesForLayout = [...layoutEdges].map(pair => JSON.parse(pair) as [string, string]);
+    for (let iteration = 0; iteration < 90; iteration += 1) {
+      const forces = new Map(nodes.map(node => [node.id, { x: 0, y: 0 }]));
+      // Repel vertices to create readable spacing even when many nodes are connected.
+      for (let i = 0; i < nodes.length; i += 1) {
+        for (let j = i + 1; j < nodes.length; j += 1) {
+          const left = nodes[i]!;
+          const right = nodes[j]!;
+          const a = stablePositions.get(left.id)!;
+          const b = stablePositions.get(right.id)!;
+          let dx = a.x - b.x, dy = a.y - b.y;
+          let distance = Math.hypot(dx, dy);
+          if (distance < 0.01) { dx = (i + 1) * 0.7; dy = (j + 1) * 0.9; distance = Math.hypot(dx, dy); }
+          const strength = Math.min(7, 15000 / (distance * distance));
+          const fx = dx / distance * strength, fy = dy / distance * strength;
+          forces.get(left.id)!.x += fx; forces.get(left.id)!.y += fy;
+          forces.get(right.id)!.x -= fx; forces.get(right.id)!.y -= fy;
+        }
+      }
+      // Connected nodes attract one another; this keeps components readable and compact.
+      for (const [from, to] of edgesForLayout) {
+        const a = stablePositions.get(from)!, b = stablePositions.get(to)!;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const distance = Math.max(1, Math.hypot(dx, dy));
+        const strength = Math.max(-5, Math.min(5, (distance - 175) * 0.012));
+        const fx = dx / distance * strength, fy = dy / distance * strength;
+        forces.get(from)!.x += fx; forces.get(from)!.y += fy;
+        forces.get(to)!.x -= fx; forces.get(to)!.y -= fy;
+      }
+      const cooling = Math.max(0.35, 1 - iteration / 120);
+      for (const node of nodes) {
+        const point = stablePositions.get(node.id)!;
+        const force = forces.get(node.id)!;
+        const dx = Math.max(-7, Math.min(7, force.x)) * cooling;
+        const dy = Math.max(-7, Math.min(7, force.y)) * cooling;
+        stablePositions.set(node.id, { x: point.x + dx, y: point.y + dy });
+      }
+    }
+    // Keep the full layout inside positive stage coordinates, with room for labels.
+    const points = [...stablePositions.values()];
+    const minX = Math.min(...points.map(point => point.x));
+    const minY = Math.min(...points.map(point => point.y));
+    const shiftX = Math.max(0, 95 - minX);
+    const shiftY = Math.max(0, 105 - minY);
+    if (shiftX || shiftY) {
+      for (const [id, point] of stablePositions) stablePositions.set(id, { x: point.x + shiftX, y: point.y + shiftY });
+    }
+    layoutSignature.current = layoutSignatureValue;
   }
   const positions = new Map<string, { x: number; y: number }>();
   for (const node of nodes) {
     const position = stablePositions.get(node.id);
     if (position) positions.set(node.id, position);
   }
-  const graphWidth = Math.max(600, Math.max(1, nodes.length ? Math.max(...[...positions.values()].map(point => point.x)) : 0) + 90);
-  const graphHeight = Math.max(320, Math.max(1, nodes.length ? Math.max(...[...positions.values()].map(point => point.y)) : 0) + 65);
+  const graphWidth = Math.max(600, Math.max(1, nodes.length ? Math.max(...[...positions.values()].map(point => point.x)) : 0) + 115);
+  const graphHeight = Math.max(320, Math.max(1, nodes.length ? Math.max(...[...positions.values()].map(point => point.y)) : 0) + 115);
   const trail = selectedIndex >= 0 ? graphVisitTrail(session.states, selectedIndex) : undefined;
   const traversedEdgePairs = new Set<string>();
   if (previous) {
@@ -3456,11 +3526,11 @@ export function GraphView({ objects, variables = {}, state }: {
         <button type="button" onClick={() => setZoom(value => Math.max(0.25, Math.round((value - 0.1) * 10) / 10))} disabled={zoom <= 0.25} aria-label="Zoom out">−</button>
         <span aria-live="polite">{Math.round(zoom * 100)}%</span>
         <button type="button" onClick={() => setZoom(value => Math.min(1.8, Math.round((value + 0.1) * 10) / 10))} disabled={zoom >= 1.8} aria-label="Zoom in">+</button>
-        <button type="button" onClick={() => setZoom(Math.max(0.25, Math.min(1, 600 / graphWidth, 320 / graphHeight)))}>Fit</button>
+        <button type="button" onClick={() => { const viewport = graphCanvasRef.current; if (viewport) setZoom(Math.max(0.25, Math.min(1.8, viewport.clientWidth / graphWidth, viewport.clientHeight / graphHeight))); }}>Fit</button>
         <button type="button" onClick={() => setZoom(1)} disabled={zoom === 1}>Reset</button>
       </div>
       <div className="yv-graph-layout">
-        <div className="yv-graph-canvas" data-graph-zoom={zoom}><div className="yv-graph-stage" style={{ width: `${graphWidth}px`, height: `${graphHeight}px`, transform: `scale(${zoom})`, transformOrigin: "top left" }}>
+        <div className="yv-graph-canvas" data-graph-zoom={zoom} ref={graphCanvasRef}><div className="yv-graph-stage" style={{ width: `${graphWidth}px`, height: `${graphHeight}px`, transform: `scale(${zoom})`, transformOrigin: "top left" }}>
           <svg className="yv-graph-links" width={graphWidth} height={graphHeight} viewBox={`0 0 ${graphWidth} ${graphHeight}`} preserveAspectRatio="xMidYMid meet" aria-label="Graph links"
             style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}>
             <defs>
