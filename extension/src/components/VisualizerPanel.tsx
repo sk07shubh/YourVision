@@ -3257,10 +3257,26 @@ export function GraphView({ objects, variables = {}, state }: {
   const allNodes = Object.entries(objects).flatMap(([key, value]) => {
     if (!isPlainObject(value) || !looksGraphNode(value)) return [];
     const id = typeof value.$objectId === 'string' ? value.$objectId : key;
-    return [{ id, value, label: nodeValue(value), neighbors: graphNeighborValues(value) ?? [] }];
+    return [{ id, value, label: nodeValue(value), neighbors: graphNeighborValues(value) ?? [], removed: false as const }];
   });
-  const nodes = allNodes.slice(0, 80);
-  const omittedNodeCount = Math.max(0, allNodes.length - nodes.length);
+  const currentNodes = allNodes.slice(0, 80);
+  const currentNodeIds = new Set(currentNodes.map(node => node.id));
+  const previousGraphNodes = previous ? Object.entries(previousObjects).flatMap(([key, value]) => {
+    if (!isPlainObject(value) || !looksGraphNode(value)) return [];
+    const id = typeof value.$objectId === 'string' ? value.$objectId : key;
+    if (currentNodeIds.has(id)) return [];
+    const neighbors = graphNeighborValues(value) ?? [];
+    const connectsToCurrent = neighbors.some(neighbor => {
+      const target = graphReferenceId(neighbor, previousObjects);
+      return Boolean(target && currentNodeIds.has(target));
+    });
+    const currentPointsToRemoved = currentNodes.some(node =>
+      node.neighbors.some(neighbor => graphReferenceId(neighbor, objects) === id));
+    if (!connectsToCurrent && !currentPointsToRemoved) return [];
+    return [{ id, value, label: nodeValue(value), neighbors: [], removed: true as const }];
+  }) : [];
+  const nodes = [...currentNodes, ...previousGraphNodes].slice(0, 80);
+  const omittedNodeCount = Math.max(0, allNodes.length + previousGraphNodes.length - nodes.length);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const graphInstanceId = useId().replace(/:/g, '');
   useEffect(() => {
@@ -3365,7 +3381,7 @@ export function GraphView({ objects, variables = {}, state }: {
   if (!nodes.length) return <div className="yv-empty">No graph nodes captured.</div>;
 
   return (
-    <div className="yv-graph" data-graph-node-count={nodes.length} data-graph-edge-count={edges.length}>
+    <div className="yv-graph" data-graph-node-count={nodes.length} data-graph-live-node-count={currentNodes.length} data-graph-edge-count={edges.length}>
       <div className="yv-collection-meta">
         <span>Adjacency graph</span>
         <span>{nodes.length} nodes · {edges.length} links{omittedNodeCount ? ` · ${omittedNodeCount} more nodes omitted` : nodes.length === 80 ? ' · display limit reached' : ''}</span>
@@ -3423,8 +3439,9 @@ export function GraphView({ objects, variables = {}, state }: {
             const changed = changedNodeIds.has(node.id);
             const entered = enteredNodeIds.has(node.id);
             const selected = selectedNode?.id === node.id;
+            const removed = node.removed;
             return <div key={node.id + ((changed || entered || createdNodeIds.has(node.id)) ? ':' + selectedIndex : '')}
-              className={'yv-graph-node' + (selected ? ' yv-graph-node-selected' : '') + (changed ? ' yv-graph-node-changed' : '') + (entered ? ' yv-graph-node-entered' : '') + (createdNodeIds.has(node.id) ? ' yv-graph-node-created' : '')}
+              className={'yv-graph-node' + (selected ? ' yv-graph-node-selected' : '') + (changed ? ' yv-graph-node-changed' : '') + (entered ? ' yv-graph-node-entered' : '') + (createdNodeIds.has(node.id) ? ' yv-graph-node-created' : '') + (removed ? ' yv-graph-node-removed' : '')}
               data-graph-node-id={node.id} data-graph-selected={selected ? 'true' : undefined}
               data-graph-changed={changed ? 'true' : undefined} data-graph-entered={entered ? 'true' : undefined}
               data-graph-created={createdNodeIds.has(node.id) ? 'true' : undefined}
@@ -3439,8 +3456,8 @@ export function GraphView({ objects, variables = {}, state }: {
                 boxShadow: selected ? '0 0 0 3px color-mix(in srgb,var(--yv-accent,#65a9ff),transparent 38%)' : entered ? '0 0 0 3px color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 55%)' : changed ? '0 0 0 2px color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 55%)' : '0 2px 8px rgba(0,0,0,.2)', textAlign: 'center', fontSize: 12, zIndex: selected ? 2 : 1, cursor: 'pointer' }}>
               <span>{compactValue(node.label)}</span>
               <span style={{ color: 'var(--yv-accent, #65a9ff)', fontSize: 10 }}>object {node.id}</span>
-              {createdNodeIds.has(node.id) && <span className="yv-graph-node-status yv-graph-node-status-created">created</span>}
-              {!createdNodeIds.has(node.id) && changed && <span className="yv-graph-node-status">updated</span>}
+              {removed && <span className="yv-graph-node-status yv-graph-node-status-removed">removed</span>}{!removed && createdNodeIds.has(node.id) && <span className="yv-graph-node-status yv-graph-node-status-created">created</span>}
+              {!removed && !createdNodeIds.has(node.id) && changed && <span className="yv-graph-node-status">updated</span>}
               {pointers.length > 0 && <span style={{ color: 'var(--yv-muted, #8b9bb4)', fontSize: 10 }}>{pointers.join(' · ')}</span>}
             </div>;
           })}
