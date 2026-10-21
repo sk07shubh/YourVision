@@ -3344,7 +3344,7 @@ export function GraphView({ objects, variables = {}, state }: {
     const occurrence = currentEdgeCounts.get(pair) ?? 0;
     currentEdgeCounts.set(pair, occurrence + 1);
     const added = Boolean(previous && occurrence >= (previousEdgeCounts.get(pair) ?? 0));
-    return [{ key: pair + ':' + index, from: node.id, to: target, status: added ? 'added' as const :
+    return [{ key: pair + ':' + index, from: node.id, to: target, parallelIndex: occurrence, status: added ? 'added' as const :
       traversedEdgePairs.has(node.id + ':' + target) ? 'traversed' as const : 'steady' as const }];
   }));
   const removedCounts = new Map<string, number>();
@@ -3353,7 +3353,7 @@ export function GraphView({ objects, variables = {}, state }: {
     const occurrence = removedCounts.get(pair) ?? 0;
     removedCounts.set(pair, occurrence + 1);
     if (occurrence < (currentEdgeCounts.get(pair) ?? 0)) return [];
-    return [{ key: 'removed:' + edge.key, from: edge.from, to: edge.to, status: 'removed' as const }];
+    return [{ key: 'removed:' + edge.key, from: edge.from, to: edge.to, parallelIndex: occurrence, status: 'removed' as const }];
   });
   const pointerNames = new Map<string, string[]>();
   for (const [name, value] of Object.entries(variables)) {
@@ -3372,7 +3372,7 @@ export function GraphView({ objects, variables = {}, state }: {
       </div>
       <div className="yv-graph-legend" aria-label="Graph state legend">
         <span><i className="yv-graph-legend-dot yv-graph-legend-selected" />Selected</span>
-        <span><i className="yv-graph-legend-dot yv-graph-legend-entered" />Visited by pointer</span>
+        <span><i className="yv-graph-legend-dot yv-graph-legend-entered" />Pointer target changed</span>
         <span><i className="yv-graph-legend-dot yv-graph-legend-created" />Created this step</span>
         <span><i className="yv-graph-legend-line yv-graph-legend-edge" />Relationship</span>
       </div>
@@ -3386,27 +3386,35 @@ export function GraphView({ objects, variables = {}, state }: {
               </marker>
             </defs>
             {[...edges, ...removedEdges].map(edge => {
-              const from = positions.get(edge.from)!;
-              const to = positions.get(edge.to)!;
+              const from = positions.get(edge.from);
+              const to = positions.get(edge.to);
+              if (!from || !to) return null;
               const stroke = edge.status === 'added' || edge.status === 'traversed' ? 'var(--yv-accent, #65a9ff)'
                 : edge.status === 'removed' ? 'var(--yv-warning, #f59e0b)' : 'var(--yv-muted, #8b9bb4)';
+              const parallelOffset = ((edge.parallelIndex ?? 0) % 2 === 0
+                ? Math.ceil((edge.parallelIndex ?? 0) / 2)
+                : -Math.ceil((edge.parallelIndex ?? 0) / 2)) * 16;
               if (edge.from === edge.to) {
+                const radius = 38 + (edge.parallelIndex ?? 0) * 13;
                 return <path key={edge.key + (edge.status !== 'steady' ? ':' + selectedIndex : '')} className={`yv-graph-edge yv-graph-edge-${edge.status}`}
                   data-graph-edge-from={edge.from} data-graph-edge-to={edge.to}
-                  data-graph-edge-status={edge.status}
-                  d={`M ${from.x + 20} ${from.y - 12} C ${from.x + 70} ${from.y - 65}, ${from.x - 45} ${from.y - 65}, ${from.x - 20} ${from.y - 12}`}
+                  data-graph-edge-status={edge.status} data-graph-edge-parallel-index={edge.parallelIndex ?? 0}
+                  d={`M ${from.x + 18} ${from.y - 16} C ${from.x + radius} ${from.y - radius - 18}, ${from.x - radius} ${from.y - radius - 18}, ${from.x - 18} ${from.y - 16}`}
                   fill="none" stroke={stroke} strokeDasharray={edge.status === 'removed' ? '4 3' : undefined}
                   opacity={edge.status === 'removed' ? 0.65 : 1} strokeWidth={edge.status === 'traversed' ? 2.5 : 1.5} markerEnd={`url(#yv-graph-arrow-${graphInstanceId})`} />;
               }
               const dx = to.x - from.x, dy = to.y - from.y;
               const length = Math.max(1, Math.hypot(dx, dy));
-              return <line key={edge.key + (edge.status !== 'steady' ? ':' + selectedIndex : '')} className={`yv-graph-edge yv-graph-edge-${edge.status}`}
+              const x1 = from.x + dx / length * 48, y1 = from.y + dy / length * 28;
+              const x2 = to.x - dx / length * 50, y2 = to.y - dy / length * 30;
+              const cx = (x1 + x2) / 2 - (dy / length) * parallelOffset;
+              const cy = (y1 + y2) / 2 + (dx / length) * parallelOffset;
+              return <path key={edge.key + (edge.status !== 'steady' ? ':' + selectedIndex : '')} className={`yv-graph-edge yv-graph-edge-${edge.status}`}
                 data-graph-edge-from={edge.from} data-graph-edge-to={edge.to}
-                data-graph-edge-status={edge.status}
-                x1={from.x + dx / length * 43} y1={from.y + dy / length * 25}
-                x2={to.x - dx / length * 50} y2={to.y - dy / length * 30}
-                stroke={stroke} strokeDasharray={edge.status === 'removed' ? '4 3' : undefined}
-                opacity={edge.status === 'removed' ? 0.65 : 1} strokeWidth={edge.status === 'traversed' ? 2.5 : 1.5} markerEnd="url(#yv-graph-arrow)" />;
+                data-graph-edge-status={edge.status} data-graph-edge-parallel-index={edge.parallelIndex ?? 0}
+                d={`M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`}
+                fill="none" stroke={stroke} strokeDasharray={edge.status === 'removed' ? '4 3' : undefined}
+                opacity={edge.status === 'removed' ? 0.65 : 1} strokeWidth={edge.status === 'traversed' ? 2.5 : 1.5} markerEnd={`url(#yv-graph-arrow-${graphInstanceId})`} />;
             })}
           </svg>
           {nodes.map(node => {
