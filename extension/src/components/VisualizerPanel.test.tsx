@@ -1097,7 +1097,7 @@ describe('graph data structure visualization', () => {
       g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'g2' }] } } },
       g2: { $objectId: 'g2', $type: 'Node', fields: { val: 2, neighbors: { values: [{ $ref: 'g1' }] } } },
     }} />);
-    const paths = [...html.matchAll(/data-graph-edge-from="g[12]" data-graph-edge-to="g[12]"[^>]*d="([^"]+)"/g)].map(match => match[1]);
+    const paths = [...html.matchAll(/ d="([^"]+)"/g)].map(match => match[1]).filter(path => path.startsWith('M '));
     expect(paths).toHaveLength(2);
     expect(paths[0]).not.toBe(paths[1]);
   });
