@@ -3155,6 +3155,7 @@ export function TrieView({ objects, variables = {}, source = '', state }: {
     list.push(edge);
     trieChildEdges.set(edge.source, list);
   }
+  const directedEdgePairs = new Set([...edges, ...removedEdges].map(edge => edgePairKey(edge.from, edge.to)));
   const pointerNames = new Map<string, string[]>();
   for (const [name, value] of Object.entries(variables)) {
     const directId = graphReferenceId(value, objects);
@@ -3452,9 +3453,11 @@ export function GraphView({ objects, variables = {}, state }: {
               if (!from || !to) return null;
               const stroke = edge.status === 'added' || edge.status === 'traversed' ? 'var(--yv-accent, #65a9ff)'
                 : edge.status === 'removed' ? 'var(--yv-warning, #f59e0b)' : 'var(--yv-muted, #8b9bb4)';
-              const parallelOffset = ((edge.parallelIndex ?? 0) % 2 === 0
+              const parallelOffset = (((edge.parallelIndex ?? 0) % 2 === 0
                 ? Math.ceil((edge.parallelIndex ?? 0) / 2)
-                : -Math.ceil((edge.parallelIndex ?? 0) / 2)) * 16;
+                : -Math.ceil((edge.parallelIndex ?? 0) / 2)) * 16) +
+                (directedEdgePairs.has(edgePairKey(edge.to, edge.from))
+                  ? (edge.from.localeCompare(edge.to) < 0 ? 12 : -12) : 0);
               if (edge.from === edge.to) {
                 const radius = 38 + (edge.parallelIndex ?? 0) * 13;
                 return <path key={edge.key + (edge.status !== 'steady' ? ':' + selectedIndex : '')} className={`yv-graph-edge yv-graph-edge-${edge.status}`}
