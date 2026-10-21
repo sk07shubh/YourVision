@@ -2754,3 +2754,12 @@
 .yv-graph-inspector-object-fields .yv-graph-inspector-field strong {overflow-wrap:anywhere;word-break:break-word}
 .yv-graph-node-status-removed {background:color-mix(in srgb,var(--yv-warning,#f59e0b),transparent 84%);color:var(--yv-warning,#f59e0b)}
 .yv-graph-stage>.yv-graph-node:focus-visible {outline:2px solid var(--yv-accent,#65a9ff);outline-offset:3px}
+
+.yv-graph-controls {display:flex;align-items:center;justify-content:flex-end;gap:6px;margin:0 0 8px;color:var(--yv-muted);font-size:11px}
+.yv-graph-controls button {min-width:30px;padding:5px 8px;border:1px solid var(--yv-border);border-radius:6px;background:var(--yv-panel);color:var(--yv-text);cursor:pointer}
+.yv-graph-controls button:hover:not(:disabled) {border-color:var(--yv-accent)}
+.yv-graph-controls button:disabled {opacity:.45;cursor:default}
+.yv-graph-controls button:focus-visible {outline:2px solid var(--yv-accent);outline-offset:2px}
+.yv-graph-legend-removed {background:var(--yv-warning,#f59e0b);border-color:var(--yv-warning,#f59e0b)}
+.yv-graph-legend-edge-removed {border-top:1.5px dashed var(--yv-warning,#f59e0b)}
+.yv-graph-stage {will-change:transform}
