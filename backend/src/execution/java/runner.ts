@@ -10,7 +10,7 @@ import { buildStates } from "../trace/stateBuilder.js";
 import { enrichTrace } from "../trace/enrichTrace.js";
 
 const MAX_TRACE_EVENTS = 5000;
-const JAVA_EXECUTION_TIMEOUT_MS = 5000;
+const JAVA_EXECUTION_TIMEOUT_MS = 15000;
 const JAVA_EXECUTION_MAX_BUFFER = 8 * 1024 * 1024;
 
 const execFileAsync = promisify(execFile);
