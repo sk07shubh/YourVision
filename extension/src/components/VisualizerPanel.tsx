@@ -3433,9 +3433,10 @@ export function GraphView({ objects, variables = {}, state }: {
         <span><i className="yv-graph-legend-line yv-graph-legend-edge" />Relationship</span>
       </div>
       <div className="yv-graph-controls" role="group" aria-label="Graph zoom controls">
-        <button type="button" onClick={() => setZoom(value => Math.max(0.5, Math.round((value - 0.1) * 10) / 10))} disabled={zoom <= 0.5} aria-label="Zoom out">−</button>
+        <button type="button" onClick={() => setZoom(value => Math.max(0.25, Math.round((value - 0.1) * 10) / 10))} disabled={zoom <= 0.25} aria-label="Zoom out">−</button>
         <span aria-live="polite">{Math.round(zoom * 100)}%</span>
         <button type="button" onClick={() => setZoom(value => Math.min(1.8, Math.round((value + 0.1) * 10) / 10))} disabled={zoom >= 1.8} aria-label="Zoom in">+</button>
+        <button type="button" onClick={() => setZoom(Math.max(0.25, Math.min(1, 600 / graphWidth, 320 / graphHeight)))}>Fit</button>
         <button type="button" onClick={() => setZoom(1)} disabled={zoom === 1}>Reset</button>
       </div>
       <div className="yv-graph-layout">
