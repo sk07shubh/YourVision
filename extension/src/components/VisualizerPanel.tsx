@@ -3393,6 +3393,11 @@ export function GraphView({ objects, variables = {}, state }: {
     return [{ key: pair + ':' + index, from: node.id, to: target, parallelIndex: occurrence, status: added ? 'added' as const :
       traversedEdgePairs.has(node.id + ':' + target) ? 'traversed' as const : 'steady' as const }];
   }));
+  const allCapturedEdgeCount = allNodes.reduce((total, node) => total + node.neighbors.filter(neighbor => {
+    const target = graphReferenceId(neighbor, objects);
+    return Boolean(target && allNodes.some(candidate => candidate.id === target));
+  }).length, 0);
+  const omittedEdgeCount = Math.max(0, allCapturedEdgeCount - edges.length);
   const removedCounts = new Map<string, number>();
   const removedEdges = previousEdgeOccurrences.flatMap(edge => {
     const pair = edgePairKey(edge.from, edge.to);
@@ -3414,12 +3419,14 @@ export function GraphView({ objects, variables = {}, state }: {
     <div className="yv-graph" data-graph-node-count={nodes.length} data-graph-live-node-count={currentNodes.length} data-graph-edge-count={edges.length}>
       <div className="yv-collection-meta">
         <span>Adjacency graph</span>
-        <span>{nodes.length} nodes · {edges.length} links{omittedNodeCount ? ` · ${omittedNodeCount} more nodes omitted` : nodes.length === 80 ? ' · display limit reached' : ''}</span>
+        <span>{currentNodes.length} live nodes · {edges.length} links{omittedNodeCount ? ` · ${omittedNodeCount} nodes omitted` : ''}{omittedEdgeCount ? ` · ${omittedEdgeCount} links hidden by display limit` : ''}</span>
       </div>
       <div className="yv-graph-legend" aria-label="Graph state legend">
         <span><i className="yv-graph-legend-dot yv-graph-legend-selected" />Selected</span>
         <span><i className="yv-graph-legend-dot yv-graph-legend-entered" />Pointer target changed</span>
         <span><i className="yv-graph-legend-dot yv-graph-legend-created" />Created this step</span>
+        <span><i className="yv-graph-legend-dot yv-graph-legend-removed" />Removed node</span>
+        <span><i className="yv-graph-legend-line yv-graph-legend-edge-removed" />Removed link</span>
         <span><i className="yv-graph-legend-line yv-graph-legend-edge" />Relationship</span>
       </div>
       <div className="yv-graph-controls" role="group" aria-label="Graph zoom controls">
