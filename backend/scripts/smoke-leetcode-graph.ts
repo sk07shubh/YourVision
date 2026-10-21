@@ -6,7 +6,6 @@ function assert(condition: boolean, message: string): void {
 
 const cloneGraphSource = `
 /*
-// LeetCode's supplied definition (kept commented out in submissions):
 class Node {
     public int val;
     public List<Node> neighbors;

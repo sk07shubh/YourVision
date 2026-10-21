@@ -267,7 +267,7 @@ function prepareJavaSource(source: string): string {
 function declaresType(source: string, typeName: string): boolean {
     // LeetCode snippets sometimes include the commented-out type definition
     // in their problem boilerplate. It must not suppress our compatibility
-    // type, or ordinary references to ListNode/TreeNode fail at javac time.
+    // type, or ordinary references to ListNode/TreeNode/Node fail at javac time.
     const code = source
         .replace(/\/\*[\s\S]*?\*\//g, " ")
         .replace(/\/\/[^\r\n]*/g, " ");
@@ -479,9 +479,7 @@ await fs.writeFile(
                 message:
                     isTimeout(error)
                         ? "Java compilation timed out"
-                        : (error.stderr?.trim()
-                            ? `Java compilation failed: ${error.stderr.trim().split(/\r?\n/).slice(-8).join(" | ")}`
-                            : "Java compilation failed")
+                        : "Java compilation failed"
             };
         }
 

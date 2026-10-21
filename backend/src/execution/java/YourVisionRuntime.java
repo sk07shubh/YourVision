@@ -537,12 +537,6 @@ public class YourVisionRuntime {
                 80
             );
         }
-if (isGraphNodeType(type)) {
-    return text.startsWith("{")
-        ? parseObject(text, type)
-        : parseGraphNode(text, type);
-}
-
 if (isListNodeType(type)) {
     return text.startsWith("{")
         ? parseObject(text, type)
@@ -553,6 +547,12 @@ if (isTreeNodeType(type)) {
     return text.startsWith("{")
         ? parseObject(text, type)
         : parseTreeNode(text, type);
+}
+
+if (isGraphNodeType(type)) {
+    return text.startsWith("{")
+        ? parseObject(text, type)
+        : parseGraphNode(text, type);
 }
 
         if (type.isArray()) {
@@ -1496,11 +1496,7 @@ if (isTreeNodeType(type)) {
             this.score = score;
         }
     }
-        private static boolean isGraphNodeType(Class<?> type) {
-        return "Node".equals(type.getSimpleName());
-    }
-
-    private static boolean isListNodeType(Class<?> type) {
+        private static boolean isListNodeType(Class<?> type) {
         return "ListNode".equals(type.getSimpleName());
     }
 
@@ -1508,13 +1504,23 @@ if (isTreeNodeType(type)) {
         return "TreeNode".equals(type.getSimpleName());
     }
 
+    private static boolean isGraphNodeType(Class<?> type) {
+        return "Node".equals(type.getSimpleName()) &&
+            findField(type, "val") != null &&
+            findField(type, "neighbors") != null;
+    }
+
     private static ParseResult parseGraphNode(
         String text,
         Class<?> type
     ) {
+        if (text.startsWith("{") && text.endsWith("}")) {
+            return parseObject(text, type);
+        }
+
         if (!text.startsWith("[") || !text.endsWith("]")) {
             throw new IllegalArgumentException(
-                "Node input must use adjacency-list syntax [[neighbors...], ...] or object syntax"
+                "Node input must use adjacency-list [..] or object syntax"
             );
         }
 
@@ -1522,73 +1528,73 @@ if (isTreeNodeType(type)) {
             text.substring(1, text.length() - 1)
         );
 
-        if (adjacency.isEmpty()) {
-            return new ParseResult(null, 150);
-        }
-
-        Field valField = findField(type, "val");
-        Field neighborsField = findField(type, "neighbors");
-        if (valField == null || neighborsField == null) {
-            throw new IllegalArgumentException(
-                "Node must contain val and neighbors fields"
-            );
+        if (adjacency.isEmpty() ||
+            (adjacency.size() == 1 && adjacency.get(0).trim().isEmpty())) {
+            return new ParseResult(null, 130);
         }
 
         try {
-            valField.setAccessible(true);
-            neighborsField.setAccessible(true);
             Constructor<?> constructor = type.getDeclaredConstructor();
             constructor.setAccessible(true);
+            Field valField = findField(type, "val");
+            Field neighborsField = findField(type, "neighbors");
 
-            List<Object> nodes = new ArrayList<>();
-            for (int i = 0; i < adjacency.size(); i++) {
-                Object node = constructor.newInstance();
-                valField.set(node, i + 1);
-                neighborsField.set(node, new ArrayList<>());
-                nodes.add(node);
+            if (valField == null || neighborsField == null) {
+                throw new IllegalArgumentException(
+                    "Node must contain val and neighbors fields"
+                );
             }
 
+            valField.setAccessible(true);
+            neighborsField.setAccessible(true);
+
+            List<Object> nodes = new ArrayList<>();
+            List<List<String>> neighborIndexes = new ArrayList<>();
+
             for (int i = 0; i < adjacency.size(); i++) {
-                String neighborsText = adjacency.get(i).trim();
-                if (!neighborsText.startsWith("[") || !neighborsText.endsWith("]")) {
+                Object node = constructor.newInstance();
+                ParseResult value = parseValue(String.valueOf(i + 1), valField.getType());
+                valField.set(node, value.value);
+                nodes.add(node);
+
+                String row = adjacency.get(i).trim();
+                if (!row.startsWith("[") || !row.endsWith("]")) {
                     throw new IllegalArgumentException(
-                        "Each graph adjacency entry must use [neighbor, ...] syntax"
+                        "each Node adjacency entry must use [..] syntax"
                     );
                 }
 
-                List<String> neighborValues = splitTopLevel(
-                    neighborsText.substring(1, neighborsText.length() - 1)
+                List<String> indexes = splitTopLevel(
+                    row.substring(1, row.length() - 1)
                 );
-                Object node = nodes.get(i);
-                @SuppressWarnings("unchecked")
-                List<Object> neighbors = (List<Object>) neighborsField.get(node);
-
-                for (String neighborText : neighborValues) {
-                    if (neighborText.trim().isEmpty()) continue;
-                    int neighborValue;
-                    try {
-                        neighborValue = Integer.parseInt(neighborText.trim());
-                    } catch (NumberFormatException ex) {
-                        throw new IllegalArgumentException(
-                            "Graph neighbor values must be 1-based integer node labels",
-                            ex
-                        );
-                    }
-                    if (neighborValue < 1 || neighborValue > nodes.size()) {
-                        throw new IllegalArgumentException(
-                            "Graph neighbor " + neighborValue +
-                            " is outside the valid range 1.." + nodes.size()
-                        );
-                    }
-                    neighbors.add(nodes.get(neighborValue - 1));
+                if (indexes.size() == 1 && indexes.get(0).trim().isEmpty()) {
+                    indexes = new ArrayList<>();
                 }
+                neighborIndexes.add(indexes);
             }
 
-            return new ParseResult(nodes.get(0), 180 + adjacency.size());
+            for (int i = 0; i < nodes.size(); i++) {
+                List<Object> neighbors = new ArrayList<>();
+                for (String indexText : neighborIndexes.get(i)) {
+                    int neighborIndex = Integer.parseInt(indexText.trim());
+                    if (neighborIndex < 1 || neighborIndex > nodes.size()) {
+                        throw new IllegalArgumentException(
+                            "Node neighbor index out of range: " + neighborIndex
+                        );
+                    }
+                    neighbors.add(nodes.get(neighborIndex - 1));
+                }
+                neighborsField.set(nodes.get(i), neighbors);
+            }
+
+            return new ParseResult(nodes.get(0), 160 + adjacency.size());
         } catch (IllegalArgumentException ex) {
             throw ex;
         } catch (Exception ex) {
-            throw new IllegalArgumentException("could not construct graph Node input", ex);
+            throw new IllegalArgumentException(
+                "could not construct graph Node input",
+                ex
+            );
         }
     }
 

@@ -1,16 +1,12 @@
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
-/**
- * Compatibility definition for LeetCode's Graph Node problem template.
- * Package-private because this file has a different filename.
- */
 class Node {
     public int val;
     public List<Node> neighbors;
 
     public Node() {
-        this(0);
+        this.val = 0;
+        this.neighbors = new ArrayList<>();
     }
 
     public Node(int val) {
@@ -18,8 +14,8 @@ class Node {
         this.neighbors = new ArrayList<>();
     }
 
-    public Node(int val, ArrayList<Node> neighbors) {
+    public Node(int val, List<Node> neighbors) {
         this.val = val;
-        this.neighbors = neighbors == null ? new ArrayList<>() : neighbors;
+        this.neighbors = neighbors;
     }
 }

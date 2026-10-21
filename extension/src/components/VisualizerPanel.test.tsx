@@ -430,6 +430,33 @@ describe('design-class instance state visualization', () => {
   });
 });
 
+describe('independently scrollable nested maps', () => {
+  it('bounds each large nested map separately when a parent contains multiple structures', () => {
+    const entries = (prefix: string) => [1, 2, 3, 4].map(n => ({
+      key: prefix + n,
+      value: n,
+    }));
+    const current = state({
+      dataStructures: {
+        outer: {
+          $mapId: 'outer-map',
+          $type: 'java.util.HashMap',
+          entries: [
+            { key: 'left', value: { $mapId: 'left-map', $type: 'java.util.HashMap', entries: entries('l') } },
+            { key: 'right', value: { $mapId: 'right-map', $type: 'java.util.HashMap', entries: entries('r') } },
+          ],
+        },
+      },
+    });
+
+    const html = renderToStaticMarkup(<DataStructures state={current} source="inspect(outer);" />);
+    expect((html.match(/yv-map-table-scroll/g) ?? []).length).toBe(3);
+    expect(html).toContain('data-map-id="outer-map"');
+    expect(html).toContain('data-map-id="left-map"');
+    expect(html).toContain('data-map-id="right-map"');
+  });
+});
+
 describe('linked-list graph visualization', () => {
   it('preserves node identity, aliases, and explicit null termination', () => {
     const current = state({
@@ -901,6 +928,11 @@ describe('graph data structure visualization', () => {
     expect(html).toContain('data-graph-node-id="g2"');
     expect(html).toContain('data-graph-edge-from="g1" data-graph-edge-to="g2"');
     expect(html).toContain('data-graph-edge-from="g2" data-graph-edge-to="g1"');
+    expect(html).toContain('data-graph-inspector="g1"');
+    expect(html).toContain('Graph state legend');
+    expect(html).toContain('Pointer target changed');
+    expect(html).toContain('CONNECTED TO');
+    expect(html).toContain('yv-graph-canvas');
     expect(html).toContain('start');
   });
 
@@ -1011,6 +1043,63 @@ describe('graph data structure visualization', () => {
     } finally {
       sessionStore.set(priorSession);
     }
+  });
+
+  it('keeps deleted vertices and their removed edges visible for one transition', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 117,
+      objects: {
+        g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'g2' }] } } },
+        g2: { $objectId: 'g2', $type: 'Node', fields: { val: 2, neighbors: { values: [] } } },
+      },
+    });
+    const current = state({
+      sequence: 118,
+      objects: {
+        g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [] } } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'remove(g2);', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<GraphView objects={current.objects} state={current} />);
+      expect(html).toContain('data-graph-node-id="g2"');
+      expect(html).toContain('yv-graph-node-removed');
+      expect(html).toContain('data-graph-edge-from="g1" data-graph-edge-to="g2"');
+      expect(html).toContain('data-graph-edge-status="removed"');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('uses unique arrow marker IDs when multiple graph views are mounted', () => {
+    const objects = {
+      g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'g1' }] } } },
+    };
+    const html = renderToStaticMarkup(<><GraphView objects={objects} /><GraphView objects={objects} /></>);
+    const markerIds = [...html.matchAll(/<marker id="([^"]+)"/g)].map(match => match[1]);
+    expect(markerIds).toHaveLength(2);
+    expect(new Set(markerIds).size).toBe(2);
+    expect(html).not.toContain('markerEnd="url(#yv-graph-arrow)"');
+  });
+
+  it('separates parallel edges with distinct curve offsets', () => {
+    const html = renderToStaticMarkup(<GraphView objects={{
+      g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'g2' }, { $ref: 'g2' }, { $ref: 'g2' }] } } },
+      g2: { $objectId: 'g2', $type: 'Node', fields: { val: 2, neighbors: { values: [] } } },
+    }} />);
+    expect((html.match(/data-graph-edge-parallel-index=/g) ?? []).length).toBe(3);
+    expect(html).toContain('Q ');
+  });
+
+  it('draws opposing directed edges on separate curves', () => {
+    const html = renderToStaticMarkup(<GraphView objects={{
+      g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'g2' }] } } },
+      g2: { $objectId: 'g2', $type: 'Node', fields: { val: 2, neighbors: { values: [{ $ref: 'g1' }] } } },
+    }} />);
+    const paths = [...html.matchAll(/ d="([^"]+)"/g)].map(match => match[1]).filter(path => path.startsWith('M '));
+    expect(paths).toHaveLength(2);
+    expect(paths[0]).not.toBe(paths[1]);
   });
 
   it('handles a self-loop without duplicating the graph node', () => {
@@ -1941,7 +2030,7 @@ describe('execution visualization feature matrix', () => {
     ]);
   });
 
-  it('renders structured map-value updates as visual before/after snapshots', () => {
+  it('keeps structured map-value updates compact in the execution result', () => {
     const previous = state({
       sequence: 120,
       dataStructures: {
@@ -1982,13 +2071,14 @@ describe('execution visualization feature matrix', () => {
     });
 
     const html = markup(dataStructureResults(current, previous, 'groups.get("aet").add("tea");'));
-    expect(html).toContain('yv-ds-result-structured-values');
-    expect(html).toContain('yv-ds-result-snapshot-label">Before');
-    expect(html).toContain('yv-ds-result-snapshot-label">After');
-    expect(html).toContain('eat');
-    expect(html).toContain('tea');
-    expect(html).not.toContain('yv-ds-result-old');
+    expect(html).toContain('[Update]');
+    expect(html).toContain('ArrayList · 1 items');
+    expect(html).toContain('ArrayList · 2 items');
+    expect(html).not.toContain('yv-ds-result-structured-values');
+    expect(html).not.toContain('yv-ds-result-snapshot');
     expect(html).not.toContain('$collectionId');
+    expect(html).not.toContain('>eat<');
+    expect(html).not.toContain('>tea<');
   });
 
   it('renders map, array, and collection operations into the execution result', () => {
