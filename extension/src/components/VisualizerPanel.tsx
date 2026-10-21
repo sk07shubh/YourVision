@@ -3563,10 +3563,10 @@ export function GraphView({ objects, variables = {}, state }: {
             return <div key={node.id + ((changed || entered || createdNodeIds.has(node.id)) ? ':' + selectedIndex : '')}
               className={'yv-graph-node' + (paired ? ' yv-graph-node-paired' : '') + (selected ? ' yv-graph-node-selected' : '') + (changed ? ' yv-graph-node-changed' : '') + (entered ? ' yv-graph-node-entered' : '') + (createdNodeIds.has(node.id) ? ' yv-graph-node-created' : '') + (removed ? ' yv-graph-node-removed' : '')}
               data-graph-node-id={node.id} data-graph-selected={selected ? 'true' : undefined}
-              data-graph-paired={paired ? 'true' : undefined}
-              data-graph-component={graphComponentIndexByNodeId.get(node.id)}
               data-graph-changed={changed ? 'true' : undefined} data-graph-entered={entered ? 'true' : undefined}
               data-graph-created={createdNodeIds.has(node.id) ? 'true' : undefined}
+              data-graph-paired={paired ? 'true' : undefined}
+              data-graph-component={graphComponentIndexByNodeId.get(node.id)}
               role="button" tabIndex={0} aria-pressed={selected}
               aria-label={`Select node ${compactValue(node.label)}`}
               onClick={() => setSelectedNodeId(node.id)}
