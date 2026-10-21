@@ -1099,6 +1099,29 @@ describe('graph data structure visualization', () => {
     }
   });
 
+  it('separates original and cloned graph components into labeled cards', () => {
+    const priorSession = sessionStore.get();
+    const current = state({
+      variables: { node: { $objectId: 'original-1' } },
+      objects: {
+        'original-1': { $objectId: 'original-1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'original-2' }] } } },
+        'original-2': { $objectId: 'original-2', $type: 'Node', fields: { val: 2, neighbors: { values: [{ $ref: 'original-1' }] } } },
+        'clone-1': { $objectId: 'clone-1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'clone-2' }] } } },
+        'clone-2': { $objectId: 'clone-2', $type: 'Node', fields: { val: 2, neighbors: { values: [{ $ref: 'clone-1' }] } } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'class Solution { Node cloneGraph(Node node) { return node; } }', states: [current], index: 0 });
+      const html = renderToStaticMarkup(<GraphView objects={current.objects} variables={current.variables} state={current} />);
+      expect(html).toContain('data-graph-component-title="Original graph"');
+      expect(html).toContain('data-graph-component-title="Cloned graph"');
+      expect(html).toContain('data-graph-paired="true"');
+      expect(html).toContain('yv-graph-component-title');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
   it('uses unique arrow marker IDs when multiple graph views are mounted', () => {
     const objects = {
       g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'g1' }] } } },
