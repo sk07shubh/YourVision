@@ -2877,3 +2877,7 @@
   .yv-graph-edge.yv-graph-edge-added { animation: none; stroke-dashoffset: 0; }
   .yv-graph-node, .yv-graph-edge { transition: none; }
 }
+
+
+/* Keep graph state badges visible outside the vertex circle. */
+.yv-graph-stage>.yv-graph-node { overflow: visible; max-height: none; }

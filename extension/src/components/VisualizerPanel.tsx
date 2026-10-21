@@ -3484,7 +3484,7 @@ export function GraphView({ objects, variables = {}, state }: {
                   data-graph-edge-from={edge.from} data-graph-edge-to={edge.to}
                   data-graph-edge-status={edge.status} data-graph-edge-parallel-index={edge.parallelIndex ?? 0}
                   d={`M ${from.x + 18} ${from.y - 16} C ${from.x + radius} ${from.y - radius - 18}, ${from.x - radius} ${from.y - radius - 18}, ${from.x - 18} ${from.y - 16}`}
-                  fill="none" markerEnd={`url(#yv-graph-arrow-${graphInstanceId})`} />;
+                  fill="none" strokeDasharray={edge.status === 'removed' ? '4 3' : undefined} markerEnd={`url(#yv-graph-arrow-${graphInstanceId})`} />;
               }
               const dx = to.x - from.x, dy = to.y - from.y;
               const length = Math.max(1, Math.hypot(dx, dy));
@@ -3496,7 +3496,7 @@ export function GraphView({ objects, variables = {}, state }: {
                 data-graph-edge-from={edge.from} data-graph-edge-to={edge.to}
                 data-graph-edge-status={edge.status} data-graph-edge-parallel-index={edge.parallelIndex ?? 0}
                 d={`M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`}
-                fill="none" markerEnd={`url(#yv-graph-arrow-${graphInstanceId})`} />;
+                fill="none" strokeDasharray={edge.status === 'removed' ? '4 3' : undefined} markerEnd={`url(#yv-graph-arrow-${graphInstanceId})`} />;
             })}
           </svg>
           {nodes.map(node => {

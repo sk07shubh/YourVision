@@ -1093,7 +1093,7 @@ describe('graph data structure visualization', () => {
       expect(html).toContain('data-meta-name="visited" data-meta-value="true"');
       expect(html).toContain('data-meta-name="dist" data-meta-value="3"');
       expect(html).toContain('yv-graph-chip-changed');
-      expect(html).toContain('NODE UPDATED');
+      expect(html).toContain('data-graph-changed="true"');
     } finally {
       sessionStore.set(priorSession);
     }
