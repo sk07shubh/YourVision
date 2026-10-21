@@ -3509,7 +3509,7 @@ export function GraphView({ objects, variables = {}, state }: {
             {graphComponentCards.map(card => <g key={card.index} data-graph-component={card.index} data-graph-component-title={card.title}>
               <rect x={card.x} y={card.y} width={card.width} height={card.height} rx="12"
                 fill="var(--yv-elevated, var(--yv-panel, #101b2d))" stroke="var(--yv-border, #334155)" strokeWidth="1.5" />
-              <text x={card.x + 16} y={card.y + 23} fill="var(--yv-text, #f3f6ff)" fontSize="13" fontWeight="600">{card.title}</text>
+              <text className="yv-graph-component-title" x={card.x + 16} y={card.y + 23} fill="var(--yv-text, #f3f6ff)" fontSize="13" fontWeight="600">{card.title}</text>
             </g>)}
             <defs>
               <marker id={`yv-graph-arrow-${graphInstanceId}`} markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
