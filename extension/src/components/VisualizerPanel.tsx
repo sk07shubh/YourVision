@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useId } from 'react';
 import { createPortal } from 'react-dom';
 import type { CSSProperties, ReactNode } from 'react';
 import { useSession } from '../state/session';
@@ -3254,24 +3254,30 @@ export function GraphView({ objects, variables = {}, state }: {
       if (currentId && currentId !== previousId) enteredNodeIds.add(currentId);
     }
   }
-  const nodes = Object.entries(objects).flatMap(([key, value]) => {
+  const allNodes = Object.entries(objects).flatMap(([key, value]) => {
     if (!isPlainObject(value) || !looksGraphNode(value)) return [];
     const id = typeof value.$objectId === 'string' ? value.$objectId : key;
     return [{ id, value, label: nodeValue(value), neighbors: graphNeighborValues(value) ?? [] }];
-  }).slice(0, 80);
+  });
+  const nodes = allNodes.slice(0, 80);
+  const omittedNodeCount = Math.max(0, allNodes.length - nodes.length);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const graphInstanceId = useId().replace(/:/g, '');
   useEffect(() => {
     const syncSelection = (event: Event) => {
-      const id = (event as CustomEvent<string>).detail;
+      const detail = (event as CustomEvent<{ graphId?: string; nodeId?: string } | string>).detail;
+      if (!detail || typeof detail !== 'object' || detail.graphId !== graphInstanceId) return;
+      const id = detail.nodeId;
       if (typeof id === 'string' && nodes.some(node => node.id === id)) setSelectedNodeId(id);
     };
     window.addEventListener('yv-graph-node-selected', syncSelection);
     return () => window.removeEventListener('yv-graph-node-selected', syncSelection);
-  }, [nodes.map(node => node.id).join('|')]);
+  }, [graphInstanceId, nodes.map(node => node.id).join('|')]);
   useEffect(() => {
-    if (selectedNodeId) window.dispatchEvent(new CustomEvent('yv-graph-node-selected', { detail: selectedNodeId }));
+    if (selectedNodeId) window.dispatchEvent(new CustomEvent('yv-graph-node-selected', { detail: { graphId: graphInstanceId, nodeId: selectedNodeId } }));
   }, [selectedNodeId]);
   const ids = new Set(nodes.map(node => node.id));
+  useEffect(() => { if (selectedNodeId && !ids.has(selectedNodeId)) setSelectedNodeId(nodes[0]?.id ?? null); }, [selectedNodeId, nodes.map(node => node.id).join('|')]);
   const selectedNode = nodes.find(node => node.id === selectedNodeId) ?? nodes[0];
   const selectedNeighborIds = selectedNode
     ? selectedNode.neighbors.map(neighbor => graphReferenceId(neighbor, objects)).filter((id): id is string => Boolean(id))
@@ -3283,46 +3289,25 @@ export function GraphView({ objects, variables = {}, state }: {
     positionSession.current = session.states[0];
   }
   const stablePositions = stableGraphPositions.current;
-  // Lay out the first observed snapshot once. Later vertices take an unused
-  // slot; existing vertices never orbit/reflow merely because another is added.
-  if (stablePositions.size === 0 && nodes.length) {
-    nodes.forEach((node, index) => {
-      const angle = -Math.PI / 2 + (2 * Math.PI * index) / Math.max(1, nodes.length);
-      stablePositions.set(node.id, {
-        x: 300 + (nodes.length <= 1 ? 0 : 205 * Math.cos(angle)),
-        y: 160 + (nodes.length <= 1 ? 0 : 112 * Math.sin(angle)),
-      });
-    });
-  } else {
-    const slots = Array.from({ length: 80 }, (_, index) => ({
-      x: 30 + (index % 10) * 60,
-      y: 20 + Math.floor(index / 10) * 40,
-    }));
-    for (const node of nodes) {
-      if (stablePositions.has(node.id)) continue;
-      let hash = 0;
-      for (let index = 0; index < node.id.length; index++) hash = (hash * 31 + node.id.charCodeAt(index)) >>> 0;
-      let chosen: { x: number; y: number } | undefined;
-      let bestDistance = -1;
-      for (let offset = 0; offset < slots.length; offset++) {
-        const candidate = slots[(hash + offset) % slots.length]!;
-        const minDistance = stablePositions.size
-          ? Math.min(...[...stablePositions.values()].map(point => Math.hypot(point.x - candidate.x, point.y - candidate.y)))
-          : Infinity;
-        if (minDistance > bestDistance) {
-          bestDistance = minDistance;
-          chosen = candidate;
-        }
-        if (minDistance >= 50) break;
-      }
-      stablePositions.set(node.id, chosen ?? { x: 300, y: 160 });
-    }
+  // Use a roomy grid: center spacing exceeds the node footprint, and the
+  // scrollable stage grows instead of compressing an arbitrary graph into 600×320.
+  const slots = Array.from({ length: 80 }, (_, index) => ({
+    x: 70 + (index % 10) * 130,
+    y: 45 + Math.floor(index / 10) * 100,
+  }));
+  for (const node of nodes) {
+    if (stablePositions.has(node.id)) continue;
+    const occupied = new Set([...stablePositions.values()].map(point => point.x + ':' + point.y));
+    const preferred = slots.find(point => !occupied.has(point.x + ':' + point.y));
+    stablePositions.set(node.id, preferred ?? { x: 70, y: 45 });
   }
   const positions = new Map<string, { x: number; y: number }>();
   for (const node of nodes) {
     const position = stablePositions.get(node.id);
     if (position) positions.set(node.id, position);
   }
+  const graphWidth = Math.max(600, Math.max(1, nodes.length ? Math.max(...[...positions.values()].map(point => point.x)) : 0) + 90);
+  const graphHeight = Math.max(320, Math.max(1, nodes.length ? Math.max(...[...positions.values()].map(point => point.y)) : 0) + 65);
   const traversedEdgePairs = new Set<string>();
   if (previous) {
     for (const [name, currentValue] of Object.entries(variables)) {
@@ -3383,7 +3368,7 @@ export function GraphView({ objects, variables = {}, state }: {
     <div className="yv-graph" data-graph-node-count={nodes.length} data-graph-edge-count={edges.length}>
       <div className="yv-collection-meta">
         <span>Adjacency graph</span>
-        <span>{nodes.length} nodes · {edges.length} links{nodes.length === 80 ? ' · display limit reached' : ''}</span>
+        <span>{nodes.length} nodes · {edges.length} links{omittedNodeCount ? ` · ${omittedNodeCount} more nodes omitted` : nodes.length === 80 ? ' · display limit reached' : ''}</span>
       </div>
       <div className="yv-graph-legend" aria-label="Graph state legend">
         <span><i className="yv-graph-legend-dot yv-graph-legend-selected" />Selected</span>
@@ -3392,11 +3377,11 @@ export function GraphView({ objects, variables = {}, state }: {
         <span><i className="yv-graph-legend-line yv-graph-legend-edge" />Relationship</span>
       </div>
       <div className="yv-graph-layout">
-        <div className="yv-graph-canvas">
-          <svg width="100%" height="100%" viewBox="0 0 600 320" preserveAspectRatio="xMidYMid meet" aria-label="Graph links"
+        <div className="yv-graph-canvas"><div className="yv-graph-stage" style={{ width: `${graphWidth}px`, height: `${graphHeight}px` }}>
+          <svg width={graphWidth} height={graphHeight} viewBox={`0 0 ${graphWidth} ${graphHeight}`} preserveAspectRatio="xMidYMid meet" aria-label="Graph links"
             style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}>
             <defs>
-              <marker id="yv-graph-arrow" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+              <marker id={`yv-graph-arrow-${graphInstanceId}`} markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
                 <path d="M0,0 L7,3.5 L0,7 z" fill="var(--yv-muted, #8b9bb4)" />
               </marker>
             </defs>
@@ -3411,7 +3396,7 @@ export function GraphView({ objects, variables = {}, state }: {
                   data-graph-edge-status={edge.status}
                   d={`M ${from.x + 20} ${from.y - 12} C ${from.x + 70} ${from.y - 65}, ${from.x - 45} ${from.y - 65}, ${from.x - 20} ${from.y - 12}`}
                   fill="none" stroke={stroke} strokeDasharray={edge.status === 'removed' ? '4 3' : undefined}
-                  opacity={edge.status === 'removed' ? 0.65 : 1} strokeWidth={edge.status === 'traversed' ? 2.5 : 1.5} markerEnd="url(#yv-graph-arrow)" />;
+                  opacity={edge.status === 'removed' ? 0.65 : 1} strokeWidth={edge.status === 'traversed' ? 2.5 : 1.5} markerEnd={`url(#yv-graph-arrow-${graphInstanceId})`} />;
               }
               const dx = to.x - from.x, dy = to.y - from.y;
               const length = Math.max(1, Math.hypot(dx, dy));
@@ -3439,7 +3424,7 @@ export function GraphView({ objects, variables = {}, state }: {
               aria-label={`Select node ${compactValue(node.label)}`}
               onClick={() => setSelectedNodeId(node.id)}
               onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedNodeId(node.id); } }}
-              style={{ position: 'absolute', left: `${(point.x / 600) * 100}%`, top: `${(point.y / 320) * 100}%`, transform: 'translate(-50%, -50%)', width: 'clamp(68px, 15.7%, 94px)', minHeight: 42,
+              style={{ position: 'absolute', left: `${(point.x / graphWidth) * 100}%`, top: `${(point.y / graphHeight) * 100}%`, transform: 'translate(-50%, -50%)', width: 'clamp(68px, 15.7%, 94px)', minHeight: 42,
                 boxSizing: 'border-box', display: 'flex', flexDirection: 'column', alignItems: 'center',
                 justifyContent: 'center', gap: 2, padding: '5px 6px', border: '1px solid var(--yv-accent, #65a9ff)',
                 borderRadius: 10, background: changed ? 'var(--yv-highlight, #203b5b)' : 'var(--yv-panel, #101b2d)', color: 'var(--yv-text, #f3f6ff)',
@@ -3451,7 +3436,7 @@ export function GraphView({ objects, variables = {}, state }: {
               {pointers.length > 0 && <span style={{ color: 'var(--yv-muted, #8b9bb4)', fontSize: 10 }}>{pointers.join(' · ')}</span>}
             </div>;
           })}
-        </div>
+        </div></div>
         {selectedNode && <aside className="yv-graph-inspector" aria-label="Selected graph node" data-graph-inspector={selectedNode.id}>
           <div className="yv-graph-inspector-heading">
             <div><span className="yv-graph-inspector-kicker">SELECTED NODE</span><strong>{compactValue(selectedNode.label)}</strong></div>
