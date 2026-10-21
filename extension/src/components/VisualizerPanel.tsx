@@ -3532,7 +3532,7 @@ export function GraphView({ objects, variables = {}, state }: {
         <button type="button" onClick={() => setZoom(1)} disabled={zoom === 1}>Reset</button>
       </div>
       <div className="yv-graph-layout">
-        <div className="yv-graph-canvas" data-graph-zoom={zoom} ref={graphCanvasRef}><div className="yv-graph-stage" style={{ width: `${graphWidth}px`, height: `${graphHeight}px`, transform: `scale(${zoom})`, transformOrigin: "top left" }}>
+        <div className="yv-graph-canvas" data-graph-zoom={zoom} ref={graphCanvasRef}><div className="yv-graph-scaled" style={{ width: `${graphWidth * zoom}px`, height: `${graphHeight * zoom}px` }}><div className="yv-graph-stage" style={{ width: `${graphWidth}px`, height: `${graphHeight}px`, transform: `scale(${zoom})`, transformOrigin: "top left" }}>
           <svg className="yv-graph-links" width={graphWidth} height={graphHeight} viewBox={`0 0 ${graphWidth} ${graphHeight}`} preserveAspectRatio="xMidYMid meet" aria-label="Graph links"
             style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}>
             <defs>
@@ -3621,7 +3621,7 @@ export function GraphView({ objects, variables = {}, state }: {
               </span>}
             </div>;
           })}
-        </div></div>
+        </div></div></div>
         {selectedNode && <aside className="yv-graph-inspector" aria-label="Selected graph node" data-graph-inspector={selectedNode.id}>
           <div className="yv-graph-inspector-heading">
             <div><span className="yv-graph-inspector-kicker">SELECTED NODE</span><strong>{compactValue(selectedNode.label)}</strong></div>
