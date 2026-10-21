@@ -3317,7 +3317,8 @@ export function GraphView({ objects, variables = {}, state }: {
   const omittedNodeCount = Math.max(0, allNodes.length + previousGraphNodes.length - nodes.length);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [hoverId, setHoverId] = useState<string | undefined>(undefined);
-  const [zoom, setZoom] = useState(1);\n  const graphCanvasRef = useRef<HTMLDivElement | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const graphCanvasRef = useRef<HTMLDivElement | null>(null);
   const graphInstanceId = useId().replace(/:/g, '');
   useEffect(() => {
     const syncSelection = (event: Event) => {
