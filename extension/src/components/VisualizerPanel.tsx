@@ -3598,7 +3598,7 @@ export function GraphView({ objects, variables = {}, state }: {
         <div className="yv-graph-canvas" data-graph-zoom={zoom} ref={graphCanvasRef}><div className="yv-graph-scaled" style={{ width: `${graphWidth * zoom}px`, height: `${graphHeight * zoom}px` }}><div className="yv-graph-stage" style={{ width: `${graphWidth}px`, height: `${graphHeight}px`, transform: `scale(${zoom})`, transformOrigin: "top left" }}>
           <svg className="yv-graph-links" width={graphWidth} height={graphHeight} viewBox={`0 0 ${graphWidth} ${graphHeight}`} preserveAspectRatio="xMidYMid meet" aria-label="Graph links"
             style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}>
-            {graphComponentCards.map(card => <g key={card.index} data-graph-component={card.index} data-graph-component-title={card.title}>
+            {graphComponents.length > 1 && graphComponentCards.map(card => <g key={card.index} data-graph-component={card.index} data-graph-component-title={card.title}>
               <rect x={card.x} y={card.y} width={card.width} height={card.height} rx="12"
                 fill="var(--yv-elevated, var(--yv-panel, #101b2d))" stroke="var(--yv-border, #334155)" strokeWidth="1.5" />
               <text className="yv-graph-component-title" x={card.x + 16} y={card.y + 23} fill="var(--yv-text, #f3f6ff)" fontSize="13" fontWeight="600">{card.title}</text>
@@ -5378,7 +5378,7 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
       }),
     });
   }
-  const cloneGraphRootParameter = source.match(/cloneGraph\\s*\\(\\s*([A-Za-z_$][\\w$]*)/)?.[1];
+  const cloneGraphRootParameter = source.match(/cloneGraph\s*\(\s*([A-Za-z_$][\w$]*)/)?.[1];
   const cloneGraphRootId = cloneGraphRootParameter
     ? graphReferenceId(state?.variables?.[cloneGraphRootParameter], state?.objects ?? {})
     : undefined;
