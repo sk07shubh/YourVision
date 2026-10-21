@@ -2769,3 +2769,13 @@
   outline: 2px dashed var(--yv-success, #4ade80);
   outline-offset: 3px;
 }
+
+/* SVG graph-card headings should never stack characters vertically. */
+.yv-graph-component-title {
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+  letter-spacing: normal;
+}
