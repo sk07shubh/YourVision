@@ -2945,3 +2945,27 @@
   position: relative;
   flex: 0 0 auto;
 }
+
+
+/* The scaled wrapper owns the scroll dimensions. Keep the transformed stage
+   out of normal flow so its unscaled box cannot create phantom scroll ranges. */
+.yv-graph-canvas {
+  display: block;
+  overflow: auto;
+  min-width: 0;
+  min-height: 0;
+  max-height: min(55vh, 520px);
+  scrollbar-gutter: stable;
+}
+.yv-graph-scaled {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+}
+.yv-graph-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
+  transform-origin: top left;
+}
