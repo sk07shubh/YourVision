@@ -2881,3 +2881,62 @@
 
 /* Keep graph state badges visible outside the vertex circle. */
 .yv-graph-stage>.yv-graph-node { overflow: visible; max-height: none; }
+
+
+/* Graph viewport: scroll the graph itself, never compress its topology into a fixed box. */
+.yv-graph-canvas {
+  width: 100%;
+  max-width: none;
+  height: min(55vh, 520px);
+  min-height: 320px;
+  aspect-ratio: auto;
+  margin: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  isolation: isolate;
+}
+.yv-graph-stage {
+  margin: 0;
+  flex: 0 0 auto;
+  transform-origin: top left;
+}
+.yv-graph-stage > .yv-graph-node {
+  overflow: visible;
+  max-height: none;
+}
+
+/* Keep execution anchored at the bottom. Only result content scrolls; navigation
+   controls stay visible and the upper panels keep their own independent viewport. */
+.yv-root { min-height: 0; }
+.yv-scroll {
+  flex: 1 1 0%;
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+.yv-current {
+  flex: 0 0 clamp(190px, 34vh, 310px);
+  height: clamp(190px, 34vh, 310px);
+  min-height: 180px;
+  max-height: min(42vh, 310px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+.yv-execution {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-right: 4px;
+}
+.yv-controls {
+  flex: 0 0 auto;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--yv-border);
+  background: var(--yv-panel);
+}
