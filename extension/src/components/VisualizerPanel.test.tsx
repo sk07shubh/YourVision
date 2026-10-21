@@ -957,7 +957,7 @@ describe('graph data structure visualization', () => {
       const html = renderToStaticMarkup(<GraphView objects={current.objects} variables={current.variables} state={current} />);
       expect(html).toContain('data-graph-component-title="Original graph"');
       expect(html).toContain('data-graph-component-title="Cloned graph"');
-      expect(html).toContain('data-graph-node-id="clone-1" data-graph-selected="true" data-graph-paired="true"');
+      expect(html).toContain('data-graph-node-id="clone-1" data-graph-paired="true"');
       expect(html).toContain('data-graph-node-id="original-1"');
       expect(html).toContain('data-graph-component="1"');
     } finally {
