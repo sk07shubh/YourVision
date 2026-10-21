@@ -3393,9 +3393,10 @@ export function GraphView({ objects, variables = {}, state }: {
     return [{ key: pair + ':' + index, from: node.id, to: target, parallelIndex: occurrence, status: added ? 'added' as const :
       traversedEdgePairs.has(node.id + ':' + target) ? 'traversed' as const : 'steady' as const }];
   }));
+  const allNodeIds = new Set(allNodes.map(node => node.id));
   const allCapturedEdgeCount = allNodes.reduce((total, node) => total + node.neighbors.filter(neighbor => {
     const target = graphReferenceId(neighbor, objects);
-    return Boolean(target && allNodes.some(candidate => candidate.id === target));
+    return Boolean(target && allNodeIds.has(target));
   }).length, 0);
   const omittedEdgeCount = Math.max(0, allCapturedEdgeCount - edges.length);
   const removedCounts = new Map<string, number>();
