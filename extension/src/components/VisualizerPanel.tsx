@@ -3468,7 +3468,7 @@ export function GraphView({ objects, variables = {}, state }: {
   const graphComponentIndexByNodeId = new Map<string, number>();
   graphComponents.forEach((component, index) =>
     component.nodes.forEach(node => graphComponentIndexByNodeId.set(node.id, index)));
-  const cloneGraphParameter = session.source.match(/cloneGraph\s*\(\s*([A-Za-z_$][\w$]*)/)?.[1];
+  const cloneGraphParameter = session.source.match(/cloneGraph\s*\(\s*(?:[A-Za-z_$][\w$.[\]<>]*\s+)?([A-Za-z_$][\w$]*)/)?.[1];
   const originalGraphRootId = cloneGraphParameter ? graphReferenceId(variables[cloneGraphParameter], objects) : undefined;
   const isCloneGraphTrace = Boolean(cloneGraphParameter && graphComponents.length > 1);
   const graphComponentTitles = graphComponents.map((component, index) => {
@@ -5378,7 +5378,7 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
       }),
     });
   }
-  const cloneGraphRootParameter = source.match(/cloneGraph\s*\(\s*([A-Za-z_$][\w$]*)/)?.[1];
+  const cloneGraphRootParameter = source.match(/cloneGraph\s*\(\s*(?:[A-Za-z_$][\w$.[\]<>]*\s+)?([A-Za-z_$][\w$]*)/)?.[1];
   const cloneGraphRootId = cloneGraphRootParameter
     ? graphReferenceId(state?.variables?.[cloneGraphRootParameter], state?.objects ?? {})
     : undefined;
