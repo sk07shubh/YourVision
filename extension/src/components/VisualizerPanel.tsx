@@ -3292,7 +3292,13 @@ export function GraphView({ objects, variables = {}, state }: {
     });
     const currentPointsToRemoved = currentNodes.some(node =>
       node.neighbors.some(neighbor => graphReferenceId(neighbor, objects) === id));
-    if (!connectsToCurrent && !currentPointsToRemoved) return [];
+    const previousLiveNodePointsToRemoved = Object.entries(previousObjects).some(([previousKey, candidate]) => {
+      if (!isPlainObject(candidate) || !looksGraphNode(candidate)) return false;
+      const sourceId = typeof candidate.$objectId === 'string' ? candidate.$objectId : previousKey;
+      return currentNodeIds.has(sourceId) &&
+        (graphNeighborValues(candidate) ?? []).some(neighbor => graphReferenceId(neighbor, previousObjects) === id);
+    });
+    if (!connectsToCurrent && !currentPointsToRemoved && !previousLiveNodePointsToRemoved) return [];
     return [{ id, value, label: nodeValue(value), neighbors: [], removed: true as const }];
   }) : [];
   const nodes = [...currentNodes, ...previousGraphNodes].slice(0, 80);
