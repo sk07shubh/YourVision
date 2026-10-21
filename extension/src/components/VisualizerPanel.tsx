@@ -5337,6 +5337,52 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
   const graphNodeEntries = objectEntries.filter(([, value]) =>
     isPlainObject(value) && looksGraphNode(value)
   );
+  // Each disconnected runtime graph is its own palette, just like an independently
+  // declared array/map/list. This keeps a cloned graph out of the original's palette.
+  const graphPaletteComponents: Array<{ id: string; entries: Array<[string, unknown]> }> = [];
+  const graphPaletteNodeIds = new Map(graphNodeEntries.map(([key, value]) => [
+    typeof (value as Obj).$objectId === 'string' ? String((value as Obj).$objectId) : key,
+    key,
+  ]));
+  const graphPaletteAdjacency = new Map<string, Set<string>>();
+  for (const [key, value] of graphNodeEntries) {
+    const id = typeof (value as Obj).$objectId === 'string' ? String((value as Obj).$objectId) : key;
+    if (!graphPaletteAdjacency.has(id)) graphPaletteAdjacency.set(id, new Set());
+    for (const neighbor of graphNeighborValues(value as Obj) ?? []) {
+      const targetId = graphReferenceId(neighbor, state?.objects ?? {});
+      if (!targetId || !graphPaletteNodeIds.has(targetId)) continue;
+      graphPaletteAdjacency.get(id)?.add(targetId);
+      graphPaletteAdjacency.get(targetId)?.add(id);
+    }
+  }
+  const graphPaletteVisited = new Set<string>();
+  for (const [id] of graphPaletteNodeIds) {
+    if (graphPaletteVisited.has(id)) continue;
+    const pending = [id];
+    const ids: string[] = [];
+    graphPaletteVisited.add(id);
+    while (pending.length) {
+      const currentId = pending.pop()!;
+      ids.push(currentId);
+      for (const nextId of graphPaletteAdjacency.get(currentId) ?? []) {
+        if (graphPaletteVisited.has(nextId)) continue;
+        graphPaletteVisited.add(nextId);
+        pending.push(nextId);
+      }
+    }
+    graphPaletteComponents.push({
+      id,
+      entries: ids.flatMap(nodeId => {
+        const key = graphPaletteNodeIds.get(nodeId);
+        return key === undefined ? [] : [[key, (state?.objects ?? {})[key]] as [string, unknown]];
+      }),
+    });
+  }
+  const cloneGraphRootParameter = source.match(/cloneGraph\\s*\\(\\s*([A-Za-z_$][\\w$]*)/)?.[1];
+  const cloneGraphRootId = cloneGraphRootParameter
+    ? graphReferenceId(state?.variables?.[cloneGraphRootParameter], state?.objects ?? {})
+    : undefined;
+  const isCloneGraphPaletteLayout = Boolean(cloneGraphRootId && graphPaletteComponents.length > 1);
   const trieNodeEntries = objectEntries.filter(([, value]) =>
     isPlainObject(value) && looksTrieNode(value)
   );
@@ -5434,15 +5480,30 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
           <TrieView objects={state?.objects ?? {}} variables={state?.variables ?? {}} source={source} state={state} />
         </div>
       )}
-      {graphNodeEntries.length > 0 && (
-        <div className="yv-ds" key="Graph → runtime nodes">
-          <div className="yv-ds-title">Graph → {[...new Set(Object.entries(state?.variables ?? {}).flatMap(([name, value]) => {
-            const id = graphReferenceId(value, state?.objects ?? {});
-            return id && graphNodeEntries.some(([key, node]) => id === key || (isPlainObject(node) && node.$objectId === id)) ? [name] : [];
-          }))].join(' / ') || 'runtime nodes'}</div>
-          <GraphView objects={state?.objects ?? {}} variables={state?.variables ?? {}} state={state} />
-        </div>
-      )}
+      {graphPaletteComponents.map((component, index) => {
+        const componentIds = new Set(component.entries.map(([key, value]) =>
+          isPlainObject(value) && typeof value.$objectId === 'string' ? value.$objectId : key
+        ));
+        const names = [...new Set(Object.entries(state?.variables ?? {}).flatMap(([name, value]) => {
+          const id = graphReferenceId(value, state?.objects ?? {});
+          return id && componentIds.has(id) ? [name] : [];
+        }))];
+        const isOriginal = Boolean(isCloneGraphPaletteLayout && componentIds.has(cloneGraphRootId!));
+        const title = isCloneGraphPaletteLayout
+          ? (isOriginal ? 'Original graph' : 'Cloned graph' + (graphPaletteComponents.filter(candidate =>
+              !candidate.entries.some(([key, value]) => (isPlainObject(value) && typeof value.$objectId === 'string' ? value.$objectId : key) === cloneGraphRootId)
+            ).length === 1 ? '' : ' · part ' + (index + 1)))
+          : 'Graph' + (graphPaletteComponents.length > 1 ? ' ' + (index + 1) : '');
+        const componentObjects = Object.fromEntries(component.entries);
+        return (
+          <div className="yv-ds" key={'Graph → ' + component.id}>
+            <div className="yv-ds-title">{title}{names.length ? ' → ' + names.join(' / ') : names.length === 0 ? ' → runtime nodes' : ''}</div>
+            <div className="yv-ds-visualization">
+              <GraphView objects={componentObjects} variables={state?.variables ?? {}} state={state} />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
