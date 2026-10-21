@@ -3372,7 +3372,7 @@ export function GraphView({ objects, variables = {}, state }: {
   graphComponents.forEach((component, componentIndex) => {
     component.nodes.forEach(node => graphComponentIndexByNodeId.set(node.id, componentIndex));
   });
-  const cloneGraphParameter = session.source.match(/cloneGraph\\s*\\(\\s*([A-Za-z_$][\\w$]*)/)?.[1];
+  const cloneGraphParameter = session.source.match(/cloneGraph\s*\(\s*([A-Za-z_$][\w$]*)/)?.[1];
   const originalGraphRootId = cloneGraphParameter
     ? graphReferenceId(variables[cloneGraphParameter], objects)
     : undefined;
