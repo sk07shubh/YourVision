@@ -3304,6 +3304,7 @@ export function GraphView({ objects, variables = {}, state }: {
   const nodes = [...currentNodes, ...previousGraphNodes].slice(0, 80);
   const omittedNodeCount = Math.max(0, allNodes.length + previousGraphNodes.length - nodes.length);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
   const graphInstanceId = useId().replace(/:/g, '');
   useEffect(() => {
     const syncSelection = (event: Event) => {
@@ -3421,8 +3422,14 @@ export function GraphView({ objects, variables = {}, state }: {
         <span><i className="yv-graph-legend-dot yv-graph-legend-created" />Created this step</span>
         <span><i className="yv-graph-legend-line yv-graph-legend-edge" />Relationship</span>
       </div>
+      <div className="yv-graph-controls" role="group" aria-label="Graph zoom controls">
+        <button type="button" onClick={() => setZoom(value => Math.max(0.5, Math.round((value - 0.1) * 10) / 10))} disabled={zoom <= 0.5} aria-label="Zoom out">−</button>
+        <span aria-live="polite">{Math.round(zoom * 100)}%</span>
+        <button type="button" onClick={() => setZoom(value => Math.min(1.8, Math.round((value + 0.1) * 10) / 10))} disabled={zoom >= 1.8} aria-label="Zoom in">+</button>
+        <button type="button" onClick={() => setZoom(1)} disabled={zoom === 1}>Reset</button>
+      </div>
       <div className="yv-graph-layout">
-        <div className="yv-graph-canvas"><div className="yv-graph-stage" style={{ width: `${graphWidth}px`, height: `${graphHeight}px` }}>
+        <div className="yv-graph-canvas" data-graph-zoom={zoom}><div className="yv-graph-stage" style={{ width: `${graphWidth}px`, height: `${graphHeight}px`, transform: `scale(${zoom})`, transformOrigin: "top left" }}>
           <svg width={graphWidth} height={graphHeight} viewBox={`0 0 ${graphWidth} ${graphHeight}`} preserveAspectRatio="xMidYMid meet" aria-label="Graph links"
             style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}>
             <defs>
