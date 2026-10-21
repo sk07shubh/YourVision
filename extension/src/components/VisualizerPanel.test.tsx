@@ -1946,7 +1946,7 @@ describe('execution visualization feature matrix', () => {
     ]);
   });
 
-  it('renders structured map-value updates as visual before/after snapshots', () => {
+  it('keeps structured map-value updates compact in the execution result', () => {
     const previous = state({
       sequence: 120,
       dataStructures: {
@@ -1987,13 +1987,14 @@ describe('execution visualization feature matrix', () => {
     });
 
     const html = markup(dataStructureResults(current, previous, 'groups.get("aet").add("tea");'));
-    expect(html).toContain('yv-ds-result-structured-values');
-    expect(html).toContain('yv-ds-result-snapshot-label">Before');
-    expect(html).toContain('yv-ds-result-snapshot-label">After');
-    expect(html).toContain('eat');
-    expect(html).toContain('tea');
-    expect(html).not.toContain('yv-ds-result-old');
+    expect(html).toContain('[Update]');
+    expect(html).toContain('ArrayList · 1 items');
+    expect(html).toContain('ArrayList · 2 items');
+    expect(html).not.toContain('yv-ds-result-structured-values');
+    expect(html).not.toContain('yv-ds-result-snapshot');
     expect(html).not.toContain('$collectionId');
+    expect(html).not.toContain('>eat<');
+    expect(html).not.toContain('>tea<');
   });
 
   it('renders map, array, and collection operations into the execution result', () => {
