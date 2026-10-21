@@ -2721,3 +2721,9 @@
 .yv-graph-inspector-field strong{overflow-wrap:anywhere;font-size:12px}
 .yv-graph-neighbor{min-width:0}
 .yv-graph-neighbor span{overflow-wrap:anywhere}
+
+.yv-map-row[data-graph-reference-id]{cursor:pointer}
+.yv-map-row[data-graph-reference-id]:hover{background:color-mix(in srgb,var(--yv-accent),var(--yv-bg) 94%)}
+.yv-map-row.yv-map-graph-linked-selected{background:color-mix(in srgb,var(--yv-accent),var(--yv-bg) 86%);box-shadow:inset 3px 0 0 var(--yv-accent)}
+.yv-map-row.yv-map-graph-linked-selected>.yv-map-key{color:var(--yv-accent);font-weight:700}
+.yv-map-row[aria-current="true"] .yv-compact-value-summary{color:var(--yv-accent)}
