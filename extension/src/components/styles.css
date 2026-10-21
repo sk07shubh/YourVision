@@ -2763,3 +2763,9 @@
 .yv-graph-legend-removed {background:var(--yv-warning,#f59e0b);border-color:var(--yv-warning,#f59e0b)}
 .yv-graph-legend-edge-removed {border-top:1.5px dashed var(--yv-warning,#f59e0b)}
 .yv-graph-stage {will-change:transform}
+
+/* Keep cloned and original graph components visually distinct. */
+.yv-graph-node-paired {
+  outline: 2px dashed var(--yv-success, #4ade80);
+  outline-offset: 3px;
+}
