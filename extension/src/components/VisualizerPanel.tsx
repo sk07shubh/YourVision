@@ -3280,11 +3280,12 @@ export function GraphView({ objects, variables = {}, state }: {
     return [{ id, value, label: nodeValue(value), neighbors: graphNeighborValues(value) ?? [], removed: false as const }];
   });
   const currentNodes = allNodes.slice(0, 80);
+  const allCurrentNodeIds = new Set(allNodes.map(node => node.id));
   const currentNodeIds = new Set(currentNodes.map(node => node.id));
   const previousGraphNodes = previous ? Object.entries(previousObjects).flatMap(([key, value]) => {
     if (!isPlainObject(value) || !looksGraphNode(value)) return [];
     const id = typeof value.$objectId === 'string' ? value.$objectId : key;
-    if (currentNodeIds.has(id)) return [];
+    if (allCurrentNodeIds.has(id)) return [];
     const neighbors = graphNeighborValues(value) ?? [];
     const connectsToCurrent = neighbors.some(neighbor => {
       const target = graphReferenceId(neighbor, previousObjects);
