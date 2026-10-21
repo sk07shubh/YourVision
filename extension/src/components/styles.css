@@ -2969,3 +2969,30 @@
   margin: 0;
   transform-origin: top left;
 }
+
+
+/* Graph component cards: keep headings readable and distinct. */
+.yv-graph-component-title {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  white-space: nowrap !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  letter-spacing: normal;
+}
+
+/* Short vertex values such as "copy" must stay on one line, not one
+   character per line inside the compact graph node. */
+.yv-graph-node-value {
+  display: block;
+  max-width: none;
+  white-space: nowrap !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  line-height: 1.2;
+}
+
+.yv-graph-node-paired {
+  outline: 2px dashed var(--yv-success, #4ade80);
+  outline-offset: 3px;
+}
