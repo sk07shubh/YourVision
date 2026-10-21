@@ -617,49 +617,40 @@ function newDataStructureResults(current?: TraceState, previous?: TraceState): R
 }
 
 
-function isStructuredResultValue(value: unknown): boolean {
-  return isMapSnapshot(value) || isCollectionSnapshot(value) || isArraySnapshot(value) ||
-    Array.isArray(value) ||
-    (isPlainObject(value) && (
-      typeof value.$objectId === 'string' ||
-      typeof value.$ref === 'string' ||
-      isPlainObject(value.fields)
-    ));
+function executionValueSummary(value: unknown): string {
+  if (isPlainObject(value)) {
+    const id = typeof value.$objectId === 'string' ? value.$objectId
+      : typeof value.$ref === 'string' ? value.$ref : undefined;
+    const fields = objectFields(value);
+    const label = typeof value.$type === 'string' ? value.$type.split('.').pop()! : 'Object';
+    const scalar = fields.val ?? fields.value ?? fields.data;
+    if (id) return label + ' #' + (id.length > 8 ? id.slice(-6) : id) +
+      (scalar !== undefined ? ' (val=' + compactValue(scalar) + ')' : '');
+    if (isMapSnapshot(value) || isArraySnapshot(value) || isCollectionSnapshot(value)) return variableSummary(value);
+    if (isPlainObject(value.fields)) return label;
+  }
+  if (isMapSnapshot(value) || isArraySnapshot(value) || isCollectionSnapshot(value)) {
+    return variableSummary(value);
+  }
+  return compactValue(value);
 }
 
 function DataStructureResult({
-  name, operation, value, oldValue, position, showOld = oldValue !== undefined,
-  state, previousState, source
+  name, operation, value, oldValue, position, showOld = oldValue !== undefined
 }: {
   name: string; operation: string; value: unknown; oldValue?: unknown; position: string; showOld?: boolean;
-  state?: TraceState; previousState?: TraceState; source: string;
 }) {
-  const structuredUpdate = showOld && isStructuredResultValue(oldValue) && isStructuredResultValue(value);
   return (
-    <div className={'yv-ds-result' + (structuredUpdate ? ' yv-ds-result-structured' : '')}>
+    <div className="yv-ds-result">
       <span className="yv-ds-result-name">{name}</span>
       <span className="yv-ds-result-arrow">→</span>
       <span className="yv-ds-result-operation">[{operation}]</span>
       <span className="yv-ds-result-position">[{position}]</span>
-      {structuredUpdate ? (
-        <div className="yv-ds-result-structured-values">
-          <div className="yv-ds-result-snapshot">
-            <span className="yv-ds-result-snapshot-label">Before</span>
-            <DataValue value={oldValue} state={previousState} source={source} depth={1}/>
-          </div>
-          <span className="yv-ds-result-transition" aria-hidden="true">→</span>
-          <div className="yv-ds-result-snapshot is-current">
-            <span className="yv-ds-result-snapshot-label">After</span>
-            <DataValue value={value} state={state} source={source} depth={1}/>
-          </div>
-        </div>
-      ) : (
-        <span className="yv-ds-result-value">
-          {showOld && <span className="yv-ds-result-old">{compactValue(oldValue)}</span>}
-          {showOld && <span className="yv-ds-result-transition">→</span>}
-          <span className={showOld ? 'yv-ds-result-new' : ''}>{compactValue(value)}</span>
-        </span>
-      )}
+      <span className="yv-ds-result-value">
+        {showOld && <span className="yv-ds-result-old">{executionValueSummary(oldValue)}</span>}
+        {showOld && <span className="yv-ds-result-transition">→</span>}
+        <span className={showOld ? 'yv-ds-result-new' : ''}>{executionValueSummary(value)}</span>
+      </span>
     </div>
   );
 }
@@ -888,7 +879,7 @@ export function dataStructureResults(current?: TraceState, previous?: TraceState
   const add = (key:string,name:string,operation:string,value:unknown,position:string,oldValue?:unknown,showOld=oldValue!==undefined) => {
     if (seen.has(key) || name === 'this' || value === undefined) return;
     seen.add(key);
-    rows.push(<DataStructureResult key={key} name={name} operation={operation} value={value} oldValue={oldValue} position={position} showOld={showOld} state={current} previousState={previous} source={statement}/>);
+    rows.push(<DataStructureResult key={key} name={name} operation={operation} value={value} oldValue={oldValue} position={position} showOld={showOld}/>);
   };
 
   const before = {
