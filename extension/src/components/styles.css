@@ -2701,3 +2701,23 @@
 .yv-graph-legend-line{display:inline-block;width:15px;height:0;border-top:1.5px solid var(--yv-muted)}
 .yv-graph-node-status{padding:1px 4px;border-radius:4px;background:color-mix(in srgb,var(--yv-accent),transparent 86%);color:var(--yv-accent);font-size:9px}
 .yv-graph-node-status-created{background:color-mix(in srgb,var(--yv-success,#4ade80),transparent 84%);color:var(--yv-success,#4ade80)}
+
+
+/* Compact nested values in map rows; full runtime data stays available on demand. */
+.yv-compact-value{min-width:0;max-width:100%;font-size:11px}
+.yv-compact-value>summary{display:flex;align-items:center;gap:7px;max-width:100%;min-height:24px;cursor:pointer;list-style:none;color:var(--yv-text)}
+.yv-compact-value>summary::-webkit-details-marker{display:none}
+.yv-compact-value>summary::before{content:"›";display:inline-flex;align-items:center;justify-content:center;flex:0 0 14px;width:14px;height:14px;border:1px solid var(--yv-border);border-radius:4px;color:var(--yv-muted);font-size:14px;line-height:1}
+.yv-compact-value[open]>summary::before{content:"⌄"}
+.yv-compact-value-summary{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.yv-compact-value-toggle{flex:0 0 auto;color:var(--yv-muted);font-size:9px}
+.yv-compact-value-details{margin:6px 0 2px 8px;padding:7px;border-left:2px solid var(--yv-border);min-width:0;max-width:100%;overflow-x:auto}
+.yv-map-row>div{overflow-wrap:anywhere}
+.yv-map-key .yv-compact-value{display:inline-block}
+.yv-graph-inspector{min-width:0}
+.yv-graph-inspector-heading strong{font-size:14px;line-height:1.4;overflow-wrap:anywhere}
+.yv-graph-inspector-fields{gap:8px}
+.yv-graph-inspector-field{min-width:0}
+.yv-graph-inspector-field strong{overflow-wrap:anywhere;font-size:12px}
+.yv-graph-neighbor{min-width:0}
+.yv-graph-neighbor span{overflow-wrap:anywhere}
