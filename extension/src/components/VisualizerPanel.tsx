@@ -3260,13 +3260,24 @@ export function GraphView({ objects, variables = {}, state }: {
   const changedNodeIds = new Set<string>();
   const enteredNodeIds = new Set<string>();
   const createdNodeIds = new Set<string>();
-  if (state && previous && session.states.includes(state)) {
+  const previousLabels = new Map<string, unknown>();
+  const changedMetadata = new Map<string, string[]>();
+  const metadataFields = ['visited', 'dist', 'distance', 'depth', 'level', 'color', 'state', 'status', 'weight', 'indegree', 'inDegree', 'component', 'low', 'disc', 'time', 'rank'];
+  const hasPair = Boolean(state && previous && session.states.includes(state));
+  if (hasPair && previous) {
     for (const [key, value] of Object.entries(objects)) {
       if (!isPlainObject(value) || !looksGraphNode(value)) continue;
       const id = typeof value.$objectId === 'string' ? value.$objectId : key;
       const before = objectByGraphId(previousObjects, id);
       if (before === undefined) createdNodeIds.add(id);
-      else if (isPlainObject(before) && graphNodeSignature(before, previousObjects) !== graphNodeSignature(value, objects)) changedNodeIds.add(id);
+      else if (isPlainObject(before)) {
+        if (graphNodeSignature(before, previousObjects) !== graphNodeSignature(value, objects)) changedNodeIds.add(id);
+        const beforeFields = objectFields(before);
+        const afterFields = objectFields(value);
+        if (valueChanged(nodeValue(before), nodeValue(value))) previousLabels.set(id, nodeValue(before));
+        const names = metadataFields.filter(name => name in afterFields && valueChanged(beforeFields[name], afterFields[name]));
+        if (names.length) changedMetadata.set(id, names);
+      }
     }
     for (const [name, value] of Object.entries(variables)) {
       const currentId = graphReferenceId(value, objects);
@@ -3305,6 +3316,7 @@ export function GraphView({ objects, variables = {}, state }: {
   const nodes = [...currentNodes, ...previousGraphNodes].slice(0, 80);
   const omittedNodeCount = Math.max(0, allNodes.length + previousGraphNodes.length - nodes.length);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [hoverId, setHoverId] = useState<string | undefined>(undefined);
   const [zoom, setZoom] = useState(1);
   const graphInstanceId = useId().replace(/:/g, '');
   useEffect(() => {
@@ -3355,6 +3367,7 @@ export function GraphView({ objects, variables = {}, state }: {
   }
   const graphWidth = Math.max(600, Math.max(1, nodes.length ? Math.max(...[...positions.values()].map(point => point.x)) : 0) + 90);
   const graphHeight = Math.max(320, Math.max(1, nodes.length ? Math.max(...[...positions.values()].map(point => point.y)) : 0) + 65);
+  const trail = selectedIndex >= 0 ? graphVisitTrail(session.states, selectedIndex) : undefined;
   const traversedEdgePairs = new Set<string>();
   if (previous) {
     for (const [name, currentValue] of Object.entries(variables)) {
@@ -3392,7 +3405,8 @@ export function GraphView({ objects, variables = {}, state }: {
     currentEdgeCounts.set(pair, occurrence + 1);
     const added = Boolean(previous && occurrence >= (previousEdgeCounts.get(pair) ?? 0));
     return [{ key: pair + ':' + index, from: node.id, to: target, parallelIndex: occurrence, status: added ? 'added' as const :
-      traversedEdgePairs.has(node.id + ':' + target) ? 'traversed' as const : 'steady' as const }];
+      traversedEdgePairs.has(node.id + ':' + target) ? 'traversed' as const :
+      trail?.hops.has(node.id + '>' + target) ? 'trail' as const : 'steady' as const }];
   }));
   const allNodeIds = new Set(allNodes.map(node => node.id));
   const allCapturedEdgeCount = allNodes.reduce((total, node) => total + node.neighbors.filter(neighbor => {
@@ -3416,10 +3430,16 @@ export function GraphView({ objects, variables = {}, state }: {
     pointerNames.set(id, [...(pointerNames.get(id) ?? []), name]);
   }
 
+  const neighborOfHover = new Set<string>();
+  if (hoverId) for (const edge of [...edges, ...removedEdges]) {
+    if (edge.from === hoverId) neighborOfHover.add(edge.to);
+    if (edge.to === hoverId) neighborOfHover.add(edge.from);
+  }
+
   if (!nodes.length) return <div className="yv-empty">No graph nodes captured.</div>;
 
   return (
-    <div className="yv-graph" data-graph-node-count={nodes.length} data-graph-live-node-count={currentNodes.length} data-graph-edge-count={edges.length}>
+    <div className={`yv-graph${hoverId ? ' is-hovering' : ''}`} data-graph-node-count={nodes.length} data-graph-live-node-count={currentNodes.length} data-graph-edge-count={edges.length}>
       <div className="yv-collection-meta">
         <span>Adjacency graph</span>
         <span>{currentNodes.length} live nodes · {edges.length} links{omittedNodeCount ? ` · ${omittedNodeCount} nodes omitted` : ''}{omittedEdgeCount ? ` · ${omittedEdgeCount} links hidden by display limit` : ''}</span>
@@ -3441,19 +3461,18 @@ export function GraphView({ objects, variables = {}, state }: {
       </div>
       <div className="yv-graph-layout">
         <div className="yv-graph-canvas" data-graph-zoom={zoom}><div className="yv-graph-stage" style={{ width: `${graphWidth}px`, height: `${graphHeight}px`, transform: `scale(${zoom})`, transformOrigin: "top left" }}>
-          <svg width={graphWidth} height={graphHeight} viewBox={`0 0 ${graphWidth} ${graphHeight}`} preserveAspectRatio="xMidYMid meet" aria-label="Graph links"
+          <svg className="yv-graph-links" width={graphWidth} height={graphHeight} viewBox={`0 0 ${graphWidth} ${graphHeight}`} preserveAspectRatio="xMidYMid meet" aria-label="Graph links"
             style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}>
             <defs>
-              <marker id={`yv-graph-arrow-${graphInstanceId}`} markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
-                <path d="M0,0 L7,3.5 L0,7 z" fill="var(--yv-muted, #8b9bb4)" />
+              <marker id={`yv-graph-arrow-${graphInstanceId}`} className="yv-graph-arrow" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+                <path d="M0,0 L7,3.5 L0,7 z" />
               </marker>
             </defs>
             {[...edges, ...removedEdges].map(edge => {
               const from = positions.get(edge.from);
               const to = positions.get(edge.to);
               if (!from || !to) return null;
-              const stroke = edge.status === 'added' || edge.status === 'traversed' ? 'var(--yv-accent, #65a9ff)'
-                : edge.status === 'removed' ? 'var(--yv-warning, #f59e0b)' : 'var(--yv-muted, #8b9bb4)';
+              const incident = Boolean(hoverId && (edge.from === hoverId || edge.to === hoverId));
               const parallelOffset = (((edge.parallelIndex ?? 0) % 2 === 0
                 ? Math.ceil((edge.parallelIndex ?? 0) / 2)
                 : -Math.ceil((edge.parallelIndex ?? 0) / 2)) * 16) +
@@ -3461,12 +3480,11 @@ export function GraphView({ objects, variables = {}, state }: {
                   ? (edge.from.localeCompare(edge.to) < 0 ? 12 : -12) : 0);
               if (edge.from === edge.to) {
                 const radius = 38 + (edge.parallelIndex ?? 0) * 13;
-                return <path key={edge.key + (edge.status !== 'steady' ? ':' + selectedIndex : '')} className={`yv-graph-edge yv-graph-edge-${edge.status}`}
+                return <path key={edge.key + (edge.status !== 'steady' ? ':' + selectedIndex : '')} className={`yv-graph-edge yv-graph-edge-${edge.status}${incident ? ' is-incident' : ''}`}
                   data-graph-edge-from={edge.from} data-graph-edge-to={edge.to}
                   data-graph-edge-status={edge.status} data-graph-edge-parallel-index={edge.parallelIndex ?? 0}
                   d={`M ${from.x + 18} ${from.y - 16} C ${from.x + radius} ${from.y - radius - 18}, ${from.x - radius} ${from.y - radius - 18}, ${from.x - 18} ${from.y - 16}`}
-                  fill="none" stroke={stroke} strokeDasharray={edge.status === 'removed' ? '4 3' : undefined}
-                  opacity={edge.status === 'removed' ? 0.65 : 1} strokeWidth={edge.status === 'traversed' ? 2.5 : 1.5} markerEnd={`url(#yv-graph-arrow-${graphInstanceId})`} />;
+                  fill="none" markerEnd={`url(#yv-graph-arrow-${graphInstanceId})`} />;
               }
               const dx = to.x - from.x, dy = to.y - from.y;
               const length = Math.max(1, Math.hypot(dx, dy));
@@ -3474,7 +3492,7 @@ export function GraphView({ objects, variables = {}, state }: {
               const x2 = to.x - dx / length * 50, y2 = to.y - dy / length * 30;
               const cx = (x1 + x2) / 2 - (dy / length) * parallelOffset;
               const cy = (y1 + y2) / 2 + (dx / length) * parallelOffset;
-              return <path key={edge.key + (edge.status !== 'steady' ? ':' + selectedIndex : '')} className={`yv-graph-edge yv-graph-edge-${edge.status}`}
+              return <path key={edge.key + (edge.status !== 'steady' ? ':' + selectedIndex : '')} className={`yv-graph-edge yv-graph-edge-${edge.status}${incident ? ' is-incident' : ''}`}
                 data-graph-edge-from={edge.from} data-graph-edge-to={edge.to}
                 data-graph-edge-status={edge.status} data-graph-edge-parallel-index={edge.parallelIndex ?? 0}
                 d={`M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`}
@@ -3487,27 +3505,49 @@ export function GraphView({ objects, variables = {}, state }: {
             const pointers = pointerNames.get(node.id) ?? [];
             const changed = changedNodeIds.has(node.id);
             const entered = enteredNodeIds.has(node.id);
+            const created = createdNodeIds.has(node.id);
             const selected = selectedNode?.id === node.id;
             const removed = node.removed;
-            return <div key={node.id + ((changed || entered || createdNodeIds.has(node.id)) ? ':' + selectedIndex : '')}
-              className={'yv-graph-node' + (selected ? ' yv-graph-node-selected' : '') + (changed ? ' yv-graph-node-changed' : '') + (entered ? ' yv-graph-node-entered' : '') + (createdNodeIds.has(node.id) ? ' yv-graph-node-created' : '') + (removed ? ' yv-graph-node-removed' : '')}
+            const previousLabel = previousLabels.get(node.id);
+            const valueUpdated = previousLabels.has(node.id);
+            const metadata = Object.entries(objectFields(node.value)).filter(([name, value]) =>
+              metadataFields.includes(name) && (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'));
+            const flashed = changedMetadata.get(node.id) ?? [];
+            const orders = trail?.orders.get(node.id);
+            const classes = 'yv-graph-node' + (selected ? ' yv-graph-node-selected' : '') + (changed ? ' yv-graph-node-changed' : '')
+              + (entered ? ' yv-graph-node-entered' : '') + (created ? ' yv-graph-node-created' : '')
+              + (removed ? ' yv-graph-node-removed' : '') + (valueUpdated ? ' yv-graph-node-value-changed' : '')
+              + (pointers.length ? ' yv-graph-node-pointed' : '') + (hoverId === node.id ? ' is-hovered' : '')
+              + (hoverId && neighborOfHover.has(node.id) ? ' is-neighbor' : '');
+            return <div key={node.id + ((changed || entered || created || valueUpdated) ? ':' + selectedIndex : '')}
+              className={classes}
               data-graph-node-id={node.id} data-graph-selected={selected ? 'true' : undefined}
               data-graph-changed={changed ? 'true' : undefined} data-graph-entered={entered ? 'true' : undefined}
-              data-graph-created={createdNodeIds.has(node.id) ? 'true' : undefined}
+              data-graph-created={created ? 'true' : undefined}
               role="button" tabIndex={0} aria-pressed={selected}
-              aria-label={`Select node ${compactValue(node.label)}`}
+              aria-label={`Select graph node ${compactValue(node.label)}`}
+              onMouseEnter={() => setHoverId(node.id)} onMouseLeave={() => setHoverId(undefined)}
+              onFocus={() => setHoverId(node.id)} onBlur={() => setHoverId(undefined)}
               onClick={() => setSelectedNodeId(node.id)}
               onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedNodeId(node.id); } }}
-              style={{ position: 'absolute', left: `${(point.x / graphWidth) * 100}%`, top: `${(point.y / graphHeight) * 100}%`, transform: 'translate(-50%, -50%)', width: 'clamp(68px, 15.7%, 94px)', minHeight: 42,
-                boxSizing: 'border-box', display: 'flex', flexDirection: 'column', alignItems: 'center',
-                justifyContent: 'center', gap: 2, padding: '5px 6px', border: '1px solid var(--yv-accent, #65a9ff)',
-                borderRadius: 10, background: changed ? 'var(--yv-highlight, #203b5b)' : 'var(--yv-panel, #101b2d)', color: 'var(--yv-text, #f3f6ff)',
-                boxShadow: selected ? '0 0 0 3px color-mix(in srgb,var(--yv-accent,#65a9ff),transparent 38%)' : entered ? '0 0 0 3px color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 55%)' : changed ? '0 0 0 2px color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 55%)' : '0 2px 8px rgba(0,0,0,.2)', textAlign: 'center', fontSize: 12, zIndex: selected ? 2 : 1, cursor: 'pointer' }}>
-              <span>{compactValue(node.label)}</span>
-              <span style={{ color: 'var(--yv-accent, #65a9ff)', fontSize: 10 }}>object {node.id}</span>
-              {removed && <span className="yv-graph-node-status yv-graph-node-status-removed">removed</span>}{!removed && createdNodeIds.has(node.id) && <span className="yv-graph-node-status yv-graph-node-status-created">created</span>}
-              {!removed && !createdNodeIds.has(node.id) && changed && <span className="yv-graph-node-status">updated</span>}
-              {pointers.length > 0 && <span style={{ color: 'var(--yv-muted, #8b9bb4)', fontSize: 10 }}>{pointers.join(' · ')}</span>}
+              style={{ left: point.x - 27, top: point.y - 27 }}>
+              {(created || valueUpdated || (changed && !valueUpdated && !created) || entered || removed) && <span className="yv-graph-node-badges">
+                {created && <span className="yv-graph-node-badge is-created yv-tree-operation-badge">NODE CREATED</span>}
+                {valueUpdated && <span className="yv-graph-node-badge is-changed yv-tree-operation-badge">{compactValue(previousLabel)} → {compactValue(node.label)}</span>}
+                {changed && !valueUpdated && !created && !removed && <span className="yv-graph-node-badge is-changed yv-tree-operation-badge">NODE UPDATED</span>}
+                {entered && <span className="yv-graph-node-badge is-current yv-tree-operation-badge">VISITED</span>}
+                {removed && <span className="yv-graph-node-badge is-removed yv-tree-operation-badge">NODE REMOVED</span>}
+              </span>}
+              {pointers.length > 0 && !removed && <span className="yv-graph-node-flags">
+                {pointers.map(name => <span className="yv-graph-node-flag" key={name} title={name + ' points to this vertex'}>{name}</span>)}
+              </span>}
+              <span className="yv-graph-node-value">{compactValue(node.label)}</span>
+              {orders && orders.length > 0 && <span className="yv-graph-node-trail" title={'Visit order: ' + orders.join(', ')}>{orders.slice(-3).join('·')}</span>}
+              <span className="yv-graph-node-id">{node.id}</span>
+              {metadata.length > 0 && !removed && <span className="yv-graph-node-meta">
+                {metadata.map(([name, metadataValue]) => <span key={name} className={'yv-graph-chip' + (flashed.includes(name) ? ' yv-graph-chip-changed' : '')}
+                  data-meta-name={name} data-meta-value={String(metadataValue)}>{name}={displayValue(metadataValue)}</span>)}
+              </span>}
             </div>;
           })}
         </div></div>
@@ -3541,6 +3581,34 @@ export function GraphView({ objects, variables = {}, state }: {
       </div>
     </div>
   );
+}
+
+
+const graphTrailCache = new WeakMap<object, { index: number; value: { orders: Map<string, number[]>; hops: Set<string> } }>();
+function graphVisitTrail(states: TraceState[], index: number) {
+  const cached = graphTrailCache.get(states);
+  if (cached && cached.index === index) return cached.value;
+  const orders = new Map<string, number[]>();
+  const hops = new Set<string>();
+  let last: string | undefined;
+  let count = 0;
+  for (let i = 1; i <= index && i < states.length; i += 1) {
+    const before = states[i - 1]!;
+    const after = states[i]!;
+    for (const [name, pointerValue] of Object.entries(after.variables ?? {})) {
+      const target = graphReferenceId(pointerValue, after.objects ?? {});
+      if (!target || target === graphReferenceId(before.variables?.[name], before.objects ?? {}) || target === last) continue;
+      count += 1;
+      const list = orders.get(target) ?? [];
+      list.push(count);
+      orders.set(target, list);
+      if (last) hops.add(last + '>' + target);
+      last = target;
+    }
+  }
+  const value = { orders, hops };
+  graphTrailCache.set(states, { index, value });
+  return value;
 }
 
 export function LinkedListView({

@@ -1072,6 +1072,33 @@ describe('graph data structure visualization', () => {
     }
   });
 
+  it('shows old-to-new value badges and changed metadata chips from captured snapshots', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 119,
+      variables: { current: { $objectId: 'g1' } },
+      objects: { g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, visited: false, dist: 0, neighbors: { values: [{ $ref: 'g2' }] } } },
+        g2: { $objectId: 'g2', $type: 'Node', fields: { val: 2, neighbors: { values: [] } } } },
+    });
+    const current = state({
+      sequence: 120,
+      variables: { current: { $objectId: 'g2' } },
+      objects: { g1: { $objectId: 'g1', $type: 'Node', fields: { val: 9, visited: true, dist: 3, neighbors: { values: [{ $ref: 'g2' }] } } },
+        g2: { $objectId: 'g2', $type: 'Node', fields: { val: 2, neighbors: { values: [] } } } },
+    });
+    try {
+      sessionStore.set({ source: 'g1.val = 9; current = g2;', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<GraphView objects={current.objects} variables={current.variables} state={current} />);
+      expect(html).toContain('1 → 9');
+      expect(html).toContain('data-meta-name="visited" data-meta-value="true"');
+      expect(html).toContain('data-meta-name="dist" data-meta-value="3"');
+      expect(html).toContain('yv-graph-chip-changed');
+      expect(html).toContain('NODE UPDATED');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
   it('uses unique arrow marker IDs when multiple graph views are mounted', () => {
     const objects = {
       g1: { $objectId: 'g1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'g1' }] } } },
