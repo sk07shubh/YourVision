@@ -3027,6 +3027,26 @@ function graphNeighborValues(value: Obj): unknown[] | undefined {
   return neighbors == null ? [] : undefined;
 }
 
+function objectByGraphId(objects: Record<string, unknown>, id: string): unknown {
+  if (objects[id] !== undefined) return objects[id];
+  for (const value of Object.values(objects)) {
+    if (isPlainObject(value) && value.$objectId === id) return value;
+  }
+  return undefined;
+}
+
+function graphNodeSignature(value: Obj, objects: Record<string, unknown>): string {
+  const fields = objectFields(value);
+  const visibleFields = Object.fromEntries(Object.entries(fields)
+    .filter(([key]) => key !== 'neighbors')
+    .map(([key, fieldValue]) => [key, isPlainObject(fieldValue)
+      ? (graphReferenceId(fieldValue, objects) ?? (typeof fieldValue.$type === 'string' ? fieldValue.$type : '[object]'))
+      : fieldValue]));
+  const neighbors = (graphNeighborValues(value) ?? []).map(neighbor =>
+    graphReferenceId(neighbor, objects) ?? (isPlainObject(neighbor) ? '[unresolved reference]' : neighbor));
+  return stableStringify({ fields: visibleFields, neighbors });
+}
+
 function graphReferenceId(value: unknown, objects: Record<string, unknown>): string | undefined {
   if (!isPlainObject(value)) return undefined;
   if (typeof value.$objectId === 'string') return value.$objectId;
@@ -3244,9 +3264,9 @@ export function GraphView({ objects, variables = {}, state }: {
     for (const [key, value] of Object.entries(objects)) {
       if (!isPlainObject(value) || !looksGraphNode(value)) continue;
       const id = typeof value.$objectId === 'string' ? value.$objectId : key;
-      const before = previousObjects[id];
+      const before = objectByGraphId(previousObjects, id);
       if (before === undefined) createdNodeIds.add(id);
-      else if (stableStringify(before) !== stableStringify(value)) changedNodeIds.add(id);
+      else if (isPlainObject(before) && graphNodeSignature(before, previousObjects) !== graphNodeSignature(value, objects)) changedNodeIds.add(id);
     }
     for (const [name, value] of Object.entries(variables)) {
       const currentId = graphReferenceId(value, objects);
@@ -3298,6 +3318,7 @@ export function GraphView({ objects, variables = {}, state }: {
   const selectedNeighborIds = selectedNode
     ? selectedNode.neighbors.map(neighbor => graphReferenceId(neighbor, objects)).filter((id): id is string => Boolean(id))
     : [];
+  const selectedFields = selectedNode ? Object.entries(objectFields(selectedNode.value)).filter(([key]) => key !== 'neighbors') : [];
   const positionSession = useRef(session.states[0]);
   const stableGraphPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
   if (positionSession.current !== session.states[0]) {
@@ -3470,6 +3491,13 @@ export function GraphView({ objects, variables = {}, state }: {
           <div className="yv-graph-inspector-fields">
             <div className="yv-graph-inspector-field"><span>Value</span><strong>{compactValue(selectedNode.label)}</strong></div>
             <div className="yv-graph-inspector-field"><span>Neighbors</span><strong>{selectedNeighborIds.length}</strong></div>
+          </div>
+          <div className="yv-graph-inspector-object-fields" aria-label="Node fields">
+            <span className="yv-graph-inspector-kicker">FIELDS</span>
+            {selectedFields.length
+              ? selectedFields.slice(0, 8).map(([name, value]) => <div className="yv-graph-inspector-field" key={name}><span>{name}</span><strong>{compactValue(value)}</strong></div>)
+              : <span className="yv-graph-no-neighbors">No captured fields</span>}
+            {selectedFields.length > 8 && <span className="yv-graph-no-neighbors">+{selectedFields.length - 8} more fields</span>}
           </div>
           <div className="yv-graph-neighbors"><span>CONNECTED TO</span>
             {selectedNeighborIds.length
