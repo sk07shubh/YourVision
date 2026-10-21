@@ -936,6 +936,35 @@ describe('graph data structure visualization', () => {
     expect(html).toContain('start');
   });
 
+  it('separates the original and cloned graph into labeled cards and pairs matching nodes', () => {
+    const priorSession = sessionStore.get();
+    const current = state({
+      sequence: 80,
+      variables: { node: { $objectId: 'original-1' } },
+      objects: {
+        'original-1': { $objectId: 'original-1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'original-2' }] } } },
+        'original-2': { $objectId: 'original-2', $type: 'Node', fields: { val: 2, neighbors: { values: [{ $ref: 'original-1' }] } } },
+        'clone-1': { $objectId: 'clone-1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'clone-2' }] } } },
+        'clone-2': { $objectId: 'clone-2', $type: 'Node', fields: { val: 2, neighbors: { values: [{ $ref: 'clone-1' }] } } },
+      },
+    });
+    try {
+      sessionStore.set({
+        source: 'class Solution { Node cloneGraph(Node node) { return node; } }',
+        states: [current],
+        index: 0,
+      });
+      const html = renderToStaticMarkup(<GraphView objects={current.objects} variables={current.variables} state={current} />);
+      expect(html).toContain('data-graph-component-title="Original graph"');
+      expect(html).toContain('data-graph-component-title="Cloned graph"');
+      expect(html).toContain('data-graph-node-id="clone-1" data-graph-selected="true" data-graph-paired="true"');
+      expect(html).toContain('data-graph-node-id="original-1"');
+      expect(html).toContain('data-graph-component="1"');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
   it('highlights graph nodes entered by a pointer moving on the current trace step', () => {
     const priorSession = sessionStore.get();
     const previous = state({
