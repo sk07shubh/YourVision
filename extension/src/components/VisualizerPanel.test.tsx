@@ -430,6 +430,33 @@ describe('design-class instance state visualization', () => {
   });
 });
 
+describe('independently scrollable nested maps', () => {
+  it('bounds each large nested map separately when a parent contains multiple structures', () => {
+    const entries = (prefix: string) => [1, 2, 3, 4].map(n => ({
+      key: prefix + n,
+      value: n,
+    }));
+    const current = state({
+      dataStructures: {
+        outer: {
+          $mapId: 'outer-map',
+          $type: 'java.util.HashMap',
+          entries: [
+            { key: 'left', value: { $mapId: 'left-map', $type: 'java.util.HashMap', entries: entries('l') } },
+            { key: 'right', value: { $mapId: 'right-map', $type: 'java.util.HashMap', entries: entries('r') } },
+          ],
+        },
+      },
+    });
+
+    const html = renderToStaticMarkup(<DataStructures state={current} source="inspect(outer);" />);
+    expect((html.match(/yv-map-table-scroll/g) ?? []).length).toBe(3);
+    expect(html).toContain('data-map-id="outer-map"');
+    expect(html).toContain('data-map-id="left-map"');
+    expect(html).toContain('data-map-id="right-map"');
+  });
+});
+
 describe('linked-list graph visualization', () => {
   it('preserves node identity, aliases, and explicit null termination', () => {
     const current = state({
