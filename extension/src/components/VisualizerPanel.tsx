@@ -3434,13 +3434,74 @@ export function GraphView({ objects, variables = {}, state }: {
     }
     layoutSignature.current = layoutSignatureValue;
   }
-  const positions = new Map<string, { x: number; y: number }>();
+  // Split disconnected components into separately framed cards. This is
+  // important for Clone Graph: original and cloned vertices must not appear
+  // to belong to one shared object network.
+  const graphNeighborsById = new Map(nodes.map(node => [node.id, new Set<string>()]));
   for (const node of nodes) {
-    const position = stablePositions.get(node.id);
-    if (position) positions.set(node.id, position);
+    for (const neighbor of node.neighbors) {
+      const target = graphReferenceId(neighbor, objects);
+      if (!target || !graphNeighborsById.has(target)) continue;
+      graphNeighborsById.get(node.id)?.add(target);
+      graphNeighborsById.get(target)?.add(node.id);
+    }
   }
-  const graphWidth = Math.max(600, Math.max(1, nodes.length ? Math.max(...[...positions.values()].map(point => point.x)) : 0) + 115);
-  const graphHeight = Math.max(320, Math.max(1, nodes.length ? Math.max(...[...positions.values()].map(point => point.y)) : 0) + 115);
+  const graphComponents: Array<{ id: string; nodes: typeof nodes }> = [];
+  const visitedGraphNodeIds = new Set<string>();
+  for (const node of nodes) {
+    if (visitedGraphNodeIds.has(node.id)) continue;
+    const pending = [node.id];
+    const componentNodes: typeof nodes = [];
+    visitedGraphNodeIds.add(node.id);
+    while (pending.length) {
+      const id = pending.pop()!;
+      const componentNode = nodes.find(candidate => candidate.id === id);
+      if (componentNode) componentNodes.push(componentNode);
+      for (const neighborId of graphNeighborsById.get(id) ?? []) {
+        if (visitedGraphNodeIds.has(neighborId)) continue;
+        visitedGraphNodeIds.add(neighborId);
+        pending.push(neighborId);
+      }
+    }
+    graphComponents.push({ id: node.id, nodes: componentNodes });
+  }
+  const graphComponentIndexByNodeId = new Map<string, number>();
+  graphComponents.forEach((component, index) =>
+    component.nodes.forEach(node => graphComponentIndexByNodeId.set(node.id, index)));
+  const cloneGraphParameter = session.source.match(/cloneGraph\\s*\\(\\s*([A-Za-z_$][\\w$]*)/)?.[1];
+  const originalGraphRootId = cloneGraphParameter ? graphReferenceId(variables[cloneGraphParameter], objects) : undefined;
+  const isCloneGraphTrace = Boolean(cloneGraphParameter && graphComponents.length > 1);
+  const graphComponentTitles = graphComponents.map((component, index) => {
+    if (isCloneGraphTrace && component.nodes.some(node => node.id === originalGraphRootId)) return "Original graph";
+    if (isCloneGraphTrace) return graphComponents.filter(candidate =>
+      !candidate.nodes.some(node => node.id === originalGraphRootId)).length === 1
+      ? "Cloned graph" : "Cloned graph · part " + (index + 1);
+    return graphComponents.length > 1 ? "Graph " + (index + 1) : "Graph";
+  });
+  const componentLayouts = graphComponents.map(component => {
+    const points = component.nodes.map(node => stablePositions.get(node.id) ?? { x: 95, y: 105 });
+    const minX = Math.min(...points.map(point => point.x));
+    const minY = Math.min(...points.map(point => point.y));
+    const maxX = Math.max(...points.map(point => point.x));
+    const maxY = Math.max(...points.map(point => point.y));
+    return { minX, minY, width: Math.max(620, maxX - minX + 140), height: Math.max(190, maxY - minY + 125) };
+  });
+  const positions = new Map<string, { x: number; y: number }>();
+  const graphComponentCards: Array<{ index: number; title: string; x: number; y: number; width: number; height: number }> = [];
+  let componentOffsetX = 0;
+  let graphHeight = 320;
+  for (const [componentIndex, component] of graphComponents.entries()) {
+    const layout = componentLayouts[componentIndex]!;
+    graphComponentCards.push({ index: componentIndex, title: graphComponentTitles[componentIndex]!,
+      x: componentOffsetX + 8, y: 10, width: layout.width - 16, height: layout.height });
+    for (const node of component.nodes) {
+      const point = stablePositions.get(node.id) ?? { x: layout.minX, y: layout.minY };
+      positions.set(node.id, { x: componentOffsetX + 70 + point.x - layout.minX, y: 70 + point.y - layout.minY });
+    }
+    componentOffsetX += layout.width;
+    graphHeight = Math.max(graphHeight, layout.height + 20);
+  }
+  const graphWidth = Math.max(600, componentOffsetX);
   const trail = selectedIndex >= 0 ? graphVisitTrail(session.states, selectedIndex) : undefined;
   const traversedEdgePairs = new Set<string>();
   if (previous) {
@@ -3537,6 +3598,11 @@ export function GraphView({ objects, variables = {}, state }: {
         <div className="yv-graph-canvas" data-graph-zoom={zoom} ref={graphCanvasRef}><div className="yv-graph-scaled" style={{ width: `${graphWidth * zoom}px`, height: `${graphHeight * zoom}px` }}><div className="yv-graph-stage" style={{ width: `${graphWidth}px`, height: `${graphHeight}px`, transform: `scale(${zoom})`, transformOrigin: "top left" }}>
           <svg className="yv-graph-links" width={graphWidth} height={graphHeight} viewBox={`0 0 ${graphWidth} ${graphHeight}`} preserveAspectRatio="xMidYMid meet" aria-label="Graph links"
             style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}>
+            {graphComponentCards.map(card => <g key={card.index} data-graph-component={card.index} data-graph-component-title={card.title}>
+              <rect x={card.x} y={card.y} width={card.width} height={card.height} rx="12"
+                fill="var(--yv-elevated, var(--yv-panel, #101b2d))" stroke="var(--yv-border, #334155)" strokeWidth="1.5" />
+              <text className="yv-graph-component-title" x={card.x + 16} y={card.y + 23} fill="var(--yv-text, #f3f6ff)" fontSize="13" fontWeight="600">{card.title}</text>
+            </g>)}
             <defs>
               <marker id={`yv-graph-arrow-${graphInstanceId}`} className="yv-graph-arrow" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
                 <path d="M0,0 L7,3.5 L0,7 z" />
@@ -3580,6 +3646,9 @@ export function GraphView({ objects, variables = {}, state }: {
             const entered = enteredNodeIds.has(node.id);
             const created = createdNodeIds.has(node.id);
             const selected = selectedNode?.id === node.id;
+            const paired = Boolean(isCloneGraphTrace && selectedNode && selectedNode.id !== node.id &&
+              graphComponentIndexByNodeId.get(selectedNode.id) !== graphComponentIndexByNodeId.get(node.id) &&
+              compactValue(selectedNode.label) === compactValue(node.label));
             const removed = node.removed;
             const previousLabel = previousLabels.get(node.id);
             const valueUpdated = previousLabels.has(node.id);
@@ -3593,8 +3662,10 @@ export function GraphView({ objects, variables = {}, state }: {
               + (pointers.length ? ' yv-graph-node-pointed' : '') + (hoverId === node.id ? ' is-hovered' : '')
               + (hoverId && neighborOfHover.has(node.id) ? ' is-neighbor' : '');
             return <div key={node.id + ((changed || entered || created || valueUpdated) ? ':' + selectedIndex : '')}
-              className={classes}
+              className={classes + (paired ? ' yv-graph-node-paired' : '')}
               data-graph-node-id={node.id} data-graph-selected={selected ? 'true' : undefined}
+              data-graph-paired={paired ? 'true' : undefined}
+              data-graph-component={graphComponentIndexByNodeId.get(node.id)}
               data-graph-changed={changed ? 'true' : undefined} data-graph-entered={entered ? 'true' : undefined}
               data-graph-created={created ? 'true' : undefined}
               role="button" tabIndex={0} aria-pressed={selected}
