@@ -3358,6 +3358,10 @@ export function GraphView({ objects, variables = {}, state }: {
       .map(neighbor => graphReferenceId(neighbor, objects) ?? '?').join(','))
   ).join('|');
   if (layoutSignature.current !== layoutSignatureValue) {
+    // Treat coordinates from earlier steps as anchors. Only newly encountered
+    // vertices move during layout, so advancing the trace cannot drag the
+    // existing graph down or rearrange it just because an edge changed.
+    const anchoredNodeIds = new Set(stablePositions.keys());
     const nodeIndex = new Map(nodes.map((node, index) => [node.id, index] as [string, number]));
     for (const [index, node] of nodes.entries()) {
       if (stablePositions.has(node.id)) continue;
@@ -3414,6 +3418,7 @@ export function GraphView({ objects, variables = {}, state }: {
       }
       const cooling = Math.max(0.35, 1 - iteration / 120);
       for (const node of nodes) {
+        if (anchoredNodeIds.has(node.id)) continue;
         const point = stablePositions.get(node.id)!;
         const force = forces.get(node.id)!;
         const dx = Math.max(-7, Math.min(7, force.x)) * cooling;
@@ -3421,14 +3426,11 @@ export function GraphView({ objects, variables = {}, state }: {
         stablePositions.set(node.id, { x: point.x + dx, y: point.y + dy });
       }
     }
-    // Keep the full layout inside positive stage coordinates, with room for labels.
-    const points = [...stablePositions.values()];
-    const minX = Math.min(...points.map(point => point.x));
-    const minY = Math.min(...points.map(point => point.y));
-    const shiftX = Math.max(0, 95 - minX);
-    const shiftY = Math.max(0, 105 - minY);
-    if (shiftX || shiftY) {
-      for (const [id, point] of stablePositions) stablePositions.set(id, { x: point.x + shiftX, y: point.y + shiftY });
+    // Clamp only new vertices; never translate the existing graph to make room.
+    for (const node of nodes) {
+      if (anchoredNodeIds.has(node.id)) continue;
+      const point = stablePositions.get(node.id)!;
+      stablePositions.set(node.id, { x: Math.max(95, point.x), y: Math.max(105, point.y) });
     }
     layoutSignature.current = layoutSignatureValue;
   }
