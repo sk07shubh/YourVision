@@ -2869,6 +2869,7 @@ function MapView({
   const deleted = changes.filter(
     change => change.kind === 'delete'
   );
+  const mapTableRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const syncSelection = (event: Event) => {
       const selectedId = (event as CustomEvent<string>).detail;
@@ -2883,7 +2884,6 @@ function MapView({
     window.addEventListener('yv-graph-node-selected', syncSelection);
     return () => window.removeEventListener('yv-graph-node-selected', syncSelection);
   }, []);
-  const mapTableRef = useRef<HTMLDivElement | null>(null);
   const previousMapRowRects = useRef<Map<string, DOMRect>>(new Map());
   const mapRowAnimations = useRef<WeakMap<HTMLElement, Animation>>(new WeakMap());
   useLayoutEffect(() => {
