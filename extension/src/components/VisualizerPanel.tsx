@@ -2869,6 +2869,8 @@ function MapView({
   const deleted = changes.filter(
     change => change.kind === 'delete'
   );
+  const largeNestedEntries = value.entries.filter(entry => isStructuredMapValue(entry.value)).length;
+  const shouldScrollMap = value.entries.length >= 4 || largeNestedEntries >= 2;
   const mapTableRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const syncSelection = (event: Event) => {
@@ -2930,7 +2932,7 @@ function MapView({
             : value.entries.length + ' entries'}</span>
       </div>
 
-      <div ref={mapTableRef} className={"yv-map-table" + (deleted.length ? ' yv-map-delete-pulse' : '')}
+      <div ref={mapTableRef} className={"yv-map-table" + (shouldScrollMap ? ' yv-map-table-scroll' : '') + (deleted.length ? ' yv-map-delete-pulse' : '')}
         data-map-delete-count={deleted.length || undefined}>
         <div className="yv-map-header">
           <div>Key</div>
