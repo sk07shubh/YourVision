@@ -936,6 +936,31 @@ describe('graph data structure visualization', () => {
     expect(html).toContain('start');
   });
 
+  it('renders original and cloned graphs as separate data-structure palettes', () => {
+    const priorSession = sessionStore.get();
+    const current = state({
+      variables: { node: { $objectId: 'original-1' } },
+      objects: {
+        'original-1': { $objectId: 'original-1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'original-2' }] } } },
+        'original-2': { $objectId: 'original-2', $type: 'Node', fields: { val: 2, neighbors: { values: [{ $ref: 'original-1' }] } } },
+        'clone-1': { $objectId: 'clone-1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'clone-2' }] } } },
+        'clone-2': { $objectId: 'clone-2', $type: 'Node', fields: { val: 2, neighbors: { values: [{ $ref: 'clone-1' }] } } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'class Solution { Node cloneGraph(Node node) { return node; } }', states: [current], index: 0 });
+      const html = renderToStaticMarkup(<DataStructures state={current} source="class Solution { Node cloneGraph(Node node) { return node; } }" />);
+      expect((html.match(/class="yv-ds"/g) ?? []).length).toBe(2);
+      expect(html).toContain('Original graph → node');
+      expect(html).toContain('Cloned graph → runtime nodes');
+      expect(html).toContain('data-graph-node-count="2"');
+      expect(html).not.toContain('data-graph-component-title="Original graph"');
+      expect(html).not.toContain('data-graph-component-title="Cloned graph"');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
   it('highlights graph nodes entered by a pointer moving on the current trace step', () => {
     const priorSession = sessionStore.get();
     const previous = state({
