@@ -626,11 +626,19 @@ function executionValueSummary(value: unknown): string {
     const scalar = fields.val ?? fields.value ?? fields.data;
     if (id) return label + ' #' + (id.length > 8 ? id.slice(-6) : id) +
       (scalar !== undefined ? ' (val=' + compactValue(scalar) + ')' : '');
-    if (isMapSnapshot(value) || isArraySnapshot(value) || isCollectionSnapshot(value)) return variableSummary(value);
+    if (isMapSnapshot(value) || isArraySnapshot(value)) return variableSummary(value);
+    if (isCollectionSnapshot(value)) {
+      const kind = typeof value.$type === 'string' ? value.$type.split('.').pop()! : 'Collection';
+      const count = Array.isArray(value.values) ? value.values.length : (typeof value.size === 'number' ? value.size : 0);
+      return kind + ' · ' + count + ' items';
+    }
     if (isPlainObject(value.fields)) return label;
   }
-  if (isMapSnapshot(value) || isArraySnapshot(value) || isCollectionSnapshot(value)) {
-    return variableSummary(value);
+  if (isMapSnapshot(value) || isArraySnapshot(value)) return variableSummary(value);
+  if (isCollectionSnapshot(value)) {
+    const kind = typeof value.$type === 'string' ? value.$type.split('.').pop()! : 'Collection';
+    const count = Array.isArray(value.values) ? value.values.length : (typeof value.size === 'number' ? value.size : 0);
+    return kind + ' · ' + count + ' items';
   }
   return compactValue(value);
 }
