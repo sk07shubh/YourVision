@@ -3326,6 +3326,8 @@ export function GraphView({ objects, variables = {}, state }: {
     positionSession.current = session.states[0];
   }
   const stablePositions = stableGraphPositions.current;
+  const visibleGraphNodeIds = new Set(nodes.map(node => node.id));
+  for (const id of stablePositions.keys()) if (!visibleGraphNodeIds.has(id)) stablePositions.delete(id);
   // Use a roomy grid: center spacing exceeds the node footprint, and the
   // scrollable stage grows instead of compressing an arbitrary graph into 600×320.
   const slots = Array.from({ length: 80 }, (_, index) => ({
