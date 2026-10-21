@@ -2940,3 +2940,8 @@
   border-top: 1px solid var(--yv-border);
   background: var(--yv-panel);
 }
+
+.yv-graph-scaled {
+  position: relative;
+  flex: 0 0 auto;
+}
