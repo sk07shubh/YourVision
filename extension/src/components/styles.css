@@ -2459,8 +2459,8 @@
   animation: yv-tree-child-remove 360ms ease-in both;
 }
 .yv-tree-connectors path.yv-tree-connector-added {
-  stroke-dasharray: 1000;
-  stroke-dashoffset: 1000;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
   animation: yv-tree-connector-draw 420ms ease-out forwards;
 }
 .yv-tree-connectors path.yv-tree-connector-traversed {
@@ -2820,8 +2820,8 @@
 }
 .yv-tree-connectors path.yv-tree-connector-added {
   stroke: var(--g-green, #2CBB5D);
-  stroke-dasharray: 1000;
-  stroke-dashoffset: 1000;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
   animation: yv-tree-connector-draw 420ms ease-out forwards;
 }
 .yv-tree-connectors path.yv-tree-connector-traversed {
@@ -3244,8 +3244,8 @@
 }
 .yv-tree-connectors path.yv-tree-connector-added {
   stroke: var(--g-green, #2CBB5D);
-  stroke-dasharray: 1000;
-  stroke-dashoffset: 1000;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
   animation: yv-tree-connector-draw 420ms ease-out forwards;
 }
 .yv-tree-connectors path.yv-tree-connector-traversed {
