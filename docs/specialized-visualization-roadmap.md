@@ -15,7 +15,8 @@ This work extends the existing YourVision visualization system. Preserve the est
 - [x] Highlight trie terminal nodes only when a captured terminal flag is explicitly true.
 - [x] Add conservative rotation/recolor transition cues only when adjacent snapshots establish the changed links, middle-subtree transfer, or explicit red/black metadata change.
 - [x] Add focused regression tests for snapshot-backed left/right rotations, null middle-subtree handling, ordinary reparenting false-positive prevention, and red-black recoloring.
-- [ ] Add focused regression tests for root replacement, null-child rotation cases, and historical replay.
+- [x] Add focused regression tests for root replacement after rotation and historical replay at the first captured snapshot.
+- [ ] Add broader double-rotation grouping tests and validate against real AVL/red-black traces.
 
 ### Tree families to implement
 - [ ] AVL trees: balance factors/heights and trace-backed rotations.
@@ -50,4 +51,4 @@ This work extends the existing YourVision visualization system. Preserve the est
 
 ## Current verification status
 
-The first specialized tree styling slice now includes snapshot-backed single-rotation pivot/demotion cues and explicit red-black recolor cues, with focused regression cases for observed rotations, false-positive prevention, and recoloring. The cues are deliberately conservative: double-rotation grouping and full AVL/red-black operation animations remain outstanding. Tests, typecheck, build, and real-trace checks have not yet been run for this branch.
+The first specialized tree styling slice now includes snapshot-backed single-rotation pivot/demotion cues and explicit red-black recolor cues, with focused regression cases for left/right rotations, null middle subtrees, root replacement, historical replay, false-positive prevention, and recoloring. The cues are deliberately conservative: double-rotation grouping and full AVL/red-black operation animations remain outstanding. Tests, typecheck, build, and real-trace checks have not yet been run for this branch.
