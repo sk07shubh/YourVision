@@ -3048,3 +3048,24 @@
   min-height: 0;
   max-height: min(42vh, 360px);
 }
+
+
+/* Compact graph sizing: let small graphs use only their actual content size.
+   The old fixed canvas/stage minimums left large empty panels around one- and
+   two-node graphs. Inline dimensions from GraphView already account for node
+   bounds and zoom, so let those dimensions drive the viewport. Large graphs
+   still get a capped, independently scrollable canvas. */
+.yv-graph-canvas {
+  height: auto;
+  min-height: 0;
+  max-height: min(55vh, 520px);
+  scrollbar-gutter: auto;
+}
+.yv-graph-stage {
+  min-width: 0;
+  min-height: 0;
+}
+.yv-graph-scaled {
+  min-width: 0;
+  min-height: 0;
+}
