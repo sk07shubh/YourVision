@@ -4258,7 +4258,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const nodeValueChanged = Boolean(hasPreviousSnapshot && valueChanged(nodeValue(previousFields), nodeValue(resolved)));
   // Only label a rotation when snapshots show the reciprocal parent/child move
   // and the middle subtree transferred to the vacated child slot.
-  const rotationCue = id && hasSnapshotPair ? treeRotationCue(id, previousObjects, objects) : undefined;
+  const rotationCue = id && hasSnapshotPair ? (treeDoubleRotationCue(id, previousObjects, objects) ?? treeRotationCue(id, previousObjects, objects)) : undefined;
   const changedMetadataNames = Object.keys(fields).filter(name =>
     ['color', 'isRed', 'isBlack', 'bf', 'balanceFactor', 'height', 'weight', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord'].includes(name) &&
     hasPreviousSnapshot && valueChanged(previousFields[name], fields[name])
@@ -4350,8 +4350,9 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
         </div>
         {trailOrders && trailOrders.length > 0 && <span className="yv-tree-trail-order" title={'Visit order: ' + trailOrders.join(', ')}>{trailOrders.slice(-3).join('·')}</span>}
         {created && <span className="yv-binary-node-status is-created yv-tree-operation-badge">NODE CREATED</span>}
-         {rotationCue?.role === 'pivot' && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-tree-rotation={rotationCue.direction} title="Inferred from observed parent/child and middle-subtree link changes">{rotationCue.direction.toUpperCase()} ROTATION · PIVOT</span>}
+         {rotationCue?.role === 'pivot' && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-tree-rotation={rotationCue.direction} title="Inferred from observed parent/child and transferred-subtree links">{rotationCue.direction.toUpperCase()} ROTATION · PIVOT</span>}
          {rotationCue?.role === 'demoted' && <span className="yv-tree-operation-badge yv-tree-rotation-demoted" data-tree-rotation={rotationCue.direction} title="This node moved below the rotation pivot in the captured topology">ROTATED DOWN</span>}
+         {rotationCue?.role === 'intermediate' && <span className="yv-tree-operation-badge yv-tree-rotation-demoted" data-tree-rotation={rotationCue.direction} title="This node participated in the observed double rotation">DOUBLE ROTATION · INNER</span>}
          {redBlackRecolored && <span className="yv-tree-operation-badge yv-tree-recolored-badge" data-tree-recolored="true" title="The captured red/black state changed between adjacent snapshots">RECOLORED {previousRedBlackColor?.toUpperCase()} → {redBlackColor?.toUpperCase()}</span>}
         {nodeValueChanged && <span className="yv-binary-node-status is-changed yv-tree-operation-badge yv-tree-value-delta" title="Value changed between adjacent execution snapshots">
           {compactValue(nodeValue(previousFields))} → {compactValue(nodeValue(resolved))}
@@ -4432,7 +4433,54 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   );
 }
 const TREE_CHILD_FIELD = /^(left|right|children|child\d+|firstChild|secondChild)$/i;
-type TreeRotationCue = { role: 'pivot' | 'demoted'; direction: 'left' | 'right' };
+type TreeRotationCue = { role: 'pivot' | 'demoted' | 'intermediate'; direction: 'left' | 'right' | 'left-right' | 'right-left' };
+
+/**
+ * Recognize an AVL-style double rotation only when the before/after snapshots
+ * establish the complete three-node topology and both transferred subtrees.
+ * This intentionally does not infer an operation from values or source names.
+ */
+function treeDoubleRotationCue(id: string, previousObjects: Record<string, unknown>, objects: Record<string, unknown>): TreeRotationCue | undefined {
+  const before = (nodeId: string, snapshot: Record<string, unknown>) => {
+    const raw = snapshot[nodeId];
+    return isPlainObject(raw) ? objectFields(raw) : undefined;
+  };
+  const ref = (fields: Obj | undefined, slot: 'left' | 'right', snapshot: Record<string, unknown>) =>
+    fields ? graphReferenceId(fields[slot], snapshot) : undefined;
+
+  for (const aId of Object.keys(previousObjects)) {
+    const aBefore = before(aId, previousObjects), aNow = before(aId, objects);
+    if (!aBefore || !aNow) continue;
+    for (const shape of ['left-right', 'right-left'] as const) {
+      const bId = ref(aBefore, shape === 'left-right' ? 'left' : 'right', previousObjects);
+      if (!bId) continue;
+      const bBefore = before(bId, previousObjects), bNow = before(bId, objects);
+      if (!bBefore || !bNow) continue;
+      const cId = ref(bBefore, shape === 'left-right' ? 'right' : 'left', previousObjects);
+      if (!cId) continue;
+      const cBefore = before(cId, previousObjects), cNow = before(cId, objects);
+      if (!cBefore || !cNow) continue;
+
+      const innerSlot = shape === 'left-right' ? 'left' : 'right';
+      const outerSlot = shape === 'left-right' ? 'right' : 'left';
+      const aTransferBefore = ref(cBefore, innerSlot, previousObjects);
+      const cTransferBefore = ref(cBefore, outerSlot, previousObjects);
+      const aChildNow = ref(aNow, shape === 'left-right' ? 'left' : 'right', objects);
+      const bChildNow = ref(bNow, shape === 'left-right' ? 'right' : 'left', objects);
+      const cInnerNow = ref(cNow, innerSlot, objects);
+      const cOuterNow = ref(cNow, outerSlot, objects);
+
+      const matches = aChildNow === cTransferBefore &&
+        bChildNow === aTransferBefore &&
+        cInnerNow === bId && cOuterNow === aId;
+      if (!matches) continue;
+      if (id === cId) return { role: 'pivot', direction: shape };
+      if (id === aId) return { role: 'demoted', direction: shape };
+      if (id === bId) return { role: 'intermediate', direction: shape };
+    }
+  }
+  return undefined;
+}
 
 /**
  * Infer a binary rotation only when adjacent snapshots show the reciprocal
