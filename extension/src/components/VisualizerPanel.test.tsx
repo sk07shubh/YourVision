@@ -3119,3 +3119,88 @@ describe('multiway tree leaf semantics', () => {
     expect(html).toContain('yv-tree-node-leaf');
   });
 });
+
+
+describe('snapshot-backed AVL double rotations', () => {
+  it('groups a left-right rotation only when both transferred subtrees match', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({ sequence: 431, objects: {
+      a: { $objectId: 'a', $type: 'AVLNode', fields: { val: 30, left: { $ref: 'b' }, right: null } },
+      b: { $objectId: 'b', $type: 'AVLNode', fields: { val: 10, left: null, right: { $ref: 'c' } } },
+      c: { $objectId: 'c', $type: 'AVLNode', fields: { val: 20, left: { $ref: 'beta' }, right: { $ref: 'gamma' } } },
+      beta: { $objectId: 'beta', $type: 'AVLNode', fields: { val: 15, left: null, right: null } },
+      gamma: { $objectId: 'gamma', $type: 'AVLNode', fields: { val: 25, left: null, right: null } },
+    }});
+    const current = state({ sequence: 432, objects: {
+      a: { $objectId: 'a', $type: 'AVLNode', fields: { val: 30, left: { $ref: 'beta' }, right: null } },
+      b: { $objectId: 'b', $type: 'AVLNode', fields: { val: 10, left: null, right: { $ref: 'gamma' } } },
+      c: { $objectId: 'c', $type: 'AVLNode', fields: { val: 20, left: { $ref: 'b' }, right: { $ref: 'a' } } },
+      beta: { $objectId: 'beta', $type: 'AVLNode', fields: { val: 15, left: null, right: null } },
+      gamma: { $objectId: 'gamma', $type: 'AVLNode', fields: { val: 25, left: null, right: null } },
+    }});
+    try {
+      sessionStore.set({ source: 'rotateLeftRight(root)', states: [previous, current], index: 1 });
+      const pivot = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'c' }} objects={current.objects} state={current} />);
+      const demoted = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'a' }} objects={current.objects} state={current} />);
+      const inner = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'b' }} objects={current.objects} state={current} />);
+      expect(pivot).toContain('data-tree-rotation="left-right"');
+      expect(pivot).toContain('LEFT-RIGHT ROTATION · PIVOT');
+      expect(demoted).toContain('ROTATED DOWN');
+      expect(inner).toContain('DOUBLE ROTATION · INNER');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('recognizes the mirrored right-left rotation with stable identities', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({ sequence: 433, objects: {
+      a: { $objectId: 'a', $type: 'AVLNode', fields: { val: 10, left: null, right: { $ref: 'b' } } },
+      b: { $objectId: 'b', $type: 'AVLNode', fields: { val: 30, left: { $ref: 'c' }, right: null } },
+      c: { $objectId: 'c', $type: 'AVLNode', fields: { val: 20, left: { $ref: 'beta' }, right: { $ref: 'gamma' } } },
+      beta: { $objectId: 'beta', $type: 'AVLNode', fields: { val: 15, left: null, right: null } },
+      gamma: { $objectId: 'gamma', $type: 'AVLNode', fields: { val: 25, left: null, right: null } },
+    }});
+    const current = state({ sequence: 434, objects: {
+      a: { $objectId: 'a', $type: 'AVLNode', fields: { val: 10, left: null, right: { $ref: 'beta' } } },
+      b: { $objectId: 'b', $type: 'AVLNode', fields: { val: 30, left: { $ref: 'gamma' }, right: null } },
+      c: { $objectId: 'c', $type: 'AVLNode', fields: { val: 20, left: { $ref: 'a' }, right: { $ref: 'b' } } },
+      beta: { $objectId: 'beta', $type: 'AVLNode', fields: { val: 15, left: null, right: null } },
+      gamma: { $objectId: 'gamma', $type: 'AVLNode', fields: { val: 25, left: null, right: null } },
+    }});
+    try {
+      sessionStore.set({ source: 'rotateRightLeft(root)', states: [previous, current], index: 1 });
+      const pivot = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'c' }} objects={current.objects} state={current} />);
+      expect(pivot).toContain('data-tree-rotation="right-left"');
+      expect(pivot).toContain('RIGHT-LEFT ROTATION · PIVOT');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('does not group a double rotation when a transferred subtree identity is wrong', () => {
+    const previous = state({ sequence: 435, objects: {
+      a: { $objectId: 'a', $type: 'AVLNode', fields: { val: 30, left: { $ref: 'b' }, right: null } },
+      b: { $objectId: 'b', $type: 'AVLNode', fields: { val: 10, left: null, right: { $ref: 'c' } } },
+      c: { $objectId: 'c', $type: 'AVLNode', fields: { val: 20, left: { $ref: 'beta' }, right: { $ref: 'gamma' } } },
+      beta: { $objectId: 'beta', $type: 'AVLNode', fields: { val: 15, left: null, right: null } },
+      gamma: { $objectId: 'gamma', $type: 'AVLNode', fields: { val: 25, left: null, right: null } },
+    }});
+    const current = state({ sequence: 436, objects: {
+      a: { $objectId: 'a', $type: 'AVLNode', fields: { val: 30, left: { $ref: 'gamma' }, right: null } },
+      b: { $objectId: 'b', $type: 'AVLNode', fields: { val: 10, left: null, right: { $ref: 'beta' } } },
+      c: { $objectId: 'c', $type: 'AVLNode', fields: { val: 20, left: { $ref: 'b' }, right: { $ref: 'a' } } },
+      beta: { $objectId: 'beta', $type: 'AVLNode', fields: { val: 15, left: null, right: null } },
+      gamma: { $objectId: 'gamma', $type: 'AVLNode', fields: { val: 25, left: null, right: null } },
+    }});
+    const priorSession = sessionStore.get();
+    try {
+      sessionStore.set({ source: 'pointer rewiring', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'c' }} objects={current.objects} state={current} />);
+      expect(html).not.toContain('LEFT-RIGHT ROTATION · PIVOT');
+      expect(html).not.toContain('RIGHT-LEFT ROTATION · PIVOT');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+});
