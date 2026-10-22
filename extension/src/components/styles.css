@@ -2998,44 +2998,40 @@
 }
 
 
-/* Fit graph cards to the nodes that actually exist; inspector never steals
-   the canvas width inside narrow argument dropdowns or nested visualizations. */
+/* Keep the graph canvas at 80% and its node inspector at 20% at every
+   embedding size, including narrow argument previews. The canvas scrolls
+   internally when its nodes need more width; the inspector never takes a row. */
 .yv-graph {
-  container-type: inline-size;
-  container-name: graph-view;
   min-width: 0;
+  width: 100%;
 }
 .yv-graph-layout {
-  grid-template-columns: minmax(0, 1fr);
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 1fr);
+  gap: 8px;
   min-width: 0;
+  align-items: start;
 }
 .yv-graph-canvas {
+  grid-column: 1;
   width: 100%;
-  max-width: none;
+  max-width: 100%;
   min-width: 0;
 }
 .yv-graph-inspector {
+  grid-column: 2;
   width: 100%;
   max-width: none;
   min-width: 0;
-}
-@container graph-view (min-width: 720px) {
-  .yv-graph-layout {
-    grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
-    gap: 12px;
-  }
+  margin: 0;
+  padding: 7px;
 }
 
-/* Let the execution panel wrap its content instead of reserving a tall empty
-   block below the result. The inspector scrolls only when its content needs it. */
+/* The execution strip should be only as tall as its contents. Its existing
+   scroll behavior is retained as a safety valve for unusually long results. */
 .yv-current {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   height: auto;
   min-height: 0;
-  max-height: min(55vh, 420px);
-}
-.yv-execution {
-  flex: 0 1 auto;
-  min-height: 0;
-  max-height: min(55vh, 350px);
+  max-height: min(42vh, 360px);
 }
