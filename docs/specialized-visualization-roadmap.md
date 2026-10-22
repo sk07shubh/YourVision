@@ -20,7 +20,7 @@ This work extends the existing YourVision visualization system. Preserve the est
 
 ### Tree families to implement
 - [x] AVL trees: conservative single- and double-rotation cues when adjacent snapshots prove topology changes.\n- [ ] AVL trees: richer balance-factor/height transition summaries and real-trace validation.
-- [ ] Red-black trees: red/black properties, recoloring, rotations, root-black state when observed.
+- [x] Red-black trees: pair an observed pivot rotation with an explicit recolor on the same captured transition.\n- [ ] Red-black trees: validate complete multi-node fix-up cases and root-black state where observed.
 - [x] Treaps: identify explicit priority fields and expose priority metadata in the existing node theme.
 - [ ] Treaps: trace-backed rotation/heap-order transitions.
 - [x] B-tree-shaped nodes: multi-key cells and explicit leaf styling.
@@ -51,4 +51,4 @@ This work extends the existing YourVision visualization system. Preserve the est
 
 ## Current verification status
 
-The first specialized tree styling slice now includes snapshot-backed single-rotation pivot/demotion cues and explicit red-black recolor cues, with focused regression cases for left/right and left-right/right-left rotations, null middle subtrees, root replacement, historical replay, false-positive prevention, and recoloring. The cues are deliberately conservative: single and double rotations are inferred only from adjacent snapshots with stable identities and matching subtree transfers. Full AVL/red-black operation animations and real-trace validation remain outstanding. Tests, typecheck, build, and real-trace checks have not yet been run for this branch.
+The first specialized tree styling slice now includes snapshot-backed single-rotation pivot/demotion cues and explicit red-black recolor cues, with focused regression cases for left/right and left-right/right-left rotations, null middle subtrees, root replacement, historical replay, false-positive prevention, and recoloring. The cues are deliberately conservative: single and double rotations are inferred only from adjacent snapshots with stable identities and matching subtree transfers. Full AVL/red-black operation animations, complete red-black fix-up grouping, and real-trace validation remain outstanding. Tests, typecheck, build, and real-trace checks have not yet been run for this branch.
