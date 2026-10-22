@@ -4260,7 +4260,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   // and the middle subtree transferred to the vacated child slot.
   const rotationCue = id && hasSnapshotPair ? treeRotationCue(id, previousObjects, objects) : undefined;
   const changedMetadataNames = Object.keys(fields).filter(name =>
-    ['color', 'bf', 'balanceFactor', 'height', 'weight', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord'].includes(name) &&
+    ['color', 'isRed', 'isBlack', 'bf', 'balanceFactor', 'height', 'weight', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord'].includes(name) &&
     hasPreviousSnapshot && valueChanged(previousFields[name], fields[name])
   );
   const changedReferenceNames = ['parent', 'next', 'prev', 'thread', 'random'].filter(name =>
@@ -4300,6 +4300,13 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     : rawColor === 'black' || rawColor === 'b' || fields.isRed === false || fields.isBlack === true
       ? 'black'
       : undefined;
+  const previousRawColor = typeof previousFields.color === 'string' ? previousFields.color.toLowerCase() : '';
+  const previousRedBlackColor = previousRawColor === 'red' || previousRawColor === 'r' || previousFields.isRed === true
+    ? 'red'
+    : previousRawColor === 'black' || previousRawColor === 'b' || previousFields.isRed === false || previousFields.isBlack === true
+      ? 'black'
+      : undefined;
+  const redBlackRecolored = Boolean(hasPreviousSnapshot && redBlackColor && previousRedBlackColor && redBlackColor !== previousRedBlackColor);
   const hasRangeBounds = (typeof fields.leftBound === 'number' || typeof fields.rangeLeft === 'number' || typeof fields.start === 'number' || typeof fields.l === 'number')
     && (typeof fields.rightBound === 'number' || typeof fields.rangeRight === 'number' || typeof fields.end === 'number' || typeof fields.r === 'number');
   const hasAggregate = ['sum', 'min', 'max', 'aggregate', 'value'].some(name => typeof fields[name] === 'number');
@@ -4345,6 +4352,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
         {created && <span className="yv-binary-node-status is-created yv-tree-operation-badge">NODE CREATED</span>}
          {rotationCue?.role === 'pivot' && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-tree-rotation={rotationCue.direction} title="Inferred from observed parent/child and middle-subtree link changes">{rotationCue.direction.toUpperCase()} ROTATION · PIVOT</span>}
          {rotationCue?.role === 'demoted' && <span className="yv-tree-operation-badge yv-tree-rotation-demoted" data-tree-rotation={rotationCue.direction} title="This node moved below the rotation pivot in the captured topology">ROTATED DOWN</span>}
+         {redBlackRecolored && <span className="yv-tree-operation-badge yv-tree-recolored-badge" data-tree-recolored="true" title="The captured red/black state changed between adjacent snapshots">RECOLORED {previousRedBlackColor?.toUpperCase()} → {redBlackColor?.toUpperCase()}</span>}
         {nodeValueChanged && <span className="yv-binary-node-status is-changed yv-tree-operation-badge yv-tree-value-delta" title="Value changed between adjacent execution snapshots">
           {compactValue(nodeValue(previousFields))} → {compactValue(nodeValue(resolved))}
         </span>}
