@@ -2811,6 +2811,11 @@
   color: #211331;
   border: 1px solid color-mix(in srgb, var(--g-purple, #B57BFF), transparent 15%);
 }
+.yv-tree-operation-badge.yv-tree-recolored-badge {
+  background: color-mix(in srgb, var(--g-orange, #FFA116), transparent 68%);
+  color: var(--yv-text, inherit);
+  border: 1px solid color-mix(in srgb, var(--g-orange, #FFA116), transparent 25%);
+}
 .yv-tree-operation-badge.yv-tree-rotation-demoted {
   background: color-mix(in srgb, var(--g-purple, #B57BFF), transparent 78%);
   color: var(--yv-text, inherit);
