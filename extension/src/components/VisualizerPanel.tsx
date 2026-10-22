@@ -3516,7 +3516,7 @@ export function GraphView({ objects, variables = {}, state }: {
     const minY = Math.min(...points.map(point => point.y));
     const maxX = Math.max(...points.map(point => point.x));
     const maxY = Math.max(...points.map(point => point.y));
-    return { minX, minY, width: Math.max(620, maxX - minX + 140), height: Math.max(190, maxY - minY + 125) };
+    return { minX, minY, width: Math.max(180, maxX - minX + 130), height: Math.max(150, maxY - minY + 125) };
   });
   const positions = new Map<string, { x: number; y: number }>();
   const graphComponentCards: Array<{ index: number; title: string; x: number; y: number; width: number; height: number }> = [];
