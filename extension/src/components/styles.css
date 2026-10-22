@@ -2734,8 +2734,8 @@
 
 /* Graph layout hardening: keep the graph stage larger than its viewport so dense
    graphs scroll instead of forcing nodes into overlapping fixed coordinates. */
-.yv-graph-canvas {width:100%;max-width:100%;max-height:min(68vh,720px);overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;aspect-ratio:auto}
-.yv-graph-stage {position:relative;flex:none;min-width:600px;min-height:320px}
+.yv-graph-canvas {width:max-content;max-width:100%;max-height:min(68vh,720px);overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;aspect-ratio:auto}
+.yv-graph-stage {position:relative;flex:none;min-width:0;min-height:0}
 .yv-graph-stage>svg {position:absolute;inset:0;overflow:visible;pointer-events:none}
 .yv-graph-layout {min-width:0;align-items:start}
 .yv-graph-inspector {overflow:auto;max-height:min(68vh,720px)}
