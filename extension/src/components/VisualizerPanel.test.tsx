@@ -2909,3 +2909,16 @@ describe('range aggregate tree metadata', () => {
     expect(html).toContain('sum=12');
   });
 });
+
+
+describe('multiway tree leaf semantics', () => {
+  it('marks explicitly declared B-tree leaf nodes', () => {
+    const objects = {
+      root: { $objectId: 'root', $type: 'BTreeNode', fields: { keys: [4, 8], isLeaf: true, children: [] } },
+    };
+    const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={objects} />);
+    expect(html).toContain('data-tree-variant="multiway"');
+    expect(html).toContain('data-tree-leaf="true"');
+    expect(html).toContain('yv-tree-node-leaf');
+  });
+});
