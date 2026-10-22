@@ -3445,3 +3445,14 @@
   border-bottom-width: 3px;
   border-bottom-color: var(--g-green, #4ade80);
 }
+
+
+/* Snapshot-backed range-query emphasis for segment-tree intervals. */
+.yv-structure-node.yv-tree-node-range-overlap > .yv-structure-node-card {
+  outline: 2px solid var(--g-blue, #4DA3FF);
+  outline-offset: 4px;
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--g-blue, #4DA3FF) 14%, transparent);
+}
+.yv-structure-node.yv-tree-node-range-overlap .yv-tree-node-metadata {
+  border-top-color: var(--g-blue, #4DA3FF);
+}
