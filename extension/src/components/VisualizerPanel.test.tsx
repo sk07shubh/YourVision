@@ -2869,3 +2869,17 @@ describe('specialized balanced tree semantics', () => {
     expect(html).toContain('height=2');
   });
 });
+
+
+describe('specialized trie terminal rendering', () => {
+  it('highlights only nodes with an explicitly true terminal flag', () => {
+    const objects = {
+      root: { $objectId: 'root', $type: 'TrieNode', fields: { val: 'root', isEnd: false, children: [{ $ref: 'word' }] } },
+      word: { $objectId: 'word', $type: 'TrieNode', fields: { val: 'word', isEnd: true, children: [] } },
+    };
+    const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={objects} />);
+    expect(html).toContain('yv-tree-variant-trie');
+    expect(html).toContain('yv-tree-node-terminal');
+    expect(html).toContain('data-tree-node-id="word"');
+  });
+});
