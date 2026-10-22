@@ -2927,6 +2927,62 @@ describe('snapshot-backed tree rotation cues', () => {
     }
   });
 
+  it('recognizes the mirrored right rotation and preserves the pivot identity', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 405,
+      objects: {
+        p: { $objectId: 'p', $type: 'AVLNode', fields: { val: 20, left: { $ref: 'q' }, right: null } },
+        q: { $objectId: 'q', $type: 'AVLNode', fields: { val: 10, left: null, right: { $ref: 'beta' } } },
+        beta: { $objectId: 'beta', $type: 'AVLNode', fields: { val: 15, left: null, right: null } },
+      },
+    });
+    const current = state({
+      sequence: 406,
+      objects: {
+        p: { $objectId: 'p', $type: 'AVLNode', fields: { val: 20, left: { $ref: 'beta' }, right: null } },
+        q: { $objectId: 'q', $type: 'AVLNode', fields: { val: 10, left: null, right: { $ref: 'p' } } },
+        beta: { $objectId: 'beta', $type: 'AVLNode', fields: { val: 15, left: null, right: null } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'rotateRight(p)', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 'q' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-tree-rotation="right"');
+      expect(html).toContain('RIGHT ROTATION · PIVOT');
+      expect(html).toContain('data-tree-node-id="q"');
+      expect(html).toContain('ROTATED DOWN');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('recognizes a rotation when the transferred middle subtree is null', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 407,
+      objects: {
+        p: { $objectId: 'p', $type: 'AVLNode', fields: { val: 1, left: null, right: { $ref: 'q' } } },
+        q: { $objectId: 'q', $type: 'AVLNode', fields: { val: 2, left: null, right: null } },
+      },
+    });
+    const current = state({
+      sequence: 408,
+      objects: {
+        p: { $objectId: 'p', $type: 'AVLNode', fields: { val: 1, left: null, right: null } },
+        q: { $objectId: 'q', $type: 'AVLNode', fields: { val: 2, left: { $ref: 'p' }, right: null } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'rotateLeft(p)', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 'q' }} objects={current.objects} state={current} />);
+      expect(html).toContain('LEFT ROTATION · PIVOT');
+      expect(html).toContain('ROTATED DOWN');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
   it('does not label an ordinary child reparent as a rotation without a transferred subtree', () => {
     const priorSession = sessionStore.get();
     const previous = state({
