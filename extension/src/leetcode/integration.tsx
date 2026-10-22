@@ -818,15 +818,30 @@ function moveVisualizeToEnd(
     return;
   }
 
-  if (
-    visualizeButton.parentElement !==
-      region ||
-    region.lastElementChild !==
-      visualizeButton
-  ) {
-    region.appendChild(
-      visualizeButton
-    );
+  // Keep Visualize attached to the testcase tabs, not to the end of the row
+  // (where LeetCode's "+" control may live). The last testcase tab is the
+  // stable ordering anchor when a new case is inserted.
+  const cases = [
+    ...region.querySelectorAll<HTMLButtonElement>(
+      '[data-e2e-locator="console-testcase-tag"]'
+    ),
+    ...[...region.querySelectorAll<HTMLButtonElement>('button')].filter(button =>
+      button !== visualizeButton &&
+      /^case\\s+\\d+$/i.test((button.textContent ?? '').trim())
+    ),
+  ].filter((button, index, all) => all.indexOf(button) === index);
+
+  const lastCase = cases[cases.length - 1];
+  if (!lastCase) {
+    if (visualizeButton.parentElement !== region || region.lastElementChild !== visualizeButton) {
+      region.appendChild(visualizeButton);
+    }
+    return;
+  }
+
+  const next = lastCase.nextElementSibling;
+  if (next !== visualizeButton) {
+    region.insertBefore(visualizeButton, next);
   }
 }
 
@@ -875,9 +890,10 @@ export function injectVisualizeButton(): boolean {
   for (const duplicate of mainButtons.slice(1)) duplicate.remove();
   if (existing) {
     visualizeButton = existing;
-    if (existing.parentElement !== region || region.lastElementChild !== existing) region.appendChild(existing);
+    moveVisualizeToEnd(region);
   } else {
     visualizeButton = createVisualizeButton(region);
+    moveVisualizeToEnd(region);
   }
 
   const activeResultButtons = new Set<HTMLButtonElement>();
