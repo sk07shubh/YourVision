@@ -3416,3 +3416,12 @@
 .yv-structure-node.yv-tree-variant-treap > .yv-structure-node-card {
   border-color: var(--yv-accent, #60a5fa);
 }
+
+.yv-structure-node.yv-tree-variant-segment-tree .yv-tree-node-metadata {
+  border-top: 1px solid var(--border-subtle, #64748b55);
+  padding-top: 3px;
+}
+.yv-structure-node.yv-tree-variant-segment-tree > .yv-structure-node-card {
+  border-radius: 10px;
+  border-color: var(--yv-accent, #60a5fa);
+}
