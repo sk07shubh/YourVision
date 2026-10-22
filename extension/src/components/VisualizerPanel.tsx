@@ -3329,6 +3329,7 @@ export function GraphView({ objects, variables = {}, state }: {
   const selectedFields = selectedNode ? Object.entries(objectFields(selectedNode.value)).filter(([key]) => key !== 'neighbors') : [];
   const positionSession = useRef(session.states[0]);
   const stableGraphPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const stableGraphComponentLayouts = useRef<Map<string, string>>(new Map());
   if (positionSession.current !== session.states[0]) {
     stableGraphPositions.current.clear();
     positionSession.current = session.states[0];
@@ -3405,6 +3406,11 @@ export function GraphView({ objects, variables = {}, state }: {
   }
   for (const [componentIndex, component] of graphComponents.entries()) {
     const componentIds = new Set(component.nodes.map(node => node.id));
+    const layoutSignature = component.nodes.map(node => node.id).join('|');
+    if (stableGraphComponentLayouts.current.get(component.id) !== layoutSignature) {
+      for (const id of componentIds) stablePositions.delete(id);
+      stableGraphComponentLayouts.current.set(component.id, layoutSignature);
+    }
     const occupied = new Set([...stablePositions.entries()]
       .filter(([id]) => componentIds.has(id))
       .map(([, point]) => point.x + ':' + point.y));
@@ -3521,7 +3527,7 @@ export function GraphView({ objects, variables = {}, state }: {
         <button type="button" onClick={() => setZoom(1)} disabled={zoom === 1}>Reset</button>
       </div>
       <div className="yv-graph-layout">
-        <div className="yv-graph-canvas" data-graph-zoom={zoom}><div className="yv-graph-stage" style={{ width: `${graphWidth}px`, height: `${graphHeight}px`, transform: `scale(${zoom})`, transformOrigin: "top left" }}>
+        <div className="yv-graph-canvas" data-graph-zoom={zoom} data-graph-layout-width={graphWidth} data-graph-layout-height={graphHeight}><div className="yv-graph-stage" style={{ width: `${graphWidth}px`, height: `${graphHeight}px`, transform: `scale(${zoom})`, transformOrigin: "top left" }}>
           <svg width={graphWidth} height={graphHeight} viewBox={`0 0 ${graphWidth} ${graphHeight}`} preserveAspectRatio="xMidYMid meet" aria-label="Graph links"
             style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}>
             {graphComponentCards.map(card => <g key={card.index} data-graph-component={card.index} data-graph-component-title={card.title}>
