@@ -701,6 +701,13 @@ mount.style.boxSizing =
     <VisualizerPanel />
   );
 
+  // LeetCode can replace its tabset while a visualization is running. If this
+  // is a replacement tab, restore the active visualizer state immediately
+  // after its panel and React root have been mounted.
+  if (yourVisionActive) {
+    enforceActiveLayout();
+  }
+
   tabList.addEventListener(
     'pointerdown',
     event => {
@@ -847,6 +854,11 @@ function createVisualizeButton(region: HTMLElement, resultPanel = false): HTMLBu
   button.addEventListener('click',event=>{
     event.preventDefault();
     event.stopPropagation();
+
+    // Switch synchronously, before source/testcase reads or the backend
+    // request yield. Otherwise Description remains selected during the
+    // asynchronous gap and LeetCode may keep it selected after the run.
+    activateTab();
     void visualize(region);
   });
 
@@ -994,7 +1006,14 @@ export function installLeetCodeIntegration() {
         return;
       }
 
-      if (scheduled || reinjectTimer !== null) {
+      // Debounce through the complete LeetCode render transaction. Adding a
+      // testcase is multi-step: the "+" control fires first, then the new
+      // testcase tab is inserted. Do not move Visualize in the middle of it.
+      if (reinjectTimer !== null) {
+        window.clearTimeout(reinjectTimer);
+        reinjectTimer = null;
+      }
+      if (scheduled) {
         return;
       }
 
