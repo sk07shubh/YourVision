@@ -2883,3 +2883,15 @@ describe('specialized trie terminal rendering', () => {
     expect(html).toContain('data-tree-node-id="word"');
   });
 });
+
+
+describe('treap node metadata', () => {
+  it('identifies explicit priority fields and renders their values', () => {
+    const objects = {
+      root: { $objectId: 'root', $type: 'TreapNode', fields: { val: 10, priority: 4, left: null, right: null } },
+    };
+    const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={objects} />);
+    expect(html).toContain('data-tree-variant="treap"');
+    expect(html).toContain('priority=4');
+  });
+});
