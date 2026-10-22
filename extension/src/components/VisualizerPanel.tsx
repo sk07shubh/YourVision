@@ -4300,16 +4300,18 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const treeVariant = redBlackColor ? 'red-black'
     : (typeof fields.balanceFactor === 'number' || typeof fields.bf === 'number' || typeof fields.height === 'number')
       ? 'height-balanced'
-      : keyCells ? 'multiway'
-        : (typeof fields.isEnd === 'boolean' || typeof fields.isWord === 'boolean' ||
-          typeof fields.endOfWord === 'boolean' || typeof fields.isEndOfWord === 'boolean' ||
-          typeof fields.isTerminal === 'boolean' || typeof fields.terminal === 'boolean')
-          ? 'trie'
-          : undefined;
+      : (typeof fields.priority === 'number' || typeof fields.heapPriority === 'number')
+        ? 'treap'
+        : keyCells ? 'multiway'
+          : (typeof fields.isEnd === 'boolean' || typeof fields.isWord === 'boolean' ||
+            typeof fields.endOfWord === 'boolean' || typeof fields.isEndOfWord === 'boolean' ||
+            typeof fields.isTerminal === 'boolean' || typeof fields.terminal === 'boolean')
+            ? 'trie'
+            : undefined;
   const isTerminalTrieNode = ['isEnd', 'isWord', 'endOfWord', 'isEndOfWord', 'isTerminal', 'terminal']
     .some(name => fields[name] === true);
   const nodeMetadata = Object.entries(fields).filter(([name, metadataValue]) =>
-    ['color', 'bf', 'balanceFactor', 'height', 'weight', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord', 'isRed', 'isBlack'].includes(name) &&
+    ['color', 'bf', 'balanceFactor', 'height', 'weight', 'priority', 'heapPriority', 'rank', 'size', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord', 'isTerminal', 'terminal', 'isRed', 'isBlack'].includes(name) &&
     (typeof metadataValue === 'string' || typeof metadataValue === 'number' || typeof metadataValue === 'boolean')
   );
   const modelReferenceEdges = model.edges.filter(edge => edge.kind === 'reference' && edge.source === modelNodeId);
