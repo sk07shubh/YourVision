@@ -3309,3 +3309,29 @@ describe('specialized structure operation transitions', () => {
     }
   });
 });
+
+
+describe('trie insertion and terminal-state transitions', () => {
+  it('marks a newly linked trie child and an explicit terminal-state change', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({ sequence: 451, objects: {
+      root: { $objectId: 'root', $type: 'TrieNode', fields: { val: 'r', children: [] } },
+      word: { $objectId: 'word', $type: 'TrieNode', fields: { val: 'd', isEnd: false, children: [] } },
+    }});
+    const current = state({ sequence: 452, objects: {
+      root: { $objectId: 'root', $type: 'TrieNode', fields: { val: 'r', children: [{ $ref: 'word' }] } },
+      word: { $objectId: 'word', $type: 'TrieNode', fields: { val: 'd', isEnd: true, children: [] } },
+    }});
+    try {
+      sessionStore.set({ source: 'insert("rd")', states: [previous, current], index: 1 });
+      const rootHtml = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={current.objects} state={current} />);
+      const wordHtml = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'word' }} objects={current.objects} state={current} />);
+      expect(rootHtml).toContain('data-trie-transition="insertion"');
+      expect(rootHtml).toContain('TRIE INSERTION');
+      expect(wordHtml).toContain('data-trie-transition="word-added"');
+      expect(wordHtml).toContain('WORD ADDED');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+});
