@@ -4176,11 +4176,36 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateConnectors) : undefined;
     observer?.observe(root);
     root.querySelectorAll<HTMLElement>('.yv-structure-node-card, .yv-binary-tree-edge').forEach((element) => observer?.observe(element));
+
+    // Re-measure when React or surrounding UI changes the layout. In particular,
+    // the copy-visualization status update can trigger a layout pass that makes
+    // previously stale connector coordinates appear correct. Observe the whole
+    // section for the top-level tree, and each nested subtree for local changes.
+    const mutationObserver = typeof MutationObserver !== 'undefined' ? new MutationObserver(updateConnectors) : undefined;
+    const layoutRoot = depth === 0
+      ? root.closest<HTMLElement>('.yv-section-body') ?? root
+      : root;
+    mutationObserver?.observe(layoutRoot, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ['class', 'style'],
+    });
+
+    // Fonts and deferred styles can settle after the first layout measurement.
+    if (typeof document !== 'undefined' && document.fonts?.ready) {
+      void document.fonts.ready.then(() => {
+        if (root.isConnected) updateConnectors();
+      });
+    }
+
     window.addEventListener('resize', updateConnectors);
     return () => {
       window.cancelAnimationFrame(layoutFrame);
       window.cancelAnimationFrame(animationFrame);
       observer?.disconnect();
+      mutationObserver?.disconnect();
       window.removeEventListener('resize', updateConnectors);
     };
   }, [value, objects, depth, state, structureModel]);
