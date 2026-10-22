@@ -4427,67 +4427,58 @@ const TREE_CHILD_FIELD = /^(left|right|children|child\d+|firstChild|secondChild)
 type TreeRotationCue = { role: 'pivot' | 'demoted'; direction: 'left' | 'right' };
 
 /**
- * Infer a binary rotation only when the adjacent snapshots show both the
- * pivot/parent relationship changing and the middle subtree transferred.
- * This is topology evidence, not a guess based on method names or values.
+ * Infer a binary rotation only when adjacent snapshots show the reciprocal
+ * parent/child move and the middle subtree transferred to the vacated slot.
+ * Node identities are compared; equal values never count as topology evidence.
  */
 function treeRotationCue(id: string, previousObjects: Record<string, unknown>, objects: Record<string, unknown>): TreeRotationCue | undefined {
   const previousParents = parentsByChild(previousObjects);
   const currentParents = parentsByChild(objects);
-  const oldParentId = previousParents.get(id);
-  if (!oldParentId) return undefined;
 
-  const oldParentBefore = previousObjects[oldParentId];
-  const pivotBefore = previousObjects[id];
-  const oldParentNow = objects[oldParentId];
-  const pivotNow = objects[id];
-  if (!isPlainObject(oldParentBefore) || !isPlainObject(pivotBefore) ||
-      !isPlainObject(oldParentNow) || !isPlainObject(pivotNow)) return undefined;
+  // Find a candidate pivot either because this node was promoted or because
+  // this node was the parent demoted below a newly promoted child.
+  const previousParentId = previousParents.get(id);
+  const currentParentId = currentParents.get(id);
+  const candidates = new Set<string>();
+  if (previousParentId) candidates.add(previousParentId);
+  if (currentParentId && previousParents.get(currentParentId) === id) candidates.add(id);
 
-  const parentBefore = objectFields(oldParentBefore);
-  const pivotBeforeFields = objectFields(pivotBefore);
-  const parentNow = objectFields(oldParentNow);
-  const pivotNowFields = objectFields(pivotNow);
-  const parentLeftBefore = graphReferenceId(parentBefore.left, previousObjects);
-  const parentRightBefore = graphReferenceId(parentBefore.right, previousObjects);
-  const pivotLeftBefore = graphReferenceId(pivotBeforeFields.left, previousObjects);
-  const pivotRightBefore = graphReferenceId(pivotBeforeFields.right, previousObjects);
-  const parentLeftNow = graphReferenceId(parentNow.left, objects);
-  const parentRightNow = graphReferenceId(parentNow.right, objects);
-  const pivotLeftNow = graphReferenceId(pivotNowFields.left, objects);
-  const pivotRightNow = graphReferenceId(pivotNowFields.right, objects);
+  for (const formerParentId of candidates) {
+    const formerParentBeforeRaw = previousObjects[formerParentId];
+    const formerParentNowRaw = objects[formerParentId];
+    if (!isPlainObject(formerParentBeforeRaw) || !isPlainObject(formerParentNowRaw)) continue;
+    const formerParentBefore = objectFields(formerParentBeforeRaw);
+    const formerParentNow = objectFields(formerParentNowRaw);
 
-  const pivotPromoted = currentParents.get(oldParentId) === id;
-  if (pivotPromoted && parentRightBefore === id && pivotLeftNow === oldParentId && parentRightNow === pivotLeftBefore) {
-    return { role: 'pivot', direction: 'left' };
-  }
-  if (pivotPromoted && parentLeftBefore === id && pivotRightNow === oldParentId && parentLeftNow === pivotRightBefore) {
-    return { role: 'pivot', direction: 'right' };
-  }
+    const pivotId = formerParentId === id ? currentParentId : id;
+    if (!pivotId) continue;
+    const pivotBeforeRaw = previousObjects[pivotId];
+    const pivotNowRaw = objects[pivotId];
+    if (!isPlainObject(pivotBeforeRaw) || !isPlainObject(pivotNowRaw)) continue;
+    const pivotBefore = objectFields(pivotBeforeRaw);
+    const pivotNow = objectFields(pivotNowRaw);
 
-  // The old parent is now the pivot's child. Mark it as demoted, but only
-  // when the pivot itself passes the same strict rotation-shape check.
-  const newParentId = currentParents.get(id);
-  if (newParentId && previousParents.get(newParentId) === id) {
-    const newParent = objects[newParentId];
-    const newParentBefore = previousObjects[newParentId];
-    if (isPlainObject(newParent) && isPlainObject(newParentBefore)) {
-      const currentPivotFields = objectFields(newParent);
-      const oldPivotFields = objectFields(newParentBefore);
-      const wasRightChild = graphReferenceId(objectFields(previousObjects[id] as Obj).right, previousObjects) === newParentId;
-      const wasLeftChild = graphReferenceId(objectFields(previousObjects[id] as Obj).left, previousObjects) === newParentId;
-      const leftTransfer = wasRightChild &&
-        graphReferenceId(objectFields(newParentBefore).right, previousObjects) === id &&
-        graphReferenceId(currentPivotFields.left, objects) === id &&
-        graphReferenceId(objectFields(previousObjects[id] as Obj).left, previousObjects) === graphReferenceId(objectFields(newParent).right, objects);
-      const rightTransfer = wasLeftChild &&
-        graphReferenceId(objectFields(newParentBefore).left, previousObjects) === id &&
-        graphReferenceId(currentPivotFields.right, objects) === id &&
-        graphReferenceId(objectFields(previousObjects[id] as Obj).right, previousObjects) === graphReferenceId(objectFields(newParent).left, objects);
-      if (leftTransfer) return { role: 'demoted', direction: 'left' };
-      if (rightTransfer) return { role: 'demoted', direction: 'right' };
-      void oldPivotFields;
-    }
+    const parentLeftBefore = graphReferenceId(formerParentBefore.left, previousObjects);
+    const parentRightBefore = graphReferenceId(formerParentBefore.right, previousObjects);
+    const parentLeftNow = graphReferenceId(formerParentNow.left, objects);
+    const parentRightNow = graphReferenceId(formerParentNow.right, objects);
+    const pivotLeftBefore = graphReferenceId(pivotBefore.left, previousObjects);
+    const pivotRightBefore = graphReferenceId(pivotBefore.right, previousObjects);
+    const pivotLeftNow = graphReferenceId(pivotNow.left, objects);
+    const pivotRightNow = graphReferenceId(pivotNow.right, objects);
+
+    const isLeftRotation = parentRightBefore === pivotId &&
+      currentParents.get(formerParentId) === pivotId &&
+      pivotLeftNow === formerParentId &&
+      parentRightNow === pivotLeftBefore;
+    const isRightRotation = parentLeftBefore === pivotId &&
+      currentParents.get(formerParentId) === pivotId &&
+      pivotRightNow === formerParentId &&
+      parentLeftNow === pivotRightBefore;
+    if (!isLeftRotation && !isRightRotation) continue;
+
+    if (id === pivotId) return { role: 'pivot', direction: isLeftRotation ? 'left' : 'right' };
+    if (id === formerParentId) return { role: 'demoted', direction: isLeftRotation ? 'left' : 'right' };
   }
   return undefined;
 }
