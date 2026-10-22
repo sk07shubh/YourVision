@@ -3601,7 +3601,6 @@ export function GraphView({ objects, variables = {}, state }: {
                 borderRadius: 10, background: changed ? 'var(--yv-highlight, #203b5b)' : 'var(--yv-panel, #101b2d)', color: 'var(--yv-text, #f3f6ff)',
                 boxShadow: selected ? '0 0 0 3px color-mix(in srgb,var(--yv-accent,#65a9ff),transparent 38%)' : entered ? '0 0 0 3px color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 55%)' : changed ? '0 0 0 2px color-mix(in srgb, var(--yv-accent, #65a9ff), transparent 55%)' : '0 2px 8px rgba(0,0,0,.2)', textAlign: 'center', fontSize: 12, zIndex: selected ? 2 : 1, cursor: 'pointer' }}>
               <span>{compactValue(node.label)}</span>
-              <span style={{ color: 'var(--yv-accent, #65a9ff)', fontSize: 10 }}>object {node.id}</span>
               {removed && <span className="yv-graph-node-status yv-graph-node-status-removed">removed</span>}{!removed && createdNodeIds.has(node.id) && <span className="yv-graph-node-status yv-graph-node-status-created">created</span>}
               {!removed && !createdNodeIds.has(node.id) && changed && <span className="yv-graph-node-status">updated</span>}
               {pointers.length > 0 && <span style={{ color: 'var(--yv-muted, #8b9bb4)', fontSize: 10 }}>{pointers.join(' · ')}</span>}
@@ -3610,26 +3609,21 @@ export function GraphView({ objects, variables = {}, state }: {
         </div></div>
         {selectedNode && <aside className="yv-graph-inspector" aria-label="Selected graph node" data-graph-inspector={selectedNode.id}>
           <div className="yv-graph-inspector-heading">
-            <div><span className="yv-graph-inspector-kicker">SELECTED NODE</span><strong>{compactValue(selectedNode.label)}</strong></div>
-            <code>{selectedNode.id}</code>
+            <strong>{compactValue(selectedNode.label)}</strong>
           </div>
-          <div className="yv-graph-inspector-fields">
-            <div className="yv-graph-inspector-field"><span>Value</span><strong>{compactValue(selectedNode.label)}</strong></div>
-            <div className="yv-graph-inspector-field"><span>Neighbors</span><strong>{selectedNeighborIds.length}</strong></div>
-          </div>
-          <div className="yv-graph-inspector-object-fields" aria-label="Node fields">
+          {selectedFields.length > 0 && <div className="yv-graph-inspector-object-fields" aria-label="Node fields">
             <span className="yv-graph-inspector-kicker">FIELDS</span>
-            {selectedFields.length
-              ? selectedFields.slice(0, 8).map(([name, value]) => <div className="yv-graph-inspector-field" key={name}><span>{name}</span><strong>{compactValue(value)}</strong></div>)
-              : <span className="yv-graph-no-neighbors">No captured fields</span>}
+            {selectedFields
+              .filter(([name, value]) => !(name === 'val' && compactValue(value) === compactValue(selectedNode.label)))
+              .slice(0, 8).map(([name, value]) => <div className="yv-graph-inspector-field" key={name}><span>{name}</span><strong>{compactValue(value)}</strong></div>)}
             {selectedFields.length > 8 && <span className="yv-graph-no-neighbors">+{selectedFields.length - 8} more fields</span>}
-          </div>
-          <div className="yv-graph-neighbors"><span>CONNECTED TO</span>
+          </div>}
+          <div className="yv-graph-neighbors"><span>CONNECTED TO · {selectedNeighborIds.length}</span>
             {selectedNeighborIds.length
               ? selectedNeighborIds.map((id, index) => {
                 const neighbor = nodes.find(candidate => candidate.id === id);
                 return <button type="button" key={id + ':' + index} className="yv-graph-neighbor" onClick={() => setSelectedNodeId(id)} disabled={!neighbor}>
-                  <span>{neighbor ? compactValue(neighbor.label) : id}</span><code>{id}</code>
+                  <span>{neighbor ? compactValue(neighbor.label) : 'Unknown node'}</span>
                 </button>;
               })
               : <span className="yv-graph-no-neighbors">No captured neighbors</span>}
