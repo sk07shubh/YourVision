@@ -1222,8 +1222,8 @@ describe('graph data structure visualization', () => {
     const html = renderToStaticMarkup(<GraphView objects={{
       g1: { $objectId: 'g1', $type: 'Node', fields: { val: 4, neighbors: { values: [] } } },
     }} />);
-    expect(html).toContain('width="220" height="170"');
-    expect(html).toContain('width:220px;height:170px');
+    expect(html).toContain('width="140" height="140"');
+    expect(html).toContain('width:140px;height:140px');
   });
 });
 
