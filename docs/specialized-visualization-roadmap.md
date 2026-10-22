@@ -22,15 +22,15 @@ This work extends the existing YourVision visualization system. Preserve the est
 - [x] AVL trees: conservative single- and double-rotation cues when adjacent snapshots prove topology changes.\n- [ ] AVL trees: richer balance-factor/height transition summaries and real-trace validation.
 - [x] Red-black trees: pair an observed pivot rotation with an explicit recolor on the same captured transition.\n- [ ] Red-black trees: validate complete multi-node fix-up cases and root-black state where observed.
 - [x] Treaps: identify explicit priority fields and expose priority metadata in the existing node theme.
-- [ ] Treaps: trace-backed rotation/heap-order transitions.
+- [x] Treaps: mark rotations only when a proven topology change occurs on nodes with explicit priority metadata; do not assume min-heap or max-heap convention.\n- [ ] Treaps: infer and validate heap-order changes when the priority convention is explicit.
 - [x] B-tree-shaped nodes: multi-key cells and explicit leaf styling.
-- [ ] B-trees and B+ trees: child-key range semantics, internal-vs-leaf behavior inference where reliable, split/merge transitions.
-- [ ] Trie: insertion/search/prefix-search/deletion and pruning transitions, including empty keys and Unicode.
+- [x] B-tree-shaped nodes: show conservative split/merge cues when key count and child count change together in adjacent snapshots; flag child redistribution when keys stay stable but child identities change.\n- [ ] B-trees and B+ trees: child-key range semantics and internal-vs-leaf behavior inference where reliable.
+- [x] Trie: show explicit terminal-state changes and child-pruning cues from adjacent snapshots.\n- [ ] Trie: richer insertion/search/prefix-search/deletion traces, including empty keys and Unicode.
 - [ ] Finish DSU/union-find: parent forest, path compression, union by rank/size, component changes.
 
 ### Range-query structures
 - [x] Segment-tree node candidates: identify explicit interval bounds plus aggregate fields and style them in the existing tree renderer.
-- [ ] Segment tree: dedicated range/query highlighting and trace-backed build/update/query transitions.
+- [x] Segment tree: highlight intervals overlapping an explicit captured query range; outline the matching nodes using the existing theme.\n- [ ] Segment tree: trace-backed build/update/query transitions and validate inclusive/exclusive interval conventions.
 - [ ] Fenwick/Binary Indexed Tree: index coverage, update propagation, prefix/range-query traversal.
 - [ ] Sparse table: range intervals and overlapping query blocks where a concrete implementation is recognized.
 
@@ -51,4 +51,4 @@ This work extends the existing YourVision visualization system. Preserve the est
 
 ## Current verification status
 
-The first specialized tree styling slice now includes snapshot-backed single-rotation pivot/demotion cues and explicit red-black recolor cues, with focused regression cases for left/right and left-right/right-left rotations, null middle subtrees, root replacement, historical replay, false-positive prevention, and recoloring. The cues are deliberately conservative: single and double rotations are inferred only from adjacent snapshots with stable identities and matching subtree transfers. Full AVL/red-black operation animations, complete red-black fix-up grouping, and real-trace validation remain outstanding. Tests, typecheck, build, and real-trace checks have not yet been run for this branch.
+The specialized tree slice now includes conservative single/double rotation cues, red-black recolor/rotation pairing, treap rotation cues gated on explicit priority metadata, multiway split/merge cues gated on key/child-count deltas, trie terminal/pruning cues, and segment-tree range-overlap highlighting gated on explicit captured query bounds. These are snapshot-derived hints, not substitutes for full operation animations. Heap-order convention inference, complete B-tree/B+ tree semantics, full trie operation traces, aggregate propagation, real-trace validation, and executable CI verification remain outstanding. Tests, typecheck, build, and real-trace checks have not yet been run for this branch.
