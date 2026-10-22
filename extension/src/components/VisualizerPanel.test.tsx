@@ -1217,6 +1217,14 @@ describe('graph data structure visualization', () => {
     expect(html).toContain('data-graph-edge-from="g1" data-graph-edge-to="g1"');
     expect((html.match(/data-graph-node-id="g1"/g) ?? []).length).toBe(1);
   });
+
+  it('sizes a single-node graph around its actual contents', () => {
+    const html = renderToStaticMarkup(<GraphView objects={{
+      g1: { $objectId: 'g1', $type: 'Node', fields: { val: 4, neighbors: { values: [] } } },
+    }} />);
+    expect(html).toContain('width="220" height="170"');
+    expect(html).toContain('width:220px;height:170px');
+  });
 });
 
 describe('string data structure visualization', () => {
