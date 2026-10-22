@@ -145,9 +145,10 @@ Run commands from the indicated directory. A command listed here is an available
 | Command | Purpose |
 |---|---|
 | `npm run typecheck` | TypeScript check |
-| `npm run test:all` | Full backend regression sequence, including typecheck |
+| `npm test` / `npm run test:all` | Full backend regression sequence, including typecheck |
 | `npm run test:trace-state` | State-building regressions |
 | `npm run test:trace-enrichment` | Trace enrichment and effect association |
+| `npm run test:trace-map` | Map mutation enrichment (insert, update, delete) |
 | `npm run test:trace-replay` | Trace replay regressions |
 | `npm run test:string-trace` | String trace regressions |
 | `npm run test:semantic-roles` | Semantic role inference |
@@ -168,14 +169,13 @@ Run commands from the indicated directory. A command listed here is an available
 | `npm run test:array-discovery` | Array access discovery |
 | `npm run test:data-structures` | Java data-structure snapshots |
 
-The generic backend `npm test` script is an intentionally unimplemented placeholder that exits with an error. Use `npm run test:all` instead.
+`npm test` is an alias for `npm run test:all`, so the default backend test command runs the complete regression suite.
 
 ### Current CI workflows
 
-- `.github/workflows/backend.yml` — Node 22 + Temurin JDK 17; installs backend dependencies and runs `npm run test:all`.
-- `.github/workflows/full-regression.yml` — runs the backend regression matrix and, separately, extension tests, typecheck, and production build.
+- `.github/workflows/full-regression.yml` — the single consolidated CI workflow; runs backend regression/typecheck plus extension tests, typecheck, and production build. It preserves the previous push triggers for `main`, `yourvision-safety-hardened`, `automation/comprehensive-regression-lab`, and `feat/all-remaining-ds-visualization`, as well as pull requests targeting `main`.
 
-Both workflows can run the backend suite on pushes to `main` and pull requests targeting `main`, so some backend work may be tested twice. Check the actual workflow run and commit SHA before reporting verification.
+The duplicate `.github/workflows/backend.yml` was removed so pull requests targeting `main` do not run the backend suite twice. Check the actual workflow run and commit SHA before reporting verification.
 
 ### Verification reporting
 
