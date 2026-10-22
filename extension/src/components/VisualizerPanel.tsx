@@ -3386,37 +3386,55 @@ export function GraphView({ objects, variables = {}, state }: {
     return graphComponents.length > 1 ? 'Graph ' + (componentIndex + 1) : 'Graph';
   });
 
-  // Keep each component's node positions stable while reserving its own card.
-  // A card is 620px wide; the canvas itself remains horizontally scrollable.
-  const componentWidth = 620;
+  // Size each component to its own node count. Small graphs should not be
+  // stretched across a large fixed canvas; denser components gain columns only
+  // when they need them. Positions are stored component-locally so resizing one
+  // component never shifts the nodes inside another.
+  const componentGap = 20;
+  const componentCellWidth = 112;
+  const componentRowHeight = 82;
+  const componentColumns = graphComponents.map(component =>
+    Math.min(4, Math.max(1, Math.ceil(Math.sqrt(component.nodes.length))))
+  );
+  const componentWidths = componentColumns.map(columns => columns * componentCellWidth + 16);
+  const componentOffsets: number[] = [];
+  let nextComponentOffset = 0;
+  for (const width of componentWidths) {
+    componentOffsets.push(nextComponentOffset);
+    nextComponentOffset += width + componentGap;
+  }
   for (const [componentIndex, component] of graphComponents.entries()) {
     const componentIds = new Set(component.nodes.map(node => node.id));
     const occupied = new Set([...stablePositions.entries()]
       .filter(([id]) => componentIds.has(id))
-      .map(([, point]) => (point.x - componentIndex * componentWidth) + ':' + point.y));
-    const slots = Array.from({ length: 80 }, (_, index) => ({
-      x: 70 + (index % 4) * 130,
-      y: 65 + Math.floor(index / 4) * 100,
+      .map(([, point]) => point.x + ':' + point.y));
+    const columns = componentColumns[componentIndex] ?? 1;
+    const slots = Array.from({ length: component.nodes.length }, (_, index) => ({
+      x: 56 + (index % columns) * componentCellWidth,
+      y: 56 + Math.floor(index / columns) * componentRowHeight,
     }));
     for (const node of component.nodes) {
       if (stablePositions.has(node.id)) continue;
       const preferred = slots.find(point => !occupied.has(point.x + ':' + point.y));
-      const local = preferred ?? { x: 70, y: 65 };
-      stablePositions.set(node.id, { x: componentIndex * componentWidth + local.x, y: local.y });
+      const local = preferred ?? { x: 56, y: 56 };
+      stablePositions.set(node.id, local);
       occupied.add(local.x + ':' + local.y);
     }
   }
   const positions = new Map<string, { x: number; y: number }>();
   for (const node of nodes) {
     const position = stablePositions.get(node.id);
-    if (position) positions.set(node.id, position);
+    const componentIndex = graphComponentIndexByNodeId.get(node.id) ?? 0;
+    if (position) positions.set(node.id, { x: (componentOffsets[componentIndex] ?? 0) + position.x, y: position.y });
   }
-  const graphWidth = Math.max(600, graphComponents.length * componentWidth);
-  const graphHeight = Math.max(320, Math.max(1, nodes.length ? Math.max(...[...positions.values()].map(point => point.y)) : 0) + 70);
+  const graphWidth = Math.max(140, nextComponentOffset - (graphComponents.length ? componentGap : 0));
+  const graphHeight = Math.max(120, Math.max(1, nodes.length ? Math.max(...[...positions.values()].map(point => point.y)) : 0) + 70);
   const graphComponentCards = graphComponents.map((component, componentIndex) => {
-    const localY = component.nodes.reduce((max, node) => Math.max(max, positions.get(node.id)?.y ?? 65), 65);
-    return { index: componentIndex, title: graphComponentTitles[componentIndex], x: componentIndex * componentWidth + 8,
-      y: 10, width: componentWidth - 16, height: Math.max(150, localY + 48) };
+    const localY = component.nodes.reduce((max, node) => Math.max(max, stablePositions.get(node.id)?.y ?? 56), 56);
+    return { index: componentIndex, title: graphComponentTitles[componentIndex],
+      x: (componentOffsets[componentIndex] ?? 0) + 6, y: 10,
+      width: (componentWidths[componentIndex] ?? 140) - 12,
+      height: Math.max(108, localY + 42) };
   });
   const traversedEdgePairs = new Set<string>();
   if (previous) {
