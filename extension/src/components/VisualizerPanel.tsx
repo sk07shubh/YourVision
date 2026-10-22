@@ -4118,18 +4118,29 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
         return;
       }
       const parentRect = parentCard.getBoundingClientRect();
-      const startX = parentRect.left + parentRect.width / 2 - rootRect.left;
-      const startY = parentRect.bottom - rootRect.top;
+      const parentCenterX = parentRect.left + parentRect.width / 2;
+      const parentCenterY = parentRect.top + parentRect.height / 2;
       const edges = Array.from(root.querySelectorAll<HTMLElement>(':scope > .yv-binary-tree-children > .yv-binary-tree-edge'));
       const lines = edges.flatMap((edge) => {
         const childCard = edge.querySelector<HTMLElement>(':scope > .yv-binary-tree-edge-content > .yv-structure-node > .yv-structure-node-card');
         if (!childCard) return [];
         const childRect = childCard.getBoundingClientRect();
+        const childCenterX = childRect.left + childRect.width / 2;
+        const childCenterY = childRect.top + childRect.height / 2;
+        const dx = childCenterX - parentCenterX;
+        const dy = childCenterY - parentCenterY;
+        const distance = Math.hypot(dx, dy) || 1;
+        // Clip each connector to the circular node outlines, rather than
+        // anchoring it to the untransformed top/bottom box edges.
+        const parentRadius = Math.min(parentRect.width, parentRect.height) / 2;
+        const childRadius = Math.min(childRect.width, childRect.height) / 2;
+        const ux = dx / distance;
+        const uy = dy / distance;
         return [{
-          x1: startX,
-          y1: startY,
-          x2: childRect.left + childRect.width / 2 - rootRect.left,
-          y2: childRect.top - rootRect.top,
+          x1: parentCenterX + ux * parentRadius - rootRect.left,
+          y1: parentCenterY + uy * parentRadius - rootRect.top,
+          x2: childCenterX - ux * childRadius - rootRect.left,
+          y2: childCenterY - uy * childRadius - rootRect.top,
           rootWidth: rootRect.width,
           rootHeight: rootRect.height,
           target: edge.dataset.treeEdgeTarget ?? edge.dataset.treeEdgeLabel ?? 'child',
@@ -4150,12 +4161,25 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     // ResizeObserver alone is not enough to keep SVG edges aligned.
     updateConnectors();
     const layoutFrame = window.requestAnimationFrame(updateConnectors);
+    // Newly inserted nodes animate from a smaller scale to their final size.
+    // ResizeObserver does not report CSS transforms, so refresh measurements
+    // during that short animation window to keep green edges attached.
+    let animationFrame = 0;
+    const animationStartedAt = performance.now();
+    const trackAnimatedLayout = (now: number) => {
+      updateConnectors();
+      if (now - animationStartedAt < 700) {
+        animationFrame = window.requestAnimationFrame(trackAnimatedLayout);
+      }
+    };
+    animationFrame = window.requestAnimationFrame(trackAnimatedLayout);
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateConnectors) : undefined;
     observer?.observe(root);
     root.querySelectorAll<HTMLElement>('.yv-structure-node-card, .yv-binary-tree-edge').forEach((element) => observer?.observe(element));
     window.addEventListener('resize', updateConnectors);
     return () => {
       window.cancelAnimationFrame(layoutFrame);
+      window.cancelAnimationFrame(animationFrame);
       observer?.disconnect();
       window.removeEventListener('resize', updateConnectors);
     };
