@@ -3204,3 +3204,108 @@ describe('snapshot-backed AVL double rotations', () => {
     }
   });
 });
+
+
+describe('specialized structure operation transitions', () => {
+  it('marks a treap rotation only when explicit priority metadata accompanies a proven rotation', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({ sequence: 441, objects: {
+      p: { $objectId: 'p', $type: 'TreapNode', fields: { val: 10, priority: 7, left: null, right: { $ref: 'q' } } },
+      q: { $objectId: 'q', $type: 'TreapNode', fields: { val: 20, priority: 3, left: null, right: null } },
+    }});
+    const current = state({ sequence: 442, objects: {
+      p: { $objectId: 'p', $type: 'TreapNode', fields: { val: 10, priority: 7, left: null, right: null } },
+      q: { $objectId: 'q', $type: 'TreapNode', fields: { val: 20, priority: 3, left: { $ref: 'p' }, right: null } },
+    }});
+    try {
+      sessionStore.set({ source: 'rotateLeft(root)', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'q' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-treap-transition="rotation"');
+      expect(html).toContain('TREAP ROTATION · PRIORITY 3');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('marks a multiway node split from a simultaneous key and child-count increase', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({ sequence: 443, objects: {
+      root: { $objectId: 'root', $type: 'BTreeNode', fields: { keys: [10], children: [{ $ref: 'a' }, { $ref: 'b' }] } },
+      a: { $objectId: 'a', $type: 'BTreeNode', fields: { keys: [5], isLeaf: true, children: [] } },
+      b: { $objectId: 'b', $type: 'BTreeNode', fields: { keys: [15], isLeaf: true, children: [] } },
+    }});
+    const current = state({ sequence: 444, objects: {
+      root: { $objectId: 'root', $type: 'BTreeNode', fields: { keys: [10, 20], children: [{ $ref: 'a' }, { $ref: 'b' }, { $ref: 'c' }] } },
+      a: { $objectId: 'a', $type: 'BTreeNode', fields: { keys: [5], isLeaf: true, children: [] } },
+      b: { $objectId: 'b', $type: 'BTreeNode', fields: { keys: [15], isLeaf: true, children: [] } },
+      c: { $objectId: 'c', $type: 'BTreeNode', fields: { keys: [25], isLeaf: true, children: [] } },
+    }});
+    try {
+      sessionStore.set({ source: 'splitChild(root)', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-btree-transition="split"');
+      expect(html).toContain('B-TREE SPLIT');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('marks a multiway merge from a simultaneous key and child-count decrease', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({ sequence: 445, objects: {
+      root: { $objectId: 'root', $type: 'BTreeNode', fields: { keys: [10, 20], children: [{ $ref: 'a' }, { $ref: 'b' }, { $ref: 'c' }] } },
+      a: { $objectId: 'a', $type: 'BTreeNode', fields: { keys: [5], isLeaf: true, children: [] } },
+      b: { $objectId: 'b', $type: 'BTreeNode', fields: { keys: [15], isLeaf: true, children: [] } },
+      c: { $objectId: 'c', $type: 'BTreeNode', fields: { keys: [25], isLeaf: true, children: [] } },
+    }});
+    const current = state({ sequence: 446, objects: {
+      root: { $objectId: 'root', $type: 'BTreeNode', fields: { keys: [10], children: [{ $ref: 'a' }, { $ref: 'c' }] } },
+      a: { $objectId: 'a', $type: 'BTreeNode', fields: { keys: [5, 8, 9], isLeaf: true, children: [] } },
+      c: { $objectId: 'c', $type: 'BTreeNode', fields: { keys: [25], isLeaf: true, children: [] } },
+    }});
+    try {
+      sessionStore.set({ source: 'mergeChildren(root)', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-btree-transition="merge"');
+      expect(html).toContain('B-TREE MERGE');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('labels explicit trie terminal transitions and child pruning', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({ sequence: 447, objects: {
+      root: { $objectId: 'root', $type: 'TrieNode', fields: { val: 'r', children: [{ $ref: 'word' }] } },
+      word: { $objectId: 'word', $type: 'TrieNode', fields: { val: 'd', isEnd: false, children: [] } },
+    }});
+    const current = state({ sequence: 448, objects: {
+      root: { $objectId: 'root', $type: 'TrieNode', fields: { val: 'r', children: [] } },
+    }});
+    try {
+      sessionStore.set({ source: 'deleteWord("rd")', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-trie-transition="pruning"');
+      expect(html).toContain('TRIE PRUNING');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('highlights segment-tree intervals overlapping an explicit captured query range', () => {
+    const current = state({ sequence: 449, objects: {
+      root: { $objectId: 'root', $type: 'SegmentNode', fields: { val: 10, leftBound: 0, rightBound: 7, sum: 10, left: { $ref: 'left' }, right: { $ref: 'right' } } },
+      left: { $objectId: 'left', $type: 'SegmentNode', fields: { val: 4, leftBound: 0, rightBound: 3, sum: 4, left: null, right: null } },
+      right: { $objectId: 'right', $type: 'SegmentNode', fields: { val: 6, leftBound: 4, rightBound: 7, sum: 6, left: null, right: null } },
+    }, lastEvent: { type: 'STEP', data: { queryLeft: 5, queryRight: 6 } } });
+    const priorSession = sessionStore.get();
+    try {
+      sessionStore.set({ source: 'query(5, 6)', states: [current], index: 0 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-segment-range="overlap"');
+      expect(html).toContain('RANGE QUERY');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+});
