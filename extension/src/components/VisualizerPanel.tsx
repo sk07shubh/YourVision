@@ -3521,7 +3521,7 @@ export function GraphView({ objects, variables = {}, state }: {
   const positions = new Map<string, { x: number; y: number }>();
   const graphComponentCards: Array<{ index: number; title: string; x: number; y: number; width: number; height: number }> = [];
   let componentOffsetX = 0;
-  let graphHeight = 320;
+  let graphHeight = 170;
   for (const [componentIndex, component] of graphComponents.entries()) {
     const layout = componentLayouts[componentIndex]!;
     graphComponentCards.push({ index: componentIndex, title: graphComponentTitles[componentIndex]!,
@@ -3533,7 +3533,7 @@ export function GraphView({ objects, variables = {}, state }: {
     componentOffsetX += layout.width;
     graphHeight = Math.max(graphHeight, layout.height + 20);
   }
-  const graphWidth = Math.max(600, componentOffsetX);
+  const graphWidth = Math.max(220, componentOffsetX);
   const trail = selectedIndex >= 0 ? graphVisitTrail(session.states, selectedIndex) : undefined;
   const traversedEdgePairs = new Set<string>();
   if (previous) {
