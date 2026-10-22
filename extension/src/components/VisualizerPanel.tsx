@@ -3368,15 +3368,6 @@ export function GraphView({ objects, variables = {}, state }: {
   const ids = new Set(nodes.map(node => node.id));
   useEffect(() => { if (selectedNodeId && !ids.has(selectedNodeId)) setSelectedNodeId(nodes[0]?.id ?? null); }, [selectedNodeId, nodes.map(node => node.id).join('|')]);
   const selectedNode = nodes.find(node => node.id === selectedNodeId) ?? nodes[0];
-  const selectedNeighborIds = selectedNode
-    ? selectedNode.neighbors.map(neighbor => graphReferenceId(neighbor, objects)).filter((id): id is string => Boolean(id))
-    : [];
-  const selectedFields = selectedNode ? Object.entries(objectFields(selectedNode.value)).filter(([key]) => key !== 'neighbors') : [];
-  const inspectorNode = nodes.find(node => node.id === hoverId) ?? selectedNode;
-  const inspectorNeighborIds = inspectorNode
-    ? inspectorNode.neighbors.map(neighbor => graphReferenceId(neighbor, objects)).filter((id): id is string => Boolean(id))
-    : [];
-  const inspectorFields = inspectorNode ? Object.entries(objectFields(inspectorNode.value)).filter(([key]) => key !== 'neighbors') : [];
   const positionSession = useRef(session.states[0]);
   const stableGraphPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
   const layoutSignature = useRef('');
@@ -3731,29 +3722,6 @@ export function GraphView({ objects, variables = {}, state }: {
               </span>}
             </div>;
           })}
-          {inspectorNode && <aside className="yv-graph-inspector" aria-label="Selected graph node" data-graph-inspector={inspectorNode.id} style={{ left: (positions.get(inspectorNode.id)?.x ?? 27) - 27, top: (positions.get(inspectorNode.id)?.y ?? 0) + 27 }}>
-          <div className="yv-graph-inspector-heading">
-            <strong>{compactValue(inspectorNode.label)}</strong>
-          </div>
-          {inspectorFields.length > 0 && <div className="yv-graph-inspector-object-fields" aria-label="Node fields">
-            <span className="yv-graph-inspector-kicker">FIELDS</span>
-            {inspectorFields
-              .filter(([name, value]) => !(name === 'val' && compactValue(value) === compactValue(inspectorNode.label)))
-              .slice(0, 8)
-              .map(([name, value]) => <div className="yv-graph-inspector-field" key={name}><span>{name}</span><strong>{compactValue(value)}</strong></div>)}
-            {inspectorFields.length > 8 && <span className="yv-graph-no-neighbors">+{inspectorFields.length - 8} more fields</span>}
-          </div>}
-          <div className="yv-graph-neighbors"><span>CONNECTED TO · {inspectorNeighborIds.length}</span>
-            {inspectorNeighborIds.length
-              ? inspectorNeighborIds.map((id, index) => {
-                const neighbor = nodes.find(candidate => candidate.id === id);
-                return <button type="button" key={id + ':' + index} className="yv-graph-neighbor" onClick={() => { setSelectedNodeId(id); setHoverId(id); }} disabled={!neighbor}>
-                  <span>{neighbor ? compactValue(neighbor.label) : 'Unknown node'}</span>
-                </button>;
-              })
-              : <span className="yv-graph-no-neighbors">No neighbors</span>}
-          </div>
-        </aside>}
         </div></div></div>
 
       </div>
