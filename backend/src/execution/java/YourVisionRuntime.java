@@ -1440,9 +1440,78 @@ if (isGraphNodeType(type)) {
             }
         }
 
+        // LeetCode's Clone Graph result is represented by the graph's
+        // adjacency list, not Object.toString() (which yields Node@<hash>).
+        if (isGraphNodeType(type)) {
+            return formatGraphNode(value);
+        }
+
         return "\"" +
             escapeJson(String.valueOf(value)) +
             "\"";
+    }
+
+    private static String formatGraphNode(Object root) {
+        try {
+            Field valField = findField(root.getClass(), "val");
+            Field neighborsField = findField(root.getClass(), "neighbors");
+            if (valField == null || neighborsField == null) {
+                return "\"" + escapeJson(String.valueOf(root)) + "\"";
+            }
+            valField.setAccessible(true);
+            neighborsField.setAccessible(true);
+
+            List<Object> nodes = new ArrayList<>();
+            IdentityHashMap<Object, Integer> indexes = new IdentityHashMap<>();
+            ArrayDeque<Object> queue = new ArrayDeque<>();
+            queue.add(root);
+            indexes.put(root, 0);
+            nodes.add(root);
+
+            while (!queue.isEmpty()) {
+                Object node = queue.removeFirst();
+                Field nodeNeighborsField = findField(node.getClass(), "neighbors");
+                if (nodeNeighborsField == null) continue;
+                nodeNeighborsField.setAccessible(true);
+                Object rawNeighbors = nodeNeighborsField.get(node);
+                if (!(rawNeighbors instanceof Iterable<?> neighbors)) continue;
+                for (Object neighbor : neighbors) {
+                    if (neighbor == null || indexes.containsKey(neighbor)) continue;
+                    indexes.put(neighbor, nodes.size());
+                    nodes.add(neighbor);
+                    queue.addLast(neighbor);
+                }
+            }
+
+            StringBuilder result = new StringBuilder("[");
+            for (int i = 0; i < nodes.size(); i++) {
+                if (i > 0) result.append(',');
+                Object node = nodes.get(i);
+                Field nodeNeighborsField = findField(node.getClass(), "neighbors");
+                nodeNeighborsField.setAccessible(true);
+                Object rawNeighbors = nodeNeighborsField.get(node);
+                result.append('[');
+                boolean first = true;
+                if (rawNeighbors instanceof Iterable<?> neighbors) {
+                    for (Object neighbor : neighbors) {
+                        if (neighbor == null) continue;
+                        if (!first) result.append(',');
+                        first = false;
+                        Field neighborValField = findField(neighbor.getClass(), "val");
+                        if (neighborValField == null) {
+                            result.append("null");
+                        } else {
+                            neighborValField.setAccessible(true);
+                            result.append(formatValue(neighborValField.get(neighbor)));
+                        }
+                    }
+                }
+                result.append(']');
+            }
+            return result.append(']').toString();
+        } catch (ReflectiveOperationException | RuntimeException ex) {
+            return "\"" + escapeJson(String.valueOf(root)) + "\"";
+        }
     }
 
     private static String escapeJson(
