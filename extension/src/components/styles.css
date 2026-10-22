@@ -2715,7 +2715,6 @@
 .yv-graph-layout {min-width:0;align-items:start}
 
 .yv-graph-stage>.yv-graph-node {max-height:88px;overflow:hidden;line-height:1.2;overflow-wrap:anywhere}
-.yv-graph-inspector-object-fields {display:flex;flex-direction:column;gap:7px;padding:10px 0;border-bottom:1px solid var(--yv-border)}
 .yv-graph-node-status-removed {background:color-mix(in srgb,var(--yv-warning,#f59e0b),transparent 84%);color:var(--yv-warning,#f59e0b)}
 .yv-graph-stage>.yv-graph-node:focus-visible {outline:2px solid var(--yv-accent,#65a9ff);outline-offset:3px}
 
@@ -2729,7 +2728,7 @@
 .yv-graph-stage {will-change:transform}
 
 
-/* Integrated graph design from graph-design/yv-graph.css. The stage remains inside the existing scroll viewport and inspector layout. */
+/* Integrated graph design from graph-design/yv-graph.css. The stage remains inside the existing scroll viewport. */
 /* ==========================================================================
    YourVision graph renderer. APPEND to the end of styles.css (after the tree
    block). Keep your existing shared keyframes (yv-graph-node-entered, etc.):
