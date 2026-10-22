@@ -4270,6 +4270,11 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const currentKeyCount = Array.isArray(fields.keys) ? fields.keys.length : undefined;
   const previousChildCount = childTargetsOf(previousFields, previousObjects).length;
   const currentChildCount = childTargetsOf(fields, objects).length;
+  const queryRange = treeVariantRangeCandidate(fields) ? capturedQueryRange(state) : undefined;
+  const nodeRangeLeft = ['leftBound', 'rangeLeft', 'start', 'l'].find(name => typeof fields[name] === 'number');
+  const nodeRangeRight = ['rightBound', 'rangeRight', 'end', 'r'].find(name => typeof fields[name] === 'number');
+  const segmentRangeMatches = Boolean(queryRange && nodeRangeLeft && nodeRangeRight &&
+    (fields[nodeRangeLeft] as number) <= queryRange[1] && (fields[nodeRangeRight] as number) >= queryRange[0]);
   const multiwayTransition = hasPreviousSnapshot && previousKeyCount !== undefined && currentKeyCount !== undefined
     ? (currentKeyCount > previousKeyCount && currentChildCount > previousChildCount ? 'split'
       : currentKeyCount < previousKeyCount && currentChildCount < previousChildCount ? 'merge'
@@ -4382,6 +4387,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
          {rotationCue?.role === 'intermediate' && <span className="yv-tree-operation-badge yv-tree-rotation-demoted" data-tree-rotation={rotationCue.direction} title="This node participated in the observed double rotation">DOUBLE ROTATION · INNER</span>}
          {treapRotation && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-treap-transition="rotation" title="A topology-proven rotation occurred on a node with explicit priority metadata; heap convention is not assumed">TREAP ROTATION · PRIORITY {priorityNow}</span>}
          {multiwayTransition && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-btree-transition={multiwayTransition} title="Inferred from captured key-count and child-topology changes">{multiwayTransition === 'split' ? 'B-TREE SPLIT' : multiwayTransition === 'merge' ? 'B-TREE MERGE' : 'CHILD REDISTRIBUTION'}</span>}
+         {segmentRangeMatches && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-segment-range="overlap" title={'Captured query range [' + queryRange![0] + ', ' + queryRange![1] + '] overlaps this node interval'}>RANGE QUERY</span>}
          {trieTerminalTransition && trieNodeLike && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-trie-transition={trieTerminalTransition.toLowerCase().replace(' ', '-')}>{trieTerminalTransition}</span>}
          {triePrunedChildren && <span className="yv-tree-operation-badge yv-tree-rotation-demoted" data-trie-transition="pruning" title="A previously linked child is no longer linked in this snapshot">TRIE PRUNING</span>}
          {redBlackRecolored && <span className="yv-tree-operation-badge yv-tree-recolored-badge" data-tree-recolored="true" title="The captured red/black state changed between adjacent snapshots">RECOLORED {previousRedBlackColor?.toUpperCase()} → {redBlackColor?.toUpperCase()}</span>}
@@ -4569,6 +4575,45 @@ function treeRotationCue(id: string, previousObjects: Record<string, unknown>, o
     if (id === formerParentId) return { role: 'demoted', direction: isLeftRotation ? 'left' : 'right' };
   }
   return undefined;
+}
+
+function capturedQueryRange(state: TraceState | undefined): [number, number] | undefined {
+  const data = isPlainObject(state?.lastEvent?.data) ? state!.lastEvent!.data as Obj : undefined;
+  if (!data) return undefined;
+  const candidates: unknown[] = [data, ...[
+    data.queryRange, data.range, data.query, data.executionEvents,
+  ].filter(Boolean)];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate) && candidate.length >= 2 &&
+      typeof candidate[0] === 'number' && typeof candidate[1] === 'number') {
+      return [Math.min(candidate[0], candidate[1]), Math.max(candidate[0], candidate[1])];
+    }
+    if (!isPlainObject(candidate)) continue;
+    const left = ['queryLeft', 'queryL', 'rangeLeft', 'leftBound', 'from'].find(key => typeof candidate[key] === 'number');
+    const right = ['queryRight', 'queryR', 'rangeRight', 'rightBound', 'to'].find(key => typeof candidate[key] === 'number');
+    if (left && right) {
+      const a = candidate[left] as number, b = candidate[right] as number;
+      return [Math.min(a, b), Math.max(a, b)];
+    }
+    if (Array.isArray(candidate.executionEvents)) {
+      for (const event of candidate.executionEvents) {
+        if (!isPlainObject(event) || !isPlainObject(event.data)) continue;
+        const eventData = event.data;
+        const a = typeof eventData.queryLeft === 'number' ? eventData.queryLeft
+          : typeof eventData.queryL === 'number' ? eventData.queryL : undefined;
+        const b = typeof eventData.queryRight === 'number' ? eventData.queryRight
+          : typeof eventData.queryR === 'number' ? eventData.queryR : undefined;
+        if (a !== undefined && b !== undefined) return [Math.min(a, b), Math.max(a, b)];
+      }
+    }
+  }
+  return undefined;
+}
+
+function treeVariantRangeCandidate(fields: Obj): boolean {
+  return ['leftBound', 'rangeLeft', 'start', 'l'].some(name => typeof fields[name] === 'number') &&
+    ['rightBound', 'rangeRight', 'end', 'r'].some(name => typeof fields[name] === 'number') &&
+    ['sum', 'min', 'max', 'aggregate', 'value'].some(name => typeof fields[name] === 'number');
 }
 
 function childTargetsOf(fields: Obj, objs: Record<string, unknown>): string[] {
