@@ -2927,6 +2927,61 @@ describe('snapshot-backed tree rotation cues', () => {
     }
   });
 
+  it('shows a root-pivot cue when the captured root reference changes after rotation', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 403,
+      variables: { root: { $ref: 'p' } },
+      objects: {
+        p: { $objectId: 'p', $type: 'AVLNode', fields: { val: 10, left: null, right: { $ref: 'q' } } },
+        q: { $objectId: 'q', $type: 'AVLNode', fields: { val: 20, left: null, right: null } },
+      },
+    });
+    const current = state({
+      sequence: 404,
+      variables: { root: { $ref: 'q' } },
+      objects: {
+        p: { $objectId: 'p', $type: 'AVLNode', fields: { val: 10, left: null, right: null } },
+        q: { $objectId: 'q', $type: 'AVLNode', fields: { val: 20, left: { $ref: 'p' }, right: null } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'root = rotateLeft(root)', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'q' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-tree-rotation="left"');
+      expect(html).toContain('LEFT ROTATION · PIVOT');
+      expect(html).toContain('data-tree-node-id="q"');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('does not invent a rotation cue when replaying the first captured snapshot', () => {
+    const priorSession = sessionStore.get();
+    const initial = state({
+      sequence: 409,
+      objects: {
+        p: { $objectId: 'p', $type: 'AVLNode', fields: { val: 1, left: null, right: { $ref: 'q' } } },
+        q: { $objectId: 'q', $type: 'AVLNode', fields: { val: 2, left: null, right: null } },
+      },
+    });
+    const later = state({
+      sequence: 410,
+      objects: {
+        p: { $objectId: 'p', $type: 'AVLNode', fields: { val: 1, left: null, right: null } },
+        q: { $objectId: 'q', $type: 'AVLNode', fields: { val: 2, left: { $ref: 'p' }, right: null } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'rotateLeft(p)', states: [initial, later], index: 0 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'p' }} objects={initial.objects} state={initial} />);
+      expect(html).not.toContain('yv-tree-rotation-badge');
+      expect(html).not.toContain('yv-tree-rotation-demoted');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
   it('recognizes the mirrored right rotation and preserves the pivot identity', () => {
     const priorSession = sessionStore.get();
     const previous = state({
