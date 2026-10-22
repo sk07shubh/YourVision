@@ -3731,8 +3731,7 @@ export function GraphView({ objects, variables = {}, state }: {
               </span>}
             </div>;
           })}
-        </div></div></div>
-        {inspectorNode && <aside className="yv-graph-inspector" aria-label="Selected graph node" data-graph-inspector={inspectorNode.id} onMouseEnter={() => setHoverId(inspectorNode.id)}>
+          {inspectorNode && hoverId && <aside className="yv-graph-inspector" aria-label="Selected graph node" data-graph-inspector={inspectorNode.id} onMouseEnter={() => setHoverId(inspectorNode.id)} style={{ left: positions.get(inspectorNode.id)?.x ?? 0, top: (positions.get(inspectorNode.id)?.y ?? 0) + 38, transform: "translateX(-50%)" }}>
           <div className="yv-graph-inspector-heading">
             <div><span className="yv-graph-inspector-kicker">SELECTED NODE</span><strong>{compactValue(inspectorNode.label)}</strong></div>
             <code>{inspectorNode.id}</code>
@@ -3759,6 +3758,8 @@ export function GraphView({ objects, variables = {}, state }: {
               : <span className="yv-graph-no-neighbors">No captured neighbors</span>}
           </div>
         </aside>}
+        </div></div></div>
+
       </div>
     </div>
   );
