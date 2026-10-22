@@ -3056,6 +3056,38 @@ function graphReferenceId(value: unknown, objects: Record<string, unknown>): str
   return undefined;
 }
 
+/** Keep an argument preview focused on the graph component reachable from its passed Node. */
+function graphComponentObjects(root: unknown, objects: Record<string, unknown>): Record<string, unknown> {
+  const rootId = graphReferenceId(root, objects);
+  if (!rootId) return objects;
+
+  const nodeById = new Map<string, [string, unknown]>();
+  for (const [key, value] of Object.entries(objects)) {
+    if (!isPlainObject(value) || !looksGraphNode(value)) continue;
+    const id = typeof value.$objectId === 'string' ? value.$objectId : key;
+    nodeById.set(id, [key, value]);
+  }
+  if (!nodeById.has(rootId)) return objects;
+
+  const reachable = new Set<string>([rootId]);
+  const pending = [rootId];
+  while (pending.length) {
+    const id = pending.pop()!;
+    const entry = nodeById.get(id);
+    if (!entry || !isPlainObject(entry[1])) continue;
+    for (const neighbor of graphNeighborValues(entry[1]) ?? []) {
+      const targetId = graphReferenceId(neighbor, objects);
+      if (!targetId || !nodeById.has(targetId) || reachable.has(targetId)) continue;
+      reachable.add(targetId);
+      pending.push(targetId);
+    }
+  }
+
+  return Object.fromEntries([...nodeById.entries()]
+    .filter(([id]) => reachable.has(id))
+    .map(([, [key, value]]) => [key, value]));
+}
+
 function looksTrieNode(value: Obj): boolean {
   const fields = objectFields(value);
   return /TrieNode/i.test(objectType(value)) ||
@@ -4633,7 +4665,7 @@ function CompactDataValue({
   );
 }
 
-function DataValue({
+export function DataValue({
   value,
   state,
   source,
@@ -4653,6 +4685,16 @@ function DataValue({
   /** Prevent a one-dimensional array stored inside a collection from being mistaken for a matrix row. */
   nestedArrayItem?: boolean;
 }) {
+  // Graph-node arguments are object references, not maps or generic object records.
+  // Render the graph component rooted at the actual value passed to this invocation.
+  if (isPlainObject(value)) {
+    const resolvedGraphNode = resolveObjects ? resolveRef(value, state?.objects ?? {}) : value;
+    if (isPlainObject(resolvedGraphNode) && looksGraphNode(resolvedGraphNode)) {
+      const objects = graphComponentObjects(resolvedGraphNode, state?.objects ?? {});
+      return <GraphView objects={objects} variables={{ [name ?? 'node']: value }} state={state}/>;
+    }
+  }
+
   if (isPlainObject(value) && typeof value.$ref === 'string' &&
       (typeof value.$arrayId === 'string' || typeof value.$mapId === 'string' || typeof value.$collectionId === 'string')) {
     return <div className="yv-code">↻ {value.$ref}</div>;
