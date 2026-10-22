@@ -3380,3 +3380,23 @@
   min-height: 0;
   overflow-y: auto;
 }
+
+
+/* Specialized tree semantics layered onto the existing node visual language.
+   Only apply color when the captured node explicitly exposes red/black state. */
+.yv-structure-node.yv-tree-node-red-black-red > .yv-structure-node-card {
+  border-color: #f87171;
+  box-shadow: inset 0 0 0 1.5px #f87171, 0 0 0 2px #f8717122;
+}
+.yv-structure-node.yv-tree-node-red-black-black > .yv-structure-node-card {
+  border-color: #94a3b8;
+  background: color-mix(in srgb, var(--panel, #111827) 84%, #64748b 16%);
+  box-shadow: inset 0 0 0 1.5px #94a3b8;
+}
+.yv-structure-node.yv-tree-variant-height-balanced .yv-tree-node-metadata {
+  border-top: 1px solid var(--border-subtle, #64748b55);
+  padding-top: 3px;
+}
+.yv-structure-node.yv-tree-variant-multiway .yv-node-key-cells {
+  gap: 2px;
+}
