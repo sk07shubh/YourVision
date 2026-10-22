@@ -4256,6 +4256,33 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     .map(edge => edge.target));
   const previousParents = hasSnapshotPair ? parentsByChild(previousObjects) : undefined;
   const nodeValueChanged = Boolean(hasPreviousSnapshot && valueChanged(nodeValue(previousFields), nodeValue(resolved)));
+  const priorityOf = (fields: Obj): number | undefined => {
+    for (const key of ['priority', 'heapPriority', 'rank']) {
+      if (typeof fields[key] === 'number') return fields[key] as number;
+    }
+    return undefined;
+  };
+  const priorityBefore = priorityOf(previousFields);
+  const priorityNow = priorityOf(fields);
+  const treapRotation = Boolean(rotationCue && priorityBefore !== undefined && priorityNow !== undefined &&
+    (rotationCue.role === 'pivot' || rotationCue.role === 'demoted'));
+  const previousKeyCount = Array.isArray(previousFields.keys) ? previousFields.keys.length : undefined;
+  const currentKeyCount = Array.isArray(fields.keys) ? fields.keys.length : undefined;
+  const previousChildCount = childTargetsOf(previousFields, previousObjects).length;
+  const currentChildCount = childTargetsOf(fields, objects).length;
+  const multiwayTransition = hasPreviousSnapshot && previousKeyCount !== undefined && currentKeyCount !== undefined
+    ? (currentKeyCount > previousKeyCount && currentChildCount > previousChildCount ? 'split'
+      : currentKeyCount < previousKeyCount && currentChildCount < previousChildCount ? 'merge'
+        : currentKeyCount === previousKeyCount && valueChanged(childTargetsOf(previousFields, previousObjects).sort(), childTargetsOf(fields, objects).sort()) ? 'redistribution' : undefined)
+    : undefined;
+  const trieFlags = ['isEnd', 'isWord', 'endOfWord', 'isEndOfWord', 'isTerminal', 'terminal'];
+  const previousTrieTerminal = trieFlags.some(name => previousFields[name] === true);
+  const currentTrieTerminal = trieFlags.some(name => fields[name] === true);
+  const trieTerminalTransition = hasPreviousSnapshot && previousTrieTerminal !== currentTrieTerminal
+    ? (currentTrieTerminal ? 'WORD ADDED' : 'WORD REMOVED') : undefined;
+  const trieNodeLike = /trie/i.test(String(resolved.$type ?? '')) || trieFlags.some(name => name in fields);
+  const triePrunedChildren = Boolean(trieNodeLike && hasPreviousSnapshot &&
+    childTargetsOf(previousFields, previousObjects).some(childId => !childTargetsOf(fields, objects).includes(childId)));
   // Only label a rotation when snapshots show the reciprocal parent/child move
   // and the middle subtree transferred to the vacated child slot.
   const rotationCue = id && hasSnapshotPair ? (treeDoubleRotationCue(id, previousObjects, objects) ?? treeRotationCue(id, previousObjects, objects)) : undefined;
@@ -4353,6 +4380,10 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
          {rotationCue?.role === 'pivot' && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-tree-rotation={rotationCue.direction} title="Inferred from observed parent/child and transferred-subtree links">{rotationCue.direction.toUpperCase()} ROTATION · PIVOT</span>}
          {rotationCue?.role === 'demoted' && <span className="yv-tree-operation-badge yv-tree-rotation-demoted" data-tree-rotation={rotationCue.direction} title="This node moved below the rotation pivot in the captured topology">ROTATED DOWN</span>}
          {rotationCue?.role === 'intermediate' && <span className="yv-tree-operation-badge yv-tree-rotation-demoted" data-tree-rotation={rotationCue.direction} title="This node participated in the observed double rotation">DOUBLE ROTATION · INNER</span>}
+         {treapRotation && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-treap-transition="rotation" title="A topology-proven rotation occurred on a node with explicit priority metadata; heap convention is not assumed">TREAP ROTATION · PRIORITY {priorityNow}</span>}
+         {multiwayTransition && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-btree-transition={multiwayTransition} title="Inferred from captured key-count and child-topology changes">{multiwayTransition === 'split' ? 'B-TREE SPLIT' : multiwayTransition === 'merge' ? 'B-TREE MERGE' : 'CHILD REDISTRIBUTION'}</span>}
+         {trieTerminalTransition && trieNodeLike && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-trie-transition={trieTerminalTransition.toLowerCase().replace(' ', '-')}>{trieTerminalTransition}</span>}
+         {triePrunedChildren && <span className="yv-tree-operation-badge yv-tree-rotation-demoted" data-trie-transition="pruning" title="A previously linked child is no longer linked in this snapshot">TRIE PRUNING</span>}
          {redBlackRecolored && <span className="yv-tree-operation-badge yv-tree-recolored-badge" data-tree-recolored="true" title="The captured red/black state changed between adjacent snapshots">RECOLORED {previousRedBlackColor?.toUpperCase()} → {redBlackColor?.toUpperCase()}</span>}
          {redBlackRecolored && rotationCue?.role === 'pivot' && <span className="yv-tree-operation-badge yv-tree-recolored-badge" data-tree-red-black-fixup="true" title="The same captured transition includes both a proven rotation and an explicit red/black color change">RED-BLACK FIX-UP · ROTATE + RECOLOR</span>}
         {nodeValueChanged && <span className="yv-binary-node-status is-changed yv-tree-operation-badge yv-tree-value-delta" title="Value changed between adjacent execution snapshots">
