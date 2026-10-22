@@ -5150,11 +5150,9 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
       '.yv-graph-node-entered', '.yv-graph-node-changed', '.yv-graph-node-created',
       '.yv-graph-node-selected', '.yv-graph-node-status', '.yv-graph-node-status-created',
       '.yv-graph-edge-added', '.yv-graph-edge-removed', '.yv-graph-edge-traversed',
-      '.yv-graph-neighbor', '.yv-graph-neighbors', '.yv-graph-no-neighbors',
       '.yv-graph-legend', '.yv-graph-legend-created', '.yv-graph-legend-dot',
       '.yv-graph-legend-entered', '.yv-graph-legend-line', '.yv-graph-legend-selected',
-      '.yv-graph-inspector', '.yv-graph-inspector-field', '.yv-graph-inspector-fields',
-      '.yv-graph-inspector-heading', '.yv-graph-inspector-kicker', '.yv-linked-graph',
+      '.yv-linked-graph',
     ];
     const selectors = graphActive ? graphSelectors : treeSelectors;
     const rules: string[] = [];
