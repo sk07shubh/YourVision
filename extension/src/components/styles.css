@@ -2691,7 +2691,7 @@
 .yv-graph-neighbor:hover:not(:disabled){border-color:var(--yv-accent)}
 .yv-graph-neighbor:disabled{opacity:.5;cursor:default}
 .yv-graph-no-neighbors{font-size:11px;color:var(--yv-muted)}
-@media(min-width:720px){.yv-graph-layout{grid-template-columns:minmax(0,1fr) minmax(190px,250px);gap:14px}.yv-graph-canvas{grid-column:auto}.yv-graph-inspector{grid-column:auto}}
+@media(min-width:720px){.yv-graph-layout{grid-template-columns:max-content minmax(190px,250px);gap:10px;justify-content:start}.yv-graph-canvas{grid-column:auto}.yv-graph-inspector{grid-column:auto}}
 @media(max-width:480px){.yv-graph-inspector{padding:9px}.yv-graph-neighbor{padding:5px 6px}}
 @media(prefers-reduced-motion:reduce){.yv-graph-canvas>.yv-graph-node{transition:none}}
 
