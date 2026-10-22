@@ -2871,6 +2871,67 @@ describe('specialized balanced tree semantics', () => {
 });
 
 
+describe('snapshot-backed tree rotation cues', () => {
+  it('identifies a left rotation from the transferred middle subtree and stable node identities', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 401,
+      objects: {
+        p: { $objectId: 'p', $type: 'AVLNode', fields: { val: 10, left: null, right: { $ref: 'q' } } },
+        q: { $objectId: 'q', $type: 'AVLNode', fields: { val: 20, left: { $ref: 'beta' }, right: null } },
+        beta: { $objectId: 'beta', $type: 'AVLNode', fields: { val: 15, left: null, right: null } },
+      },
+    });
+    const current = state({
+      sequence: 402,
+      objects: {
+        p: { $objectId: 'p', $type: 'AVLNode', fields: { val: 10, left: null, right: { $ref: 'beta' } } },
+        q: { $objectId: 'q', $type: 'AVLNode', fields: { val: 20, left: { $ref: 'p' }, right: null } },
+        beta: { $objectId: 'beta', $type: 'AVLNode', fields: { val: 15, left: null, right: null } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'rotateLeft(p)', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 'q' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-tree-rotation="left"');
+      expect(html).toContain('LEFT ROTATION · PIVOT');
+      expect(html).toContain('ROTATED DOWN');
+      expect(html).toContain('yv-tree-rotation-demoted');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('does not label an ordinary child reparent as a rotation without a transferred subtree', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 411,
+      objects: {
+        p: { $objectId: 'p', $type: 'TreeNode', fields: { val: 1, left: { $ref: 'q' }, right: null } },
+        q: { $objectId: 'q', $type: 'TreeNode', fields: { val: 2, left: null, right: null } },
+        r: { $objectId: 'r', $type: 'TreeNode', fields: { val: 3, left: null, right: null } },
+      },
+    });
+    const current = state({
+      sequence: 412,
+      objects: {
+        p: { $objectId: 'p', $type: 'TreeNode', fields: { val: 1, left: null, right: null } },
+        q: { $objectId: 'q', $type: 'TreeNode', fields: { val: 2, left: { $ref: 'p' }, right: null } },
+        r: { $objectId: 'r', $type: 'TreeNode', fields: { val: 3, left: null, right: null } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'q.left = p', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 'q' }} objects={current.objects} state={current} />);
+      expect(html).not.toContain('yv-tree-rotation-badge');
+      expect(html).not.toContain('yv-tree-rotation-demoted');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+});
+
+
 describe('specialized trie terminal rendering', () => {
   it('highlights only nodes with an explicitly true terminal flag', () => {
     const objects = {
