@@ -13,8 +13,9 @@ This work extends the existing YourVision visualization system. Preserve the est
 - [x] Reuse multi-key node cells for B-tree-shaped nodes.
 - [x] Distinguish explicitly flagged multiway-tree leaves (e.g. B-tree/B+ tree leaf nodes).
 - [x] Highlight trie terminal nodes only when a captured terminal flag is explicitly true.
-- [ ] Add rotation/recolor transition cues only when trace snapshots establish the changed links or metadata.
-- [ ] Add focused regression tests for tree rotations, root replacement, null children, and historical replay.
+- [x] Add conservative rotation/recolor transition cues only when adjacent snapshots establish the changed links, middle-subtree transfer, or explicit red/black metadata change.
+- [x] Add focused regression tests for a snapshot-backed left rotation, ordinary reparenting false-positive prevention, and red-black recoloring.
+- [ ] Add focused regression tests for root replacement, null-child rotation cases, and historical replay.
 
 ### Tree families to implement
 - [ ] AVL trees: balance factors/heights and trace-backed rotations.
@@ -49,4 +50,4 @@ This work extends the existing YourVision visualization system. Preserve the est
 
 ## Current verification status
 
-The first specialized tree styling slice, explicit trie-terminal highlighting, treap priority metadata, segment-tree candidate metadata, explicit multiway-tree leaf styling, and focused component tests have been committed on the feature branch. Tests, typecheck, build, and real-trace checks have not yet been run for this branch.
+The first specialized tree styling slice now includes snapshot-backed single-rotation pivot/demotion cues and explicit red-black recolor cues, with focused regression cases for observed rotations, false-positive prevention, and recoloring. The cues are deliberately conservative: double-rotation grouping and full AVL/red-black operation animations remain outstanding. Tests, typecheck, build, and real-trace checks have not yet been run for this branch.
