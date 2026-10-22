@@ -3425,3 +3425,8 @@
   border-radius: 10px;
   border-color: var(--yv-accent, #60a5fa);
 }
+
+.yv-structure-node.yv-tree-variant-multiway.yv-tree-node-leaf > .yv-structure-node-card {
+  border-bottom-width: 3px;
+  border-bottom-color: var(--g-green, #4ade80);
+}
