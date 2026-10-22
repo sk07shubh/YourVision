@@ -4256,6 +4256,9 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     .map(edge => edge.target));
   const previousParents = hasSnapshotPair ? parentsByChild(previousObjects) : undefined;
   const nodeValueChanged = Boolean(hasPreviousSnapshot && valueChanged(nodeValue(previousFields), nodeValue(resolved)));
+  // Only label a rotation when snapshots show the reciprocal parent/child move
+  // and the middle subtree transferred to the vacated child slot.
+  const rotationCue = id && hasSnapshotPair ? treeRotationCue(id, previousObjects, objects) : undefined;
   const changedMetadataNames = Object.keys(fields).filter(name =>
     ['color', 'bf', 'balanceFactor', 'height', 'weight', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord'].includes(name) &&
     hasPreviousSnapshot && valueChanged(previousFields[name], fields[name])
@@ -4340,6 +4343,8 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
         </div>
         {trailOrders && trailOrders.length > 0 && <span className="yv-tree-trail-order" title={'Visit order: ' + trailOrders.join(', ')}>{trailOrders.slice(-3).join('·')}</span>}
         {created && <span className="yv-binary-node-status is-created yv-tree-operation-badge">NODE CREATED</span>}
+         {rotationCue?.role === 'pivot' && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-tree-rotation={rotationCue.direction} title="Inferred from observed parent/child and middle-subtree link changes">{rotationCue.direction.toUpperCase()} ROTATION · PIVOT</span>}
+         {rotationCue?.role === 'demoted' && <span className="yv-tree-operation-badge yv-tree-rotation-demoted" data-tree-rotation={rotationCue.direction} title="This node moved below the rotation pivot in the captured topology">ROTATED DOWN</span>}
         {nodeValueChanged && <span className="yv-binary-node-status is-changed yv-tree-operation-badge yv-tree-value-delta" title="Value changed between adjacent execution snapshots">
           {compactValue(nodeValue(previousFields))} → {compactValue(nodeValue(resolved))}
         </span>}
@@ -4419,6 +4424,74 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   );
 }
 const TREE_CHILD_FIELD = /^(left|right|children|child\d+|firstChild|secondChild)$/i;
+type TreeRotationCue = { role: 'pivot' | 'demoted'; direction: 'left' | 'right' };
+
+/**
+ * Infer a binary rotation only when the adjacent snapshots show both the
+ * pivot/parent relationship changing and the middle subtree transferred.
+ * This is topology evidence, not a guess based on method names or values.
+ */
+function treeRotationCue(id: string, previousObjects: Record<string, unknown>, objects: Record<string, unknown>): TreeRotationCue | undefined {
+  const previousParents = parentsByChild(previousObjects);
+  const currentParents = parentsByChild(objects);
+  const oldParentId = previousParents.get(id);
+  if (!oldParentId) return undefined;
+
+  const oldParentBefore = previousObjects[oldParentId];
+  const pivotBefore = previousObjects[id];
+  const oldParentNow = objects[oldParentId];
+  const pivotNow = objects[id];
+  if (!isPlainObject(oldParentBefore) || !isPlainObject(pivotBefore) ||
+      !isPlainObject(oldParentNow) || !isPlainObject(pivotNow)) return undefined;
+
+  const parentBefore = objectFields(oldParentBefore);
+  const pivotBeforeFields = objectFields(pivotBefore);
+  const parentNow = objectFields(oldParentNow);
+  const pivotNowFields = objectFields(pivotNow);
+  const parentLeftBefore = graphReferenceId(parentBefore.left, previousObjects);
+  const parentRightBefore = graphReferenceId(parentBefore.right, previousObjects);
+  const pivotLeftBefore = graphReferenceId(pivotBeforeFields.left, previousObjects);
+  const pivotRightBefore = graphReferenceId(pivotBeforeFields.right, previousObjects);
+  const parentLeftNow = graphReferenceId(parentNow.left, objects);
+  const parentRightNow = graphReferenceId(parentNow.right, objects);
+  const pivotLeftNow = graphReferenceId(pivotNowFields.left, objects);
+  const pivotRightNow = graphReferenceId(pivotNowFields.right, objects);
+
+  const pivotPromoted = currentParents.get(oldParentId) === id;
+  if (pivotPromoted && parentRightBefore === id && pivotLeftNow === oldParentId && parentRightNow === pivotLeftBefore) {
+    return { role: 'pivot', direction: 'left' };
+  }
+  if (pivotPromoted && parentLeftBefore === id && pivotRightNow === oldParentId && parentLeftNow === pivotRightBefore) {
+    return { role: 'pivot', direction: 'right' };
+  }
+
+  // The old parent is now the pivot's child. Mark it as demoted, but only
+  // when the pivot itself passes the same strict rotation-shape check.
+  const newParentId = currentParents.get(id);
+  if (newParentId && previousParents.get(newParentId) === id) {
+    const newParent = objects[newParentId];
+    const newParentBefore = previousObjects[newParentId];
+    if (isPlainObject(newParent) && isPlainObject(newParentBefore)) {
+      const currentPivotFields = objectFields(newParent);
+      const oldPivotFields = objectFields(newParentBefore);
+      const wasRightChild = graphReferenceId(objectFields(previousObjects[id] as Obj).right, previousObjects) === newParentId;
+      const wasLeftChild = graphReferenceId(objectFields(previousObjects[id] as Obj).left, previousObjects) === newParentId;
+      const leftTransfer = wasRightChild &&
+        graphReferenceId(objectFields(newParentBefore).right, previousObjects) === id &&
+        graphReferenceId(currentPivotFields.left, objects) === id &&
+        graphReferenceId(objectFields(previousObjects[id] as Obj).left, previousObjects) === graphReferenceId(objectFields(newParent).right, objects);
+      const rightTransfer = wasLeftChild &&
+        graphReferenceId(objectFields(newParentBefore).left, previousObjects) === id &&
+        graphReferenceId(currentPivotFields.right, objects) === id &&
+        graphReferenceId(objectFields(previousObjects[id] as Obj).right, previousObjects) === graphReferenceId(objectFields(newParent).left, objects);
+      if (leftTransfer) return { role: 'demoted', direction: 'left' };
+      if (rightTransfer) return { role: 'demoted', direction: 'right' };
+      void oldPivotFields;
+    }
+  }
+  return undefined;
+}
+
 function childTargetsOf(fields: Obj, objs: Record<string, unknown>): string[] {
   return Object.entries(fields)
     .filter(([fieldName, fieldValue]) => fieldValue != null && TREE_CHILD_FIELD.test(fieldName))
