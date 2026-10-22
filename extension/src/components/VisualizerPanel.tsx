@@ -4297,21 +4297,25 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     : rawColor === 'black' || rawColor === 'b' || fields.isRed === false || fields.isBlack === true
       ? 'black'
       : undefined;
+  const hasRangeBounds = (typeof fields.leftBound === 'number' || typeof fields.rangeLeft === 'number' || typeof fields.start === 'number' || typeof fields.l === 'number')
+    && (typeof fields.rightBound === 'number' || typeof fields.rangeRight === 'number' || typeof fields.end === 'number' || typeof fields.r === 'number');
+  const hasAggregate = ['sum', 'min', 'max', 'aggregate', 'value'].some(name => typeof fields[name] === 'number');
   const treeVariant = redBlackColor ? 'red-black'
-    : (typeof fields.balanceFactor === 'number' || typeof fields.bf === 'number' || typeof fields.height === 'number')
-      ? 'height-balanced'
-      : (typeof fields.priority === 'number' || typeof fields.heapPriority === 'number')
-        ? 'treap'
-        : keyCells ? 'multiway'
-          : (typeof fields.isEnd === 'boolean' || typeof fields.isWord === 'boolean' ||
-            typeof fields.endOfWord === 'boolean' || typeof fields.isEndOfWord === 'boolean' ||
-            typeof fields.isTerminal === 'boolean' || typeof fields.terminal === 'boolean')
-            ? 'trie'
-            : undefined;
+    : hasRangeBounds && hasAggregate ? 'segment-tree'
+      : (typeof fields.balanceFactor === 'number' || typeof fields.bf === 'number' || typeof fields.height === 'number')
+        ? 'height-balanced'
+        : (typeof fields.priority === 'number' || typeof fields.heapPriority === 'number')
+          ? 'treap'
+          : keyCells ? 'multiway'
+            : (typeof fields.isEnd === 'boolean' || typeof fields.isWord === 'boolean' ||
+              typeof fields.endOfWord === 'boolean' || typeof fields.isEndOfWord === 'boolean' ||
+              typeof fields.isTerminal === 'boolean' || typeof fields.terminal === 'boolean')
+              ? 'trie'
+              : undefined;
   const isTerminalTrieNode = ['isEnd', 'isWord', 'endOfWord', 'isEndOfWord', 'isTerminal', 'terminal']
     .some(name => fields[name] === true);
   const nodeMetadata = Object.entries(fields).filter(([name, metadataValue]) =>
-    ['color', 'bf', 'balanceFactor', 'height', 'weight', 'priority', 'heapPriority', 'rank', 'size', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord', 'isTerminal', 'terminal', 'isRed', 'isBlack'].includes(name) &&
+    ['color', 'bf', 'balanceFactor', 'height', 'weight', 'priority', 'heapPriority', 'rank', 'size', 'leftBound', 'rightBound', 'rangeLeft', 'rangeRight', 'start', 'end', 'l', 'r', 'sum', 'min', 'max', 'aggregate', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord', 'isTerminal', 'terminal', 'isRed', 'isBlack'].includes(name) &&
     (typeof metadataValue === 'string' || typeof metadataValue === 'number' || typeof metadataValue === 'boolean')
   );
   const modelReferenceEdges = model.edges.filter(edge => edge.kind === 'reference' && edge.source === modelNodeId);
