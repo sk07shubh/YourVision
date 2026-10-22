@@ -23,6 +23,7 @@ import {
   DataStructures,
   DisjointSetView,
   GraphView,
+  DataValue,
   TrieView,
   TreeNodeView,
   LinkedListView,
@@ -904,6 +905,33 @@ describe('trie data structure visualization', () => {
 });
 
 describe('graph data structure visualization', () => {
+  it('renders a passed graph-node argument as its reachable graph, not a map or unrelated clone', () => {
+    const priorSession = sessionStore.get();
+    const current = state({
+      variables: { node: { $objectId: 'original-1' } },
+      objects: {
+        'original-1': { $objectId: 'original-1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'original-2' }] } } },
+        'original-2': { $objectId: 'original-2', $type: 'Node', fields: { val: 2, neighbors: { values: [{ $ref: 'original-1' }] } } },
+        'clone-1': { $objectId: 'clone-1', $type: 'Node', fields: { val: 1, neighbors: { values: [{ $ref: 'clone-2' }] } } },
+        'clone-2': { $objectId: 'clone-2', $type: 'Node', fields: { val: 2, neighbors: { values: [{ $ref: 'clone-1' }] } } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'class Solution { Node cloneGraph(Node node) { return node; } }', states: [current], index: 0 });
+      const html = renderToStaticMarkup(
+        <DataValue value={{ $objectId: 'original-1' }} state={current} source="" name="node" />
+      );
+      expect(html).toContain('data-graph-node-count="2"');
+      expect(html).toContain('data-graph-node-id="original-1"');
+      expect(html).toContain('data-graph-node-id="original-2"');
+      expect(html).not.toContain('data-graph-node-id="clone-1"');
+      expect(html).not.toContain('data-graph-node-id="clone-2"');
+      expect(html).not.toContain('class="yv-map"');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
   it('renders actual adjacency links with stable node identities and pointer names', () => {
     const current = state({
       variables: { start: { $objectId: 'g1' } },
