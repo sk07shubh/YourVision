@@ -2843,3 +2843,29 @@ describe('multi-key tree node rendering', () => {
     expect(html).toContain('>20</span>');
   });
 });
+
+
+describe('specialized balanced tree semantics', () => {
+  it('renders explicit red-black node colors without guessing from values', () => {
+    const objects = {
+      root: { $objectId: 'root', $type: 'RBNode', fields: { val: 10, color: 'black', left: { $ref: 'child' } } },
+      child: { $objectId: 'child', $type: 'RBNode', fields: { val: 5, color: 'red', left: null, right: null } },
+    };
+    const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={objects} />);
+    expect(html).toContain('data-tree-variant="red-black"');
+    expect(html).toContain('data-tree-color="black"');
+    expect(html).toContain('yv-tree-node-red-black-black');
+    expect(html).toContain('data-tree-color="red"');
+    expect(html).toContain('yv-tree-node-red-black-red');
+  });
+
+  it('marks nodes with captured height or balance metadata as height-balanced candidates', () => {
+    const objects = {
+      root: { $objectId: 'root', $type: 'AVLNode', fields: { val: 10, height: 2, balanceFactor: 0, left: null, right: null } },
+    };
+    const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={objects} />);
+    expect(html).toContain('data-tree-variant="height-balanced"');
+    expect(html).toContain('balanceFactor=0');
+    expect(html).toContain('height=2');
+  });
+});
