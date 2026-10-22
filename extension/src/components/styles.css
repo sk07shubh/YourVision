@@ -3263,3 +3263,101 @@
   color: var(--g-purple, #B79CFF);
   border-color: var(--g-purple, #B79CFF);
 }
+
+/* Tree vertices use the same compact circular language as graph vertices.
+   Keep operation details outside the circle so the value remains readable. */
+.yv-node.yv-structure-node-card {
+  flex: 0 0 58px;
+  width: 58px;
+  height: 58px;
+  min-width: 58px;
+  max-width: 58px;
+  min-height: 58px;
+  padding: 5px;
+  border-radius: 50%;
+  overflow: visible;
+  text-align: center;
+}
+.yv-structure-node-card .yv-structure-node-main {
+  width: 100%;
+  min-width: 0;
+  gap: 2px;
+}
+.yv-structure-node-card .yv-structure-node-heading {
+  max-width: 100%;
+  min-width: 0;
+}
+.yv-structure-node-card .yv-structure-node-value {
+  max-width: 100%;
+  font-size: 13px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.yv-structure-node-card .yv-structure-node-identity {
+  max-width: 100%;
+  font-size: 8px;
+  white-space: nowrap;
+}
+.yv-structure-node-card .yv-tree-operation-badge {
+  position: absolute;
+  left: 50%;
+  bottom: -10px;
+  z-index: 4;
+  transform: translateX(-50%);
+  max-width: 112px;
+  padding: 2px 4px;
+  border-radius: 999px;
+  font-size: 8px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.yv-structure-node-card .yv-tree-node-metadata {
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 50%;
+  z-index: 3;
+  width: max-content;
+  max-width: 150px;
+  justify-content: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.yv-structure-node-card .yv-tree-pointer-labels {
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 6px);
+  z-index: 4;
+  transform: translateY(-50%);
+}
+.yv-structure-node-card .yv-tree-reference-labels {
+  position: absolute;
+  top: calc(100% + 22px);
+  left: 50%;
+  z-index: 3;
+  width: max-content;
+  max-width: 180px;
+  transform: translateX(-50%);
+}
+.yv-structure-node-card .yv-node-key-cells {
+  max-width: 100%;
+  border-radius: 999px;
+}
+.yv-structure-node-card .yv-node-key-cell {
+  min-width: 0;
+  padding: 2px 4px;
+  font-size: 10px;
+}
+@media (max-width: 520px) {
+  .yv-node.yv-structure-node-card {
+    flex-basis: 58px;
+    width: 58px;
+    height: 58px;
+    min-width: 58px;
+    max-width: 58px;
+    min-height: 58px;
+    padding: 5px;
+  }
+}
+
