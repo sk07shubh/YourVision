@@ -500,6 +500,8 @@ This section records code that has been implemented after the design audit. It d
 - **Adjacency graphs:** an initial graph view renders captured nodes with neighbors fields, their recorded references, cycles, self-links, and variable aliases. It caps rendering at 80 nodes.
 - **Trie nodes:** an initial trie view renders captured child relationships, map-key or array-index edge labels, and common terminal flags (isEnd, isWord, endOfWord, isEndOfWord, terminal, isTerminal). Rendering is depth-bounded and node-bounded.
 - **Binary trees:** left/right branch labels and stable node identities are visible; cyclic references render as references instead of repeated nodes.
+- **Specialized tree metadata:** captured red-black colors, AVL-style height/balance fields, treap priorities, segment-tree interval/aggregate fields, trie terminal flags, and explicit B-tree/B+ tree leaf state are exposed without inferring missing values.
+- **Rotation cues (initial):** adjacent snapshots can label a left/right binary rotation only when stable identities show the reciprocal parent/pivot link change and the middle subtree transfers to the vacated slot. Pivot and demoted-node cues are implemented; double-rotation sequencing, red-black recoloring/operation grouping, and full AVL/RB algorithm animations remain outstanding.
 - **Disjoint sets:** an initial parent-forest view is enabled only when the source contains conventional find/union and parent/parents/par array patterns. It displays parent relationships and highlights recorded parent-array writes. It supports self-parent roots and -1 root sentinels.
 
 ### Regression coverage added

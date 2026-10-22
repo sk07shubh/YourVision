@@ -2843,3 +2843,520 @@ describe('multi-key tree node rendering', () => {
     expect(html).toContain('>20</span>');
   });
 });
+
+
+describe('specialized balanced tree semantics', () => {
+  it('renders explicit red-black node colors without guessing from values', () => {
+    const objects = {
+      root: { $objectId: 'root', $type: 'RBNode', fields: { val: 10, color: 'black', left: { $ref: 'child' } } },
+      child: { $objectId: 'child', $type: 'RBNode', fields: { val: 5, color: 'red', left: null, right: null } },
+    };
+    const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={objects} />);
+    expect(html).toContain('data-tree-variant="red-black"');
+    expect(html).toContain('data-tree-color="black"');
+    expect(html).toContain('yv-tree-node-red-black-black');
+    expect(html).toContain('data-tree-color="red"');
+    expect(html).toContain('yv-tree-node-red-black-red');
+  });
+
+  it('labels a red-black recolor only when adjacent snapshots show a color change', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 421,
+      objects: {
+        root: { $objectId: 'root', $type: 'RBNode', fields: { val: 10, color: 'black', left: null, right: null } },
+      },
+    });
+    const current = state({
+      sequence: 422,
+      objects: {
+        root: { $objectId: 'root', $type: 'RBNode', fields: { val: 10, color: 'red', left: null, right: null } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'root.color = RED', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 'root' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-tree-recolored="true"');
+      expect(html).toContain('RECOLORED BLACK → RED');
+      expect(html).toContain('yv-tree-recolored-badge');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('marks nodes with captured height or balance metadata as height-balanced candidates', () => {
+    const objects = {
+      root: { $objectId: 'root', $type: 'AVLNode', fields: { val: 10, height: 2, balanceFactor: 0, left: null, right: null } },
+    };
+    const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={objects} />);
+    expect(html).toContain('data-tree-variant="height-balanced"');
+    expect(html).toContain('balanceFactor=0');
+    expect(html).toContain('height=2');
+  });
+});
+
+
+describe('snapshot-backed tree rotation cues', () => {
+  it('identifies a left rotation from the transferred middle subtree and stable node identities', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 401,
+      objects: {
+        p: { $objectId: 'p', $type: 'AVLNode', fields: { val: 10, left: null, right: { $ref: 'q' } } },
+        q: { $objectId: 'q', $type: 'AVLNode', fields: { val: 20, left: { $ref: 'beta' }, right: null } },
+        beta: { $objectId: 'beta', $type: 'AVLNode', fields: { val: 15, left: null, right: null } },
+      },
+    });
+    const current = state({
+      sequence: 402,
+      objects: {
+        p: { $objectId: 'p', $type: 'AVLNode', fields: { val: 10, left: null, right: { $ref: 'beta' } } },
+        q: { $objectId: 'q', $type: 'AVLNode', fields: { val: 20, left: { $ref: 'p' }, right: null } },
+        beta: { $objectId: 'beta', $type: 'AVLNode', fields: { val: 15, left: null, right: null } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'rotateLeft(p)', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 'q' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-tree-rotation="left"');
+      expect(html).toContain('LEFT ROTATION · PIVOT');
+      expect(html).toContain('ROTATED DOWN');
+      expect(html).toContain('yv-tree-rotation-demoted');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('shows a root-pivot cue when the captured root reference changes after rotation', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 403,
+      variables: { root: { $ref: 'p' } },
+      objects: {
+        p: { $objectId: 'p', $type: 'AVLNode', fields: { val: 10, left: null, right: { $ref: 'q' } } },
+        q: { $objectId: 'q', $type: 'AVLNode', fields: { val: 20, left: null, right: null } },
+      },
+    });
+    const current = state({
+      sequence: 404,
+      variables: { root: { $ref: 'q' } },
+      objects: {
+        p: { $objectId: 'p', $type: 'AVLNode', fields: { val: 10, left: null, right: null } },
+        q: { $objectId: 'q', $type: 'AVLNode', fields: { val: 20, left: { $ref: 'p' }, right: null } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'root = rotateLeft(root)', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'q' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-tree-rotation="left"');
+      expect(html).toContain('LEFT ROTATION · PIVOT');
+      expect(html).toContain('data-tree-node-id="q"');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('does not invent a rotation cue when replaying the first captured snapshot', () => {
+    const priorSession = sessionStore.get();
+    const initial = state({
+      sequence: 409,
+      objects: {
+        p: { $objectId: 'p', $type: 'AVLNode', fields: { val: 1, left: null, right: { $ref: 'q' } } },
+        q: { $objectId: 'q', $type: 'AVLNode', fields: { val: 2, left: null, right: null } },
+      },
+    });
+    const later = state({
+      sequence: 410,
+      objects: {
+        p: { $objectId: 'p', $type: 'AVLNode', fields: { val: 1, left: null, right: null } },
+        q: { $objectId: 'q', $type: 'AVLNode', fields: { val: 2, left: { $ref: 'p' }, right: null } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'rotateLeft(p)', states: [initial, later], index: 0 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'p' }} objects={initial.objects} state={initial} />);
+      expect(html).not.toContain('yv-tree-rotation-badge');
+      expect(html).not.toContain('yv-tree-rotation-demoted');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('recognizes the mirrored right rotation and preserves the pivot identity', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 405,
+      objects: {
+        p: { $objectId: 'p', $type: 'AVLNode', fields: { val: 20, left: { $ref: 'q' }, right: null } },
+        q: { $objectId: 'q', $type: 'AVLNode', fields: { val: 10, left: null, right: { $ref: 'beta' } } },
+        beta: { $objectId: 'beta', $type: 'AVLNode', fields: { val: 15, left: null, right: null } },
+      },
+    });
+    const current = state({
+      sequence: 406,
+      objects: {
+        p: { $objectId: 'p', $type: 'AVLNode', fields: { val: 20, left: { $ref: 'beta' }, right: null } },
+        q: { $objectId: 'q', $type: 'AVLNode', fields: { val: 10, left: null, right: { $ref: 'p' } } },
+        beta: { $objectId: 'beta', $type: 'AVLNode', fields: { val: 15, left: null, right: null } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'rotateRight(p)', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 'q' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-tree-rotation="right"');
+      expect(html).toContain('RIGHT ROTATION · PIVOT');
+      expect(html).toContain('data-tree-node-id="q"');
+      expect(html).toContain('ROTATED DOWN');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('recognizes a rotation when the transferred middle subtree is null', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 407,
+      objects: {
+        p: { $objectId: 'p', $type: 'AVLNode', fields: { val: 1, left: null, right: { $ref: 'q' } } },
+        q: { $objectId: 'q', $type: 'AVLNode', fields: { val: 2, left: null, right: null } },
+      },
+    });
+    const current = state({
+      sequence: 408,
+      objects: {
+        p: { $objectId: 'p', $type: 'AVLNode', fields: { val: 1, left: null, right: null } },
+        q: { $objectId: 'q', $type: 'AVLNode', fields: { val: 2, left: { $ref: 'p' }, right: null } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'rotateLeft(p)', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 'q' }} objects={current.objects} state={current} />);
+      expect(html).toContain('LEFT ROTATION · PIVOT');
+      expect(html).toContain('ROTATED DOWN');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('does not label an ordinary child reparent as a rotation without a transferred subtree', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 411,
+      objects: {
+        p: { $objectId: 'p', $type: 'TreeNode', fields: { val: 1, left: { $ref: 'q' }, right: null } },
+        q: { $objectId: 'q', $type: 'TreeNode', fields: { val: 2, left: null, right: null } },
+        r: { $objectId: 'r', $type: 'TreeNode', fields: { val: 3, left: null, right: null } },
+      },
+    });
+    const current = state({
+      sequence: 412,
+      objects: {
+        p: { $objectId: 'p', $type: 'TreeNode', fields: { val: 1, left: null, right: null } },
+        q: { $objectId: 'q', $type: 'TreeNode', fields: { val: 2, left: { $ref: 'p' }, right: null } },
+        r: { $objectId: 'r', $type: 'TreeNode', fields: { val: 3, left: null, right: null } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'q.left = p', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 'q' }} objects={current.objects} state={current} />);
+      expect(html).not.toContain('yv-tree-rotation-badge');
+      expect(html).not.toContain('yv-tree-rotation-demoted');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+});
+
+
+describe('specialized trie terminal rendering', () => {
+  it('highlights only nodes with an explicitly true terminal flag', () => {
+    const objects = {
+      root: { $objectId: 'root', $type: 'TrieNode', fields: { val: 'root', isEnd: false, children: [{ $ref: 'word' }] } },
+      word: { $objectId: 'word', $type: 'TrieNode', fields: { val: 'word', isEnd: true, children: [] } },
+    };
+    const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={objects} />);
+    expect(html).toContain('yv-tree-variant-trie');
+    expect(html).toContain('yv-tree-node-terminal');
+    expect(html).toContain('data-tree-node-id="word"');
+  });
+});
+
+
+describe('treap node metadata', () => {
+  it('identifies explicit priority fields and renders their values', () => {
+    const objects = {
+      root: { $objectId: 'root', $type: 'TreapNode', fields: { val: 10, priority: 4, left: null, right: null } },
+    };
+    const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={objects} />);
+    expect(html).toContain('data-tree-variant="treap"');
+    expect(html).toContain('priority=4');
+  });
+});
+
+
+describe('range aggregate tree metadata', () => {
+  it('identifies nodes with explicit interval bounds and aggregate values', () => {
+    const objects = {
+      root: { $objectId: 'root', $type: 'SegmentNode', fields: { val: 12, leftBound: 0, rightBound: 3, sum: 12, left: null, right: null } },
+    };
+    const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={objects} />);
+    expect(html).toContain('data-tree-variant="segment-tree"');
+    expect(html).toContain('leftBound=0');
+    expect(html).toContain('rightBound=3');
+    expect(html).toContain('sum=12');
+  });
+});
+
+
+describe('multiway tree leaf semantics', () => {
+  it('marks explicitly declared B-tree leaf nodes', () => {
+    const objects = {
+      root: { $objectId: 'root', $type: 'BTreeNode', fields: { keys: [4, 8], isLeaf: true, children: [] } },
+    };
+    const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={objects} />);
+    expect(html).toContain('data-tree-variant="multiway"');
+    expect(html).toContain('data-tree-leaf="true"');
+    expect(html).toContain('yv-tree-node-leaf');
+  });
+});
+
+
+describe('snapshot-backed AVL double rotations', () => {
+  it('groups a left-right rotation only when both transferred subtrees match', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({ sequence: 431, objects: {
+      a: { $objectId: 'a', $type: 'AVLNode', fields: { val: 30, left: { $ref: 'b' }, right: null } },
+      b: { $objectId: 'b', $type: 'AVLNode', fields: { val: 10, left: null, right: { $ref: 'c' } } },
+      c: { $objectId: 'c', $type: 'AVLNode', fields: { val: 20, left: { $ref: 'beta' }, right: { $ref: 'gamma' } } },
+      beta: { $objectId: 'beta', $type: 'AVLNode', fields: { val: 15, left: null, right: null } },
+      gamma: { $objectId: 'gamma', $type: 'AVLNode', fields: { val: 25, left: null, right: null } },
+    }});
+    const current = state({ sequence: 432, objects: {
+      a: { $objectId: 'a', $type: 'AVLNode', fields: { val: 30, left: { $ref: 'beta' }, right: null } },
+      b: { $objectId: 'b', $type: 'AVLNode', fields: { val: 10, left: null, right: { $ref: 'gamma' } } },
+      c: { $objectId: 'c', $type: 'AVLNode', fields: { val: 20, left: { $ref: 'b' }, right: { $ref: 'a' } } },
+      beta: { $objectId: 'beta', $type: 'AVLNode', fields: { val: 15, left: null, right: null } },
+      gamma: { $objectId: 'gamma', $type: 'AVLNode', fields: { val: 25, left: null, right: null } },
+    }});
+    try {
+      sessionStore.set({ source: 'rotateLeftRight(root)', states: [previous, current], index: 1 });
+      const pivot = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'c' }} objects={current.objects} state={current} />);
+      const demoted = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'a' }} objects={current.objects} state={current} />);
+      const inner = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'b' }} objects={current.objects} state={current} />);
+      expect(pivot).toContain('data-tree-rotation="left-right"');
+      expect(pivot).toContain('LEFT-RIGHT ROTATION · PIVOT');
+      expect(demoted).toContain('ROTATED DOWN');
+      expect(inner).toContain('DOUBLE ROTATION · INNER');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('recognizes the mirrored right-left rotation with stable identities', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({ sequence: 433, objects: {
+      a: { $objectId: 'a', $type: 'AVLNode', fields: { val: 10, left: null, right: { $ref: 'b' } } },
+      b: { $objectId: 'b', $type: 'AVLNode', fields: { val: 30, left: { $ref: 'c' }, right: null } },
+      c: { $objectId: 'c', $type: 'AVLNode', fields: { val: 20, left: { $ref: 'beta' }, right: { $ref: 'gamma' } } },
+      beta: { $objectId: 'beta', $type: 'AVLNode', fields: { val: 15, left: null, right: null } },
+      gamma: { $objectId: 'gamma', $type: 'AVLNode', fields: { val: 25, left: null, right: null } },
+    }});
+    const current = state({ sequence: 434, objects: {
+      a: { $objectId: 'a', $type: 'AVLNode', fields: { val: 10, left: null, right: { $ref: 'beta' } } },
+      b: { $objectId: 'b', $type: 'AVLNode', fields: { val: 30, left: { $ref: 'gamma' }, right: null } },
+      c: { $objectId: 'c', $type: 'AVLNode', fields: { val: 20, left: { $ref: 'a' }, right: { $ref: 'b' } } },
+      beta: { $objectId: 'beta', $type: 'AVLNode', fields: { val: 15, left: null, right: null } },
+      gamma: { $objectId: 'gamma', $type: 'AVLNode', fields: { val: 25, left: null, right: null } },
+    }});
+    try {
+      sessionStore.set({ source: 'rotateRightLeft(root)', states: [previous, current], index: 1 });
+      const pivot = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'c' }} objects={current.objects} state={current} />);
+      expect(pivot).toContain('data-tree-rotation="right-left"');
+      expect(pivot).toContain('RIGHT-LEFT ROTATION · PIVOT');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('does not group a double rotation when a transferred subtree identity is wrong', () => {
+    const previous = state({ sequence: 435, objects: {
+      a: { $objectId: 'a', $type: 'AVLNode', fields: { val: 30, left: { $ref: 'b' }, right: null } },
+      b: { $objectId: 'b', $type: 'AVLNode', fields: { val: 10, left: null, right: { $ref: 'c' } } },
+      c: { $objectId: 'c', $type: 'AVLNode', fields: { val: 20, left: { $ref: 'beta' }, right: { $ref: 'gamma' } } },
+      beta: { $objectId: 'beta', $type: 'AVLNode', fields: { val: 15, left: null, right: null } },
+      gamma: { $objectId: 'gamma', $type: 'AVLNode', fields: { val: 25, left: null, right: null } },
+    }});
+    const current = state({ sequence: 436, objects: {
+      a: { $objectId: 'a', $type: 'AVLNode', fields: { val: 30, left: { $ref: 'gamma' }, right: null } },
+      b: { $objectId: 'b', $type: 'AVLNode', fields: { val: 10, left: null, right: { $ref: 'beta' } } },
+      c: { $objectId: 'c', $type: 'AVLNode', fields: { val: 20, left: { $ref: 'b' }, right: { $ref: 'a' } } },
+      beta: { $objectId: 'beta', $type: 'AVLNode', fields: { val: 15, left: null, right: null } },
+      gamma: { $objectId: 'gamma', $type: 'AVLNode', fields: { val: 25, left: null, right: null } },
+    }});
+    const priorSession = sessionStore.get();
+    try {
+      sessionStore.set({ source: 'pointer rewiring', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'c' }} objects={current.objects} state={current} />);
+      expect(html).not.toContain('LEFT-RIGHT ROTATION · PIVOT');
+      expect(html).not.toContain('RIGHT-LEFT ROTATION · PIVOT');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+});
+
+
+describe('specialized structure operation transitions', () => {
+  it('marks a treap rotation only when explicit priority metadata accompanies a proven rotation', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({ sequence: 441, objects: {
+      p: { $objectId: 'p', $type: 'TreapNode', fields: { val: 10, priority: 7, left: null, right: { $ref: 'q' } } },
+      q: { $objectId: 'q', $type: 'TreapNode', fields: { val: 20, priority: 3, left: null, right: null } },
+    }});
+    const current = state({ sequence: 442, objects: {
+      p: { $objectId: 'p', $type: 'TreapNode', fields: { val: 10, priority: 7, left: null, right: null } },
+      q: { $objectId: 'q', $type: 'TreapNode', fields: { val: 20, priority: 3, left: { $ref: 'p' }, right: null } },
+    }});
+    try {
+      sessionStore.set({ source: 'rotateLeft(root)', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'q' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-treap-transition="rotation"');
+      expect(html).toContain('TREAP ROTATION · PRIORITY 3');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('marks a multiway node split from a simultaneous key and child-count increase', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({ sequence: 443, objects: {
+      root: { $objectId: 'root', $type: 'BTreeNode', fields: { keys: [10], children: [{ $ref: 'a' }, { $ref: 'b' }] } },
+      a: { $objectId: 'a', $type: 'BTreeNode', fields: { keys: [5], isLeaf: true, children: [] } },
+      b: { $objectId: 'b', $type: 'BTreeNode', fields: { keys: [15], isLeaf: true, children: [] } },
+    }});
+    const current = state({ sequence: 444, objects: {
+      root: { $objectId: 'root', $type: 'BTreeNode', fields: { keys: [10, 20], children: [{ $ref: 'a' }, { $ref: 'b' }, { $ref: 'c' }] } },
+      a: { $objectId: 'a', $type: 'BTreeNode', fields: { keys: [5], isLeaf: true, children: [] } },
+      b: { $objectId: 'b', $type: 'BTreeNode', fields: { keys: [15], isLeaf: true, children: [] } },
+      c: { $objectId: 'c', $type: 'BTreeNode', fields: { keys: [25], isLeaf: true, children: [] } },
+    }});
+    try {
+      sessionStore.set({ source: 'splitChild(root)', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-btree-transition="split"');
+      expect(html).toContain('B-TREE SPLIT');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('marks a multiway merge from a simultaneous key and child-count decrease', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({ sequence: 445, objects: {
+      root: { $objectId: 'root', $type: 'BTreeNode', fields: { keys: [10, 20], children: [{ $ref: 'a' }, { $ref: 'b' }, { $ref: 'c' }] } },
+      a: { $objectId: 'a', $type: 'BTreeNode', fields: { keys: [5], isLeaf: true, children: [] } },
+      b: { $objectId: 'b', $type: 'BTreeNode', fields: { keys: [15], isLeaf: true, children: [] } },
+      c: { $objectId: 'c', $type: 'BTreeNode', fields: { keys: [25], isLeaf: true, children: [] } },
+    }});
+    const current = state({ sequence: 446, objects: {
+      root: { $objectId: 'root', $type: 'BTreeNode', fields: { keys: [10], children: [{ $ref: 'a' }, { $ref: 'c' }] } },
+      a: { $objectId: 'a', $type: 'BTreeNode', fields: { keys: [5, 8, 9], isLeaf: true, children: [] } },
+      c: { $objectId: 'c', $type: 'BTreeNode', fields: { keys: [25], isLeaf: true, children: [] } },
+    }});
+    try {
+      sessionStore.set({ source: 'mergeChildren(root)', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-btree-transition="merge"');
+      expect(html).toContain('B-TREE MERGE');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('labels explicit trie terminal transitions and child pruning', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({ sequence: 447, objects: {
+      root: { $objectId: 'root', $type: 'TrieNode', fields: { val: 'r', children: [{ $ref: 'word' }] } },
+      word: { $objectId: 'word', $type: 'TrieNode', fields: { val: 'd', isEnd: false, children: [] } },
+    }});
+    const current = state({ sequence: 448, objects: {
+      root: { $objectId: 'root', $type: 'TrieNode', fields: { val: 'r', children: [] } },
+    }});
+    try {
+      sessionStore.set({ source: 'deleteWord("rd")', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-trie-transition="pruning"');
+      expect(html).toContain('TRIE PRUNING');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
+  it('highlights segment-tree intervals overlapping an explicit captured query range', () => {
+    const current = state({ sequence: 449, objects: {
+      root: { $objectId: 'root', $type: 'SegmentNode', fields: { val: 10, leftBound: 0, rightBound: 7, sum: 10, left: { $ref: 'left' }, right: { $ref: 'right' } } },
+      left: { $objectId: 'left', $type: 'SegmentNode', fields: { val: 4, leftBound: 0, rightBound: 3, sum: 4, left: null, right: null } },
+      right: { $objectId: 'right', $type: 'SegmentNode', fields: { val: 6, leftBound: 4, rightBound: 7, sum: 6, left: null, right: null } },
+    }, lastEvent: { type: 'STEP', data: { queryLeft: 5, queryRight: 6 } } });
+    const priorSession = sessionStore.get();
+    try {
+      sessionStore.set({ source: 'query(5, 6)', states: [current], index: 0 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-segment-range="overlap"');
+      expect(html).toContain('RANGE QUERY');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+});
+
+
+describe('trie insertion and terminal-state transitions', () => {
+  it('marks a newly linked trie child and an explicit terminal-state change', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({ sequence: 451, objects: {
+      root: { $objectId: 'root', $type: 'TrieNode', fields: { val: 'r', children: [] } },
+      word: { $objectId: 'word', $type: 'TrieNode', fields: { val: 'd', isEnd: false, children: [] } },
+    }});
+    const current = state({ sequence: 452, objects: {
+      root: { $objectId: 'root', $type: 'TrieNode', fields: { val: 'r', children: [{ $ref: 'word' }] } },
+      word: { $objectId: 'word', $type: 'TrieNode', fields: { val: 'd', isEnd: true, children: [] } },
+    }});
+    try {
+      sessionStore.set({ source: 'insert("rd")', states: [previous, current], index: 1 });
+      const rootHtml = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={current.objects} state={current} />);
+      const wordHtml = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'word' }} objects={current.objects} state={current} />);
+      expect(rootHtml).toContain('data-trie-transition="insertion"');
+      expect(rootHtml).toContain('TRIE INSERTION');
+      expect(wordHtml).toContain('data-trie-transition="word-added"');
+      expect(wordHtml).toContain('WORD ADDED');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+});
+
+
+  it('detects child redistribution when multiway key count is stable but child slots change', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({ sequence: 453, objects: {
+      root: { $objectId: 'root', $type: 'BTreeNode', fields: { keys: [10, 20], children: [{ $ref: 'a' }, { $ref: 'b' }, { $ref: 'c' }] } },
+      a: { $objectId: 'a', $type: 'BTreeNode', fields: { keys: [5], isLeaf: true, children: [] } },
+      b: { $objectId: 'b', $type: 'BTreeNode', fields: { keys: [15], isLeaf: true, children: [] } },
+      c: { $objectId: 'c', $type: 'BTreeNode', fields: { keys: [25], isLeaf: true, children: [] } },
+    }});
+    const current = state({ sequence: 454, objects: {
+      root: { $objectId: 'root', $type: 'BTreeNode', fields: { keys: [10, 20], children: [{ $ref: 'b' }, { $ref: 'a' }, { $ref: 'c' }] } },
+      a: { $objectId: 'a', $type: 'BTreeNode', fields: { keys: [5], isLeaf: true, children: [] } },
+      b: { $objectId: 'b', $type: 'BTreeNode', fields: { keys: [15], isLeaf: true, children: [] } },
+      c: { $objectId: 'c', $type: 'BTreeNode', fields: { keys: [25], isLeaf: true, children: [] } },
+    }});
+    try {
+      sessionStore.set({ source: 'redistributeChildren(root)', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-btree-transition="redistribution"');
+      expect(html).toContain('CHILD REDISTRIBUTION');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });

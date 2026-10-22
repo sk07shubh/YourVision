@@ -4256,8 +4256,50 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     .map(edge => edge.target));
   const previousParents = hasSnapshotPair ? parentsByChild(previousObjects) : undefined;
   const nodeValueChanged = Boolean(hasPreviousSnapshot && valueChanged(nodeValue(previousFields), nodeValue(resolved)));
+  const priorityOf = (fields: Obj): number | undefined => {
+    for (const key of ['priority', 'heapPriority']) {
+      if (typeof fields[key] === 'number') return fields[key] as number;
+    }
+    return undefined;
+  };
+  // Only label a rotation when snapshots show the reciprocal parent/child move
+  // and the middle subtree transferred to the vacated child slot.
+  const rotationCue = id && hasSnapshotPair ? (treeDoubleRotationCue(id, previousObjects, objects) ?? treeRotationCue(id, previousObjects, objects)) : undefined;
+  const priorityBefore = priorityOf(previousFields);
+  const priorityNow = priorityOf(fields);
+  const treapRotation = Boolean(rotationCue && priorityBefore !== undefined && priorityNow !== undefined &&
+    (rotationCue.role === 'pivot' || rotationCue.role === 'demoted'));
+  // The rotation reverses a parent/child edge; show that priority metadata
+  // participates without guessing whether larger or smaller priorities win.
+  const treapPriorityEdgeChanged = treapRotation;
+  const previousKeyCount = Array.isArray(previousFields.keys) ? previousFields.keys.length : undefined;
+  const currentKeyCount = Array.isArray(fields.keys) ? fields.keys.length : undefined;
+  const previousChildCount = childTargetsOf(previousFields, previousObjects).length;
+  const currentChildCount = childTargetsOf(fields, objects).length;
+  const queryRange = treeVariantRangeCandidate(fields) ? capturedQueryRange(state) : undefined;
+  const nodeRangeLeft = ['leftBound', 'rangeLeft', 'start', 'l'].find(name => typeof fields[name] === 'number');
+  const nodeRangeRight = ['rightBound', 'rangeRight', 'end', 'r'].find(name => typeof fields[name] === 'number');
+  const segmentRangeMatches = Boolean(queryRange && nodeRangeLeft && nodeRangeRight &&
+    (fields[nodeRangeLeft] as number) <= queryRange[1] && (fields[nodeRangeRight] as number) >= queryRange[0]);
+  const multiwayTransition = hasPreviousSnapshot && previousKeyCount !== undefined && currentKeyCount !== undefined
+    ? (currentKeyCount > previousKeyCount && currentChildCount > previousChildCount ? 'split'
+      : currentKeyCount < previousKeyCount && currentChildCount < previousChildCount ? 'merge'
+        : currentKeyCount === previousKeyCount && valueChanged(childTargetsOf(previousFields, previousObjects), childTargetsOf(fields, objects)) ? 'redistribution' : undefined)
+    : undefined;
+  const trieFlags = ['isEnd', 'isWord', 'endOfWord', 'isEndOfWord', 'isTerminal', 'terminal'];
+  const previousTrieTerminal = trieFlags.some(name => previousFields[name] === true);
+  const currentTrieTerminal = trieFlags.some(name => fields[name] === true);
+  const trieTerminalTransition = hasPreviousSnapshot && previousTrieTerminal !== currentTrieTerminal
+    ? (currentTrieTerminal ? 'WORD ADDED' : 'WORD REMOVED') : undefined;
+  const trieNodeLike = /trie/i.test(String(resolved.$type ?? '')) || trieFlags.some(name => name in fields);
+  const previousTrieChildren = childTargetsOf(previousFields, previousObjects);
+  const currentTrieChildren = childTargetsOf(fields, objects);
+  const triePrunedChildren = Boolean(trieNodeLike && hasPreviousSnapshot &&
+    previousTrieChildren.some(childId => !currentTrieChildren.includes(childId)));
+  const trieAddedChildren = Boolean(trieNodeLike && hasPreviousSnapshot &&
+    currentTrieChildren.some(childId => !previousTrieChildren.includes(childId)));
   const changedMetadataNames = Object.keys(fields).filter(name =>
-    ['color', 'bf', 'balanceFactor', 'height', 'weight', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord'].includes(name) &&
+    ['color', 'isRed', 'isBlack', 'bf', 'balanceFactor', 'height', 'weight', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord'].includes(name) &&
     hasPreviousSnapshot && valueChanged(previousFields[name], fields[name])
   );
   const changedReferenceNames = ['parent', 'next', 'prev', 'thread', 'random'].filter(name =>
@@ -4291,16 +4333,47 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const pointed = pointerNames.length > 0;
   const nodeIdentity = id ? (id.length > 18 ? id.slice(0, 15) + '…' : id) : undefined;
   const keyCells = Array.isArray(fields.keys) ? fields.keys : undefined;
+  const rawColor = typeof fields.color === 'string' ? fields.color.toLowerCase() : '';
+  const redBlackColor = rawColor === 'red' || rawColor === 'r' || fields.isRed === true
+    ? 'red'
+    : rawColor === 'black' || rawColor === 'b' || fields.isRed === false || fields.isBlack === true
+      ? 'black'
+      : undefined;
+  const previousRawColor = typeof previousFields.color === 'string' ? previousFields.color.toLowerCase() : '';
+  const previousRedBlackColor = previousRawColor === 'red' || previousRawColor === 'r' || previousFields.isRed === true
+    ? 'red'
+    : previousRawColor === 'black' || previousRawColor === 'b' || previousFields.isRed === false || previousFields.isBlack === true
+      ? 'black'
+      : undefined;
+  const redBlackRecolored = Boolean(hasPreviousSnapshot && redBlackColor && previousRedBlackColor && redBlackColor !== previousRedBlackColor);
+  const hasRangeBounds = (typeof fields.leftBound === 'number' || typeof fields.rangeLeft === 'number' || typeof fields.start === 'number' || typeof fields.l === 'number')
+    && (typeof fields.rightBound === 'number' || typeof fields.rangeRight === 'number' || typeof fields.end === 'number' || typeof fields.r === 'number');
+  const hasAggregate = ['sum', 'min', 'max', 'aggregate', 'value'].some(name => typeof fields[name] === 'number');
+  const treeVariant = redBlackColor ? 'red-black'
+    : hasRangeBounds && hasAggregate ? 'segment-tree'
+      : (typeof fields.balanceFactor === 'number' || typeof fields.bf === 'number' || typeof fields.height === 'number')
+        ? 'height-balanced'
+        : (typeof fields.priority === 'number' || typeof fields.heapPriority === 'number')
+          ? 'treap'
+          : keyCells ? 'multiway'
+            : (typeof fields.isEnd === 'boolean' || typeof fields.isWord === 'boolean' ||
+              typeof fields.endOfWord === 'boolean' || typeof fields.isEndOfWord === 'boolean' ||
+              typeof fields.isTerminal === 'boolean' || typeof fields.terminal === 'boolean')
+              ? 'trie'
+              : undefined;
+  const isTerminalTrieNode = ['isEnd', 'isWord', 'endOfWord', 'isEndOfWord', 'isTerminal', 'terminal']
+    .some(name => fields[name] === true);
+  const isExplicitLeafNode = fields.isLeaf === true || fields.leaf === true || fields.leafNode === true;
   const nodeMetadata = Object.entries(fields).filter(([name, metadataValue]) =>
-    ['color', 'bf', 'balanceFactor', 'height', 'weight', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord'].includes(name) &&
+    ['color', 'bf', 'balanceFactor', 'height', 'weight', 'priority', 'heapPriority', 'rank', 'size', 'leftBound', 'rightBound', 'rangeLeft', 'rangeRight', 'start', 'end', 'l', 'r', 'sum', 'min', 'max', 'aggregate', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord', 'isTerminal', 'terminal', 'isLeaf', 'leaf', 'leafNode', 'isRed', 'isBlack'].includes(name) &&
     (typeof metadataValue === 'string' || typeof metadataValue === 'number' || typeof metadataValue === 'boolean')
   );
   const modelReferenceEdges = model.edges.filter(edge => edge.kind === 'reference' && edge.source === modelNodeId);
   const entered = Boolean(hasSnapshotPair && id && movedPointerTargets.has(id));
   const depthClass = 'yv-structure-depth-' + Math.min(depth, 4);
   return (
-    <div ref={treeNodeRef} className={'yv-structure-node ' + depthClass + (pointed ? ' yv-tree-node-pointed' : '') + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '') + (nodeValueChanged ? ' yv-tree-node-value-changed' : '') + (removedChildEdges.length ? ' yv-tree-node-child-removed' : '')}
-      data-tree-node-id={id} data-tree-depth={depth} data-tree-layout={isNaryTree ? 'nary' : 'binary-tree'}
+    <div ref={treeNodeRef} className={'yv-structure-node ' + depthClass + (treeVariant ? ' yv-tree-variant-' + treeVariant : '') + (isTerminalTrieNode ? ' yv-tree-node-terminal' : '') + (segmentRangeMatches ? ' yv-tree-node-range-overlap' : '') + (isExplicitLeafNode ? ' yv-tree-node-leaf' : '') + (redBlackColor ? ' yv-tree-node-red-black-' + redBlackColor : '') + (pointed ? ' yv-tree-node-pointed' : '') + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '') + (nodeValueChanged ? ' yv-tree-node-value-changed' : '') + (removedChildEdges.length ? ' yv-tree-node-child-removed' : '')}
+      data-tree-node-id={id} data-tree-depth={depth} data-tree-layout={isNaryTree ? 'nary' : 'binary-tree'} data-tree-variant={treeVariant} data-tree-color={redBlackColor} data-tree-leaf={isExplicitLeafNode ? 'true' : undefined}
       data-tree-changed={changed ? 'true' : undefined} data-tree-entered={entered ? 'true' : undefined}
       data-tree-created={created ? 'true' : undefined} aria-label={'Tree node ' + displayValue(nodeValue(resolved)) + (id ? ', object ' + id : '') + (pointed ? ', pointed to by ' + pointerNames.join(', ') : '')}>
       <div key={(changed || entered || created || nodeValueChanged) ? id + ':' + selectedIndex : id} className="yv-node yv-structure-node-card">
@@ -4316,6 +4389,18 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
         </div>
         {trailOrders && trailOrders.length > 0 && <span className="yv-tree-trail-order" title={'Visit order: ' + trailOrders.join(', ')}>{trailOrders.slice(-3).join('·')}</span>}
         {created && <span className="yv-binary-node-status is-created yv-tree-operation-badge">NODE CREATED</span>}
+         {rotationCue?.role === 'pivot' && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-tree-rotation={rotationCue.direction} title="Inferred from observed parent/child and transferred-subtree links">{rotationCue.direction.toUpperCase()} ROTATION · PIVOT</span>}
+         {rotationCue?.role === 'demoted' && <span className="yv-tree-operation-badge yv-tree-rotation-demoted" data-tree-rotation={rotationCue.direction} title="This node moved below the rotation pivot in the captured topology">ROTATED DOWN</span>}
+         {rotationCue?.role === 'intermediate' && <span className="yv-tree-operation-badge yv-tree-rotation-demoted" data-tree-rotation={rotationCue.direction} title="This node participated in the observed double rotation">DOUBLE ROTATION · INNER</span>}
+         {treapRotation && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-treap-transition="rotation" title="A topology-proven rotation occurred on a node with explicit priority metadata; heap convention is not assumed">TREAP ROTATION · PRIORITY {priorityNow}</span>}
+         {treapPriorityEdgeChanged && <span className="yv-tree-operation-badge yv-tree-recolored-badge" data-treap-priority-edge-changed="true" title="A parent/child edge changed during a rotation between nodes with explicit priorities; min-heap/max-heap convention is intentionally not inferred">PRIORITY EDGE ROTATED</span>}
+         {multiwayTransition && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-btree-transition={multiwayTransition} title="Inferred from captured key-count and child-topology changes">{multiwayTransition === 'split' ? 'B-TREE SPLIT' : multiwayTransition === 'merge' ? 'B-TREE MERGE' : 'CHILD REDISTRIBUTION'}</span>}
+         {segmentRangeMatches && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-segment-range="overlap" title={'Captured query range [' + queryRange![0] + ', ' + queryRange![1] + '] overlaps this node interval'}>RANGE QUERY</span>}
+         {trieTerminalTransition && trieNodeLike && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-trie-transition={trieTerminalTransition.toLowerCase().replace(' ', '-')}>{trieTerminalTransition}</span>}
+         {trieAddedChildren && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-trie-transition="insertion" title="A new child identity is linked from this trie node">TRIE INSERTION</span>}
+         {triePrunedChildren && <span className="yv-tree-operation-badge yv-tree-rotation-demoted" data-trie-transition="pruning" title="A previously linked child is no longer linked in this snapshot">TRIE PRUNING</span>}
+         {redBlackRecolored && <span className="yv-tree-operation-badge yv-tree-recolored-badge" data-tree-recolored="true" title="The captured red/black state changed between adjacent snapshots">RECOLORED {previousRedBlackColor?.toUpperCase()} → {redBlackColor?.toUpperCase()}</span>}
+         {redBlackRecolored && rotationCue?.role === 'pivot' && <span className="yv-tree-operation-badge yv-tree-recolored-badge" data-tree-red-black-fixup="true" title="The same captured transition includes both a proven rotation and an explicit red/black color change">RED-BLACK FIX-UP · ROTATE + RECOLOR</span>}
         {nodeValueChanged && <span className="yv-binary-node-status is-changed yv-tree-operation-badge yv-tree-value-delta" title="Value changed between adjacent execution snapshots">
           {compactValue(nodeValue(previousFields))} → {compactValue(nodeValue(resolved))}
         </span>}
@@ -4395,6 +4480,153 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   );
 }
 const TREE_CHILD_FIELD = /^(left|right|children|child\d+|firstChild|secondChild)$/i;
+type TreeRotationCue = { role: 'pivot' | 'demoted' | 'intermediate'; direction: 'left' | 'right' | 'left-right' | 'right-left' };
+
+/**
+ * Recognize an AVL-style double rotation only when the before/after snapshots
+ * establish the complete three-node topology and both transferred subtrees.
+ * This intentionally does not infer an operation from values or source names.
+ */
+function treeDoubleRotationCue(id: string, previousObjects: Record<string, unknown>, objects: Record<string, unknown>): TreeRotationCue | undefined {
+  const before = (nodeId: string, snapshot: Record<string, unknown>) => {
+    const raw = snapshot[nodeId];
+    return isPlainObject(raw) ? objectFields(raw) : undefined;
+  };
+  const ref = (fields: Obj | undefined, slot: 'left' | 'right', snapshot: Record<string, unknown>) =>
+    fields ? graphReferenceId(fields[slot], snapshot) : undefined;
+
+  for (const aId of Object.keys(previousObjects)) {
+    const aBefore = before(aId, previousObjects), aNow = before(aId, objects);
+    if (!aBefore || !aNow) continue;
+    for (const shape of ['left-right', 'right-left'] as const) {
+      const bId = ref(aBefore, shape === 'left-right' ? 'left' : 'right', previousObjects);
+      if (!bId) continue;
+      const bBefore = before(bId, previousObjects), bNow = before(bId, objects);
+      if (!bBefore || !bNow) continue;
+      const cId = ref(bBefore, shape === 'left-right' ? 'right' : 'left', previousObjects);
+      if (!cId) continue;
+      const cBefore = before(cId, previousObjects), cNow = before(cId, objects);
+      if (!cBefore || !cNow) continue;
+
+      const innerSlot = shape === 'left-right' ? 'left' : 'right';
+      const outerSlot = shape === 'left-right' ? 'right' : 'left';
+      // The middle node's left subtree transfers to A and its right subtree
+      // transfers to B in both mirrored AVL double-rotation cases.
+      const aTransferBefore = ref(cBefore, 'left', previousObjects);
+      const cTransferBefore = ref(cBefore, 'right', previousObjects);
+      const aChildNow = ref(aNow, shape === 'left-right' ? 'left' : 'right', objects);
+      const bChildNow = ref(bNow, shape === 'left-right' ? 'right' : 'left', objects);
+      const cInnerNow = ref(cNow, innerSlot, objects);
+      const cOuterNow = ref(cNow, outerSlot, objects);
+
+      const matches = aChildNow === aTransferBefore &&
+        bChildNow === cTransferBefore &&
+        cInnerNow === bId && cOuterNow === aId;
+      if (!matches) continue;
+      if (id === cId) return { role: 'pivot', direction: shape };
+      if (id === aId) return { role: 'demoted', direction: shape };
+      if (id === bId) return { role: 'intermediate', direction: shape };
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Infer a binary rotation only when adjacent snapshots show the reciprocal
+ * parent/child move and the middle subtree transferred to the vacated slot.
+ * Node identities are compared; equal values never count as topology evidence.
+ */
+function treeRotationCue(id: string, previousObjects: Record<string, unknown>, objects: Record<string, unknown>): TreeRotationCue | undefined {
+  const previousParents = parentsByChild(previousObjects);
+  const currentParents = parentsByChild(objects);
+
+  // Find a candidate pivot either because this node was promoted or because
+  // this node was the parent demoted below a newly promoted child.
+  const previousParentId = previousParents.get(id);
+  const currentParentId = currentParents.get(id);
+  const candidates = new Set<string>();
+  if (previousParentId) candidates.add(previousParentId);
+  if (currentParentId && previousParents.get(currentParentId) === id) candidates.add(id);
+
+  for (const formerParentId of candidates) {
+    const formerParentBeforeRaw = previousObjects[formerParentId];
+    const formerParentNowRaw = objects[formerParentId];
+    if (!isPlainObject(formerParentBeforeRaw) || !isPlainObject(formerParentNowRaw)) continue;
+    const formerParentBefore = objectFields(formerParentBeforeRaw);
+    const formerParentNow = objectFields(formerParentNowRaw);
+
+    const pivotId = formerParentId === id ? currentParentId : id;
+    if (!pivotId) continue;
+    const pivotBeforeRaw = previousObjects[pivotId];
+    const pivotNowRaw = objects[pivotId];
+    if (!isPlainObject(pivotBeforeRaw) || !isPlainObject(pivotNowRaw)) continue;
+    const pivotBefore = objectFields(pivotBeforeRaw);
+    const pivotNow = objectFields(pivotNowRaw);
+
+    const parentLeftBefore = graphReferenceId(formerParentBefore.left, previousObjects);
+    const parentRightBefore = graphReferenceId(formerParentBefore.right, previousObjects);
+    const parentLeftNow = graphReferenceId(formerParentNow.left, objects);
+    const parentRightNow = graphReferenceId(formerParentNow.right, objects);
+    const pivotLeftBefore = graphReferenceId(pivotBefore.left, previousObjects);
+    const pivotRightBefore = graphReferenceId(pivotBefore.right, previousObjects);
+    const pivotLeftNow = graphReferenceId(pivotNow.left, objects);
+    const pivotRightNow = graphReferenceId(pivotNow.right, objects);
+
+    const isLeftRotation = parentRightBefore === pivotId &&
+      currentParents.get(formerParentId) === pivotId &&
+      pivotLeftNow === formerParentId &&
+      parentRightNow === pivotLeftBefore;
+    const isRightRotation = parentLeftBefore === pivotId &&
+      currentParents.get(formerParentId) === pivotId &&
+      pivotRightNow === formerParentId &&
+      parentLeftNow === pivotRightBefore;
+    if (!isLeftRotation && !isRightRotation) continue;
+
+    if (id === pivotId) return { role: 'pivot', direction: isLeftRotation ? 'left' : 'right' };
+    if (id === formerParentId) return { role: 'demoted', direction: isLeftRotation ? 'left' : 'right' };
+  }
+  return undefined;
+}
+
+function capturedQueryRange(state: TraceState | undefined): [number, number] | undefined {
+  const data = isPlainObject(state?.lastEvent?.data) ? state!.lastEvent!.data as Obj : undefined;
+  if (!data) return undefined;
+  const candidates: unknown[] = [data, ...[
+    data.queryRange, data.range, data.query, data.executionEvents,
+  ].filter(Boolean)];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate) && candidate.length >= 2 &&
+      typeof candidate[0] === 'number' && typeof candidate[1] === 'number') {
+      return [Math.min(candidate[0], candidate[1]), Math.max(candidate[0], candidate[1])];
+    }
+    if (!isPlainObject(candidate)) continue;
+    const left = ['queryLeft', 'queryL', 'rangeLeft', 'leftBound', 'from'].find(key => typeof candidate[key] === 'number');
+    const right = ['queryRight', 'queryR', 'rangeRight', 'rightBound', 'to'].find(key => typeof candidate[key] === 'number');
+    if (left && right) {
+      const a = candidate[left] as number, b = candidate[right] as number;
+      return [Math.min(a, b), Math.max(a, b)];
+    }
+    if (Array.isArray(candidate.executionEvents)) {
+      for (const event of candidate.executionEvents) {
+        if (!isPlainObject(event) || !isPlainObject(event.data)) continue;
+        const eventData = event.data;
+        const a = typeof eventData.queryLeft === 'number' ? eventData.queryLeft
+          : typeof eventData.queryL === 'number' ? eventData.queryL : undefined;
+        const b = typeof eventData.queryRight === 'number' ? eventData.queryRight
+          : typeof eventData.queryR === 'number' ? eventData.queryR : undefined;
+        if (a !== undefined && b !== undefined) return [Math.min(a, b), Math.max(a, b)];
+      }
+    }
+  }
+  return undefined;
+}
+
+function treeVariantRangeCandidate(fields: Obj): boolean {
+  return ['leftBound', 'rangeLeft', 'start', 'l'].some(name => typeof fields[name] === 'number') &&
+    ['rightBound', 'rangeRight', 'end', 'r'].some(name => typeof fields[name] === 'number') &&
+    ['sum', 'min', 'max', 'aggregate', 'value'].some(name => typeof fields[name] === 'number');
+}
+
 function childTargetsOf(fields: Obj, objs: Record<string, unknown>): string[] {
   return Object.entries(fields)
     .filter(([fieldName, fieldValue]) => fieldValue != null && TREE_CHILD_FIELD.test(fieldName))
