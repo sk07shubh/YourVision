@@ -2669,30 +2669,12 @@
 
 
 
-/* Graph visualization: responsive canvas with a synchronized node inspector. */
+/* Graph visualization canvas and node interaction styling. */
 .yv-graph-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start;min-width:0}
 .yv-graph-canvas{position:relative;width:100%;max-width:900px;aspect-ratio:15/8;margin:0 auto;overflow:visible;isolation:isolate}
 .yv-graph-canvas>.yv-graph-node{font-size:clamp(10px,1.8vw,12px)!important;overflow-wrap:anywhere;line-height:1.2;transition:box-shadow 140ms ease,border-color 140ms ease,background 140ms ease}
 .yv-graph-canvas>.yv-graph-node:focus-visible{outline:2px solid var(--yv-accent,#65a9ff);outline-offset:3px}
 .yv-graph-canvas>.yv-graph-node-selected{border-color:var(--yv-accent,#65a9ff)!important}
-.yv-graph-inspector{width:100%;max-width:900px;margin:0 auto;border:1px solid var(--yv-border);border-radius:10px;background:var(--yv-elevated,var(--yv-panel));padding:12px;min-width:0}
-.yv-graph-inspector-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:10px;border-bottom:1px solid var(--yv-border)}
-.yv-graph-inspector-heading>div{display:flex;flex-direction:column;gap:4px;min-width:0}
-.yv-graph-inspector-heading strong{font-size:16px;color:var(--yv-text);overflow-wrap:anywhere}
-.yv-graph-inspector-kicker,.yv-graph-neighbors>span:first-child{font:10px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;color:var(--yv-muted)}
-.yv-graph-inspector-heading code,.yv-graph-neighbor code{font:10px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--yv-muted);overflow-wrap:anywhere}
-.yv-graph-inspector-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px 0}
-.yv-graph-inspector-field{display:flex;flex-direction:column;gap:4px;min-width:0}
-.yv-graph-inspector-field span{font-size:11px;color:var(--yv-muted)}
-.yv-graph-inspector-field strong{font-size:13px;color:var(--yv-text)}
-.yv-graph-neighbors{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding-top:9px;border-top:1px solid var(--yv-border)}
-.yv-graph-neighbors>span:first-child{width:100%;margin-bottom:2px}
-.yv-graph-neighbor{display:inline-flex;align-items:center;gap:8px;max-width:100%;padding:6px 8px;border:1px solid var(--yv-border);border-radius:7px;background:var(--yv-panel);color:var(--yv-text);cursor:pointer}
-.yv-graph-neighbor:hover:not(:disabled){border-color:var(--yv-accent)}
-.yv-graph-neighbor:disabled{opacity:.5;cursor:default}
-.yv-graph-no-neighbors{font-size:11px;color:var(--yv-muted)}
-@media(min-width:720px){.yv-graph-layout{grid-template-columns:minmax(0,1fr) minmax(190px,250px);gap:14px}.yv-graph-canvas{grid-column:auto}.yv-graph-inspector{grid-column:auto}}
-@media(max-width:480px){.yv-graph-inspector{padding:9px}.yv-graph-neighbor{padding:5px 6px}}
 @media(prefers-reduced-motion:reduce){.yv-graph-canvas>.yv-graph-node{transition:none}}
 
 .yv-graph-legend{display:flex;flex-wrap:wrap;align-items:center;gap:7px 12px;margin:0 0 10px;color:var(--yv-muted);font-size:10px}
@@ -2717,13 +2699,6 @@
 .yv-compact-value-details{margin:6px 0 2px 8px;padding:7px;border-left:2px solid var(--yv-border);min-width:0;max-width:100%;overflow-x:auto}
 .yv-map-row>div{overflow-wrap:anywhere}
 .yv-map-key .yv-compact-value{display:inline-block}
-.yv-graph-inspector{min-width:0}
-.yv-graph-inspector-heading strong{font-size:14px;line-height:1.4;overflow-wrap:anywhere}
-.yv-graph-inspector-fields{gap:8px}
-.yv-graph-inspector-field{min-width:0}
-.yv-graph-inspector-field strong{overflow-wrap:anywhere;font-size:12px}
-.yv-graph-neighbor{min-width:0}
-.yv-graph-neighbor span{overflow-wrap:anywhere}
 
 .yv-map-row[data-graph-reference-id]{cursor:pointer}
 .yv-map-row[data-graph-reference-id]:hover{background:color-mix(in srgb,var(--yv-accent),var(--yv-bg) 94%)}
@@ -2738,19 +2713,9 @@
 .yv-graph-stage {position:relative;flex:none;min-width:600px;min-height:320px}
 .yv-graph-stage>svg {position:absolute;inset:0;overflow:visible;pointer-events:none}
 .yv-graph-layout {min-width:0;align-items:start}
-.yv-graph-inspector {overflow:auto;max-height:min(68vh,720px)}
-.yv-graph-neighbors {max-height:240px;overflow-y:auto;overscroll-behavior:contain}
-.yv-graph-node-removed {opacity:.55;border-style:dashed!important;filter:grayscale(.35)}
-.yv-graph-edge {vector-effect:non-scaling-stroke}
-@media (max-width:680px) {
-  .yv-graph-inspector {width:min(270px,calc(100% - 16px));max-width:calc(100% - 16px)}
-  .yv-graph-canvas {max-height:55vh}
-}
 
 .yv-graph-stage>.yv-graph-node {max-height:88px;overflow:hidden;line-height:1.2;overflow-wrap:anywhere}
 .yv-graph-inspector-object-fields {display:flex;flex-direction:column;gap:7px;padding:10px 0;border-bottom:1px solid var(--yv-border)}
-.yv-graph-inspector-object-fields>.yv-graph-inspector-field {display:grid;grid-template-columns:minmax(62px,.7fr) minmax(0,1.3fr);gap:8px}
-.yv-graph-inspector-object-fields .yv-graph-inspector-field strong {overflow-wrap:anywhere;word-break:break-word}
 .yv-graph-node-status-removed {background:color-mix(in srgb,var(--yv-warning,#f59e0b),transparent 84%);color:var(--yv-warning,#f59e0b)}
 .yv-graph-stage>.yv-graph-node:focus-visible {outline:2px solid var(--yv-accent,#65a9ff);outline-offset:3px}
 
@@ -2997,9 +2962,6 @@
 }
 
 
-/* Node details float above the graph only while a node is hovered/focused.
-   They do not reserve a column or shrink the canvas, and may extend beyond its
-   borders. The overlay itself remains interactive for neighbor navigation. */
 .yv-graph {
   min-width: 0;
   width: 100%;
@@ -3014,30 +2976,6 @@
   width: 100%;
   max-width: 100%;
   min-width: 0;
-}
-.yv-graph-inspector {
-  display: none;
-  position: absolute;
-  z-index: 100;
-  right: auto;
-  width: 270px;
-  max-width: min(270px, calc(100vw - 24px));
-  max-height: min(48vh, 340px);
-  overflow: auto;
-  box-sizing: border-box;
-  margin: 0;
-  padding: 10px;
-  border: 1px solid var(--yv-accent, #60a5fa);
-  border-radius: 10px;
-  background: var(--yv-panel, #151a23);
-  color: var(--yv-text, #f3f4f6);
-  box-shadow: 0 12px 36px rgb(0 0 0 / 48%);
-  backdrop-filter: blur(12px);
-  text-align: left;
-  transform-origin: top center;
-}
-.yv-graph.is-hovering .yv-graph-inspector {
-  display: block;
 }
 
 /* The execution strip should be only as tall as its contents. Its existing
@@ -3073,3 +3011,28 @@
   min-width: 0;
   min-height: 0;
 }
+
+
+/* Stronger separators for map visualizations (kept separate from graph styling).
+   Mixing the theme border with text colour increases contrast in both dark and
+   light themes without hard-coding a theme-specific grey. */
+.yv-map,
+.yv-map-table {
+  --yv-map-divider: color-mix(in srgb, var(--yv-border) 42%, var(--yv-text) 58%);
+  border-color: var(--yv-map-divider);
+}
+.yv-map-row {
+  border-top-color: var(--yv-map-divider);
+  border-bottom-color: var(--yv-map-divider);
+}
+.yv-map-header > div + div,
+.yv-map-row > div + div {
+  border-left-color: var(--yv-map-divider);
+}
+.yv-map-table-scroll .yv-map-header {
+  box-shadow: 0 1px 0 var(--yv-map-divider);
+}
+.yv-object-field {
+  background: color-mix(in srgb, var(--yv-border) 42%, var(--yv-text) 58%);
+}
+
