@@ -18,7 +18,8 @@ This work extends the existing YourVision visualization system. Preserve the est
 ### Tree families to implement
 - [ ] AVL trees: balance factors/heights and trace-backed rotations.
 - [ ] Red-black trees: red/black properties, recoloring, rotations, root-black state when observed.
-- [ ] Treaps: key/priority display and trace-backed rotations.
+- [x] Treaps: identify explicit priority fields and expose priority metadata in the existing node theme.
+- [ ] Treaps: trace-backed rotation/heap-order transitions.
 - [ ] B-trees and B+ trees: multi-key nodes, child ranges, leaf distinction, split/merge transitions.
 - [ ] Trie: insertion/search/prefix-search/deletion and pruning transitions, including empty keys and Unicode.
 - [ ] Finish DSU/union-find: parent forest, path compression, union by rank/size, component changes.
@@ -45,4 +46,4 @@ This work extends the existing YourVision visualization system. Preserve the est
 
 ## Current verification status
 
-The first specialized tree styling slice and focused tests have been committed on the feature branch. Tests, typecheck, build, and real-trace checks have not yet been run for this branch.
+The first specialized tree styling slice, explicit trie-terminal highlighting, treap priority metadata, and focused component tests have been committed on the feature branch. Tests, typecheck, build, and real-trace checks have not yet been run for this branch.
