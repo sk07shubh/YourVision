@@ -4472,8 +4472,7 @@ function treeDoubleRotationCue(id: string, previousObjects: Record<string, unkno
 
       const matches = aChildNow === aTransferBefore &&
         bChildNow === cTransferBefore &&
-        cInnerNow === (shape === 'left-right' ? bId : aId) &&
-        cOuterNow === (shape === 'left-right' ? aId : bId);
+        cInnerNow === bId && cOuterNow === aId;
       if (!matches) continue;
       if (id === cId) return { role: 'pivot', direction: shape };
       if (id === aId) return { role: 'demoted', direction: shape };
