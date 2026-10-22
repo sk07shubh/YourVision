@@ -3335,3 +3335,28 @@ describe('trie insertion and terminal-state transitions', () => {
     }
   });
 });
+
+
+  it('detects child redistribution when multiway key count is stable but child slots change', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({ sequence: 453, objects: {
+      root: { $objectId: 'root', $type: 'BTreeNode', fields: { keys: [10, 20], children: [{ $ref: 'a' }, { $ref: 'b' }, { $ref: 'c' }] } },
+      a: { $objectId: 'a', $type: 'BTreeNode', fields: { keys: [5], isLeaf: true, children: [] } },
+      b: { $objectId: 'b', $type: 'BTreeNode', fields: { keys: [15], isLeaf: true, children: [] } },
+      c: { $objectId: 'c', $type: 'BTreeNode', fields: { keys: [25], isLeaf: true, children: [] } },
+    }});
+    const current = state({ sequence: 454, objects: {
+      root: { $objectId: 'root', $type: 'BTreeNode', fields: { keys: [10, 20], children: [{ $ref: 'b' }, { $ref: 'a' }, { $ref: 'c' }] } },
+      a: { $objectId: 'a', $type: 'BTreeNode', fields: { keys: [5], isLeaf: true, children: [] } },
+      b: { $objectId: 'b', $type: 'BTreeNode', fields: { keys: [15], isLeaf: true, children: [] } },
+      c: { $objectId: 'c', $type: 'BTreeNode', fields: { keys: [25], isLeaf: true, children: [] } },
+    }});
+    try {
+      sessionStore.set({ source: 'redistributeChildren(root)', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-btree-transition="redistribution"');
+      expect(html).toContain('CHILD REDISTRIBUTION');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
