@@ -25,7 +25,8 @@ This work extends the existing YourVision visualization system. Preserve the est
 - [ ] Finish DSU/union-find: parent forest, path compression, union by rank/size, component changes.
 
 ### Range-query structures
-- [ ] Segment tree: interval bounds, aggregate values, build/update/query transitions.
+- [x] Segment-tree node candidates: identify explicit interval bounds plus aggregate fields and style them in the existing tree renderer.
+- [ ] Segment tree: dedicated range/query highlighting and trace-backed build/update/query transitions.
 - [ ] Fenwick/Binary Indexed Tree: index coverage, update propagation, prefix/range-query traversal.
 - [ ] Sparse table: range intervals and overlapping query blocks where a concrete implementation is recognized.
 
@@ -46,4 +47,4 @@ This work extends the existing YourVision visualization system. Preserve the est
 
 ## Current verification status
 
-The first specialized tree styling slice, explicit trie-terminal highlighting, treap priority metadata, and focused component tests have been committed on the feature branch. Tests, typecheck, build, and real-trace checks have not yet been run for this branch.
+The first specialized tree styling slice, explicit trie-terminal highlighting, treap priority metadata, segment-tree candidate metadata, and focused component tests have been committed on the feature branch. Tests, typecheck, build, and real-trace checks have not yet been run for this branch.
