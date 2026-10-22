@@ -4177,13 +4177,20 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     observer?.observe(root);
     root.querySelectorAll<HTMLElement>('.yv-structure-node-card, .yv-binary-tree-edge').forEach((element) => observer?.observe(element));
 
+    // Argument/return previews are rendered in a portal and scaled with CSS
+    // zoom. Their surrounding preview can resize/reflow independently of the
+    // tree root, so observing only the root misses some connector invalidations.
+    // Observe the nearest visual container as well as the regular main section.
+    const previewRoot = root.closest<HTMLElement>('.yv-tree-argument-value');
+    if (previewRoot && previewRoot !== root) observer?.observe(previewRoot);
+
     // Re-measure when React or surrounding UI changes the layout. In particular,
     // the copy-visualization status update can trigger a layout pass that makes
     // previously stale connector coordinates appear correct. Observe the whole
-    // section for the top-level tree, and each nested subtree for local changes.
+    // section for the main visualizer and the preview container for portal trees.
     const mutationObserver = typeof MutationObserver !== 'undefined' ? new MutationObserver(updateConnectors) : undefined;
     const layoutRoot = depth === 0
-      ? root.closest<HTMLElement>('.yv-section-body') ?? root
+      ? root.closest<HTMLElement>('.yv-section-body, .yv-tree-argument-value, .yv-tree-arguments-popover-portal') ?? root
       : root;
     mutationObserver?.observe(layoutRoot, {
       subtree: true,
