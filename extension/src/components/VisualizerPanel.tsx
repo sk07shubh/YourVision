@@ -3708,6 +3708,7 @@ export function GraphView({ objects, variables = {}, state }: {
               role="button" tabIndex={0} aria-pressed={selected}
               aria-label={`Select graph node ${compactValue(node.label)}`}
               onMouseEnter={() => setHoverId(node.id)}
+              onMouseLeave={() => setHoverId(undefined)}
               onFocus={() => setHoverId(node.id)}
               onClick={() => setSelectedNodeId(node.id)}
               onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedNodeId(node.id); } }}
@@ -3731,7 +3732,7 @@ export function GraphView({ objects, variables = {}, state }: {
               </span>}
             </div>;
           })}
-          {inspectorNode && <aside className="yv-graph-inspector" aria-label="Selected graph node" data-graph-inspector={inspectorNode.id} onMouseEnter={() => setHoverId(inspectorNode.id)} style={{ left: positions.get(inspectorNode.id)?.x ?? 0, top: (positions.get(inspectorNode.id)?.y ?? 0) + 38, transform: "translateX(-50%)" }}>
+          {inspectorNode && <aside className="yv-graph-inspector" aria-label="Selected graph node" data-graph-inspector={inspectorNode.id} style={{ left: (positions.get(inspectorNode.id)?.x ?? 27) - 27, top: (positions.get(inspectorNode.id)?.y ?? 0) + 27 }}>
           <div className="yv-graph-inspector-heading">
             <div><span className="yv-graph-inspector-kicker">SELECTED NODE</span><strong>{compactValue(inspectorNode.label)}</strong></div>
             <code>{inspectorNode.id}</code>
