@@ -2895,3 +2895,17 @@ describe('treap node metadata', () => {
     expect(html).toContain('priority=4');
   });
 });
+
+
+describe('range aggregate tree metadata', () => {
+  it('identifies nodes with explicit interval bounds and aggregate values', () => {
+    const objects = {
+      root: { $objectId: 'root', $type: 'SegmentNode', fields: { val: 12, leftBound: 0, rightBound: 3, sum: 12, left: null, right: null } },
+    };
+    const html = renderToStaticMarkup(<TreeNodeView value={{ $ref: 'root' }} objects={objects} />);
+    expect(html).toContain('data-tree-variant="segment-tree"');
+    expect(html).toContain('leftBound=0');
+    expect(html).toContain('rightBound=3');
+    expect(html).toContain('sum=12');
+  });
+});
