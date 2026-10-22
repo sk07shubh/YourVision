@@ -3056,9 +3056,13 @@
    bounds and zoom, so let those dimensions drive the viewport. Large graphs
    still get a capped, independently scrollable canvas. */
 .yv-graph-canvas {
+  width: fit-content;
+  max-width: 100%;
   height: auto;
+  min-width: 0;
   min-height: 0;
   max-height: min(55vh, 520px);
+  margin: 0;
   scrollbar-gutter: auto;
 }
 .yv-graph-stage {
