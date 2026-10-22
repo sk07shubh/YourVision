@@ -3361,3 +3361,22 @@
   }
 }
 
+
+/* Keep the function-tree rail spanning the full available visualizer height.
+   The trace/player footer sits below the workspace, so viewport-height caps
+   here leave an awkward empty gap and clip the tree before the panel ends. */
+.yv-workspace.tree-open .yv-workspace-tree {
+  align-self: stretch;
+  min-height: 0;
+}
+.yv-workspace.tree-open .yv-function-tree {
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+  align-self: stretch;
+}
+.yv-workspace.tree-open .yv-tree-viewport {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
