@@ -3738,19 +3738,19 @@ export function GraphView({ objects, variables = {}, state }: {
             <code>{inspectorNode.id}</code>
           </div>
           <div className="yv-graph-inspector-fields">
-            <div className="yv-graph-inspector-field"><span>Value</span><strong>{compactValue(selectedNode.label)}</strong></div>
+            <div className="yv-graph-inspector-field"><span>Value</span><strong>{compactValue(inspectorNode.label)}</strong></div>
             <div className="yv-graph-inspector-field"><span>Neighbors</span><strong>{inspectorNeighborIds.length}</strong></div>
           </div>
           <div className="yv-graph-inspector-object-fields" aria-label="Node fields">
             <span className="yv-graph-inspector-kicker">FIELDS</span>
             {inspectorFields.length
-              ? selectedFields.slice(0, 8).map(([name, value]) => <div className="yv-graph-inspector-field" key={name}><span>{name}</span><strong>{compactValue(value)}</strong></div>)
+              ? inspectorFields.slice(0, 8).map(([name, value]) => <div className="yv-graph-inspector-field" key={name}><span>{name}</span><strong>{compactValue(value)}</strong></div>)
               : <span className="yv-graph-no-neighbors">No captured fields</span>}
-            {selectedFields.length > 8 && <span className="yv-graph-no-neighbors">+{selectedFields.length - 8} more fields</span>}
+            {inspectorFields.length > 8 && <span className="yv-graph-no-neighbors">+{inspectorFields.length - 8} more fields</span>}
           </div>
           <div className="yv-graph-neighbors"><span>CONNECTED TO</span>
-            {selectedNeighborIds.length
-              ? selectedNeighborIds.map((id, index) => {
+            {inspectorNeighborIds.length
+              ? inspectorNeighborIds.map((id, index) => {
                 const neighbor = nodes.find(candidate => candidate.id === id);
                 return <button type="button" key={id + ':' + index} className="yv-graph-neighbor" onClick={() => { setSelectedNodeId(id); setHoverId(id); }} disabled={!neighbor}>
                   <span>{neighbor ? compactValue(neighbor.label) : id}</span><code>{id}</code>
