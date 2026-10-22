@@ -4266,16 +4266,9 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const priorityNow = priorityOf(fields);
   const treapRotation = Boolean(rotationCue && priorityBefore !== undefined && priorityNow !== undefined &&
     (rotationCue.role === 'pivot' || rotationCue.role === 'demoted'));
-  const rotationRelatedId = rotationCue?.role === 'pivot'
-    ? previousParents?.get(id ?? '')
-    : rotationCue?.role === 'demoted' && id ? parentsByChild(objects).get(id) : undefined;
-  const relatedBeforeRaw = rotationRelatedId ? previousObjects[rotationRelatedId] : undefined;
-  const relatedNowRaw = rotationRelatedId ? objects[rotationRelatedId] : undefined;
-  const relatedBeforePriority = isPlainObject(relatedBeforeRaw) ? priorityOf(objectFields(relatedBeforeRaw)) : undefined;
-  const relatedNowPriority = isPlainObject(relatedNowRaw) ? priorityOf(objectFields(relatedNowRaw)) : undefined;
-  const treapHeapOrderChanged = Boolean(treapRotation && relatedBeforePriority !== undefined &&
-    relatedNowPriority !== undefined && priorityBefore !== undefined && priorityNow !== undefined &&
-    Math.sign(priorityBefore - relatedBeforePriority) !== Math.sign(priorityNow - relatedNowPriority));
+  // The rotation reverses a parent/child edge; show that priority metadata
+  // participates without guessing whether larger or smaller priorities win.
+  const treapPriorityEdgeChanged = treapRotation;
   const previousKeyCount = Array.isArray(previousFields.keys) ? previousFields.keys.length : undefined;
   const currentKeyCount = Array.isArray(fields.keys) ? fields.keys.length : undefined;
   const previousChildCount = childTargetsOf(previousFields, previousObjects).length;
@@ -4396,7 +4389,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
          {rotationCue?.role === 'demoted' && <span className="yv-tree-operation-badge yv-tree-rotation-demoted" data-tree-rotation={rotationCue.direction} title="This node moved below the rotation pivot in the captured topology">ROTATED DOWN</span>}
          {rotationCue?.role === 'intermediate' && <span className="yv-tree-operation-badge yv-tree-rotation-demoted" data-tree-rotation={rotationCue.direction} title="This node participated in the observed double rotation">DOUBLE ROTATION · INNER</span>}
          {treapRotation && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-treap-transition="rotation" title="A topology-proven rotation occurred on a node with explicit priority metadata; heap convention is not assumed">TREAP ROTATION · PRIORITY {priorityNow}</span>}
-         {treapHeapOrderChanged && <span className="yv-tree-operation-badge yv-tree-recolored-badge" data-treap-heap-order-changed="true" title="The numeric priority ordering between the rotated nodes changed; min-heap/max-heap convention is intentionally not inferred">PRIORITY ORDER CHANGED</span>}
+         {treapPriorityEdgeChanged && <span className="yv-tree-operation-badge yv-tree-recolored-badge" data-treap-priority-edge-changed="true" title="A parent/child edge changed during a rotation between nodes with explicit priorities; min-heap/max-heap convention is intentionally not inferred">PRIORITY EDGE ROTATED</span>}
          {multiwayTransition && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-btree-transition={multiwayTransition} title="Inferred from captured key-count and child-topology changes">{multiwayTransition === 'split' ? 'B-TREE SPLIT' : multiwayTransition === 'merge' ? 'B-TREE MERGE' : 'CHILD REDISTRIBUTION'}</span>}
          {segmentRangeMatches && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-segment-range="overlap" title={'Captured query range [' + queryRange![0] + ', ' + queryRange![1] + '] overlaps this node interval'}>RANGE QUERY</span>}
          {trieTerminalTransition && trieNodeLike && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-trie-transition={trieTerminalTransition.toLowerCase().replace(' ', '-')}>{trieTerminalTransition}</span>}
