@@ -2996,3 +2996,46 @@
   outline: 2px dashed var(--yv-success, #4ade80);
   outline-offset: 3px;
 }
+
+
+/* Fit graph cards to the nodes that actually exist; inspector never steals
+   the canvas width inside narrow argument dropdowns or nested visualizations. */
+.yv-graph {
+  container-type: inline-size;
+  container-name: graph-view;
+  min-width: 0;
+}
+.yv-graph-layout {
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+.yv-graph-canvas {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+.yv-graph-inspector {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+@container graph-view (min-width: 720px) {
+  .yv-graph-layout {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+    gap: 12px;
+  }
+}
+
+/* Let the execution panel wrap its content instead of reserving a tall empty
+   block below the result. The inspector scrolls only when its content needs it. */
+.yv-current {
+  flex: 0 1 auto;
+  height: auto;
+  min-height: 0;
+  max-height: min(55vh, 420px);
+}
+.yv-execution {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: min(55vh, 350px);
+}
