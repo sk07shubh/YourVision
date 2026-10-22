@@ -14,7 +14,7 @@ This work extends the existing YourVision visualization system. Preserve the est
 - [x] Distinguish explicitly flagged multiway-tree leaves (e.g. B-tree/B+ tree leaf nodes).
 - [x] Highlight trie terminal nodes only when a captured terminal flag is explicitly true.
 - [x] Add conservative rotation/recolor transition cues only when adjacent snapshots establish the changed links, middle-subtree transfer, or explicit red/black metadata change.
-- [x] Add focused regression tests for a snapshot-backed left rotation, ordinary reparenting false-positive prevention, and red-black recoloring.
+- [x] Add focused regression tests for snapshot-backed left/right rotations, null middle-subtree handling, ordinary reparenting false-positive prevention, and red-black recoloring.
 - [ ] Add focused regression tests for root replacement, null-child rotation cases, and historical replay.
 
 ### Tree families to implement
