@@ -4322,9 +4322,10 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
               !movedPointerTargets.has(line.target) && id && trail?.hops.has(id + '>' + line.target) && 'yv-tree-connector-trail',
               addedChildTargets.has(line.target) && previousParents?.get(line.target) !== undefined && previousParents.get(line.target) !== modelNodeId && 'yv-tree-connector-reparented',
             ].filter(Boolean).join(' ');
-            const branchY = line.y1 + Math.max(16, (line.y2 - line.y1) / 2);
+            // Tree branches connect parent and child directly. Orthogonal
+            // V/H segments create box-shaped connectors instead of a standard tree.
             return <path key={line.target} className={classes || undefined} pathLength={1}
-              d={`M ${line.x1} ${line.y1} V ${branchY} H ${line.x2} V ${line.y2}`} />;
+              d={`M ${line.x1} ${line.y1} L ${line.x2} ${line.y2}`} />;
           })}
         </svg>
       )}
