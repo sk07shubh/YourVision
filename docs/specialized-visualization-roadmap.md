@@ -16,10 +16,10 @@ This work extends the existing YourVision visualization system. Preserve the est
 - [x] Add conservative rotation/recolor transition cues only when adjacent snapshots establish the changed links, middle-subtree transfer, or explicit red/black metadata change.
 - [x] Add focused regression tests for snapshot-backed left/right rotations, null middle-subtree handling, ordinary reparenting false-positive prevention, and red-black recoloring.
 - [x] Add focused regression tests for root replacement after rotation and historical replay at the first captured snapshot.
-- [ ] Add broader double-rotation grouping tests and validate against real AVL/red-black traces.
+- [x] Add snapshot-backed AVL left-right/right-left grouping with identity-checked transferred subtrees and false-positive regression coverage.\n- [ ] Validate double-rotation grouping against real AVL/red-black traces.
 
 ### Tree families to implement
-- [ ] AVL trees: balance factors/heights and trace-backed rotations.
+- [x] AVL trees: conservative single- and double-rotation cues when adjacent snapshots prove topology changes.\n- [ ] AVL trees: richer balance-factor/height transition summaries and real-trace validation.
 - [ ] Red-black trees: red/black properties, recoloring, rotations, root-black state when observed.
 - [x] Treaps: identify explicit priority fields and expose priority metadata in the existing node theme.
 - [ ] Treaps: trace-backed rotation/heap-order transitions.
@@ -51,4 +51,4 @@ This work extends the existing YourVision visualization system. Preserve the est
 
 ## Current verification status
 
-The first specialized tree styling slice now includes snapshot-backed single-rotation pivot/demotion cues and explicit red-black recolor cues, with focused regression cases for left/right rotations, null middle subtrees, root replacement, historical replay, false-positive prevention, and recoloring. The cues are deliberately conservative: double-rotation grouping and full AVL/red-black operation animations remain outstanding. Tests, typecheck, build, and real-trace checks have not yet been run for this branch.
+The first specialized tree styling slice now includes snapshot-backed single-rotation pivot/demotion cues and explicit red-black recolor cues, with focused regression cases for left/right and left-right/right-left rotations, null middle subtrees, root replacement, historical replay, false-positive prevention, and recoloring. The cues are deliberately conservative: single and double rotations are inferred only from adjacent snapshots with stable identities and matching subtree transfers. Full AVL/red-black operation animations and real-trace validation remain outstanding. Tests, typecheck, build, and real-trace checks have not yet been run for this branch.
