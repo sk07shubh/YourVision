@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - yourvision-safety-hardened
       - automation/comprehensive-regression-lab
       - feat/all-remaining-ds-visualization
   pull_request:
@@ -37,7 +38,7 @@ jobs:
 
       - name: Run complete backend regression matrix
         working-directory: backend
-        run: npm run test:all
+        run: npm test
 
   extension:
     name: Extension feature matrix
