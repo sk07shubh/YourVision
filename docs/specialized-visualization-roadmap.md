@@ -11,6 +11,7 @@ This work extends the existing YourVision visualization system. Preserve the est
 - [x] Red-black tree node color styling when the captured object explicitly exposes `color`, `isRed`, or `isBlack`.
 - [x] Height-balanced tree candidate detection when captured nodes expose `height`, `bf`, or `balanceFactor`.
 - [x] Reuse multi-key node cells for B-tree-shaped nodes.
+- [x] Distinguish explicitly flagged multiway-tree leaves (e.g. B-tree/B+ tree leaf nodes).
 - [x] Highlight trie terminal nodes only when a captured terminal flag is explicitly true.
 - [ ] Add rotation/recolor transition cues only when trace snapshots establish the changed links or metadata.
 - [ ] Add focused regression tests for tree rotations, root replacement, null children, and historical replay.
@@ -20,7 +21,8 @@ This work extends the existing YourVision visualization system. Preserve the est
 - [ ] Red-black trees: red/black properties, recoloring, rotations, root-black state when observed.
 - [x] Treaps: identify explicit priority fields and expose priority metadata in the existing node theme.
 - [ ] Treaps: trace-backed rotation/heap-order transitions.
-- [ ] B-trees and B+ trees: multi-key nodes, child ranges, leaf distinction, split/merge transitions.
+- [x] B-tree-shaped nodes: multi-key cells and explicit leaf styling.
+- [ ] B-trees and B+ trees: child-key range semantics, internal-vs-leaf behavior inference where reliable, split/merge transitions.
 - [ ] Trie: insertion/search/prefix-search/deletion and pruning transitions, including empty keys and Unicode.
 - [ ] Finish DSU/union-find: parent forest, path compression, union by rank/size, component changes.
 
@@ -47,4 +49,4 @@ This work extends the existing YourVision visualization system. Preserve the est
 
 ## Current verification status
 
-The first specialized tree styling slice, explicit trie-terminal highlighting, treap priority metadata, segment-tree candidate metadata, and focused component tests have been committed on the feature branch. Tests, typecheck, build, and real-trace checks have not yet been run for this branch.
+The first specialized tree styling slice, explicit trie-terminal highlighting, treap priority metadata, segment-tree candidate metadata, explicit multiway-tree leaf styling, and focused component tests have been committed on the feature branch. Tests, typecheck, build, and real-trace checks have not yet been run for this branch.
