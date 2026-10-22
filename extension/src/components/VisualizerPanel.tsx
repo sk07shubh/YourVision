@@ -4281,7 +4281,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const multiwayTransition = hasPreviousSnapshot && previousKeyCount !== undefined && currentKeyCount !== undefined
     ? (currentKeyCount > previousKeyCount && currentChildCount > previousChildCount ? 'split'
       : currentKeyCount < previousKeyCount && currentChildCount < previousChildCount ? 'merge'
-        : currentKeyCount === previousKeyCount && valueChanged(childTargetsOf(previousFields, previousObjects).sort(), childTargetsOf(fields, objects).sort()) ? 'redistribution' : undefined)
+        : currentKeyCount === previousKeyCount && valueChanged(childTargetsOf(previousFields, previousObjects), childTargetsOf(fields, objects)) ? 'redistribution' : undefined)
     : undefined;
   const trieFlags = ['isEnd', 'isWord', 'endOfWord', 'isEndOfWord', 'isTerminal', 'terminal'];
   const previousTrieTerminal = trieFlags.some(name => previousFields[name] === true);
