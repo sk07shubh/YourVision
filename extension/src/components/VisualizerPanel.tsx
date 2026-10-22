@@ -4501,8 +4501,10 @@ function treeDoubleRotationCue(id: string, previousObjects: Record<string, unkno
 
       const innerSlot = shape === 'left-right' ? 'left' : 'right';
       const outerSlot = shape === 'left-right' ? 'right' : 'left';
-      const aTransferBefore = ref(cBefore, innerSlot, previousObjects);
-      const cTransferBefore = ref(cBefore, outerSlot, previousObjects);
+      // The middle node's left subtree transfers to A and its right subtree
+      // transfers to B in both mirrored AVL double-rotation cases.
+      const aTransferBefore = ref(cBefore, 'left', previousObjects);
+      const cTransferBefore = ref(cBefore, 'right', previousObjects);
       const aChildNow = ref(aNow, shape === 'left-right' ? 'left' : 'right', objects);
       const bChildNow = ref(bNow, shape === 'left-right' ? 'right' : 'left', objects);
       const cInnerNow = ref(cNow, innerSlot, objects);
