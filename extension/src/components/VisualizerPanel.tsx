@@ -3372,6 +3372,11 @@ export function GraphView({ objects, variables = {}, state }: {
     ? selectedNode.neighbors.map(neighbor => graphReferenceId(neighbor, objects)).filter((id): id is string => Boolean(id))
     : [];
   const selectedFields = selectedNode ? Object.entries(objectFields(selectedNode.value)).filter(([key]) => key !== 'neighbors') : [];
+  const inspectorNode = nodes.find(node => node.id === hoverId) ?? selectedNode;
+  const inspectorNeighborIds = inspectorNode
+    ? inspectorNode.neighbors.map(neighbor => graphReferenceId(neighbor, objects)).filter((id): id is string => Boolean(id))
+    : [];
+  const inspectorFields = inspectorNode ? Object.entries(objectFields(inspectorNode.value)).filter(([key]) => key !== 'neighbors') : [];
   const positionSession = useRef(session.states[0]);
   const stableGraphPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
   const layoutSignature = useRef('');
@@ -3626,7 +3631,7 @@ export function GraphView({ objects, variables = {}, state }: {
         <button type="button" onClick={() => { const viewport = graphCanvasRef.current; if (viewport) setZoom(Math.max(0.25, Math.min(1.8, viewport.clientWidth / graphWidth, viewport.clientHeight / graphHeight))); }}>Fit</button>
         <button type="button" onClick={() => setZoom(1)} disabled={zoom === 1}>Reset</button>
       </div>
-      <div className="yv-graph-layout">
+      <div className="yv-graph-layout" onMouseLeave={() => setHoverId(undefined)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as HTMLElement | null)) setHoverId(undefined); }}>
         <div className="yv-graph-canvas" data-graph-zoom={zoom} ref={graphCanvasRef}><div className="yv-graph-scaled" style={{ width: `${graphWidth * zoom}px`, height: `${graphHeight * zoom}px` }}><div className="yv-graph-stage" style={{ width: `${graphWidth}px`, height: `${graphHeight}px`, transform: `scale(${zoom})`, transformOrigin: "top left" }}>
           <svg className="yv-graph-links" width={graphWidth} height={graphHeight} viewBox={`0 0 ${graphWidth} ${graphHeight}`} preserveAspectRatio="xMidYMid meet" aria-label="Graph links"
             style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}>
@@ -3702,8 +3707,8 @@ export function GraphView({ objects, variables = {}, state }: {
               data-graph-created={created ? 'true' : undefined}
               role="button" tabIndex={0} aria-pressed={selected}
               aria-label={`Select graph node ${compactValue(node.label)}`}
-              onMouseEnter={() => setHoverId(node.id)} onMouseLeave={() => setHoverId(undefined)}
-              onFocus={() => setHoverId(node.id)} onBlur={() => setHoverId(undefined)}
+              onMouseEnter={() => setHoverId(node.id)}
+              onFocus={() => setHoverId(node.id)}
               onClick={() => setSelectedNodeId(node.id)}
               onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedNodeId(node.id); } }}
               style={{ left: point.x - 27, top: point.y - 27 }}>
@@ -3727,18 +3732,18 @@ export function GraphView({ objects, variables = {}, state }: {
             </div>;
           })}
         </div></div></div>
-        {selectedNode && <aside className="yv-graph-inspector" aria-label="Selected graph node" data-graph-inspector={selectedNode.id}>
+        {inspectorNode && <aside className="yv-graph-inspector" aria-label="Selected graph node" data-graph-inspector={inspectorNode.id} onMouseEnter={() => setHoverId(inspectorNode.id)}>
           <div className="yv-graph-inspector-heading">
-            <div><span className="yv-graph-inspector-kicker">SELECTED NODE</span><strong>{compactValue(selectedNode.label)}</strong></div>
-            <code>{selectedNode.id}</code>
+            <div><span className="yv-graph-inspector-kicker">SELECTED NODE</span><strong>{compactValue(inspectorNode.label)}</strong></div>
+            <code>{inspectorNode.id}</code>
           </div>
           <div className="yv-graph-inspector-fields">
             <div className="yv-graph-inspector-field"><span>Value</span><strong>{compactValue(selectedNode.label)}</strong></div>
-            <div className="yv-graph-inspector-field"><span>Neighbors</span><strong>{selectedNeighborIds.length}</strong></div>
+            <div className="yv-graph-inspector-field"><span>Neighbors</span><strong>{inspectorNeighborIds.length}</strong></div>
           </div>
           <div className="yv-graph-inspector-object-fields" aria-label="Node fields">
             <span className="yv-graph-inspector-kicker">FIELDS</span>
-            {selectedFields.length
+            {inspectorFields.length
               ? selectedFields.slice(0, 8).map(([name, value]) => <div className="yv-graph-inspector-field" key={name}><span>{name}</span><strong>{compactValue(value)}</strong></div>)
               : <span className="yv-graph-no-neighbors">No captured fields</span>}
             {selectedFields.length > 8 && <span className="yv-graph-no-neighbors">+{selectedFields.length - 8} more fields</span>}
@@ -3747,7 +3752,7 @@ export function GraphView({ objects, variables = {}, state }: {
             {selectedNeighborIds.length
               ? selectedNeighborIds.map((id, index) => {
                 const neighbor = nodes.find(candidate => candidate.id === id);
-                return <button type="button" key={id + ':' + index} className="yv-graph-neighbor" onClick={() => setSelectedNodeId(id)} disabled={!neighbor}>
+                return <button type="button" key={id + ':' + index} className="yv-graph-neighbor" onClick={() => { setSelectedNodeId(id); setHoverId(id); }} disabled={!neighbor}>
                   <span>{neighbor ? compactValue(neighbor.label) : id}</span><code>{id}</code>
                 </button>;
               })
