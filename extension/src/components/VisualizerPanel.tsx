@@ -3607,14 +3607,6 @@ export function GraphView({ objects, variables = {}, state }: {
         <span>Adjacency graph</span>
         <span>{currentNodes.length} live nodes · {edges.length} links{omittedNodeCount ? ` · ${omittedNodeCount} nodes omitted` : ''}{omittedEdgeCount ? ` · ${omittedEdgeCount} links hidden by display limit` : ''}</span>
       </div>
-      <div className="yv-graph-legend" aria-label="Graph state legend">
-        <span><i className="yv-graph-legend-dot yv-graph-legend-selected" />Selected</span>
-        <span><i className="yv-graph-legend-dot yv-graph-legend-entered" />Pointer target changed</span>
-        <span><i className="yv-graph-legend-dot yv-graph-legend-created" />Created this step</span>
-        <span><i className="yv-graph-legend-dot yv-graph-legend-removed" />Removed node</span>
-        <span><i className="yv-graph-legend-line yv-graph-legend-edge-removed" />Removed link</span>
-        <span><i className="yv-graph-legend-line yv-graph-legend-edge" />Relationship</span>
-      </div>
       <div className="yv-graph-controls" role="group" aria-label="Graph zoom controls">
         <button type="button" onClick={() => setZoom(value => Math.max(0.25, Math.round((value - 0.1) * 10) / 10))} disabled={zoom <= 0.25} aria-label="Zoom out">−</button>
         <span aria-live="polite">{Math.round(zoom * 100)}%</span>
@@ -5150,8 +5142,6 @@ export function DataStructures({ state, source }: { state?: TraceState; source: 
       '.yv-graph-node-entered', '.yv-graph-node-changed', '.yv-graph-node-created',
       '.yv-graph-node-selected', '.yv-graph-node-status', '.yv-graph-node-status-created',
       '.yv-graph-edge-added', '.yv-graph-edge-removed', '.yv-graph-edge-traversed',
-      '.yv-graph-legend', '.yv-graph-legend-created', '.yv-graph-legend-dot',
-      '.yv-graph-legend-entered', '.yv-graph-legend-line', '.yv-graph-legend-selected',
       '.yv-linked-graph',
     ];
     const selectors = graphActive ? graphSelectors : treeSelectors;
