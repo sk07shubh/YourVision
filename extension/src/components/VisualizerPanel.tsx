@@ -4354,6 +4354,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
          {rotationCue?.role === 'demoted' && <span className="yv-tree-operation-badge yv-tree-rotation-demoted" data-tree-rotation={rotationCue.direction} title="This node moved below the rotation pivot in the captured topology">ROTATED DOWN</span>}
          {rotationCue?.role === 'intermediate' && <span className="yv-tree-operation-badge yv-tree-rotation-demoted" data-tree-rotation={rotationCue.direction} title="This node participated in the observed double rotation">DOUBLE ROTATION · INNER</span>}
          {redBlackRecolored && <span className="yv-tree-operation-badge yv-tree-recolored-badge" data-tree-recolored="true" title="The captured red/black state changed between adjacent snapshots">RECOLORED {previousRedBlackColor?.toUpperCase()} → {redBlackColor?.toUpperCase()}</span>}
+         {redBlackRecolored && rotationCue?.role === 'pivot' && <span className="yv-tree-operation-badge yv-tree-recolored-badge" data-tree-red-black-fixup="true" title="The same captured transition includes both a proven rotation and an explicit red/black color change">RED-BLACK FIX-UP · ROTATE + RECOLOR</span>}
         {nodeValueChanged && <span className="yv-binary-node-status is-changed yv-tree-operation-badge yv-tree-value-delta" title="Value changed between adjacent execution snapshots">
           {compactValue(nodeValue(previousFields))} → {compactValue(nodeValue(resolved))}
         </span>}
