@@ -3018,12 +3018,11 @@
 .yv-graph-inspector {
   display: none;
   position: absolute;
-  z-index: 50;
-  top: 8px;
-  right: 8px;
-  width: min(290px, 48%);
-  max-width: calc(100% - 16px);
-  max-height: min(68vh, 480px);
+  z-index: 100;
+  right: auto;
+  width: 270px;
+  max-width: min(270px, calc(100vw - 24px));
+  max-height: min(48vh, 340px);
   overflow: auto;
   box-sizing: border-box;
   margin: 0;
@@ -3034,6 +3033,8 @@
   color: var(--yv-text, #f3f4f6);
   box-shadow: 0 12px 36px rgb(0 0 0 / 48%);
   backdrop-filter: blur(12px);
+  text-align: left;
+  transform-origin: top center;
 }
 .yv-graph.is-hovering .yv-graph-inspector {
   display: block;
