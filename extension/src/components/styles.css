@@ -2677,13 +2677,6 @@
 .yv-graph-canvas>.yv-graph-node-selected{border-color:var(--yv-accent,#65a9ff)!important}
 @media(prefers-reduced-motion:reduce){.yv-graph-canvas>.yv-graph-node{transition:none}}
 
-.yv-graph-legend{display:flex;flex-wrap:wrap;align-items:center;gap:7px 12px;margin:0 0 10px;color:var(--yv-muted);font-size:10px}
-.yv-graph-legend>span{display:inline-flex;align-items:center;gap:5px}
-.yv-graph-legend-dot{display:inline-block;width:8px;height:8px;border:1px solid var(--yv-muted);border-radius:50%;background:var(--yv-panel)}
-.yv-graph-legend-selected{border:2px solid var(--yv-accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--yv-accent),transparent 75%)}
-.yv-graph-legend-entered{background:var(--yv-accent);border-color:var(--yv-accent)}
-.yv-graph-legend-created{background:var(--yv-success,#4ade80);border-color:var(--yv-success,#4ade80)}
-.yv-graph-legend-line{display:inline-block;width:15px;height:0;border-top:1.5px solid var(--yv-muted)}
 .yv-graph-node-status{padding:1px 4px;border-radius:4px;background:color-mix(in srgb,var(--yv-accent),transparent 86%);color:var(--yv-accent);font-size:9px}
 .yv-graph-node-status-created{background:color-mix(in srgb,var(--yv-success,#4ade80),transparent 84%);color:var(--yv-success,#4ade80)}
 
@@ -2723,8 +2716,6 @@
 .yv-graph-controls button:hover:not(:disabled) {border-color:var(--yv-accent)}
 .yv-graph-controls button:disabled {opacity:.45;cursor:default}
 .yv-graph-controls button:focus-visible {outline:2px solid var(--yv-accent);outline-offset:2px}
-.yv-graph-legend-removed {background:var(--yv-warning,#f59e0b);border-color:var(--yv-warning,#f59e0b)}
-.yv-graph-legend-edge-removed {border-top:1.5px dashed var(--yv-warning,#f59e0b)}
 .yv-graph-stage {will-change:transform}
 
 
