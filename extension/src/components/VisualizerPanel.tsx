@@ -4289,8 +4289,12 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const trieTerminalTransition = hasPreviousSnapshot && previousTrieTerminal !== currentTrieTerminal
     ? (currentTrieTerminal ? 'WORD ADDED' : 'WORD REMOVED') : undefined;
   const trieNodeLike = /trie/i.test(String(resolved.$type ?? '')) || trieFlags.some(name => name in fields);
+  const previousTrieChildren = childTargetsOf(previousFields, previousObjects);
+  const currentTrieChildren = childTargetsOf(fields, objects);
   const triePrunedChildren = Boolean(trieNodeLike && hasPreviousSnapshot &&
-    childTargetsOf(previousFields, previousObjects).some(childId => !childTargetsOf(fields, objects).includes(childId)));
+    previousTrieChildren.some(childId => !currentTrieChildren.includes(childId)));
+  const trieAddedChildren = Boolean(trieNodeLike && hasPreviousSnapshot &&
+    currentTrieChildren.some(childId => !previousTrieChildren.includes(childId)));
   // Only label a rotation when snapshots show the reciprocal parent/child move
   // and the middle subtree transferred to the vacated child slot.
   const rotationCue = id && hasSnapshotPair ? (treeDoubleRotationCue(id, previousObjects, objects) ?? treeRotationCue(id, previousObjects, objects)) : undefined;
@@ -4393,6 +4397,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
          {multiwayTransition && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-btree-transition={multiwayTransition} title="Inferred from captured key-count and child-topology changes">{multiwayTransition === 'split' ? 'B-TREE SPLIT' : multiwayTransition === 'merge' ? 'B-TREE MERGE' : 'CHILD REDISTRIBUTION'}</span>}
          {segmentRangeMatches && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-segment-range="overlap" title={'Captured query range [' + queryRange![0] + ', ' + queryRange![1] + '] overlaps this node interval'}>RANGE QUERY</span>}
          {trieTerminalTransition && trieNodeLike && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-trie-transition={trieTerminalTransition.toLowerCase().replace(' ', '-')}>{trieTerminalTransition}</span>}
+         {trieAddedChildren && <span className="yv-tree-operation-badge yv-tree-rotation-badge" data-trie-transition="insertion" title="A new child identity is linked from this trie node">TRIE INSERTION</span>}
          {triePrunedChildren && <span className="yv-tree-operation-badge yv-tree-rotation-demoted" data-trie-transition="pruning" title="A previously linked child is no longer linked in this snapshot">TRIE PRUNING</span>}
          {redBlackRecolored && <span className="yv-tree-operation-badge yv-tree-recolored-badge" data-tree-recolored="true" title="The captured red/black state changed between adjacent snapshots">RECOLORED {previousRedBlackColor?.toUpperCase()} → {redBlackColor?.toUpperCase()}</span>}
          {redBlackRecolored && rotationCue?.role === 'pivot' && <span className="yv-tree-operation-badge yv-tree-recolored-badge" data-tree-red-black-fixup="true" title="The same captured transition includes both a proven rotation and an explicit red/black color change">RED-BLACK FIX-UP · ROTATE + RECOLOR</span>}
