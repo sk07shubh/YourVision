@@ -4112,6 +4112,12 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     if (!root) return;
     const updateConnectors = () => {
       const rootRect = root.getBoundingClientRect();
+      // getBoundingClientRect() returns viewport pixels after CSS zoom/scale,
+      // while the connector SVG viewBox uses the tree's unscaled layout units.
+      // Convert measurements back to local CSS pixels so portal previews keep
+      // exactly the same edge geometry as the full-size visualizer.
+      const scaleX = rootRect.width > 0 ? root.offsetWidth / rootRect.width : 1;
+      const scaleY = rootRect.height > 0 ? root.offsetHeight / rootRect.height : 1;
       const parentCard = root.querySelector<HTMLElement>(':scope > .yv-structure-node-card');
       if (!parentCard) {
         setTreeConnectorLines([]);
@@ -4137,12 +4143,12 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
         const ux = dx / distance;
         const uy = dy / distance;
         return [{
-          x1: parentCenterX + ux * parentRadius - rootRect.left,
-          y1: parentCenterY + uy * parentRadius - rootRect.top,
-          x2: childCenterX - ux * childRadius - rootRect.left,
-          y2: childCenterY - uy * childRadius - rootRect.top,
-          rootWidth: rootRect.width,
-          rootHeight: rootRect.height,
+          x1: (parentCenterX + ux * parentRadius - rootRect.left) * scaleX,
+          y1: (parentCenterY + uy * parentRadius - rootRect.top) * scaleY,
+          x2: (childCenterX - ux * childRadius - rootRect.left) * scaleX,
+          y2: (childCenterY - uy * childRadius - rootRect.top) * scaleY,
+          rootWidth: root.offsetWidth,
+          rootHeight: root.offsetHeight,
           target: edge.dataset.treeEdgeTarget ?? edge.dataset.treeEdgeLabel ?? 'child',
         }];
       });
