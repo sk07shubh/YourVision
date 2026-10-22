@@ -4291,16 +4291,27 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const pointed = pointerNames.length > 0;
   const nodeIdentity = id ? (id.length > 18 ? id.slice(0, 15) + '…' : id) : undefined;
   const keyCells = Array.isArray(fields.keys) ? fields.keys : undefined;
+  const rawColor = typeof fields.color === 'string' ? fields.color.toLowerCase() : '';
+  const redBlackColor = rawColor === 'red' || rawColor === 'r' || fields.isRed === true
+    ? 'red'
+    : rawColor === 'black' || rawColor === 'b' || fields.isRed === false || fields.isBlack === true
+      ? 'black'
+      : undefined;
+  const treeVariant = redBlackColor ? 'red-black'
+    : (typeof fields.balanceFactor === 'number' || typeof fields.bf === 'number' || typeof fields.height === 'number')
+      ? 'height-balanced'
+      : keyCells ? 'multiway'
+        : undefined;
   const nodeMetadata = Object.entries(fields).filter(([name, metadataValue]) =>
-    ['color', 'bf', 'balanceFactor', 'height', 'weight', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord'].includes(name) &&
+    ['color', 'bf', 'balanceFactor', 'height', 'weight', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord', 'isRed', 'isBlack'].includes(name) &&
     (typeof metadataValue === 'string' || typeof metadataValue === 'number' || typeof metadataValue === 'boolean')
   );
   const modelReferenceEdges = model.edges.filter(edge => edge.kind === 'reference' && edge.source === modelNodeId);
   const entered = Boolean(hasSnapshotPair && id && movedPointerTargets.has(id));
   const depthClass = 'yv-structure-depth-' + Math.min(depth, 4);
   return (
-    <div ref={treeNodeRef} className={'yv-structure-node ' + depthClass + (pointed ? ' yv-tree-node-pointed' : '') + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '') + (nodeValueChanged ? ' yv-tree-node-value-changed' : '') + (removedChildEdges.length ? ' yv-tree-node-child-removed' : '')}
-      data-tree-node-id={id} data-tree-depth={depth} data-tree-layout={isNaryTree ? 'nary' : 'binary-tree'}
+    <div ref={treeNodeRef} className={'yv-structure-node ' + depthClass + (treeVariant ? ' yv-tree-variant-' + treeVariant : '') + (redBlackColor ? ' yv-tree-node-red-black-' + redBlackColor : '') + (pointed ? ' yv-tree-node-pointed' : '') + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '') + (nodeValueChanged ? ' yv-tree-node-value-changed' : '') + (removedChildEdges.length ? ' yv-tree-node-child-removed' : '')}
+      data-tree-node-id={id} data-tree-depth={depth} data-tree-layout={isNaryTree ? 'nary' : 'binary-tree'} data-tree-variant={treeVariant} data-tree-color={redBlackColor}
       data-tree-changed={changed ? 'true' : undefined} data-tree-entered={entered ? 'true' : undefined}
       data-tree-created={created ? 'true' : undefined} aria-label={'Tree node ' + displayValue(nodeValue(resolved)) + (id ? ', object ' + id : '') + (pointed ? ', pointed to by ' + pointerNames.join(', ') : '')}>
       <div key={(changed || entered || created || nodeValueChanged) ? id + ':' + selectedIndex : id} className="yv-node yv-structure-node-card">
