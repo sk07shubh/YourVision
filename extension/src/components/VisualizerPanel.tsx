@@ -4301,7 +4301,13 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     : (typeof fields.balanceFactor === 'number' || typeof fields.bf === 'number' || typeof fields.height === 'number')
       ? 'height-balanced'
       : keyCells ? 'multiway'
-        : undefined;
+        : (typeof fields.isEnd === 'boolean' || typeof fields.isWord === 'boolean' ||
+          typeof fields.endOfWord === 'boolean' || typeof fields.isEndOfWord === 'boolean' ||
+          typeof fields.isTerminal === 'boolean' || typeof fields.terminal === 'boolean')
+          ? 'trie'
+          : undefined;
+  const isTerminalTrieNode = ['isEnd', 'isWord', 'endOfWord', 'isEndOfWord', 'isTerminal', 'terminal']
+    .some(name => fields[name] === true);
   const nodeMetadata = Object.entries(fields).filter(([name, metadataValue]) =>
     ['color', 'bf', 'balanceFactor', 'height', 'weight', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord', 'isRed', 'isBlack'].includes(name) &&
     (typeof metadataValue === 'string' || typeof metadataValue === 'number' || typeof metadataValue === 'boolean')
@@ -4310,7 +4316,7 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
   const entered = Boolean(hasSnapshotPair && id && movedPointerTargets.has(id));
   const depthClass = 'yv-structure-depth-' + Math.min(depth, 4);
   return (
-    <div ref={treeNodeRef} className={'yv-structure-node ' + depthClass + (treeVariant ? ' yv-tree-variant-' + treeVariant : '') + (redBlackColor ? ' yv-tree-node-red-black-' + redBlackColor : '') + (pointed ? ' yv-tree-node-pointed' : '') + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '') + (nodeValueChanged ? ' yv-tree-node-value-changed' : '') + (removedChildEdges.length ? ' yv-tree-node-child-removed' : '')}
+    <div ref={treeNodeRef} className={'yv-structure-node ' + depthClass + (treeVariant ? ' yv-tree-variant-' + treeVariant : '') + (isTerminalTrieNode ? ' yv-tree-node-terminal' : '') + (redBlackColor ? ' yv-tree-node-red-black-' + redBlackColor : '') + (pointed ? ' yv-tree-node-pointed' : '') + (changed ? ' yv-tree-node-changed' : '') + (entered ? ' yv-tree-node-entered' : '') + (created ? ' yv-tree-node-created' : '') + (nodeValueChanged ? ' yv-tree-node-value-changed' : '') + (removedChildEdges.length ? ' yv-tree-node-child-removed' : '')}
       data-tree-node-id={id} data-tree-depth={depth} data-tree-layout={isNaryTree ? 'nary' : 'binary-tree'} data-tree-variant={treeVariant} data-tree-color={redBlackColor}
       data-tree-changed={changed ? 'true' : undefined} data-tree-entered={entered ? 'true' : undefined}
       data-tree-created={created ? 'true' : undefined} aria-label={'Tree node ' + displayValue(nodeValue(resolved)) + (id ? ', object ' + id : '') + (pointed ? ', pointed to by ' + pointerNames.join(', ') : '')}>
