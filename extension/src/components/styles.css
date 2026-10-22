@@ -2259,9 +2259,9 @@
   align-items: center; justify-content: center; gap: 4px;
   box-sizing: border-box; flex: 0 0 112px; width: 112px; height: 112px;
   min-width: 112px; max-width: 112px; min-height: 112px;
-  margin: 0; padding: 8px; border: 2px solid #FFA116; border-radius: 16px;
-  background: color-mix(in srgb, #FFA116 8%, var(--yv-bg)); color: var(--yv-text);
-  box-shadow: 0 2px 0 color-mix(in srgb, #FFA116, transparent 68%);
+  margin: 0; padding: 8px; border: 2px solid var(--g-orange, #FFA116); border-radius: 16px;
+  background: color-mix(in srgb, var(--g-orange, #FFA116) 8%, var(--yv-bg)); color: var(--yv-text);
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--g-orange, #FFA116), transparent 68%);
   text-align: center; overflow: visible; overflow-wrap: anywhere; white-space: normal;
 }
 .yv-structure-node-card .yv-tree-operation-badge {
@@ -2274,11 +2274,13 @@
 .yv-structure-node-card .yv-tree-metadata-chip {
   white-space: normal; overflow-wrap: anywhere; font-size: 8px; padding: 1px 3px;
 }
-.yv-structure-depth-0 > .yv-structure-node-card { background: color-mix(in srgb, #FFA116 13%, var(--yv-bg)); }
-.yv-structure-depth-1 > .yv-structure-node-card { background: color-mix(in srgb, #FFA116 9%, var(--yv-bg)); }
-.yv-structure-depth-2 > .yv-structure-node-card { background: color-mix(in srgb, #FFA116 7%, var(--yv-bg)); }
-.yv-structure-depth-3 > .yv-structure-node-card { background: color-mix(in srgb, #FFA116 5%, var(--yv-bg)); }
-.yv-structure-depth-4 > .yv-structure-node-card { background: color-mix(in srgb, #FFA116 4%, var(--yv-bg)); }
+.yv-structure-depth-0 > .yv-structure-node-card,
+.yv-structure-depth-1 > .yv-structure-node-card,
+.yv-structure-depth-2 > .yv-structure-node-card,
+.yv-structure-depth-3 > .yv-structure-node-card,
+.yv-structure-depth-4 > .yv-structure-node-card {
+  background: color-mix(in srgb, var(--g-orange, #FFA116) 10%, var(--yv-bg));
+}
 .yv-structure-node-main { display:flex; flex-direction:column; align-items:center; gap:3px; min-width:0; max-width:100%; }
 .yv-structure-node-heading { display:flex; align-items:center; justify-content:center; gap:5px; min-width:0; }
 .yv-structure-node-value { font:700 14px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; overflow-wrap:anywhere; }
@@ -2304,7 +2306,7 @@
 }
 .yv-structure-node > .yv-tree-connectors path {
   fill: none;
-  stroke: #FFA116;
+  stroke: var(--g-orange, #FFA116);
   stroke-width: 3;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
@@ -2407,25 +2409,25 @@
 .yv-structure-node.yv-tree-node-created > .yv-structure-node-card {
   transform-origin: 50% 100%;
   animation: yv-tree-node-insert 460ms cubic-bezier(.18,.82,.25,1.18) both;
-  border-color: #FFA116;
-  box-shadow: 0 0 0 0 color-mix(in srgb, #FFA116, transparent 35%);
+  border-color: var(--g-orange, #FFA116);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--g-orange, #FFA116), transparent 35%);
 }
 .yv-structure-node.yv-tree-node-value-changed > .yv-structure-node-card {
   animation: yv-tree-value-update 680ms ease-out both;
-  border-color: #FFA116;
+  border-color: var(--g-orange, #FFA116);
 }
 .yv-structure-node.yv-tree-node-changed:not(.yv-tree-node-value-changed):not(.yv-tree-node-created) > .yv-structure-node-card {
   animation: yv-tree-value-update 620ms ease-out both;
-  border-color: #FFA116;
+  border-color: var(--g-orange, #FFA116);
 }
 .yv-structure-node.yv-tree-node-entered > .yv-structure-node-card {
   animation: yv-tree-node-visit 620ms ease-out both;
-  border-color: #FFA116;
+  border-color: var(--g-orange, #FFA116);
 }
 .yv-tree-value-delta {
-  color: #FFA116 !important;
-  border-color: color-mix(in srgb, #FFA116, transparent 25%) !important;
-  background: color-mix(in srgb, #FFA116, var(--yv-bg) 88%) !important;
+  color: var(--g-orange, #FFA116) !important;
+  border-color: color-mix(in srgb, var(--g-orange, #FFA116), transparent 25%) !important;
+  background: color-mix(in srgb, var(--g-orange, #FFA116), var(--yv-bg) 88%) !important;
   font-variant-numeric: tabular-nums;
 }
 .yv-tree-node-child-removed > .yv-structure-node-card {
@@ -2433,11 +2435,11 @@
 }
 .yv-tree-metadata-changed {
   animation: yv-tree-metadata-change 720ms ease-out both;
-  outline: 1px solid #FFA116;
+  outline: 1px solid var(--g-orange, #FFA116);
 }
 .yv-tree-reference-changed {
-  color: #FFA116 !important;
-  border-color: #FFA116 !important;
+  color: var(--g-orange, #FFA116) !important;
+  border-color: var(--g-orange, #FFA116) !important;
   animation: yv-tree-metadata-change 720ms ease-out both;
 }
 .yv-tree-reference-changed strong {
@@ -2449,46 +2451,46 @@
   animation: yv-tree-child-reveal 420ms cubic-bezier(.2,.8,.25,1) both;
 }
 .yv-binary-tree-edge.yv-tree-edge-added > .yv-binary-tree-edge-heading .yv-binary-tree-edge-label {
-  color: #FFA116;
-  border-color: #FFA116;
+  color: var(--g-orange, #FFA116);
+  border-color: var(--g-orange, #FFA116);
 }
 .yv-binary-tree-edge.yv-binary-tree-edge-removed {
   transform-origin: center top;
   animation: yv-tree-child-remove 360ms ease-in both;
 }
-.yv-tree-connectors line.yv-tree-connector-added {
+.yv-tree-connectors path.yv-tree-connector-added {
   stroke-dasharray: 1000;
   stroke-dashoffset: 1000;
   animation: yv-tree-connector-draw 420ms ease-out forwards;
 }
-.yv-tree-connectors line.yv-tree-connector-traversed {
-  stroke: #FFA116;
+.yv-tree-connectors path.yv-tree-connector-traversed {
+  stroke: var(--g-orange, #FFA116);
   stroke-width: 4;
   stroke-dasharray: 7 5;
   animation: yv-tree-connector-traverse 680ms ease-out both;
 }
 .yv-binary-tree-edge.yv-tree-edge-traversed > .yv-binary-tree-edge-heading .yv-binary-tree-edge-label {
-  color: #FFA116;
-  border-color: #FFA116;
+  color: var(--g-orange, #FFA116);
+  border-color: var(--g-orange, #FFA116);
 }
 @keyframes yv-tree-node-insert {
-  0% { opacity: 0; transform: translateY(-14px) scale(.55); box-shadow: 0 0 0 10px color-mix(in srgb, #FFA116, transparent 100%); }
-  62% { opacity: 1; transform: translateY(2px) scale(1.06); box-shadow: 0 0 0 5px color-mix(in srgb, #FFA116, transparent 68%); }
-  100% { opacity: 1; transform: translateY(0) scale(1); box-shadow: 0 2px 0 color-mix(in srgb, #FFA116, transparent 68%); }
+  0% { opacity: 0; transform: translateY(-14px) scale(.55); box-shadow: 0 0 0 10px color-mix(in srgb, var(--g-orange, #FFA116), transparent 100%); }
+  62% { opacity: 1; transform: translateY(2px) scale(1.06); box-shadow: 0 0 0 5px color-mix(in srgb, var(--g-orange, #FFA116), transparent 68%); }
+  100% { opacity: 1; transform: translateY(0) scale(1); box-shadow: 0 2px 0 color-mix(in srgb, var(--g-orange, #FFA116), transparent 68%); }
 }
 @keyframes yv-tree-value-update {
-  0%, 100% { background-color: color-mix(in srgb, #FFA116 8%, var(--yv-bg)); }
-  24% { background-color: color-mix(in srgb, #FFA116 35%, var(--yv-bg)); box-shadow: 0 0 0 4px color-mix(in srgb, #FFA116, transparent 62%); }
-  55% { background-color: color-mix(in srgb, #FFA116 19%, var(--yv-bg)); }
+  0%, 100% { background-color: color-mix(in srgb, var(--g-orange, #FFA116) 8%, var(--yv-bg)); }
+  24% { background-color: color-mix(in srgb, var(--g-orange, #FFA116) 35%, var(--yv-bg)); box-shadow: 0 0 0 4px color-mix(in srgb, var(--g-orange, #FFA116), transparent 62%); }
+  55% { background-color: color-mix(in srgb, var(--g-orange, #FFA116) 19%, var(--yv-bg)); }
 }
 @keyframes yv-tree-node-visit {
-  0% { box-shadow: 0 0 0 0 color-mix(in srgb, #FFA116, transparent 35%); }
-  35% { box-shadow: 0 0 0 5px color-mix(in srgb, #FFA116, transparent 58%); }
-  100% { box-shadow: 0 0 0 1px color-mix(in srgb, #FFA116, transparent 78%); }
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--g-orange, #FFA116), transparent 35%); }
+  35% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--g-orange, #FFA116), transparent 58%); }
+  100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--g-orange, #FFA116), transparent 78%); }
 }
 @keyframes yv-tree-parent-link-change {
-  0%, 100% { box-shadow: 0 2px 0 color-mix(in srgb, #FFA116, transparent 68%); }
-  45% { box-shadow: 0 0 0 4px color-mix(in srgb, #FFA116, transparent 55%); }
+  0%, 100% { box-shadow: 0 2px 0 color-mix(in srgb, var(--g-orange, #FFA116), transparent 68%); }
+  45% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--g-orange, #FFA116), transparent 55%); }
 }
 @keyframes yv-tree-child-reveal {
   0% { opacity: 0; transform: translateY(-10px) scaleY(.2); }
@@ -2509,7 +2511,7 @@
 }
 @keyframes yv-tree-metadata-change {
   0%, 100% { background: transparent; }
-  35% { background: color-mix(in srgb, #FFA116 30%, var(--yv-bg)); }
+  35% { background: color-mix(in srgb, var(--g-orange, #FFA116) 30%, var(--yv-bg)); }
 }
 @keyframes yv-tree-badge-arrive {
   from { opacity: 0; transform: translateY(4px); }
@@ -2526,8 +2528,8 @@
   .yv-tree-reference-changed,
   .yv-binary-tree-edge.yv-tree-edge-added > .yv-binary-tree-edge-content,
   .yv-binary-tree-edge.yv-binary-tree-edge-removed,
-  .yv-tree-connectors line.yv-tree-connector-added,
-  .yv-tree-connectors line.yv-tree-connector-traversed {
+  .yv-tree-connectors path.yv-tree-connector-added,
+  .yv-tree-connectors path.yv-tree-connector-traversed {
     animation: none !important;
     transform: none !important;
   }
@@ -2536,31 +2538,31 @@
 
 /* Structural tree changes stay attached to their real parent/child slots. */
 .yv-binary-tree-edge.yv-tree-edge-reparented > .yv-binary-tree-edge-heading .yv-binary-tree-edge-label {
-  color: #B79CFF;
-  border-color: color-mix(in srgb, #B79CFF, transparent 30%);
+  color: var(--g-purple, #B79CFF);
+  border-color: color-mix(in srgb, var(--g-purple, #B79CFF), transparent 30%);
 }
 .yv-binary-edge-status.is-attached {
-  color: #4DA3FF;
-  border-color: color-mix(in srgb, #4DA3FF, transparent 40%);
-  background: color-mix(in srgb, #4DA3FF, var(--yv-bg) 90%);
+  color: var(--g-blue, #4DA3FF);
+  border-color: color-mix(in srgb, var(--g-blue, #4DA3FF), transparent 40%);
+  background: color-mix(in srgb, var(--g-blue, #4DA3FF), var(--yv-bg) 90%);
 }
 .yv-binary-edge-status.is-reparented {
-  color: #B79CFF;
-  border-color: color-mix(in srgb, #B79CFF, transparent 35%);
-  background: color-mix(in srgb, #B79CFF, var(--yv-bg) 90%);
+  color: var(--g-purple, #B79CFF);
+  border-color: color-mix(in srgb, var(--g-purple, #B79CFF), transparent 35%);
+  background: color-mix(in srgb, var(--g-purple, #B79CFF), var(--yv-bg) 90%);
 }
 .yv-binary-edge-status.is-detached {
-  color: #FFC01E;
-  border-color: color-mix(in srgb, #FFC01E, transparent 35%);
-  background: color-mix(in srgb, #FFC01E, var(--yv-bg) 90%);
+  color: var(--g-yellow, #FFC01E);
+  border-color: color-mix(in srgb, var(--g-yellow, #FFC01E), transparent 35%);
+  background: color-mix(in srgb, var(--g-yellow, #FFC01E), var(--yv-bg) 90%);
 }
 .yv-binary-edge-status.is-removed {
-  color: #FF375F;
-  border-color: color-mix(in srgb, #FF375F, transparent 35%);
-  background: color-mix(in srgb, #FF375F, var(--yv-bg) 90%);
+  color: var(--g-red, #FF375F);
+  border-color: color-mix(in srgb, var(--g-red, #FF375F), transparent 35%);
+  background: color-mix(in srgb, var(--g-red, #FF375F), var(--yv-bg) 90%);
 }
 .yv-binary-tree-edge.yv-tree-edge-reparented > .yv-binary-tree-edge-content {
-  outline: 1px dashed color-mix(in srgb, #B79CFF, transparent 20%);
+  outline: 1px dashed color-mix(in srgb, var(--g-purple, #B79CFF), transparent 20%);
   outline-offset: 3px;
   border-radius: 8px;
 }
@@ -2577,7 +2579,7 @@
 
 /* Current pointer targets remain obvious even when no animation is playing. */
 .yv-structure-node.yv-tree-node-pointed > .yv-structure-node-card {
-  outline: 2px solid color-mix(in srgb, #FFA116, transparent 24%);
+  outline: 2px solid color-mix(in srgb, var(--g-orange, #FFA116), transparent 24%);
   outline-offset: 3px;
 }
 .yv-tree-trail-order {
@@ -2591,25 +2593,25 @@
   min-width: 19px;
   min-height: 19px;
   padding: 2px 5px;
-  border: 1px solid color-mix(in srgb, #FFA116, transparent 25%);
+  border: 1px solid color-mix(in srgb, var(--g-orange, #FFA116), transparent 25%);
   border-radius: 999px;
-  color: #FFA116;
+  color: var(--g-orange, #FFA116);
   background: var(--yv-bg);
   font: 700 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
   font-variant-numeric: tabular-nums;
 }
 .yv-binary-tree-edge.yv-tree-edge-trail > .yv-binary-tree-edge-heading .yv-binary-tree-edge-label {
-  color: #FFA116;
-  border-color: color-mix(in srgb, #FFA116, transparent 35%);
+  color: var(--g-orange, #FFA116);
+  border-color: color-mix(in srgb, var(--g-orange, #FFA116), transparent 35%);
 }
 .yv-tree-connectors path.yv-tree-connector-trail {
-  stroke: #FFA116;
+  stroke: var(--g-orange, #FFA116);
   stroke-width: 3;
   stroke-dasharray: 3 5;
   opacity: .9;
 }
 .yv-tree-connectors path.yv-tree-connector-reparented {
-  stroke: #B79CFF;
+  stroke: var(--g-purple, #B79CFF);
   stroke-width: 3.5;
   stroke-dasharray: 5 4;
 }
@@ -2727,8 +2729,8 @@
    .yv-graph-node-* and .yv-graph-edge-* animations by specificity.
    ========================================================================== */
 .yv-graph {
-  --g-orange: #FFA116; --g-green: #2CBB5D; --g-red: #FF375F; --g-blue: #4DA3FF;
-  --g-amber: #FFC01E; --g-edge: color-mix(in srgb, var(--yv-muted, #a8a8a8), transparent 25%);
+  --g-orange: var(--g-orange, #FFA116); --g-green: #2CBB5D; --g-red: var(--g-red, #FF375F); --g-blue: var(--g-blue, #4DA3FF);
+  --g-amber: var(--g-yellow, #FFC01E); --g-edge: color-mix(in srgb, var(--yv-muted, #a8a8a8), transparent 25%);
   --g-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .yv-graph-stage {
@@ -2758,6 +2760,91 @@
 .yv-graph-edge-badge.is-added { background: var(--g-green); }
 .yv-graph-edge-badge.is-removed { background: var(--g-red); }
 .yv-graph-edge-badge.is-traversed { background: var(--g-blue); }
+
+
+
+/* Tree nodes share the graph's palette, contrast, and state language.
+   Their rectangular silhouette still communicates a hierarchy rather than a graph vertex. */
+.yv-node.yv-structure-node-card {
+  border-color: var(--g-orange, #FFA116);
+  background: color-mix(in srgb, var(--g-orange, #FFA116) 10%, var(--yv-bg, #1a1a1a));
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--g-orange, #FFA116), transparent 68%);
+  transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+.yv-structure-node.yv-tree-node-pointed > .yv-structure-node-card {
+  outline-color: color-mix(in srgb, var(--g-orange, #FFA116), transparent 24%);
+}
+.yv-tree-node-created > .yv-structure-node-card { border-color: var(--g-green, #4ade80); }
+.yv-tree-node-entered > .yv-structure-node-card { --yv-tree-operation-color: var(--g-blue, #4DA3FF); }
+.yv-tree-node-value-changed > .yv-structure-node-card,
+.yv-tree-node-changed > .yv-structure-node-card { --yv-tree-operation-color: var(--g-orange, #FFA116); }
+.yv-tree-node-child-removed > .yv-structure-node-card { --yv-tree-operation-color: var(--g-red, #FF375F); }
+.yv-tree-metadata-changed { outline-color: var(--g-orange, #FFA116); }
+.yv-tree-reference-changed { color: var(--g-blue, #4DA3FF) !important; border-color: var(--g-blue, #4DA3FF) !important; }
+
+/* Animate every structural edge operation from adjacent snapshots:
+   insertion/attachment, reparenting, traversal, and removal/detachment. */
+.yv-binary-tree-edge.yv-tree-edge-added > .yv-binary-tree-edge-content {
+  animation: yv-tree-child-reveal 420ms cubic-bezier(.2,.8,.25,1) both;
+}
+.yv-binary-tree-edge.yv-tree-edge-added > .yv-binary-tree-edge-heading .yv-binary-tree-edge-label {
+  color: var(--g-green, #4ade80);
+  border-color: var(--g-green, #4ade80);
+}
+.yv-binary-tree-edge.yv-tree-edge-reparented > .yv-binary-tree-edge-content {
+  animation: yv-tree-edge-reparent 520ms ease-out both;
+}
+.yv-binary-tree-edge.yv-tree-edge-added:has(.is-attached) > .yv-binary-tree-edge-content {
+  animation: yv-tree-edge-attach 480ms ease-out both;
+}
+.yv-binary-tree-edge.yv-binary-tree-edge-removed {
+  animation: yv-tree-child-remove 360ms ease-in both;
+}
+.yv-tree-connectors path.yv-tree-connector-added {
+  stroke: var(--g-green, #4ade80);
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: yv-tree-connector-draw 420ms ease-out forwards;
+}
+.yv-tree-connectors path.yv-tree-connector-traversed {
+  stroke: var(--g-blue, #4DA3FF);
+  stroke-width: 4;
+  stroke-dasharray: .12 .08;
+  animation: yv-tree-connector-traverse 680ms ease-out both;
+}
+.yv-tree-connectors path.yv-tree-connector-reparented {
+  stroke: var(--g-purple, #B79CFF);
+  stroke-width: 3.5;
+  stroke-dasharray: .12 .08;
+  animation: yv-tree-connector-reparent 520ms ease-out both;
+}
+@keyframes yv-tree-edge-attach {
+  0% { opacity: .25; transform: translateY(-5px) scale(.96); outline: 2px solid color-mix(in srgb, var(--g-blue, #4DA3FF), transparent 45%); }
+  70% { opacity: 1; transform: translateY(1px) scale(1.015); }
+  100% { opacity: 1; transform: none; outline-color: transparent; }
+}
+@keyframes yv-tree-edge-reparent {
+  0% { outline: 2px dashed var(--g-purple, #B79CFF); background: color-mix(in srgb, var(--g-purple, #B79CFF), transparent 84%); transform: translateY(-3px); }
+  55% { outline: 2px dashed color-mix(in srgb, var(--g-purple, #B79CFF), transparent 20%); background: color-mix(in srgb, var(--g-purple, #B79CFF), transparent 91%); }
+  100% { outline: 1px dashed transparent; background: transparent; transform: none; }
+}
+@keyframes yv-tree-connector-reparent {
+  0% { stroke-dashoffset: .6; opacity: .35; }
+  60% { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: -.2; opacity: .95; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yv-node.yv-structure-node-card,
+  .yv-binary-tree-edge.yv-tree-edge-added > .yv-binary-tree-edge-content,
+  .yv-binary-tree-edge.yv-tree-edge-reparented > .yv-binary-tree-edge-content,
+  .yv-binary-tree-edge.yv-tree-edge-added:has(.is-attached) > .yv-binary-tree-edge-content,
+  .yv-tree-connectors path.yv-tree-connector-added,
+  .yv-tree-connectors path.yv-tree-connector-traversed,
+  .yv-tree-connectors path.yv-tree-connector-reparented {
+    animation: none !important;
+    transition: none !important;
+  }
+}
 
 /* ---------- vertices ---------- */
 .yv-graph-node {
