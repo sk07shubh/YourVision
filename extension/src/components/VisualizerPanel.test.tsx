@@ -2859,6 +2859,31 @@ describe('specialized balanced tree semantics', () => {
     expect(html).toContain('yv-tree-node-red-black-red');
   });
 
+  it('labels a red-black recolor only when adjacent snapshots show a color change', () => {
+    const priorSession = sessionStore.get();
+    const previous = state({
+      sequence: 421,
+      objects: {
+        root: { $objectId: 'root', $type: 'RBNode', fields: { val: 10, color: 'black', left: null, right: null } },
+      },
+    });
+    const current = state({
+      sequence: 422,
+      objects: {
+        root: { $objectId: 'root', $type: 'RBNode', fields: { val: 10, color: 'red', left: null, right: null } },
+      },
+    });
+    try {
+      sessionStore.set({ source: 'root.color = RED', states: [previous, current], index: 1 });
+      const html = renderToStaticMarkup(<TreeNodeView value={{ $objectId: 'root' }} objects={current.objects} state={current} />);
+      expect(html).toContain('data-tree-recolored="true"');
+      expect(html).toContain('RECOLORED BLACK → RED');
+      expect(html).toContain('yv-tree-recolored-badge');
+    } finally {
+      sessionStore.set(priorSession);
+    }
+  });
+
   it('marks nodes with captured height or balance metadata as height-balanced candidates', () => {
     const objects = {
       root: { $objectId: 'root', $type: 'AVLNode', fields: { val: 10, height: 2, balanceFactor: 0, left: null, right: null } },
