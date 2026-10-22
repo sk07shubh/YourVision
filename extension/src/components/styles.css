@@ -2743,8 +2743,7 @@
 .yv-graph-node-removed {opacity:.55;border-style:dashed!important;filter:grayscale(.35)}
 .yv-graph-edge {vector-effect:non-scaling-stroke}
 @media (max-width:680px) {
-  .yv-graph-layout {grid-template-columns:minmax(0,1fr)}
-  .yv-graph-inspector {grid-column:1;max-width:none}
+  .yv-graph-inspector {width:min(270px,calc(100% - 16px));max-width:calc(100% - 16px)}
   .yv-graph-canvas {max-height:55vh}
 }
 
@@ -2998,33 +2997,46 @@
 }
 
 
-/* Keep the graph canvas at 80% and its node inspector at 20% at every
-   embedding size, including narrow argument previews. The canvas scrolls
-   internally when its nodes need more width; the inspector never takes a row. */
+/* Node details float above the graph only while a node is hovered/focused.
+   They do not reserve a column or shrink the canvas, and may extend beyond its
+   borders. The overlay itself remains interactive for neighbor navigation. */
 .yv-graph {
   min-width: 0;
   width: 100%;
 }
 .yv-graph-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 4fr) minmax(0, 1fr);
-  gap: 8px;
+  position: relative;
+  display: block;
   min-width: 0;
-  align-items: start;
+  overflow: visible;
 }
 .yv-graph-canvas {
-  grid-column: 1;
   width: 100%;
   max-width: 100%;
   min-width: 0;
 }
 .yv-graph-inspector {
-  grid-column: 2;
-  width: 100%;
-  max-width: none;
-  min-width: 0;
+  display: none;
+  position: absolute;
+  z-index: 50;
+  top: 8px;
+  right: 8px;
+  width: min(290px, 48%);
+  max-width: calc(100% - 16px);
+  max-height: min(68vh, 480px);
+  overflow: auto;
+  box-sizing: border-box;
   margin: 0;
-  padding: 7px;
+  padding: 10px;
+  border: 1px solid var(--yv-accent, #60a5fa);
+  border-radius: 10px;
+  background: var(--yv-panel, #151a23);
+  color: var(--yv-text, #f3f4f6);
+  box-shadow: 0 12px 36px rgb(0 0 0 / 48%);
+  backdrop-filter: blur(12px);
+}
+.yv-graph.is-hovering .yv-graph-inspector {
+  display: block;
 }
 
 /* The execution strip should be only as tall as its contents. Its existing
