@@ -2729,8 +2729,9 @@
    .yv-graph-node-* and .yv-graph-edge-* animations by specificity.
    ========================================================================== */
 .yv-graph {
-  --g-orange: var(--g-orange, #FFA116); --g-green: #2CBB5D; --g-red: var(--g-red, #FF375F); --g-blue: var(--g-blue, #4DA3FF);
-  --g-amber: var(--g-yellow, #FFC01E); --g-edge: color-mix(in srgb, var(--yv-muted, #a8a8a8), transparent 25%);
+  --g-orange: #FFA116; --g-green: #2CBB5D; --g-red: #FF375F; --g-blue: #4DA3FF;
+  --g-yellow: #FFC01E; --g-amber: var(--g-yellow);
+  --g-edge: color-mix(in srgb, var(--yv-muted, #a8a8a8), transparent 25%);
   --g-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .yv-graph-stage {
@@ -2765,6 +2766,79 @@
 
 /* Tree nodes share the graph's palette, contrast, and state language.
    Their rectangular silhouette still communicates a hierarchy rather than a graph vertex. */
+.yv-ds-visualization:has(.yv-structure-node) {
+  --g-orange: #FFA116;
+  --g-green: #2CBB5D;
+  --g-red: #FF375F;
+  --g-blue: #4DA3FF;
+  --g-purple: #B79CFF;
+  --g-yellow: #FFC01E;
+  background-color: color-mix(in srgb, var(--yv-elevated, #282828) 60%, var(--yv-bg, #1a1a1a));
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--yv-text, #efefef), transparent 90%) 1px, transparent 1.4px);
+  background-size: 20px 20px;
+  border-radius: 14px;
+  padding: 16px;
+}
+.yv-node.yv-structure-node-card {
+  border-color: var(--g-orange, #FFA116);
+  background: color-mix(in srgb, var(--g-orange, #FFA116) 10%, var(--yv-bg, #1a1a1a));
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--g-orange, #FFA116), transparent 68%);
+  transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+.yv-structure-node.yv-tree-node-created > .yv-structure-node-card {
+  border-color: var(--g-green, #2CBB5D) !important;
+  border-style: solid;
+  background: color-mix(in srgb, var(--g-green, #2CBB5D) 14%, var(--yv-bg, #1a1a1a));
+}
+.yv-structure-node.yv-tree-node-entered > .yv-structure-node-card {
+  border-color: var(--g-blue, #4DA3FF) !important;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--g-blue, #4DA3FF), transparent 72%);
+}
+.yv-structure-node.yv-tree-node-value-changed > .yv-structure-node-card,
+.yv-structure-node.yv-tree-node-changed:not(.yv-tree-node-created) > .yv-structure-node-card {
+  border-color: var(--g-orange, #FFA116) !important;
+}
+.yv-structure-node.yv-tree-node-child-removed > .yv-structure-node-card {
+  border-color: var(--g-red, #FF375F) !important;
+  border-style: dashed;
+}
+.yv-structure-node.yv-tree-node-pointed > .yv-structure-node-card {
+  outline: 2px solid color-mix(in srgb, var(--g-blue, #4DA3FF), transparent 24%);
+  outline-offset: 3px;
+}
+.yv-tree-operation-badge.is-created { background: var(--g-green, #2CBB5D); color: #101510; }
+.yv-tree-operation-badge.is-changed { background: var(--g-orange, #FFA116); color: #1a1a1a; }
+.yv-tree-operation-badge.is-current { background: var(--g-blue, #4DA3FF); color: #071a2b; }
+.yv-tree-operation-badge.is-removed { background: var(--g-red, #FF375F); color: #1a080c; }
+.yv-binary-tree-edge.yv-tree-edge-added > .yv-binary-tree-edge-heading .yv-binary-tree-edge-label {
+  color: var(--g-green, #2CBB5D);
+  border-color: var(--g-green, #2CBB5D);
+}
+.yv-binary-tree-edge.yv-tree-edge-traversed > .yv-binary-tree-edge-heading .yv-binary-tree-edge-label {
+  color: var(--g-blue, #4DA3FF);
+  border-color: var(--g-blue, #4DA3FF);
+}
+.yv-tree-connectors path.yv-tree-connector-added {
+  stroke: var(--g-green, #2CBB5D);
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: yv-tree-connector-draw 420ms ease-out forwards;
+}
+.yv-tree-connectors path.yv-tree-connector-traversed {
+  stroke: var(--g-blue, #4DA3FF);
+  stroke-width: 4;
+  stroke-dasharray: 7 5;
+  animation: yv-tree-connector-traverse 680ms ease-out both;
+}
+.yv-tree-connectors path.yv-tree-connector-reparented {
+  stroke: var(--g-purple, #B79CFF);
+  stroke-width: 3.5;
+  stroke-dasharray: 5 4;
+}
+.yv-binary-tree-edge.yv-tree-edge-reparented > .yv-binary-tree-edge-heading .yv-binary-tree-edge-label {
+  color: var(--g-purple, #B79CFF);
+  border-color: var(--g-purple, #B79CFF);
+}
 .yv-node.yv-structure-node-card {
   border-color: var(--g-orange, #FFA116);
   background: color-mix(in srgb, var(--g-orange, #FFA116) 10%, var(--yv-bg, #1a1a1a));
