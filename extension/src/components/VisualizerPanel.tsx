@@ -4262,6 +4262,9 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     }
     return undefined;
   };
+  // Only label a rotation when snapshots show the reciprocal parent/child move
+  // and the middle subtree transferred to the vacated child slot.
+  const rotationCue = id && hasSnapshotPair ? (treeDoubleRotationCue(id, previousObjects, objects) ?? treeRotationCue(id, previousObjects, objects)) : undefined;
   const priorityBefore = priorityOf(previousFields);
   const priorityNow = priorityOf(fields);
   const treapRotation = Boolean(rotationCue && priorityBefore !== undefined && priorityNow !== undefined &&
@@ -4295,9 +4298,6 @@ export function TreeNodeView({ value, objects, depth = 0, seen = new Set<string>
     previousTrieChildren.some(childId => !currentTrieChildren.includes(childId)));
   const trieAddedChildren = Boolean(trieNodeLike && hasPreviousSnapshot &&
     currentTrieChildren.some(childId => !previousTrieChildren.includes(childId)));
-  // Only label a rotation when snapshots show the reciprocal parent/child move
-  // and the middle subtree transferred to the vacated child slot.
-  const rotationCue = id && hasSnapshotPair ? (treeDoubleRotationCue(id, previousObjects, objects) ?? treeRotationCue(id, previousObjects, objects)) : undefined;
   const changedMetadataNames = Object.keys(fields).filter(name =>
     ['color', 'isRed', 'isBlack', 'bf', 'balanceFactor', 'height', 'weight', 'isEnd', 'isWord', 'endOfWord', 'isEndOfWord'].includes(name) &&
     hasPreviousSnapshot && valueChanged(previousFields[name], fields[name])
