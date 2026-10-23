@@ -415,6 +415,17 @@ export function injectYourVisionTab():
     return false;
   }
 
+  // LeetCode may replace its FlexLayout tabset without changing the URL. If
+  // the old YourVision tab vanished, release its detached React root and panel
+  // before mounting into the replacement tabset.
+  root?.unmount();
+  root = null;
+  host.querySelectorAll<HTMLElement>(
+    ':scope > [data-yourvision-host="true"]'
+  ).forEach(panel => panel.remove());
+  tabDivider?.remove();
+  tabDivider = null;
+
   const nativeTabs = [
     ...tabList.querySelectorAll<HTMLElement>(
       ':scope > .flexlayout__tab_button_top'
