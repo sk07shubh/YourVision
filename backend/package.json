@@ -34,7 +34,8 @@
     "start": "node dist/src/server.js",
     "test:deployment-readiness": "tsx scripts/smoke-deployment-readiness.ts",
     "build": "tsc --outDir dist --declaration false --declarationMap false --sourceMap false",
-    "test:execution-sandbox": "tsx scripts/smoke-execution-sandbox.ts"
+    "test:execution-sandbox": "tsx scripts/smoke-execution-sandbox.ts",
+    "test:execution-worker-http": "tsx scripts/smoke-execution-worker-http.ts"
   },
   "keywords": [],
   "author": "",
