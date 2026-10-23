@@ -77,3 +77,20 @@ If the pulled environment does not include a usable `VERCEL_OIDC_TOKEN`, set `VE
 - The test confirms a valid trace from a small method, not the entire LeetCode corpus.
 - Public API deployment, request limits, command-level termination for infinite loops, concurrency, cost, and latency still need separate tests before switching production traffic.
 - Current Render deployment and its fail-closed execution behavior remain unchanged until the proof passes and a Vercel deployment is ready.
+
+
+## Deploy the isolated execution worker
+
+Deploy this directory as a **separate Vercel project**, with the Vercel project root set to `vercel-sandbox-prototype`. The API exposes `/visualize` and `/readyz`; the rewrite configuration maps these to the Vercel functions.
+
+Configure these project environment variables before deployment:
+
+- `YV_EXECUTION_WORKER_TOKEN`: a long random bearer secret shared only with the backend.
+- `YV_SANDBOX_IMAGE`: the published Java image tag, for example `yourvision-java:openjdk-21`.
+- Use Vercel OIDC where supported, or set `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, and `VERCEL_PROJECT_ID` as server-side environment variables.
+
+The readiness endpoint deliberately reports not-ready until the prebuilt Java image and sandbox credentials are configured. This prevents the backend from routing production traffic to a worker that would need to install a JDK on each request.
+
+On the backend deployment, set `YV_EXECUTION_WORKER_URL` to this worker's HTTPS origin and set `YV_EXECUTION_WORKER_TOKEN` to the same secret. Do not expose the token to the extension or browser. The backend sends the approved runtime Java source files with each request; the worker accepts only the expected filenames and returns raw tracer output for the backend to turn into YourVision trace/state snapshots.
+
+Before enabling traffic, run `npm run test:syntax` here and `npm run test:execution-worker-http` from `backend` against the deployed worker. This is an integration path, not a production switch: keep the backend fail-closed until the deployed isolation smoke test passes.
