@@ -262,3 +262,5 @@ const invokedPath = process.argv[1]
     : undefined;
 
 if (invokedPath === import.meta.url) startServer();
+
+export default app;
