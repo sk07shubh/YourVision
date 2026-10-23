@@ -208,7 +208,7 @@ app.post("/visualize", async (req, res, next) => {
             }
             if (responseBody && typeof responseBody === "object" &&
                 "protocol" in responseBody && responseBody.protocol === "yv-java-raw-v1") {
-                const raw = responseBody as {
+                const raw = responseBody as unknown as {
                     phase: "compile" | "run";
                     stdout: string;
                     stderr: string;
