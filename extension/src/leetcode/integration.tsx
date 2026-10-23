@@ -835,7 +835,7 @@ function moveVisualizeToEnd(
     return text === '+' ||
       /(?:add|new|create).*(?:test ?case|case)/i.test(label) ||
       /(?:test ?case|case).*(?:add|new|create)/i.test(label) ||
-      (text === '' && button.querySelector('svg') === null === false &&
+      (text === '' && button.querySelector('svg') !== null &&
         button === controls[controls.length - 1]);
   });
 
