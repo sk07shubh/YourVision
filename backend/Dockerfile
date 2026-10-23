@@ -17,7 +17,7 @@ ENV MAX_CONCURRENT_EXECUTIONS=2
 ENV JSON_BODY_LIMIT=256kb
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends openjdk-17-jdk-headless bubblewrap util-linux ca-certificates \
+    && apt-get install -y --no-install-recommends openjdk-17-jdk-headless ca-certificates \
     && java --list-modules | grep -q '^jdk.jdi@' \
     && javac -version \
     && rm -rf /var/lib/apt/lists/*

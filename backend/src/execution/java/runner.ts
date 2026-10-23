@@ -27,11 +27,11 @@ function runJavaTracer(
     timeoutMs = JAVA_EXECUTION_TIMEOUT_MS
 ): Promise<{ stdout: string; stderr: string }> {
     return new Promise((resolve, reject) => {
-        const command = sandboxCommand("java", args, workDir);
+        const command = sandboxCommand("/usr/bin/java", args, workDir);
         const child = spawn(command.command, command.args, {
             detached: process.platform !== "win32",
             stdio: ["ignore", "pipe", "pipe"],
-            env: isSandboxConfigured() ? { PATH: "/usr/bin:/bin" } : process.env
+            env: process.env
         });
 
         const stdoutChunks: Buffer[] = [];
@@ -469,7 +469,7 @@ await fs.writeFile(
                     tracerPath
                 ];
             compileArgs.unshift("-J-Xmx192m", "-J-XX:MaxMetaspaceSize=96m", "-J-XX:+UseSerialGC");
-            const compileCommand = sandboxCommand("javac", compileArgs, tempDir);
+            const compileCommand = sandboxCommand("/usr/bin/javac", compileArgs, tempDir);
             await execFileAsync(
                 compileCommand.command,
                 compileCommand.args,
@@ -477,7 +477,7 @@ await fs.writeFile(
                     // CI runners can be slower when several Java corpus cases compile in sequence.
                     timeout: 20000,
                     maxBuffer: 1024 * 1024,
-                    env: isSandboxConfigured() ? { PATH: "/usr/bin:/bin" } : process.env
+                    env: process.env
                 }
             );
         } catch (error: any) {

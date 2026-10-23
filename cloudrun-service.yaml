@@ -1,0 +1,33 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: yourvision-backend
+  annotations:
+    run.googleapis.com/launch-stage: BETA
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/maxScale: "3"
+    spec:
+      containerConcurrency: 1
+      timeoutSeconds: 30
+      containers:
+        - name: yourvision-backend
+          image: REGION-docker.pkg.dev/PROJECT_ID/yourvision/yourvision-backend:latest
+          sandboxLauncher: true
+          ports:
+            - containerPort: 8080
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: YV_EXECUTION_SANDBOX
+              value: cloud-run
+            - name: MAX_CONCURRENT_EXECUTIONS
+              value: "1"
+            - name: JSON_BODY_LIMIT
+              value: 256kb

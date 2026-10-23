@@ -5,7 +5,7 @@ function assert(condition: boolean, message: string): void {
     if (!condition) throw new Error(message);
 }
 
-assert(isSandboxConfigured(), "YV_EXECUTION_SANDBOX=bubblewrap must be enabled for this test");
+assert(isSandboxConfigured(), "YV_EXECUTION_SANDBOX=cloud-run must be enabled for this test");
 const health = await checkExecutionSandbox();
 assert(health.available, `sandbox probe failed: ${health.message}`);
 
@@ -16,7 +16,7 @@ import java.nio.file.Path;
 
 class Solution {
     public boolean verifySandbox() {
-        boolean appFilesHidden = !Files.exists(Path.of("/app/backend/package.json"));
+        boolean parentSecretHidden = System.getenv("YV_SANDBOX_PROBE_SECRET") == null;
         boolean filesystemReadOnly = !Files.isWritable(Path.of("/etc/passwd"));
         boolean networkBlocked;
         try (Socket socket = new Socket()) {
@@ -25,10 +25,10 @@ class Solution {
         } catch (Exception expected) {
             networkBlocked = true;
         }
-        return appFilesHidden && filesystemReadOnly && networkBlocked;
+        return parentSecretHidden && filesystemReadOnly && networkBlocked;
     }
 }`;
 const result = await runJava(source, { method: "verifySandbox", arguments: [] });
 assert(result.kind === "OK", `sandboxed Java execution failed: ${result.kind} ${result.message ?? ""} ${result.stderr}`);
 assert(result.result === "true", `sandbox boundary assertion failed: ${result.result}`);
-console.log("PASS: sandboxed Java cannot read app files, write system files, or access outbound network");
+console.log("PASS: sandboxed Java cannot inherit parent environment, write system files, or access outbound network");
