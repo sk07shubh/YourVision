@@ -1,4 +1,4 @@
-import { runJava } from "./execution/java/runner.js";
+import { getJavaRuntimeSources, interpretRemoteJavaExecution, runJava } from "./execution/java/runner.js";
 import express, { type ErrorRequestHandler } from "express";
 import cors from "cors";
 import { execFile } from "node:child_process";
@@ -180,10 +180,11 @@ app.post("/visualize", async (req, res, next) => {
             }
             let workerResponse: Response;
             try {
+                const runtimeSources = await getJavaRuntimeSources();
                 workerResponse = await fetch(new URL("/visualize", workerUrl), {
                     method: "POST",
                     headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-                    body: JSON.stringify({ language, source, testcase }),
+                    body: JSON.stringify({ language, source, testcase, runtimeSources }),
                     signal: AbortSignal.timeout(25_000)
                 });
             } catch {
@@ -194,8 +195,31 @@ app.post("/visualize", async (req, res, next) => {
                 });
                 return;
             }
-            const responseBody = await workerResponse.text();
-            res.status(workerResponse.status).type("application/json").send(responseBody);
+            let responseBody: unknown;
+            try {
+                responseBody = await workerResponse.json();
+            } catch {
+                res.status(502).json({
+                    success: false,
+                    code: "EXECUTION_WORKER_INVALID_RESPONSE",
+                    message: "The isolated execution worker returned an invalid response."
+                });
+                return;
+            }
+            if (responseBody && typeof responseBody === "object" &&
+                "protocol" in responseBody && responseBody.protocol === "yv-java-raw-v1") {
+                const raw = responseBody as {
+                    phase: "compile" | "run";
+                    stdout: string;
+                    stderr: string;
+                    exitCode: number | null;
+                    timedOut: boolean;
+                };
+                const execution = interpretRemoteJavaExecution(source, raw);
+                res.status(200).json({ language, testcase, execution });
+                return;
+            }
+            res.status(workerResponse.status).json(responseBody);
             return;
         }
 
