@@ -456,58 +456,63 @@ No reliable production cost-per-visualization estimate is available yet. It depe
 
 
 
-## Isolated execution deployment
+## Render API + isolated execution worker
 
-### Why the production target is Cloud Run Sandbox, not Render
+Render remains the public API host. The API validates requests, enforces request-size and concurrency limits, and forwards Java execution to a separate Cloud Run service configured with the Cloud Run sandbox launcher. This keeps the original Render deployment plan while placing untrusted compilation and tracing inside the platform sandbox rather than inside Render's web container.
 
-A real container smoke test showed that Bubblewrap cannot create the required mount namespace inside the Docker container (`bwrap: Failed to make / slave: Permission denied`). The API now fails closed if no supported sandbox is available. Do not enable Bubblewrap or remove the guard to make Render execution appear to work.
+### Why execution is split across two services
 
-The production deployment target for arbitrary submitted code is **Google Cloud Run with Cloud Run sandboxes enabled**. Cloud Run's sandbox launcher is a platform-provided isolation boundary: the sandbox does not inherit the parent workload's environment variables/secrets, and outbound network access is blocked by default. This feature is currently in Preview, so its availability and terms can change. See the [Cloud Run code-execution guide](https://docs.cloud.google.com/run/docs/code-execution) and [sandbox configuration for services](https://docs.cloud.google.com/run/docs/configuring/services/sandboxes).
+The Bubblewrap smoke test failed inside the Docker container with `bwrap: Failed to make / slave: Permission denied`. Do not remove the production fail-closed guard or run arbitrary submitted Java directly on Render to bypass this failure.
 
-The backend invokes the platform's `/usr/local/gcp/bin/sandbox do` CLI for both compilation and tracing, mounting only the request's temporary working directory as writable. The compiler, tracer, and debuggee run inside the sandbox. The integration sets bounded JVM heaps, disables JVM perf-data files, applies wall-clock timeouts and output limits, and keeps service concurrency at one. The Cloud Run sandbox shares the service's allocated CPU and memory, so set appropriate limits and monitor resource use.
+The execution worker uses Cloud Run's sandbox launcher, which is currently in Preview. The sandbox blocks outbound network access by default and does not inherit the parent workload's environment variables/secrets. It shares the worker's CPU and memory allocation, so the worker is configured for one concurrent request and 1 GiB memory. See the [Cloud Run code-execution guide](https://docs.cloud.google.com/run/docs/code-execution) and [sandbox configuration for services](https://docs.cloud.google.com/run/docs/configuring/services/sandboxes).
 
-### Deploy to Cloud Run
+Render receives `YV_EXECUTION_WORKER_URL` and `YV_EXECUTION_WORKER_TOKEN` as private environment variables. The worker receives the same token from Google Secret Manager and rejects every `POST /visualize` request without a matching bearer token. The token must be a strong random secret; never commit it or expose it in extension code. The extension calls only the Render API URL.
 
-Prerequisites: a Google Cloud project with billing enabled, Cloud Run and Cloud Build APIs enabled, the Cloud Run sandbox preview available to the project/region, and the Google Cloud CLI installed. This is not the time-limited trial runtime: ordinary Cloud Run usage is billed against its ongoing free-tier allowances and then at published rates, so configure budget alerts and review billing before exposing the endpoint.
+### Deployment sequence
 
-From the repository root, set your project ID and create an Artifact Registry repository in a region you intend to use:
+1. Deploy the execution worker to a Google Cloud project with billing enabled and Cloud Run sandbox access available. This is a second service, not a replacement for Render. Ordinary Cloud Run free-tier allowances are ongoing, but billing is required and usage beyond allowances can be charged; configure budget alerts first.
+2. Create a random token and store it in Google Secret Manager as `yourvision-execution-worker-token`. Grant the Cloud Run service identity permission to access that secret.
+3. Build and push the backend image:
+   
+   ```bash
+   gcloud config set project PROJECT_ID
+   gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com
+   gcloud artifacts repositories create yourvision --repository-format=docker --location=asia-south1
+   gcloud builds submit --config cloudbuild.yaml --substitutions=_IMAGE=asia-south1-docker.pkg.dev/PROJECT_ID/yourvision/yourvision-backend:latest .
+   ```
+
+   If the Artifact Registry repository already exists, skip its create command.
+
+4. Deploy the restricted worker. Replace `PROJECT_ID` and ensure the secret exists and the Cloud Run service identity can access it:
+
+   ```bash
+   gcloud beta run deploy yourvision-execution-worker --image asia-south1-docker.pkg.dev/PROJECT_ID/yourvision/yourvision-backend:latest --region asia-south1 --platform managed --allow-unauthenticated --sandbox-launcher --port 8080 --memory 1Gi --cpu 1 --concurrency 1 --timeout 30 --max 3 --set-env-vars NODE_ENV=production,YV_EXECUTION_SANDBOX=cloud-run,YV_EXECUTION_WORKER_MODE=true,MAX_CONCURRENT_EXECUTIONS=1,JSON_BODY_LIMIT=256kb --set-secrets YV_EXECUTION_WORKER_TOKEN=yourvision-execution-worker-token:latest
+   ```
+
+   The service can be publicly reachable at the HTTP layer, but execution requests are rejected without the secret bearer token. Verify `/readyz` reports `sandbox.available: true` before connecting Render.
+
+5. In the Render dashboard, configure these environment variables for `yourvision-backend`:
+   - `YV_EXECUTION_WORKER_URL`: the worker's HTTPS service URL, with no path.
+   - `YV_EXECUTION_WORKER_TOKEN`: the same random secret value stored in Secret Manager.
+
+   The included `render.yaml` declares both as unsynced secrets so they are configured privately in Render. Keep `NODE_ENV=production`. Render's `/readyz` should return 200 only when the worker is reachable and the worker token is configured.
+
+6. Verify the Render service and then configure the extension to use its HTTPS URL:
+   
+   ```bash
+   curl --fail https://YOUR_RENDER_SERVICE.onrender.com/health
+   curl --fail https://YOUR_RENDER_SERVICE.onrender.com/readyz
+   ```
+
+   Do not build the production extension until its API URL setting points to the Render URL. The extension should never contain the worker URL or token.
+
+### Isolation verification gate
+
+Run the worker integration smoke test against the deployed sandbox-enabled worker before exposing the extension to users:
 
 ```bash
-gcloud config set project PROJECT_ID
-gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com
-gcloud artifacts repositories create yourvision --repository-format=docker --location=asia-south1
-gcloud builds submit --config cloudbuild.yaml --substitutions=_IMAGE=asia-south1-docker.pkg.dev/PROJECT_ID/yourvision/yourvision-backend:latest .
-gcloud beta run deploy yourvision-backend --image asia-south1-docker.pkg.dev/PROJECT_ID/yourvision/yourvision-backend:latest --region asia-south1 --platform managed --allow-unauthenticated --sandbox-launcher --port 8080 --memory 1Gi --cpu 1 --concurrency 1 --timeout 30 --max 3 --set-env-vars NODE_ENV=production,YV_EXECUTION_SANDBOX=cloud-run,MAX_CONCURRENT_EXECUTIONS=1,JSON_BODY_LIMIT=256kb
+gcloud run services proxy yourvision-execution-worker --region asia-south1
 ```
 
-Replace `PROJECT_ID` before running. The command creates cloud resources and can incur charges; inspect the project, quotas, and budget before executing it. Do not paste credentials into chat.
+Then from a Cloud Run-enabled build/container where the sandbox launcher is available, run `node dist/scripts/smoke-execution-sandbox.js`. The test checks that host environment secrets are not visible to submitted code, the system filesystem is not writable, and outbound network connections are blocked. A passing Render health check alone is not proof of execution isolation. The actual platform-level sandbox test has not yet run because no cloud service has been deployed.
 
-After deployment, copy the service's HTTPS URL and verify:
-
-```bash
-curl --fail https://YOUR_CLOUD_RUN_URL/health
-curl --fail https://YOUR_CLOUD_RUN_URL/readyz
-```
-
-Only proceed if `/readyz` reports `sandbox.available: true`. Then run the sandbox integration smoke test from a Cloud Run-enabled build/container where the sandbox launcher is available:
-
-```node
-node dist/scripts/smoke-execution-sandbox.js
-```
-
-That test verifies the sandbox can compile and trace a Java method, cannot write system files, does not inherit a host-only environment sentinel, and cannot connect to an external network address. A successful local Docker build alone does not verify Cloud Run's platform sandbox; the real readiness probe and smoke test must pass after deployment.
-
-### Extension URL
-
-Build the extension against the Cloud Run HTTPS URL:
-
-```bash
-cd extension
-VITE_YOURVISION_API_URL=https://YOUR_CLOUD_RUN_URL YOURVISION_PRODUCTION_BUILD=true npm run build
-```
-
-The production build adds the Cloud Run origin to the extension's host permissions and removes localhost access. Load the resulting `extension/dist` in Chrome for the first end-to-end test. Do not publish the extension until the live sandbox smoke test passes.
-
-### Render status
-
-`render.yaml` is retained only as a non-executing fallback. Render does not provide the Cloud Run sandbox launcher, and the tested Bubblewrap route failed inside the container. A production Render deployment therefore intentionally returns HTTP 503 from `/visualize` unless a separately verified sandbox worker is integrated. Do not deploy Render as the public Java execution backend in its current configuration.
