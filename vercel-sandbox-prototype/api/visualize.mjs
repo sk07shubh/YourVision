@@ -113,12 +113,13 @@ export default async function handler(req, res) {
   let sandbox;
   let failureStage = "sandbox.create";
   try {
+    const configuredImage = process.env.YV_SANDBOX_IMAGE?.trim();
     const options = {
       timeout: 180_000,
       resources: { vcpus: 2 },
       persistent: false,
       networkPolicy: "allow-all",
-      ...(process.env.YV_SANDBOX_IMAGE?.trim() ? { image: process.env.YV_SANDBOX_IMAGE.trim() } : {}),
+      ...(configuredImage ? { image: configuredImage } : {}),
     };
     if (!process.env.VERCEL_OIDC_TOKEN) {
       if (!process.env.VERCEL_TOKEN || !process.env.VERCEL_TEAM_ID || !process.env.VERCEL_PROJECT_ID) {
@@ -128,8 +129,18 @@ export default async function handler(req, res) {
       options.teamId = process.env.VERCEL_TEAM_ID;
       options.projectId = process.env.VERCEL_PROJECT_ID;
     }
-    sandbox = await Sandbox.create(options);
-    if (!process.env.YV_SANDBOX_IMAGE?.trim()) {
+    let usedConfiguredImage = Boolean(configuredImage);
+    try {
+      sandbox = await Sandbox.create(options);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (!configuredImage || !/image not found/i.test(message)) throw error;
+      delete options.image;
+      usedConfiguredImage = false;
+      console.warn("[YourVision worker] configured sandbox image not found; retrying with the default image");
+      sandbox = await Sandbox.create(options);
+    }
+    if (!usedConfiguredImage) {
       failureStage = "java.provision";
       const install = await sandbox.runCommand({ cmd: "sh", args: ["-lc", "apt-get update && apt-get install -y openjdk-21-jdk-headless"], sudo: true });
       if (install.exitCode !== 0) {
