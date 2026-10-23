@@ -373,3 +373,57 @@ Before finishing:
 2. Run the focused test, then relevant full suites and build/typecheck checks.
 3. Inspect CI results for the exact commit and report only checks that actually ran.
 4. State limitations and unrun checks honestly; leave changes reviewable and do not merge a PR unless explicitly asked.
+
+
+## Production deployment preparation (Render)
+
+The backend container is built from the repository root with `backend/Dockerfile`. It pins the current CI baseline (Node.js 22 + OpenJDK 17, including `javac` and `jdk.jdi`) and starts with `npm start`. Render should use Docker runtime, Dockerfile path `./backend/Dockerfile`, Docker context `.`, and health-check path `/health`. A starter `render.yaml` is included at the repository root.
+
+### Configuration
+
+- `PORT`: HTTP port; defaults to 3000 locally and 10000 in the container/Render environment.
+- `HOST`: bind address; defaults to `127.0.0.1` locally and `0.0.0.0` in production.
+- `NODE_ENV`: set to `production` on Render.
+- `MAX_CONCURRENT_EXECUTIONS`: in-process concurrency cap (default 2).
+- `JSON_BODY_LIMIT`: request body limit (default `256kb`).
+- `VITE_YOURVISION_API_URL`: production extension build-time URL, e.g. `https://yourvision-backend.onrender.com`.
+- `YOURVISION_PRODUCTION_BUILD=true`: validates that the extension API URL is HTTPS and replaces the local host permission in the generated manifest.
+
+### Local container smoke test
+
+Run these commands from the repository root:
+
+```bash
+docker build -f backend/Dockerfile -t yourvision-backend:local .
+docker run --rm -p 3000:10000 -e PORT=10000 -e HOST=0.0.0.0 yourvision-backend:local
+curl --fail http://127.0.0.1:3000/health
+curl --fail http://127.0.0.1:3000/readyz
+```
+
+The container starts the API, but production code execution is deliberately **fail-closed**. Until a separately isolated execution worker is integrated and verified, `POST /visualize` returns HTTP 503 whenever `NODE_ENV=production`. Do not enable public code execution by removing this guard or by treating Docker alone as a sandbox.
+
+### Execution-isolation status — public launch blocker
+
+The current Java runner compiles and launches user-submitted Java in child processes under the backend container's OS identity. Its timeouts and output/trace limits do not provide OS-level isolation. The Render container setup is packaging and deployment reproducibility, not a sandbox.
+
+The API therefore disables visualization in production until an actual isolated-worker adapter is implemented. The required next step is to run the Java compiler/tracer in a separate restricted worker boundary with no access to API credentials, no unnecessary network access, per-execution filesystem isolation, CPU/memory/PID/wall-clock/output limits, and reliable process cleanup. The worker boundary must be tested with filesystem, network, fork-bomb, memory-exhaustion, timeout, and cross-request isolation cases before the production guard is lifted.
+
+### Extension production build
+
+Build the extension with the deployed API origin:
+
+```bash
+cd extension
+VITE_YOURVISION_API_URL=https://yourvision-backend.onrender.com YOURVISION_PRODUCTION_BUILD=true npm run build
+```
+
+The production build injects the API URL into the service worker and rewrites `dist/manifest.json` host permissions to allow that HTTPS origin while removing the localhost permission. For local development, omit these variables; requests continue to use `http://127.0.0.1:3000`.
+
+### Verification and benchmarks
+
+- Backend regressions: `cd backend && npm ci && npm test`.
+- Extension regressions/build: `cd extension && npm ci && npm test && npm run typecheck && npm run build`.
+- Container build and health checks: use the Docker smoke commands above.
+- Measure compile and trace latency separately; the current runner recompiles Java for each request. Record cold container startup, warm `/health`, warm `/readyz`, successful local visualization latency, peak memory, and CPU under concurrent requests.
+- No latency or cost numbers are claimed until the container and workload are actually run. Production visualization latency cannot be benchmarked until the isolated worker is integrated.
+

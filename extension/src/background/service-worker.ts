@@ -1,6 +1,8 @@
 import type { ExtensionRequest, ExtensionResponse } from '../types/messages';
 import type { VisualizationResponse } from '../types/trace';
 
+const BACKEND_BASE_URL = (import.meta.env.VITE_YOURVISION_API_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
+
 async function readLeetCodeJavaStarter(pageUrl: string): Promise<string> {
   const url = new URL(pageUrl);
   const match = url.pathname.match(/\/problems\/([^/]+)/);
@@ -78,7 +80,7 @@ chrome.runtime.onMessage.addListener((msg: ExtensionRequest | {type:'REVEAL_LINE
         sendResponse({ok:true}); return;
       }
       if (msg.type === 'RUN_DESIGN_VISUALIZATION') {
-        const res = await fetch('http://127.0.0.1:3000/visualize',{method:'POST',headers:{'content-type':'application/json'},body: JSON.stringify({
+        const res = await fetch('${BACKEND_BASE_URL}/visualize',{method:'POST',headers:{'content-type':'application/json'},body: JSON.stringify({
           language: 'java', source: msg.source, testcase: { mode: 'design', className: msg.className, constructorArguments: msg.constructorArguments, operations: msg.operations }
         })});
         const text = await res.text();
@@ -88,7 +90,7 @@ chrome.runtime.onMessage.addListener((msg: ExtensionRequest | {type:'REVEAL_LINE
         sendResponse({ok:true,data:responseData.execution ?? (data as VisualizationResponse)} satisfies ExtensionResponse); return;
       }
       if (msg.type === 'RUN_VISUALIZATION') {
-        const res = await fetch('http://127.0.0.1:3000/visualize',{method:'POST',headers:{'content-type':'application/json'},body: JSON.stringify({
+        const res = await fetch('${BACKEND_BASE_URL}/visualize',{method:'POST',headers:{'content-type':'application/json'},body: JSON.stringify({
     language: 'java',
     source: msg.source,
     testcase: {

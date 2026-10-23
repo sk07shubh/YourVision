@@ -69,3 +69,35 @@ jobs:
       - name: Build extension
         working-directory: extension
         run: npm run build
+
+  container-smoke:
+    name: Container build and smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Build backend container
+        run: docker build -f backend/Dockerfile -t yourvision-backend:ci .
+
+      - name: Start backend container
+        run: docker run -d --name yourvision-backend -p 10000:10000 -e NODE_ENV=production -e PORT=10000 -e HOST=0.0.0.0 yourvision-backend:ci
+
+      - name: Verify health and readiness
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail http://127.0.0.1:10000/health; then
+              break
+            fi
+            sleep 2
+          done
+          curl --fail http://127.0.0.1:10000/readyz
+          status=$(curl --silent --show-error --output /tmp/visualize-response.json --write-out '%{http_code}' -X POST http://127.0.0.1:10000/visualize -H 'content-type: application/json' --data '{"language":"java","source":"class Solution {}","testcase":{"method":"solve","arguments":[]}}')
+          test "$status" = "503"
+          grep -q 'EXECUTION_SANDBOX_UNAVAILABLE' /tmp/visualize-response.json
+
+      - name: Print logs and clean up
+        if: always()
+        run: |
+          docker logs yourvision-backend || true
+          docker rm -f yourvision-backend || true

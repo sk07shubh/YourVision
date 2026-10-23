@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: yourvision-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: MAX_CONCURRENT_EXECUTIONS
+        value: 2
+      - key: JSON_BODY_LIMIT
+        value: 256kb
