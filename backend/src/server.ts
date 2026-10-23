@@ -185,7 +185,7 @@ app.post("/visualize", async (req, res, next) => {
                     method: "POST",
                     headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
                     body: JSON.stringify({ language, source, testcase, runtimeSources }),
-                    signal: AbortSignal.timeout(25_000)
+                    signal: AbortSignal.timeout(115_000)
                 });
             } catch {
                 res.status(502).json({
