@@ -827,7 +827,7 @@ function moveVisualizeToEnd(
     ),
     ...[...region.querySelectorAll<HTMLButtonElement>('button')].filter(button =>
       button !== visualizeButton &&
-      /^case\\s+\\d+$/i.test((button.textContent ?? '').trim())
+      /^case\s+\d+$/i.test((button.textContent ?? '').trim())
     ),
   ].filter((button, index, all) => all.indexOf(button) === index);
 
