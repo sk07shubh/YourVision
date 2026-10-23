@@ -57,8 +57,6 @@ let tabDivider: HTMLElement | null =
 let visualizeButton:
   HTMLButtonElement | null = null;
 
-const resultVisualizeButtons = new Set<HTMLButtonElement>();
-
 let observer:
   MutationObserver | null = null;
 let hrefPollingInterval: number | null = null;
@@ -896,35 +894,6 @@ export function injectVisualizeButton(): boolean {
     moveVisualizeToEnd(region);
   }
 
-  const activeResultButtons = new Set<HTMLButtonElement>();
-  for (const panel of findTestResultContainers()) {
-    const resultRegion =
-      panel.querySelector<HTMLElement>('[data-yourvision-result-region="true"]') ??
-      [...panel.querySelectorAll<HTMLButtonElement>('[data-e2e-locator="console-testcase-tag"],button')]
-        .find(button => /^case\s+\d+$/i.test((button.textContent ?? '').trim()))?.parentElement ??
-      panel;
-
-    if (!resultRegion) continue;
-    resultRegion.dataset.yourvisionResultRegion = 'true';
-
-    const existingResult = resultRegion.querySelector<HTMLButtonElement>('[data-yourvision-result-visualize="true"]');
-    if (existingResult) {
-      activeResultButtons.add(existingResult);
-      continue;
-    }
-
-    const resultButton = createVisualizeButton(resultRegion,true);
-    if (resultButton) activeResultButtons.add(resultButton);
-  }
-
-  // Clear controls retained in hidden testcase/result tabs after LeetCode swaps
-  // the console view, including stale buttons left by a prior injection.
-  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-yourvision-result-visualize="true"]')) {
-    if (!activeResultButtons.has(button)) button.remove();
-  }
-  resultVisualizeButtons.clear();
-  for (const button of activeResultButtons) resultVisualizeButtons.add(button);
-
   return Boolean(visualizeButton);
 }
 
@@ -936,7 +905,6 @@ function cleanup() {
   tabButton = null;
   tabDivider = null;
   visualizeButton = null;
-  resultVisualizeButtons.clear();
 
   yourVisionActive =
     false;
