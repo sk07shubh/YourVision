@@ -1,3 +1,8 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { getJavaRuntimeSources, interpretRemoteJavaExecution } from "../src/execution/java/runner.js";
+
 const baseUrl = process.env.YV_EXECUTION_WORKER_URL?.trim().replace(/\/$/, "");
 const token = process.env.YV_EXECUTION_WORKER_TOKEN?.trim();
 
@@ -39,6 +44,7 @@ class Solution {
     }
 }`;
 
+const runtimeSources = await getJavaRuntimeSources();
 const response = await fetch(new URL("/visualize", baseUrl), {
     method: "POST",
     headers: {
@@ -48,17 +54,33 @@ const response = await fetch(new URL("/visualize", baseUrl), {
     body: JSON.stringify({
         language: "java",
         source,
-        testcase: { method: "verifySandbox", arguments: [] }
+        testcase: { method: "verifySandbox", arguments: [] },
+        runtimeSources
     }),
-    signal: AbortSignal.timeout(25_000)
+    signal: AbortSignal.timeout(115_000)
 });
 const payload = await response.json() as {
-    execution?: { kind?: string; result?: unknown; message?: string };
+    protocol?: string;
+    phase?: "compile" | "run";
+    stdout?: string;
+    stderr?: string;
+    exitCode?: number | null;
+    timedOut?: boolean;
     code?: string;
     message?: string;
 };
 assert(response.ok, `sandbox verification request failed with HTTP ${response.status}: ${payload.code ?? payload.message ?? "no details"}`);
-assert(payload.execution?.kind === "OK", `sandbox test did not execute successfully: ${payload.execution?.kind ?? payload.message ?? "unknown error"}`);
-assert(payload.execution.result === "true", `sandbox boundary assertion failed: ${String(payload.execution.result)}`);
+assert(payload.protocol === "yv-java-raw-v1" && payload.phase && typeof payload.stdout === "string" &&
+    typeof payload.stderr === "string" && typeof payload.timedOut === "boolean",
+    `worker returned an unexpected protocol: ${payload.message ?? "no details"}`);
+const execution = interpretRemoteJavaExecution(source, {
+    phase: payload.phase,
+    stdout: payload.stdout,
+    stderr: payload.stderr,
+    exitCode: payload.exitCode ?? null,
+    timedOut: payload.timedOut
+});
+assert(execution.kind === "OK", `sandbox test did not execute successfully: ${execution.kind} ${execution.message ?? ""}`);
+assert(execution.result === "true", `sandbox boundary assertion failed: ${String(execution.result)}`);
 
 console.log("PASS: deployed worker hides its bearer secret from Java, blocks system-file writes, and blocks outbound network access");
