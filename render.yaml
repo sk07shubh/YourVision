@@ -1,3 +1,4 @@
+# HEALTH-ONLY FALLBACK ONLY: arbitrary-code execution remains disabled on Render until a separately verified sandbox worker is integrated.
 services:
   - type: web
     name: yourvision-backend

@@ -28,7 +28,14 @@ class Solution {
         return parentSecretHidden && filesystemReadOnly && networkBlocked;
     }
 }`;
-const result = await runJava(source, { method: "verifySandbox", arguments: [] });
-assert(result.kind === "OK", `sandboxed Java execution failed: ${result.kind} ${result.message ?? ""} ${result.stderr}`);
-assert(result.result === "true", `sandbox boundary assertion failed: ${result.result}`);
-console.log("PASS: sandboxed Java cannot inherit parent environment, write system files, or access outbound network");
+const previousProbeSecret = process.env.YV_SANDBOX_PROBE_SECRET;
+process.env.YV_SANDBOX_PROBE_SECRET = "host-only-probe-secret";
+try {
+    const result = await runJava(source, { method: "verifySandbox", arguments: [] });
+    assert(result.kind === "OK", `sandboxed Java execution failed: ${result.kind} ${result.message ?? ""} ${result.stderr}`);
+    assert(result.result === "true", `sandbox boundary assertion failed: ${result.result}`);
+    console.log("PASS: sandboxed Java cannot inherit parent environment, write system files, or access outbound network");
+} finally {
+    if (previousProbeSecret === undefined) delete process.env.YV_SANDBOX_PROBE_SECRET;
+    else process.env.YV_SANDBOX_PROBE_SECRET = previousProbeSecret;
+}

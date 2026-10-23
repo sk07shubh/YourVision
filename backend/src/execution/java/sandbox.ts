@@ -73,7 +73,8 @@ async function runSandboxHealthCheck(): Promise<SandboxHealth> {
             tempDir
         ], {
             timeout: 8000,
-            maxBuffer: MAX_OUTPUT_BYTES
+            maxBuffer: MAX_OUTPUT_BYTES,
+            env: { ...process.env, YV_SANDBOX_PROBE_SECRET: "host-only-probe-secret" }
         });
         return {
             configured: true,

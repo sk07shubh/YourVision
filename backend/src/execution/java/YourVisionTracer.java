@@ -228,7 +228,7 @@ public class YourVisionTracer {
         );
 
         connectorArguments.get("options").setValue(
-            "-Xmx128m -XX:MaxMetaspaceSize=64m -XX:+UseSerialGC -cp " + quote(classpath)
+            "-Xmx128m -XX:MaxMetaspaceSize=64m -XX:+UseSerialGC -XX:-UsePerfData -Djava.io.tmpdir=" + quote(classpath) + " -cp " + quote(classpath)
         );
 
         VirtualMachine vm =

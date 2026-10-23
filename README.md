@@ -454,3 +454,60 @@ The free plan is suitable for a beta, not a production availability promise. Ren
 
 No reliable production cost-per-visualization estimate is available yet. It depends on actual request volume, CPU time, memory, bandwidth, build usage, and the sandbox design. Production visualization remains disabled until the isolated worker is implemented and security-tested.
 
+
+
+## Isolated execution deployment
+
+### Why the production target is Cloud Run Sandbox, not Render
+
+A real container smoke test showed that Bubblewrap cannot create the required mount namespace inside the Docker container (`bwrap: Failed to make / slave: Permission denied`). The API now fails closed if no supported sandbox is available. Do not enable Bubblewrap or remove the guard to make Render execution appear to work.
+
+The production deployment target for arbitrary submitted code is **Google Cloud Run with Cloud Run sandboxes enabled**. Cloud Run's sandbox launcher is a platform-provided isolation boundary: the sandbox does not inherit the parent workload's environment variables/secrets, and outbound network access is blocked by default. This feature is currently in Preview, so its availability and terms can change. See the [Cloud Run code-execution guide](https://docs.cloud.google.com/run/docs/code-execution) and [sandbox configuration for services](https://docs.cloud.google.com/run/docs/configuring/services/sandboxes).
+
+The backend invokes the platform's `/usr/local/gcp/bin/sandbox do` CLI for both compilation and tracing, mounting only the request's temporary working directory as writable. The compiler, tracer, and debuggee run inside the sandbox. The integration sets bounded JVM heaps, disables JVM perf-data files, applies wall-clock timeouts and output limits, and keeps service concurrency at one. The Cloud Run sandbox shares the service's allocated CPU and memory, so set appropriate limits and monitor resource use.
+
+### Deploy to Cloud Run
+
+Prerequisites: a Google Cloud project with billing enabled, Cloud Run and Cloud Build APIs enabled, the Cloud Run sandbox preview available to the project/region, and the Google Cloud CLI installed. This is not the time-limited trial runtime: ordinary Cloud Run usage is billed against its ongoing free-tier allowances and then at published rates, so configure budget alerts and review billing before exposing the endpoint.
+
+From the repository root, set your project ID and create an Artifact Registry repository in a region you intend to use:
+
+```bash
+gcloud config set project PROJECT_ID
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com
+gcloud artifacts repositories create yourvision --repository-format=docker --location=asia-south1
+gcloud builds submit --tag asia-south1-docker.pkg.dev/PROJECT_ID/yourvision/yourvision-backend:latest --file backend/Dockerfile .
+gcloud beta run deploy yourvision-backend --image asia-south1-docker.pkg.dev/PROJECT_ID/yourvision/yourvision-backend:latest --region asia-south1 --platform managed --allow-unauthenticated --sandbox-launcher --port 8080 --memory 1Gi --cpu 1 --concurrency 1 --timeout 30 --max 3 --set-env-vars NODE_ENV=production,YV_EXECUTION_SANDBOX=cloud-run,MAX_CONCURRENT_EXECUTIONS=1,JSON_BODY_LIMIT=256kb
+```
+
+Replace `PROJECT_ID` before running. The command creates cloud resources and can incur charges; inspect the project, quotas, and budget before executing it. Do not paste credentials into chat.
+
+After deployment, copy the service's HTTPS URL and verify:
+
+```bash
+curl --fail https://YOUR_CLOUD_RUN_URL/health
+curl --fail https://YOUR_CLOUD_RUN_URL/readyz
+```
+
+Only proceed if `/readyz` reports `sandbox.available: true`. Then run the sandbox integration smoke test from a Cloud Run-enabled build/container where the sandbox launcher is available:
+
+```node
+node dist/scripts/smoke-execution-sandbox.js
+```
+
+That test verifies the sandbox can compile and trace a Java method, cannot write system files, does not inherit a host-only environment sentinel, and cannot connect to an external network address. A successful local Docker build alone does not verify Cloud Run's platform sandbox; the real readiness probe and smoke test must pass after deployment.
+
+### Extension URL
+
+Build the extension against the Cloud Run HTTPS URL:
+
+```bash
+cd extension
+VITE_YOURVISION_API_URL=https://YOUR_CLOUD_RUN_URL YOURVISION_PRODUCTION_BUILD=true npm run build
+```
+
+The production build adds the Cloud Run origin to the extension's host permissions and removes localhost access. Load the resulting `extension/dist` in Chrome for the first end-to-end test. Do not publish the extension until the live sandbox smoke test passes.
+
+### Render status
+
+`render.yaml` is retained only as a non-executing fallback. Render does not provide the Cloud Run sandbox launcher, and the tested Bubblewrap route failed inside the container. A production Render deployment therefore intentionally returns HTTP 503 from `/visualize` unless a separately verified sandbox worker is integrated. Do not deploy Render as the public Java execution backend in its current configuration.

@@ -468,7 +468,7 @@ await fs.writeFile(
                     runtimePath,
                     tracerPath
                 ];
-            compileArgs.unshift("-J-Xmx192m", "-J-XX:MaxMetaspaceSize=96m", "-J-XX:+UseSerialGC");
+            compileArgs.unshift("-J-Xmx192m", "-J-XX:MaxMetaspaceSize=96m", "-J-XX:+UseSerialGC", `-J-Djava.io.tmpdir=${tempDir}`);
             const compileCommand = sandboxCommand("/usr/bin/javac", compileArgs, tempDir);
             await execFileAsync(
                 compileCommand.command,
@@ -526,6 +526,8 @@ await fs.writeFile(
             "-Xmx128m",
             "-XX:MaxMetaspaceSize=64m",
             "-XX:+UseSerialGC",
+            "-XX:-UsePerfData",
+            `-Djava.io.tmpdir=${tempDir}`,
             "--add-modules",
             "jdk.jdi",
             "-cp",
