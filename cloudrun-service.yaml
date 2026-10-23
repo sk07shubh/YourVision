@@ -1,7 +1,7 @@
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
-  name: yourvision-backend
+  name: yourvision-execution-worker
   annotations:
     run.googleapis.com/launch-stage: BETA
 spec:
@@ -27,6 +27,13 @@ spec:
               value: production
             - name: YV_EXECUTION_SANDBOX
               value: cloud-run
+            - name: YV_EXECUTION_WORKER_MODE
+              value: "true"
+            - name: YV_EXECUTION_WORKER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: yourvision-execution-worker-token
             - name: MAX_CONCURRENT_EXECUTIONS
               value: "1"
             - name: JSON_BODY_LIMIT
