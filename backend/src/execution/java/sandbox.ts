@@ -88,12 +88,15 @@ async function runSandboxHealthCheck(): Promise<SandboxHealth> {
             mode: "bubblewrap",
             message: "Read-only filesystem, isolated temporary directory, and network namespace probe passed."
         };
-    } catch {
+    } catch (error) {
+        const detail = error && typeof error === "object" && "stderr" in error && typeof error.stderr === "string"
+            ? error.stderr.trim().slice(0, 240)
+            : error instanceof Error ? error.message.slice(0, 240) : "unknown sandbox error";
         return {
             configured: true,
             available: false,
             mode: "bubblewrap",
-            message: "The bubblewrap namespace probe failed; execution is disabled."
+            message: `The bubblewrap namespace probe failed; execution is disabled. ${detail}`
         };
     } finally {
         if (tempDir) await fs.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);

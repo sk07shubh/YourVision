@@ -15,7 +15,6 @@ ENV PORT=10000
 ENV HOST=0.0.0.0
 ENV MAX_CONCURRENT_EXECUTIONS=2
 ENV JSON_BODY_LIMIT=256kb
-ENV YV_EXECUTION_SANDBOX=bubblewrap
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends openjdk-17-jdk-headless bubblewrap util-linux ca-certificates \

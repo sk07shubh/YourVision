@@ -14,5 +14,3 @@ services:
         value: 2
       - key: JSON_BODY_LIMIT
         value: 256kb
-      - key: YV_EXECUTION_SANDBOX
-        value: bubblewrap

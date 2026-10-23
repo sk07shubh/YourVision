@@ -90,7 +90,7 @@ jobs:
         run: docker build -f backend/Dockerfile -t yourvision-backend:ci .
 
       - name: Start backend container
-        run: docker run -d --name yourvision-backend -p 10000:10000 -e NODE_ENV=production -e PORT=10000 -e HOST=0.0.0.0 -e YV_EXECUTION_SANDBOX=bubblewrap yourvision-backend:ci
+        run: docker run --security-opt seccomp=unconfined -d --name yourvision-backend -p 10000:10000 -e NODE_ENV=production -e PORT=10000 -e HOST=0.0.0.0 -e YV_EXECUTION_SANDBOX=bubblewrap yourvision-backend:ci
 
       - name: Verify health and readiness
         run: |
@@ -100,7 +100,8 @@ jobs:
             fi
             sleep 2
           done
-          ready=$(curl --fail --silent http://127.0.0.1:10000/readyz)
+          ready=$(curl --silent http://127.0.0.1:10000/readyz)
+          printf '%s\n' "$ready"
           printf '%s' "$ready" | grep -q '"available":true'
           status=$(curl --silent --show-error --output /tmp/visualize-response.json --write-out '%{http_code}' -X POST http://127.0.0.1:10000/visualize -H 'content-type: application/json' --data '{"language":"java","source":"class Solution { public int sum(int[] nums) { int total=0; for (int n : nums) total += n; return total; } }","testcase":{"method":"sum","arguments":["[1,2,3,4]"]}}')
           test "$status" = "200"
@@ -112,7 +113,7 @@ jobs:
           docker logs yourvision-backend
           docker rm -f yourvision-backend
           started=$(date +%s%N)
-          docker run -d --name yourvision-benchmark -p 10000:10000 -e NODE_ENV=development -e PORT=10000 -e HOST=0.0.0.0 -e YV_EXECUTION_SANDBOX=bubblewrap yourvision-backend:ci
+          docker run --security-opt seccomp=unconfined -d --name yourvision-benchmark -p 10000:10000 -e NODE_ENV=development -e PORT=10000 -e HOST=0.0.0.0 -e YV_EXECUTION_SANDBOX=bubblewrap yourvision-backend:ci
           for attempt in $(seq 1 30); do
             if curl --fail --silent http://127.0.0.1:10000/health; then
               break
