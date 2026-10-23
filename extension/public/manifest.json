@@ -9,6 +9,7 @@
   ],
   "host_permissions": [
     "https://leetcode.com/*",
+    "https://your-vision-ten.vercel.app/*",
     "http://127.0.0.1:3000/*"
   ],
   "background": {
