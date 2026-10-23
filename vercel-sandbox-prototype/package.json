@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node smoke.mjs"
+    "test": "node smoke.mjs",
+    "test:syntax": "node --check smoke.mjs && node --check api/visualize.mjs && node --check api/readyz.mjs"
   },
   "dependencies": {
     "@vercel/sandbox": "^3.9.0"
