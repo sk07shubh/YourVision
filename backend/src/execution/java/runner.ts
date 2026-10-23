@@ -277,6 +277,89 @@ function declaresType(source: string, typeName: string): boolean {
         .replace(/\/\/[^\r\n]*/g, " ");
     return new RegExp("\\bclass\\s+" + typeName + "\\b").test(code);
 }
+export async function getJavaRuntimeSources(): Promise<Record<string, string>> {
+    const entries = [
+        ["YourVisionRuntime.java", RUNTIME_FILE],
+        ["YourVisionTracer.java", TRACER_FILE],
+        ["LeetCodeListNode.java", LIST_NODE_FILE],
+        ["LeetCodeTreeNode.java", TREE_NODE_FILE],
+        ["LeetCodeGraphNode.java", GRAPH_NODE_FILE]
+    ] as const;
+    const sources: Record<string, string> = {};
+    for (const [name, file] of entries) sources[name] = await fs.readFile(file, "utf8");
+    return sources;
+}
+
+export interface RemoteJavaExecutionOutput {
+    phase: "compile" | "run";
+    stdout: string;
+    stderr: string;
+    exitCode: number | null;
+    timedOut: boolean;
+}
+
+export function interpretRemoteJavaExecution(
+    source: string,
+    output: RemoteJavaExecutionOutput
+): JavaExecutionResult {
+    if (output.phase === "compile") {
+        return {
+            success: false,
+            kind: output.timedOut ? "TIMEOUT" : "COMPILATION_ERROR",
+            stdout: output.stdout,
+            stderr: output.stderr,
+            message: output.timedOut ? "Java compilation timed out" : "Java compilation failed"
+        };
+    }
+
+    const trace = parseTrace(output.stdout, source);
+    const states = buildStates(trace);
+    if (output.timedOut) {
+        const lastSequence = trace.events.at(-1)?.sequence ?? 0;
+        if (!trace.events.some(event => event.type === "TRACE_LIMIT")) {
+            const timeoutEvent: ExecutionEvent = {
+                sequence: lastSequence + 1,
+                type: "TIMEOUT",
+                data: { message: "Java execution exceeded 15000 ms" }
+            };
+            if (trace.events.length >= MAX_TRACE_EVENTS) trace.events[MAX_TRACE_EVENTS - 1] = timeoutEvent;
+            else trace.events.push(timeoutEvent);
+        }
+        return {
+            success: false, kind: "TIMEOUT", stdout: output.stdout, stderr: output.stderr,
+            message: "Java execution exceeded 15000 ms", trace, states: buildStates(trace)
+        };
+    }
+
+    const resultMarker = output.stdout.split(/\r?\n/).find(line => line.startsWith("__YV_RESULT__="));
+    if (output.exitCode !== 0 || resultMarker === undefined) {
+        const errorType = extractMarker(output.stderr, "__YV_EXCEPTION_TYPE__=");
+        const message = extractMarker(output.stderr, "__YV_EXCEPTION_MESSAGE__=");
+        return {
+            success: false,
+            kind: errorType ? "RUNTIME_ERROR" : "HARNESS_ERROR",
+            stdout: output.stdout,
+            stderr: output.stderr,
+            ...(errorType ? { errorType } : {}),
+            message: message || (output.stderr.trim()
+                ? `Java tracer failed: ${output.stderr.trim().split(/\r?\n/).slice(-8).join(" | ")}`
+                : "Java execution ended before the runtime emitted its final result marker."),
+            trace, states
+        };
+    }
+    if (trace.events.some(event => event.type === "TRACE_LIMIT")) {
+        return {
+            success: false, kind: "TIMEOUT", stdout: output.stdout, stderr: output.stderr,
+            message: "Java execution exceeded trace event limit", trace, states
+        };
+    }
+    return {
+        success: true, kind: "OK",
+        result: resultMarker.slice("__YV_RESULT__=".length),
+        stdout: output.stdout, stderr: output.stderr, trace, states
+    };
+}
+
 export async function runJava(
     source: string,
     testcase?: JavaTestcase
