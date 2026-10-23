@@ -5,6 +5,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
+import { checkExecutionSandbox, isSandboxConfigured } from "./execution/java/sandbox.js";
 
 const CHROME_EXTENSION_ORIGIN = /^chrome-extension:\/\/[a-p]{32}$/;
 const execFileAsync = promisify(execFile);
@@ -50,25 +51,32 @@ app.get("/readyz", async (_req, res) => {
         checks.jdi = stdout.split("\n").some(line => line.startsWith("jdk.jdi@"));
     } catch { /* Keep readiness responses free of process output. */ }
 
-    const ready = checks.java && checks.javac && checks.jdi;
+    const sandbox = await checkExecutionSandbox();
+    const productionSandboxReady = process.env.NODE_ENV !== "production" ||
+        (isSandboxConfigured() && sandbox.available);
+    const ready = checks.java && checks.javac && checks.jdi && productionSandboxReady;
     res.status(ready ? 200 : 503).json({
         status: ready ? "ready" : "not_ready",
         dependencies: checks,
-        executionEnabled: process.env.NODE_ENV !== "production",
+        sandbox,
+        executionEnabled: process.env.NODE_ENV !== "production" || (isSandboxConfigured() && sandbox.available),
         executionNote: process.env.NODE_ENV === "production"
-            ? "Execution is fail-closed until a separately isolated execution worker is integrated."
+            ? "Production execution requires a passing bubblewrap namespace-isolation probe."
             : "Local execution mode; do not expose this service to untrusted public traffic."
     });
 });
 
 app.post("/visualize", async (req, res, next) => {
     if (process.env.NODE_ENV === "production") {
-        res.status(503).json({
-            success: false,
-            code: "EXECUTION_SANDBOX_UNAVAILABLE",
-            message: "Code execution is temporarily unavailable until the isolated execution worker is configured."
-        });
-        return;
+        const sandbox = await checkExecutionSandbox();
+        if (!isSandboxConfigured() || !sandbox.available) {
+            res.status(503).json({
+                success: false,
+                code: "EXECUTION_SANDBOX_UNAVAILABLE",
+                message: "Code execution is unavailable because the production sandbox is not ready."
+            });
+            return;
+        }
     }
 
     if (activeExecutions >= MAX_CONCURRENT_EXECUTIONS) {

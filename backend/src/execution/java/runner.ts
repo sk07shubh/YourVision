@@ -5,6 +5,7 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import { fileURLToPath } from "url";
+import { isSandboxConfigured, sandboxCommand } from "./sandbox.js";
 import type { ExecutionTrace, ExecutionEvent, TraceState } from "../trace/schema.js";
 import { buildStates } from "../trace/stateBuilder.js";
 import { enrichTrace } from "../trace/enrichTrace.js";
@@ -22,6 +23,7 @@ const execFileAsync = promisify(execFile);
  */
 function runJavaTracer(
     args: string[],
+    workDir: string,
     timeoutMs = JAVA_EXECUTION_TIMEOUT_MS
 ): Promise<{ stdout: string; stderr: string }> {
     return new Promise((resolve, reject) => {
@@ -278,6 +280,16 @@ export async function runJava(
     testcase?: JavaTestcase
 ): Promise<JavaExecutionResult> {
 
+    if (process.env.NODE_ENV === "production" && !isSandboxConfigured()) {
+        return {
+            success: false,
+            kind: "HARNESS_ERROR",
+            stdout: "",
+            stderr: "",
+            message: "Production Java execution requires the configured bubblewrap sandbox."
+        };
+    }
+
     const designMode = testcase?.mode === "design";
     if (!testcase || (!designMode &&
         (typeof testcase.method !== "string" || testcase.method.trim() === "")) ||
@@ -435,9 +447,7 @@ await fs.writeFile(
             );
         }
         try {
-            await execFileAsync(
-                "javac",
-                [
+            const compileArgs = [
                     "--add-modules",
                     "jdk.jdi",
                     "-g",
@@ -455,12 +465,17 @@ await fs.writeFile(
                         : [path.join(tempDir, "LeetCodeGraphNode.java")]),
                     runtimePath,
                     tracerPath
-                ],
+                ];
+            compileArgs.unshift("-J-Xmx192m", "-J-XX:MaxMetaspaceSize=96m", "-J-XX:+UseSerialGC");
+            const compileCommand = sandboxCommand("javac", compileArgs, tempDir);
+            await execFileAsync(
+                compileCommand.command,
+                compileCommand.args,
                 {
                     // CI runners can be slower when several Java corpus cases compile in sequence.
                     timeout: 20000,
-                    maxBuffer:
-                        1024 * 1024
+                    maxBuffer: 1024 * 1024,
+                    env: isSandboxConfigured() ? { PATH: "/usr/bin:/bin" } : process.env
                 }
             );
         } catch (error: any) {
@@ -506,6 +521,9 @@ await fs.writeFile(
             ];
 
         const childArguments = [
+            "-Xmx128m",
+            "-XX:MaxMetaspaceSize=64m",
+            "-XX:+UseSerialGC",
             "--add-modules",
             "jdk.jdi",
             "-cp",
@@ -522,7 +540,7 @@ await fs.writeFile(
                 stdout,
                 stderr
             } =
-                await runJavaTracer(childArguments, designMode ? 15000 : JAVA_EXECUTION_TIMEOUT_MS);
+                await runJavaTracer(childArguments, tempDir, designMode ? 15000 : JAVA_EXECUTION_TIMEOUT_MS);
             const trace =
                 parseTrace(stdout, source);
 
