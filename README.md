@@ -425,5 +425,32 @@ The production build injects the API URL into the service worker and rewrites `d
 - Extension regressions/build: `cd extension && npm ci && npm test && npm run typecheck && npm run build`.
 - Container build and health checks: use the Docker smoke commands above.
 - Measure compile and trace latency separately; the current runner recompiles Java for each request. Record cold container startup, warm `/health`, warm `/readyz`, successful local visualization latency, peak memory, and CPU under concurrent requests.
-- No latency or cost numbers are claimed until the container and workload are actually run. Production visualization latency cannot be benchmarked until the isolated worker is integrated.
+#### Initial CI benchmark (2026-10-23)
+
+One GitHub-hosted Linux runner run, Docker image already built, Java execution in development mode. These are baseline measurements, not a Render performance guarantee:
+
+| Measurement | Observed |
+|---|---:|
+| Local container start to first healthy response | 2.203 s |
+| Warm `/health` response | 1.16 ms |
+| Warm `/readyz` dependency checks | 246 ms |
+| First Java compile + trace request | 2.131 s |
+| Second Java compile + trace request | 2.102 s |
+| Container memory snapshot after the requests | 106.7 MiB |
+| Instantaneous CPU snapshot after the requests | 0.13% |
+
+This was a single low-concurrency sample on a runner with substantially more memory than Render Free. The memory value is a post-request snapshot, not peak memory. Render cold-start latency, peak Java memory, concurrent-request performance, and real billing must be measured on the deployed service before production decisions.
+
+#### Render cost envelope (estimate, not a bill quote)
+
+Based on [Render's current pricing page](https://render.com/pricing) and [Free instance limitations](https://render.com/docs/free):
+
+| Plan | Monthly service cost | Relevant limit |
+|---|---:|---|
+| Free web service | $0 | 512 MB RAM, 0.1 CPU, 750 free instance-hours per workspace/month; spins down after 15 minutes idle |
+| Starter web service | $7/month | 512 MB RAM, 0.5 CPU; does not spin down from free-tier inactivity |
+
+The free plan is suitable for a beta, not a production availability promise. Render documents that if a payment method is attached, overages for some workspace-level usage can be billed; without a payment method, services/builds may instead be suspended when certain included limits are exceeded. Check your workspace billing and usage limits before deployment. The $7 plan estimate covers only the web service, not any future isolated execution worker or other add-ons.
+
+No reliable production cost-per-visualization estimate is available yet. It depends on actual request volume, CPU time, memory, bandwidth, build usage, and the sandbox design. Production visualization remains disabled until the isolated worker is implemented and security-tested.
 
