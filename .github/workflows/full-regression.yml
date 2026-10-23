@@ -26,8 +26,8 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
-      - name: Validate Vercel Sandbox proof script
-        run: node --check vercel-sandbox-prototype/smoke.mjs
+      - name: Validate Vercel Sandbox proof and API scripts
+        run: npm --prefix vercel-sandbox-prototype run test:syntax
 
       - name: Setup Java
         uses: actions/setup-java@v5
