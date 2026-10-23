@@ -1,0 +1,11 @@
+{
+  "rewrites": [
+    { "source": "/visualize", "destination": "/api/visualize" },
+    { "source": "/readyz", "destination": "/api/readyz" }
+  ],
+  "functions": {
+    "api/visualize.mjs": {
+      "maxDuration": 120
+    }
+  }
+}
