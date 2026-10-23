@@ -123,7 +123,7 @@ jobs:
           curl --silent --show-error --output /dev/null --write-out 'warm_readiness_seconds=%{time_total}\n' http://127.0.0.1:10000/readyz
           printf '%s' '{"language":"java","source":"class Solution { public int sum(int[] nums) { int total=0; for (int n : nums) total += n; return total; } }","testcase":{"method":"sum","arguments":["[1,2,3,4]"]}}' > /tmp/yourvision-benchmark.json
           for attempt in 1 2; do
-            curl --silent --show-error --output "/tmp/visualization-$attempt.json" --write-out "java_visualization_$attempt_seconds=%{time_total}\n" -X POST http://127.0.0.1:10000/visualize -H 'content-type: application/json' --data-binary @/tmp/yourvision-benchmark.json
+            curl --silent --show-error --output "/tmp/visualization-$attempt.json" --write-out "java_visualization_${attempt}_seconds=%{time_total}\n" -X POST http://127.0.0.1:10000/visualize -H 'content-type: application/json' --data-binary @/tmp/yourvision-benchmark.json
             node -e "const r=require(process.argv[1]); if (r.execution?.kind !== 'OK' || r.execution?.result !== '10') { console.error(r); process.exit(1); }" "/tmp/visualization-$attempt.json"
           done
           docker stats --no-stream --format 'container_memory={{.MemUsage}} cpu={{.CPUPerc}}' yourvision-benchmark
