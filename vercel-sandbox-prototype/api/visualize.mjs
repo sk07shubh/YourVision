@@ -138,24 +138,15 @@ export default async function handler(req, res) {
       options.teamId = process.env.VERCEL_TEAM_ID;
       options.projectId = process.env.VERCEL_PROJECT_ID;
     }
-    let usedConfiguredImage = Boolean(configuredImage);
-    try {
-      sandbox = await Sandbox.create(options);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "";
-      if (!configuredImage || !/image not found/i.test(message)) throw error;
-      delete options.image;
-      usedConfiguredImage = false;
-      console.warn("[YourVision worker] configured sandbox image not found; retrying with the default image");
-      sandbox = await Sandbox.create(options);
+    if (!configuredImage) {
+      return response(res, 503, {
+        success: false,
+        code: "SANDBOX_IMAGE_NOT_CONFIGURED",
+        message: "The Java sandbox image is not configured. Configure YV_SANDBOX_IMAGE with a published Java 21 image before enabling execution.",
+      });
     }
-    if (!usedConfiguredImage) {
-      startStage("java.provision");
-      const install = await sandbox.runCommand({ cmd: "sh", args: ["-lc", "apt-get update && apt-get install -y openjdk-21-jdk-headless"], sudo: true });
-      if (install.exitCode !== 0) {
-        return response(res, 503, { success: false, code: "SANDBOX_JDK_UNAVAILABLE", message: "Could not provision the Java runtime inside the isolated sandbox." });
-      }
-    }
+    sandbox = await Sandbox.create(options);
+    const usedConfiguredImage = true;
     startStage("sandbox.network-policy");
     await sandbox.update({ networkPolicy: "deny-all" });
     startStage("sandbox.workspace-home");
