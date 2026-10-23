@@ -476,7 +476,7 @@ From the repository root, set your project ID and create an Artifact Registry re
 gcloud config set project PROJECT_ID
 gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com
 gcloud artifacts repositories create yourvision --repository-format=docker --location=asia-south1
-gcloud builds submit --tag asia-south1-docker.pkg.dev/PROJECT_ID/yourvision/yourvision-backend:latest --file backend/Dockerfile .
+gcloud builds submit --config cloudbuild.yaml --substitutions=_IMAGE=asia-south1-docker.pkg.dev/PROJECT_ID/yourvision/yourvision-backend:latest .
 gcloud beta run deploy yourvision-backend --image asia-south1-docker.pkg.dev/PROJECT_ID/yourvision/yourvision-backend:latest --region asia-south1 --platform managed --allow-unauthenticated --sandbox-launcher --port 8080 --memory 1Gi --cpu 1 --concurrency 1 --timeout 30 --max 3 --set-env-vars NODE_ENV=production,YV_EXECUTION_SANDBOX=cloud-run,MAX_CONCURRENT_EXECUTIONS=1,JSON_BODY_LIMIT=256kb
 ```
 
