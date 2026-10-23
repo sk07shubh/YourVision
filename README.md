@@ -508,11 +508,16 @@ Render receives `YV_EXECUTION_WORKER_URL` and `YV_EXECUTION_WORKER_TOKEN` as pri
 
 ### Isolation verification gate
 
-Run the worker integration smoke test against the deployed sandbox-enabled worker before exposing the extension to users:
+Run the HTTP integration test against the actual deployed worker before exposing the extension to users. This sends a real Java test through the authenticated worker endpoint and verifies that the worker's bearer token is invisible to submitted code, system files are not writable, and outbound network access is blocked:
 
 ```bash
-gcloud run services proxy yourvision-execution-worker --region asia-south1
+export YV_EXECUTION_WORKER_URL=https://YOUR_WORKER_URL
+export YV_EXECUTION_WORKER_TOKEN="$(gcloud secrets versions access latest --secret=yourvision-execution-worker-token)"
+cd backend
+npm ci
+npm run test:execution-worker-http
+unset YV_EXECUTION_WORKER_TOKEN
 ```
 
-Then from a Cloud Run-enabled build/container where the sandbox launcher is available, run `node dist/scripts/smoke-execution-sandbox.js`. The test checks that host environment secrets are not visible to submitted code, the system filesystem is not writable, and outbound network connections are blocked. A passing Render health check alone is not proof of execution isolation. The actual platform-level sandbox test has not yet run because no cloud service has been deployed.
+The test must pass against the deployed Cloud Run service before connecting the extension. A passing Render health check alone is not proof of execution isolation. The platform-level test remains unverified until this command has been run against a real deployment.
 
