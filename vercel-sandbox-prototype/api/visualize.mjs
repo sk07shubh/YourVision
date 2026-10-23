@@ -111,6 +111,7 @@ export default async function handler(req, res) {
   }
 
   let sandbox;
+  let failureStage = "sandbox.create";
   try {
     const options = {
       timeout: 180_000,
@@ -129,15 +130,19 @@ export default async function handler(req, res) {
     }
     sandbox = await Sandbox.create(options);
     if (!process.env.YV_SANDBOX_IMAGE?.trim()) {
+      failureStage = "java.provision";
       const install = await sandbox.runCommand({ cmd: "sh", args: ["-lc", "apt-get update && apt-get install -y openjdk-21-jdk-headless"], sudo: true });
       if (install.exitCode !== 0) {
         return response(res, 503, { success: false, code: "SANDBOX_JDK_UNAVAILABLE", message: "Could not provision the Java runtime inside the isolated sandbox." });
       }
     }
+    failureStage = "sandbox.network-policy";
     await sandbox.update({ networkPolicy: "deny-all" });
+    failureStage = "sandbox.workspace-home";
     const home = await sandbox.runCommand({ cmd: "sh", args: ["-lc", "printf %s \"$HOME\""] });
     const homeResult = await readCommand(home);
     const workspace = `${homeResult.stdout.trim()}/yourvision-run`;
+    failureStage = "sandbox.workspace-create";
     await sandbox.mkDir(workspace);
 
     const source = prepareSource(body.source);
@@ -148,12 +153,14 @@ export default async function handler(req, res) {
       if (name === "LeetCodeGraphNode.java" && declaresType(source, "Node")) continue;
       files.push({ name, content: body.runtimeSources[name] });
     }
+    failureStage = "sandbox.write-files";
     await sandbox.writeFiles(files.map(({ name, content }) => ({
       path: `${workspace}/${name}`,
       content: Buffer.from(content, "utf8"),
     })));
 
     const compileNames = files.map((file) => file.name);
+    failureStage = "java.compile";
     const compile = await sandbox.runCommand({
       cmd: "timeout",
       args: ["20s", "javac", "-J-Xmx192m", "-J-XX:MaxMetaspaceSize=96m", "-J-XX:+UseSerialGC",
@@ -166,6 +173,7 @@ export default async function handler(req, res) {
     }
 
     const className = body.testcase.mode === "design" ? body.testcase.className : "Solution";
+    failureStage = "java.execute";
     const run = await sandbox.runCommand({
       cmd: "timeout",
       args: ["15s", "java", "-Xmx128m", "-XX:MaxMetaspaceSize=64m", "-XX:+UseSerialGC", "-XX:-UsePerfData",
@@ -176,6 +184,13 @@ export default async function handler(req, res) {
     const execution = await readCommand(run);
     return response(res, 200, { protocol: "yv-java-raw-v1", phase: "run", ...execution });
   } catch (error) {
+    const errorName = error instanceof Error && /^[A-Za-z][A-Za-z0-9]*Error$/.test(error.name)
+      ? error.name
+      : "UnknownError";
+    console.error("[YourVision worker] sandbox request failed", {
+      stage: failureStage,
+      errorName,
+    });
     return response(res, 503, {
       success: false,
       code: "VERCEL_SANDBOX_FAILED",
