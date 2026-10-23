@@ -85,7 +85,10 @@ app.get("/readyz", async (_req, res) => {
         : await checkExecutionSandbox();
     const productionExecutionReady = process.env.NODE_ENV !== "production" ||
         (workerUrl ? Boolean(getExecutionWorkerToken()) && workerReady : isSandboxConfigured() && sandbox.available);
-    const ready = checks.java && checks.javac && checks.jdi && productionExecutionReady;
+    const localRuntimeReady = checks.java && checks.javac && checks.jdi;
+    const ready = process.env.NODE_ENV === "production" && workerUrl
+        ? productionExecutionReady
+        : localRuntimeReady && productionExecutionReady;
     res.status(ready ? 200 : 503).json({
         status: ready ? "ready" : "not_ready",
         dependencies: checks,
