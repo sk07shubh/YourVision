@@ -1,7 +1,7 @@
 import type { ExtensionRequest, ExtensionResponse } from '../types/messages';
 import type { VisualizationResponse } from '../types/trace';
 
-const BACKEND_BASE_URL = (import.meta.env.VITE_YOURVISION_API_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
+const BACKEND_BASE_URL = (import.meta.env.VITE_YOURVISION_API_URL || 'https://your-vision-ten.vercel.app').replace(/\/$/, '');
 
 async function readLeetCodeJavaStarter(pageUrl: string): Promise<string> {
   const url = new URL(pageUrl);
