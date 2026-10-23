@@ -1,8 +1,8 @@
-import { readFile } from "node:fs/promises";
 import { getJavaRuntimeSources, interpretRemoteJavaExecution } from "../src/execution/java/runner.js";
 
 const baseUrl = process.env.YV_EXECUTION_WORKER_URL?.trim().replace(/\/$/, "");
 const token = process.env.YV_EXECUTION_WORKER_TOKEN?.trim();
+const bypassSecret = process.env.YV_WORKER_VERCEL_BYPASS_SECRET?.trim();
 
 function assert(condition: boolean, message: string): asserts condition {
     if (!condition) throw new Error(message);
@@ -10,8 +10,10 @@ function assert(condition: boolean, message: string): asserts condition {
 
 assert(typeof baseUrl === "string" && /^https:\/\//.test(baseUrl), "Set YV_EXECUTION_WORKER_URL to the deployed worker HTTPS URL");
 assert(typeof token === "string" && token.length > 0, "Set YV_EXECUTION_WORKER_TOKEN to the worker bearer token");
+assert(typeof bypassSecret === "string" && bypassSecret.length > 0, "Set YV_WORKER_VERCEL_BYPASS_SECRET to the worker deployment protection bypass secret");
 
 const readinessResponse = await fetch(new URL("/readyz", baseUrl), {
+    headers: { "x-vercel-protection-bypass": bypassSecret },
     signal: AbortSignal.timeout(8000)
 });
 assert(readinessResponse.ok, `execution worker readiness failed with HTTP ${readinessResponse.status}`);
@@ -47,7 +49,8 @@ const response = await fetch(new URL("/visualize", baseUrl), {
     method: "POST",
     headers: {
         "content-type": "application/json",
-        authorization: `Bearer ${token}`
+        authorization: `Bearer ${token}`,
+        "x-vercel-protection-bypass": bypassSecret
     },
     body: JSON.stringify({
         language: "java",
