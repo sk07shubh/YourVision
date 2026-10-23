@@ -68,7 +68,7 @@ const payload = await response.json() as {
     message?: string;
 };
 assert(response.ok, `sandbox verification request failed with HTTP ${response.status}: ${payload.code ?? payload.message ?? "no details"}`);
-assert(payload.protocol === "yv-java-raw-v1" && payload.phase && typeof payload.stdout === "string" &&
+assert(payload.protocol === "yv-java-raw-v1" && (payload.phase === "compile" || payload.phase === "run") && typeof payload.stdout === "string" &&
     typeof payload.stderr === "string" && typeof payload.timedOut === "boolean",
     `worker returned an unexpected protocol: ${payload.message ?? "no details"}`);
 const execution = interpretRemoteJavaExecution(source, {
