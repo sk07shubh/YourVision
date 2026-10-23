@@ -833,8 +833,8 @@ function moveVisualizeToEnd(
     ].join(' ').toLowerCase();
 
     return text === '+' ||
-      /(?:add|new|create)[^\\n]*(?:test ?case|case)/i.test(label) ||
-      /(?:test ?case|case)[^\\n]*(?:add|new|create)/i.test(label);
+      /(?:add|new|create).*(?:test ?case|case)/i.test(label) ||
+      /(?:test ?case|case).*(?:add|new|create)/i.test(label);
   });
 
   if (addControl) {
