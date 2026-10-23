@@ -1,0 +1,11 @@
+{
+  "name": "yourvision-vercel-sandbox-prototype",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node smoke.mjs"
+  },
+  "dependencies": {
+    "@vercel/sandbox": "^3.9.0"
+  }
+}
