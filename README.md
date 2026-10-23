@@ -386,7 +386,7 @@ The backend container is built from the repository root with `backend/Dockerfile
 - `NODE_ENV`: set to `production` on Render.
 - `MAX_CONCURRENT_EXECUTIONS`: in-process concurrency cap (default 2).
 - `JSON_BODY_LIMIT`: request body limit (default `256kb`).
-- `VITE_YOURVISION_API_URL`: production extension build-time URL, e.g. `https://yourvision-backend.onrender.com`.
+- `VITE_YOURVISION_API_URL`: production extension build-time URL, e.g. `https://your-vision-ten.vercel.app`.
 - `YOURVISION_PRODUCTION_BUILD=true`: validates that the extension API URL is HTTPS and replaces the local host permission in the generated manifest.
 
 ### Local container smoke test
@@ -414,7 +414,7 @@ Build the extension with the deployed API origin:
 
 ```bash
 cd extension
-VITE_YOURVISION_API_URL=https://yourvision-backend.onrender.com YOURVISION_PRODUCTION_BUILD=true npm run build
+VITE_YOURVISION_API_URL=https://your-vision-ten.vercel.app YOURVISION_PRODUCTION_BUILD=true npm run build
 ```
 
 The production build injects the API URL into the service worker and rewrites `dist/manifest.json` host permissions to allow that HTTPS origin while removing the localhost permission. For local development, omit these variables; requests continue to use `http://127.0.0.1:3000`.
