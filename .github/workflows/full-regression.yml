@@ -92,6 +92,12 @@ jobs:
       - name: Build backend container
         run: docker build -f backend/Dockerfile -t yourvision-backend:ci .
 
+      - name: Build and verify prebuilt Java sandbox image
+        run: |
+          docker build -f vercel-sandbox-prototype/Dockerfile -t yourvision-java-sandbox:ci vercel-sandbox-prototype
+          docker run --rm yourvision-java-sandbox:ci java --list-modules | grep -q '^jdk.jdi@'
+          docker run --rm yourvision-java-sandbox:ci javac -version
+
       - name: Start backend container
         run: docker run -d --name yourvision-backend -p 10000:10000 -e NODE_ENV=production -e PORT=10000 -e HOST=0.0.0.0 yourvision-backend:ci
 
