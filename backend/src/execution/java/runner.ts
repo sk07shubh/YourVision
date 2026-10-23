@@ -27,9 +27,11 @@ function runJavaTracer(
     timeoutMs = JAVA_EXECUTION_TIMEOUT_MS
 ): Promise<{ stdout: string; stderr: string }> {
     return new Promise((resolve, reject) => {
-        const child = spawn("java", args, {
+        const command = sandboxCommand("java", args, workDir);
+        const child = spawn(command.command, command.args, {
             detached: process.platform !== "win32",
-            stdio: ["ignore", "pipe", "pipe"]
+            stdio: ["ignore", "pipe", "pipe"],
+            env: isSandboxConfigured() ? { PATH: "/usr/bin:/bin" } : process.env
         });
 
         const stdoutChunks: Buffer[] = [];
