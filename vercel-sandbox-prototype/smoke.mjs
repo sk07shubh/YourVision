@@ -16,6 +16,9 @@ const sandboxOptions = {
   resources: { vcpus: 2 },
   persistent: false,
   networkPolicy: "allow-all",
+  ...(process.env.YV_SANDBOX_IMAGE?.trim()
+    ? { image: process.env.YV_SANDBOX_IMAGE.trim() }
+    : {}),
 };
 
 if (!process.env.VERCEL_OIDC_TOKEN) {
@@ -70,9 +73,19 @@ async function main() {
   sandbox = await Sandbox.create(sandboxOptions);
   console.log(`Created Vercel Sandbox in ${Date.now() - startedAt} ms`);
 
-  await installJdk();
+  if (process.env.YV_SANDBOX_IMAGE?.trim()) {
+    const java = await runChecked("java", ["--list-modules"]);
+    if (!java.stdout.split("\\n").some((line) => line.startsWith("jdk.jdi@"))) {
+      throw new Error("The configured YV_SANDBOX_IMAGE does not include the required jdk.jdi module.");
+    }
+    await runChecked("javac", ["-version"]);
+    console.log(`Using prebuilt Java image: ${process.env.YV_SANDBOX_IMAGE.trim()}`);
+  } else {
+    await installJdk();
+    console.log("Installed JDK in the temporary sandbox.");
+  }
   await sandbox.update({ networkPolicy: "deny-all" });
-  console.log("Installed JDK and changed sandbox egress policy to deny-all.");
+  console.log("Changed sandbox egress policy to deny-all.");
 
   const homeResult = await runChecked("sh", ["-lc", 'printf "%s" "$HOME"']);
   const workspace = path.posix.join(homeResult.stdout.trim(), "yourvision-smoke");
