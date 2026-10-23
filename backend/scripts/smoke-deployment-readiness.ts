@@ -56,19 +56,25 @@ try {
     const previousWorkerUrl = process.env.YV_EXECUTION_WORKER_URL;
     const previousWorkerToken = process.env.YV_EXECUTION_WORKER_TOKEN;
     const previousWorkerMode = process.env.YV_EXECUTION_WORKER_MODE;
+    const previousBypassSecret = process.env.YV_WORKER_VERCEL_BYPASS_SECRET;
     const originalFetch = globalThis.fetch;
+    let workerSawReadyBypassHeader = false;
     let workerSawAuthorization = false;
+    let workerSawVisualizeBypassHeader = false;
     process.env.NODE_ENV = "production";
     process.env.YV_EXECUTION_WORKER_URL = "https://worker.example";
     process.env.YV_EXECUTION_WORKER_TOKEN = "test-only-worker-token";
+    process.env.YV_WORKER_VERCEL_BYPASS_SECRET = "test-only-vercel-bypass-secret";
     delete process.env.YV_EXECUTION_WORKER_MODE;
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         if (url.startsWith("https://worker.example/readyz")) {
+            workerSawReadyBypassHeader = new Headers(init?.headers).get("x-vercel-protection-bypass") === "test-only-vercel-bypass-secret";
             return new Response(JSON.stringify({ status: "ready" }), { status: 200, headers: { "content-type": "application/json" } });
         }
         if (url.startsWith("https://worker.example/visualize")) {
             workerSawAuthorization = new Headers(init?.headers).get("authorization") === "Bearer test-only-worker-token";
+            workerSawVisualizeBypassHeader = new Headers(init?.headers).get("x-vercel-protection-bypass") === "test-only-vercel-bypass-secret";
             return new Response(JSON.stringify({ success: true, execution: { kind: "OK", success: true } }), {
                 status: 200,
                 headers: { "content-type": "application/json" }
@@ -79,6 +85,7 @@ try {
     try {
         const readyViaWorker = await originalFetch(`${baseUrl}/readyz`);
         assert(readyViaWorker.status === 200, "production API should become ready when its authenticated worker is reachable");
+        assert(workerSawReadyBypassHeader, "worker readiness proxy must send the Vercel protection-bypass header when configured");
 
         const proxied = await originalFetch(`${baseUrl}/visualize`, {
             method: "POST",
@@ -87,6 +94,7 @@ try {
         });
         assert(proxied.status === 200, "production API should proxy execution to its configured worker");
         assert(workerSawAuthorization, "execution worker proxy must send the bearer token");
+        assert(workerSawVisualizeBypassHeader, "execution worker proxy must send the Vercel protection-bypass header when configured");
 
         process.env.YV_EXECUTION_WORKER_MODE = "true";
         const unauthorizedWorkerRequest = await originalFetch(`${baseUrl}/visualize`, {
@@ -103,6 +111,8 @@ try {
         else process.env.YV_EXECUTION_WORKER_TOKEN = previousWorkerToken;
         if (previousWorkerMode === undefined) delete process.env.YV_EXECUTION_WORKER_MODE;
         else process.env.YV_EXECUTION_WORKER_MODE = previousWorkerMode;
+        if (previousBypassSecret === undefined) delete process.env.YV_WORKER_VERCEL_BYPASS_SECRET;
+        else process.env.YV_WORKER_VERCEL_BYPASS_SECRET = previousBypassSecret;
         if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
         else process.env.NODE_ENV = previousNodeEnv;
     }
