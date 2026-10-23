@@ -471,7 +471,7 @@ Render receives `YV_EXECUTION_WORKER_URL` and `YV_EXECUTION_WORKER_TOKEN` as pri
 ### Deployment sequence
 
 1. Deploy the execution worker to a Google Cloud project with billing enabled and Cloud Run sandbox access available. This is a second service, not a replacement for Render. Ordinary Cloud Run free-tier allowances are ongoing, but billing is required and usage beyond allowances can be charged; configure budget alerts first.
-2. Create a random token and store it in Google Secret Manager as `yourvision-execution-worker-token`. Grant the Cloud Run service identity permission to access that secret.
+2. Create a random token and store it in Google Secret Manager as `yourvision-execution-worker-token`. For example, after enabling Secret Manager, run `openssl rand -hex 32 | gcloud secrets create yourvision-execution-worker-token --data-file=-`. Grant the Cloud Run service identity permission to access that secret. If using the default Compute Engine service identity, obtain the project number with `gcloud projects describe PROJECT_ID --format='value(projectNumber)'`, then grant access at the secret level with `gcloud secrets add-iam-policy-binding yourvision-execution-worker-token --member="serviceAccount:PROJECT_NUMBER-compute@developer.gserviceaccount.com" --role="roles/secretmanager.secretAccessor"`. Copy the secret value into Render's `YV_EXECUTION_WORKER_TOKEN` setting through a secure terminal-to-dashboard workflow; do not print it into logs or commit it.
 3. Build and push the backend image:
    
    ```bash
