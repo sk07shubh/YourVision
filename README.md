@@ -431,13 +431,13 @@ One GitHub-hosted Linux runner run, Docker image already built, Java execution i
 
 | Measurement | Observed |
 |---|---:|
-| Local container start to first healthy response | 2.203 s |
-| Warm `/health` response | 1.16 ms |
-| Warm `/readyz` dependency checks | 246 ms |
-| First Java compile + trace request | 2.131 s |
-| Second Java compile + trace request | 2.102 s |
-| Container memory snapshot after the requests | 106.7 MiB |
-| Instantaneous CPU snapshot after the requests | 0.13% |
+| Local container start to first healthy response | 2.228 s |
+| Warm `/health` response | 1.45 ms |
+| Warm `/readyz` dependency checks | 256 ms |
+| First Java compile + trace request | 2.220 s |
+| Second Java compile + trace request | 2.284 s |
+| Container memory snapshot after the requests | 62.98 MiB |
+| Instantaneous CPU snapshot after the requests | 0.03% |
 
 This was a single low-concurrency sample on a runner with substantially more memory than Render Free. The memory value is a post-request snapshot, not peak memory. Render cold-start latency, peak Java memory, concurrent-request performance, and real billing must be measured on the deployed service before production decisions.
 
