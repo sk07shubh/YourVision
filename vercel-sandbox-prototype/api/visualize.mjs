@@ -184,12 +184,30 @@ export default async function handler(req, res) {
     const execution = await readCommand(run);
     return response(res, 200, { protocol: "yv-java-raw-v1", phase: "run", ...execution });
   } catch (error) {
-    const errorName = error instanceof Error && /^[A-Za-z][A-Za-z0-9]*Error$/.test(error.name)
-      ? error.name
-      : "UnknownError";
+    const candidate = error && typeof error === "object" ? error : {};
+    const errorName = candidate instanceof Error && /^[A-Za-z][A-Za-z0-9]*Error$/.test(candidate.name)
+      ? candidate.name
+      : typeof candidate.name === "string" && /^[A-Za-z][A-Za-z0-9]*Error$/.test(candidate.name)
+        ? candidate.name
+        : "UnknownError";
+    const rawMessage = typeof candidate.message === "string" ? candidate.message : "";
+    const safeMessage = rawMessage
+      .replace(/Bearer\s+\S+/gi, "Bearer [REDACTED]")
+      .replace(/(?:token|secret|authorization|api[_-]?key)(\s*[=:]\s*)\S+/gi, "$1[REDACTED]")
+      .replace(/https?:\/\/[^\s?]+\?[^\s]+/gi, "[URL_REDACTED]")
+      .slice(0, 300);
+    const errorCode = typeof candidate.code === "string" || typeof candidate.code === "number"
+      ? String(candidate.code).slice(0, 80)
+      : undefined;
+    const status = Number.isInteger(candidate.status) ? candidate.status
+      : Number.isInteger(candidate.statusCode) ? candidate.statusCode
+        : undefined;
     console.error("[YourVision worker] sandbox request failed", {
       stage: failureStage,
       errorName,
+      ...(errorCode ? { errorCode } : {}),
+      ...(status ? { status } : {}),
+      ...(safeMessage ? { message: safeMessage } : {}),
     });
     return response(res, 503, {
       success: false,
