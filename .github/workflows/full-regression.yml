@@ -70,6 +70,15 @@ jobs:
         working-directory: extension
         run: npm run build
 
+      - name: Verify production extension configuration
+        working-directory: extension
+        env:
+          VITE_YOURVISION_API_URL: https://yourvision-backend.onrender.com
+          YOURVISION_PRODUCTION_BUILD: "true"
+        run: |
+          npm run build
+          node --input-type=module -e "import fs from 'node:fs'; const m=JSON.parse(fs.readFileSync('dist/manifest.json','utf8')); if (!m.host_permissions.includes('https://yourvision-backend.onrender.com/*')) throw new Error('production API permission missing'); if (m.host_permissions.some(p => p.startsWith('http://127.0.0.1:'))) throw new Error('localhost permission leaked into production manifest');"
+
   container-smoke:
     name: Container build and smoke test
     runs-on: ubuntu-latest
