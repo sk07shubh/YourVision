@@ -1,3 +1,13 @@
+FROM node:22-bookworm-slim AS build
+
+WORKDIR /app/backend
+COPY backend/package.json backend/package-lock.json ./
+RUN npm ci
+COPY backend/ ./
+RUN npm run build \
+    && mkdir -p dist/src/execution/java \
+    && cp src/execution/java/*.java dist/src/execution/java/
+
 FROM node:22-bookworm-slim
 
 ENV NODE_ENV=production
@@ -14,9 +24,8 @@ RUN apt-get update \
 
 WORKDIR /app/backend
 COPY backend/package.json backend/package-lock.json ./
-RUN npm ci --include=dev
-COPY backend/ ./
-RUN chown -R node:node /app/backend
+RUN npm ci --omit=dev
+COPY --from=build --chown=node:node /app/backend/dist ./dist
 
 USER node
 EXPOSE 10000

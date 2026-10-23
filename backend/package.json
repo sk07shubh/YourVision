@@ -31,8 +31,9 @@
     "test:leetcode-execution-corpus": "tsx scripts/smoke-leetcode-execution-corpus.ts",
     "test:semantic-roles": "tsx scripts/smoke-semantic-roles.ts",
     "test:leetcode-graph": "tsx scripts/smoke-leetcode-graph.ts",
-    "start": "tsx src/server.ts",
-    "test:deployment-readiness": "tsx scripts/smoke-deployment-readiness.ts"
+    "start": "node dist/src/server.js",
+    "test:deployment-readiness": "tsx scripts/smoke-deployment-readiness.ts",
+    "build": "tsc --outDir dist --declaration false --declarationMap false --sourceMap false"
   },
   "keywords": [],
   "author": "",
