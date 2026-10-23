@@ -19,6 +19,23 @@ function parsePositiveInteger(value: string | undefined, fallback: number): numb
     return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function getExecutionWorkerUrl(): string | undefined {
+    const value = process.env.YV_EXECUTION_WORKER_URL?.trim();
+    if (!value) return undefined;
+    try {
+        const url = new URL(value);
+        if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) return undefined;
+        return url.toString().replace(/\/$/, "");
+    } catch {
+        return undefined;
+    }
+}
+
+function getExecutionWorkerToken(): string | undefined {
+    const value = process.env.YV_EXECUTION_WORKER_TOKEN?.trim();
+    return value ? value : undefined;
+}
+
 export const app = express();
 let activeExecutions = 0;
 
@@ -51,29 +68,61 @@ app.get("/readyz", async (_req, res) => {
         checks.jdi = stdout.split("\n").some(line => line.startsWith("jdk.jdi@"));
     } catch { /* Keep readiness responses free of process output. */ }
 
-    const sandbox = await checkExecutionSandbox();
-    const productionSandboxReady = process.env.NODE_ENV !== "production" ||
-        (isSandboxConfigured() && sandbox.available);
-    const ready = checks.java && checks.javac && checks.jdi && productionSandboxReady;
+    const workerUrl = getExecutionWorkerUrl();
+    let workerReady = false;
+    if (workerUrl) {
+        try {
+            const workerResponse = await fetch(new URL("/readyz", workerUrl), {
+                signal: AbortSignal.timeout(3500)
+            });
+            workerReady = workerResponse.ok;
+        } catch { /* A failed worker health check keeps this API unready. */ }
+    }
+
+    const sandbox = workerUrl
+        ? { configured: Boolean(getExecutionWorkerToken()), available: workerReady, mode: "worker" as const,
+            message: workerReady ? "Restricted execution worker is reachable." : "Restricted execution worker is unavailable." }
+        : await checkExecutionSandbox();
+    const productionExecutionReady = process.env.NODE_ENV !== "production" ||
+        (workerUrl ? Boolean(getExecutionWorkerToken()) && workerReady : isSandboxConfigured() && sandbox.available);
+    const ready = checks.java && checks.javac && checks.jdi && productionExecutionReady;
     res.status(ready ? 200 : 503).json({
         status: ready ? "ready" : "not_ready",
         dependencies: checks,
         sandbox,
-        executionEnabled: process.env.NODE_ENV !== "production" || (isSandboxConfigured() && sandbox.available),
+        executionEnabled: process.env.NODE_ENV !== "production" || productionExecutionReady,
         executionNote: process.env.NODE_ENV === "production"
-            ? "Production execution requires a passing bubblewrap namespace-isolation probe."
+            ? "Production execution requires a reachable authenticated execution worker or a verified platform sandbox."
             : "Local execution mode; do not expose this service to untrusted public traffic."
     });
 });
 
 app.post("/visualize", async (req, res, next) => {
-    if (process.env.NODE_ENV === "production") {
+    if (process.env.YV_EXECUTION_WORKER_MODE === "true") {
+        const expectedToken = getExecutionWorkerToken();
+        const suppliedToken = req.header("authorization");
+        if (!expectedToken || suppliedToken !== `Bearer ${expectedToken}`) {
+            res.status(401).json({ success: false, code: "EXECUTION_WORKER_UNAUTHORIZED", message: "Unauthorized execution worker request." });
+            return;
+        }
+    }
+
+    const workerUrl = getExecutionWorkerUrl();
+    if (process.env.NODE_ENV === "production" && workerUrl && !getExecutionWorkerToken()) {
+        res.status(503).json({
+            success: false,
+            code: "EXECUTION_WORKER_MISCONFIGURED",
+            message: "Code execution is unavailable because the execution worker credentials are not configured."
+        });
+        return;
+    }
+    if (process.env.NODE_ENV === "production" && !workerUrl) {
         const sandbox = await checkExecutionSandbox();
         if (!isSandboxConfigured() || !sandbox.available) {
             res.status(503).json({
                 success: false,
                 code: "EXECUTION_SANDBOX_UNAVAILABLE",
-                message: "Code execution is unavailable because the production sandbox is not ready."
+                message: "Code execution is unavailable because no verified production sandbox is ready."
             });
             return;
         }
@@ -119,6 +168,37 @@ app.post("/visualize", async (req, res, next) => {
 
     activeExecutions++;
     try {
+        if (workerUrl && process.env.YV_EXECUTION_WORKER_MODE !== "true") {
+            const token = getExecutionWorkerToken();
+            if (!token) {
+                res.status(503).json({
+                    success: false,
+                    code: "EXECUTION_WORKER_MISCONFIGURED",
+                    message: "Code execution is unavailable because the execution worker credentials are not configured."
+                });
+                return;
+            }
+            let workerResponse: Response;
+            try {
+                workerResponse = await fetch(new URL("/visualize", workerUrl), {
+                    method: "POST",
+                    headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ language, source, testcase }),
+                    signal: AbortSignal.timeout(25_000)
+                });
+            } catch {
+                res.status(502).json({
+                    success: false,
+                    code: "EXECUTION_WORKER_UNAVAILABLE",
+                    message: "The isolated execution worker could not be reached. Please retry shortly."
+                });
+                return;
+            }
+            const responseBody = await workerResponse.text();
+            res.status(workerResponse.status).type("application/json").send(responseBody);
+            return;
+        }
+
         const result = await runJava(source, testcase as Parameters<typeof runJava>[1]);
         const status = result.kind === "VALIDATION_ERROR" ? 400 : 200;
         res.status(status).json({ language, testcase, execution: result });
