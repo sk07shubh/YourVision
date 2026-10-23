@@ -1,6 +1,4 @@
 import { readFile } from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { getJavaRuntimeSources, interpretRemoteJavaExecution } from "../src/execution/java/runner.js";
 
 const baseUrl = process.env.YV_EXECUTION_WORKER_URL?.trim().replace(/\/$/, "");
