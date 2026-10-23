@@ -5,8 +5,8 @@ function assert(condition: boolean, message: string): asserts condition {
     if (!condition) throw new Error(message);
 }
 
-assert(baseUrl && /^https:\/\//.test(baseUrl), "Set YV_EXECUTION_WORKER_URL to the deployed worker HTTPS URL");
-assert(token, "Set YV_EXECUTION_WORKER_TOKEN to the worker bearer token");
+assert(typeof baseUrl === "string" && /^https:\/\//.test(baseUrl), "Set YV_EXECUTION_WORKER_URL to the deployed worker HTTPS URL");
+assert(typeof token === "string" && token.length > 0, "Set YV_EXECUTION_WORKER_TOKEN to the worker bearer token");
 
 const readinessResponse = await fetch(new URL("/readyz", baseUrl), {
     signal: AbortSignal.timeout(8000)
