@@ -816,30 +816,56 @@ function moveVisualizeToEnd(
     return;
   }
 
-  // Keep Visualize attached to the testcase tabs, not to the end of the row
-  // (where LeetCode's "+" control may live). The last testcase tab is the
-  // stable ordering anchor when a new case is inserted.
+  // Keep Visualize after LeetCode's add-testcase (+) control. The testcase
+  // tabs are inserted before that control, so their creation never temporarily
+  // pushes Visualize ahead of the new tab.
+  const controls = [
+    ...region.querySelectorAll<HTMLButtonElement>('button'),
+  ].filter(button => button !== visualizeButton);
+
+  const addControl = controls.find(button => {
+    const text = (button.textContent ?? '').replace(/\s+/g, ' ').trim();
+    const label = [
+      button.getAttribute('aria-label') ?? '',
+      button.getAttribute('title') ?? '',
+      button.getAttribute('data-e2e-locator') ?? '',
+      text,
+    ].join(' ').toLowerCase();
+
+    return text === '+' ||
+      /(?:add|new|create)[^\\n]*(?:test ?case|case)/i.test(label) ||
+      /(?:test ?case|case)[^\\n]*(?:add|new|create)/i.test(label);
+  });
+
+  if (addControl) {
+    const next = addControl.nextElementSibling;
+    if (next !== visualizeButton) {
+      region.insertBefore(visualizeButton, next);
+    }
+    return;
+  }
+
+  // Fallback for LeetCode layouts whose add control has no accessible label.
   const cases = [
     ...region.querySelectorAll<HTMLButtonElement>(
       '[data-e2e-locator="console-testcase-tag"]'
     ),
-    ...[...region.querySelectorAll<HTMLButtonElement>('button')].filter(button =>
-      button !== visualizeButton &&
+    ...controls.filter(button =>
       /^case\s+\d+$/i.test((button.textContent ?? '').trim())
     ),
   ].filter((button, index, all) => all.indexOf(button) === index);
 
   const lastCase = cases[cases.length - 1];
-  if (!lastCase) {
-    if (visualizeButton.parentElement !== region || region.lastElementChild !== visualizeButton) {
-      region.appendChild(visualizeButton);
+  if (lastCase) {
+    const next = lastCase.nextElementSibling;
+    if (next !== visualizeButton) {
+      region.insertBefore(visualizeButton, next);
     }
     return;
   }
 
-  const next = lastCase.nextElementSibling;
-  if (next !== visualizeButton) {
-    region.insertBefore(visualizeButton, next);
+  if (visualizeButton.parentElement !== region || region.lastElementChild !== visualizeButton) {
+    region.appendChild(visualizeButton);
   }
 }
 
