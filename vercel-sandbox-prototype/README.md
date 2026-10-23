@@ -3,7 +3,7 @@
 This is an isolated proof of concept. It does not change the current Render deployment or enable public Java execution.
 
 It tests the actual YourVision Java/JDI tracer inside a Vercel Sandbox:
-- Installs a JDK in a temporary sandbox for the initial compatibility check.
+- Installs a JDK in a temporary sandbox for the initial compatibility check, or uses a prebuilt image when `YV_SANDBOX_IMAGE` is set.
 - Compiles the repository's `YourVisionRuntime.java` and `YourVisionTracer.java`.
 - Runs a real Java method and asserts a result plus trace events are returned.
 - Switches sandbox network egress to `deny-all` before compiling/running submitted source.
@@ -32,11 +32,41 @@ npx vercel link
 npx vercel env pull .env.local
 ```
 
-Then run the proof:
+Then run the proof using the default image (the first run installs Java):
 
 ```sh
 node --env-file=.env.local smoke.mjs
 ```
+
+## Build a prebuilt Java image
+
+The repository includes a Dockerfile with OpenJDK 21 and the required `jdk.jdi` module. Publishing the image to Vercel Container Registry avoids running `apt-get update` and installing the JDK for every new sandbox.
+
+1. Ensure Docker Desktop is installed and running, and that this folder is linked to the Vercel test project.
+2. Pull the local Vercel environment and load its project-scoped OIDC token:
+
+   ```sh
+   npx vercel link
+   npx vercel env pull .env.local
+   set -a
+   source .env.local
+   set +a
+   ```
+
+3. Log in to the Vercel Container Registry. Replace the team and project slugs with the slugs shown in your Vercel dashboard:
+
+   ```sh
+   printf '%s' "$VERCEL_OIDC_TOKEN" | docker login vcr.vercel.com --username oidc --password-stdin
+   docker buildx build --platform linux/amd64 --provenance=false --output=type=image,push=true,compression=zstd,compression-level=3,force-compression=true -t vcr.vercel.com/<team-slug>/<project-slug>/yourvision-java:openjdk-21 -f Dockerfile .
+   ```
+
+4. Run the smoke test with the image repository and tag (not the full registry URL):
+
+   ```sh
+   YV_SANDBOX_IMAGE=yourvision-java:openjdk-21 node --env-file=.env.local smoke.mjs
+   ```
+
+The image is scoped to the Vercel project that stores it. Keep registry credentials and OIDC tokens private; OIDC tokens expire and should be refreshed rather than committed.
 
 If the pulled environment does not include a usable `VERCEL_OIDC_TOKEN`, set `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, and `VERCEL_PROJECT_ID` in your local shell. Never commit `.env.local` or paste tokens into chat.
 
