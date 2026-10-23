@@ -906,6 +906,12 @@ function createVisualizeButton(region: HTMLElement, resultPanel = false): HTMLBu
 }
 
 export function injectVisualizeButton(): boolean {
+  // Remove legacy controls from older injected builds; the supported action
+  // belongs only beside the active testcase tabs.
+  document
+    .querySelectorAll<HTMLButtonElement>('[data-yourvision-result-visualize="true"]')
+    .forEach(button => button.remove());
+
   const region = findTestcaseRegion();
   if (!region) return false;
 
