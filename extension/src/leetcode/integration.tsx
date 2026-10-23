@@ -1016,14 +1016,9 @@ export function installLeetCodeIntegration() {
         return;
       }
 
-      // Debounce through the complete LeetCode render transaction. Adding a
-      // testcase is multi-step: the "+" control fires first, then the new
-      // testcase tab is inserted. Do not move Visualize in the middle of it.
-      if (reinjectTimer !== null) {
-        window.clearTimeout(reinjectTimer);
-        reinjectTimer = null;
-      }
-      if (scheduled) {
+      // Schedule once on the first relevant mutation. Resetting this timer
+      // for every subsequent page mutation starves reinjection on busy renders.
+      if (scheduled || reinjectTimer !== null) {
         return;
       }
 
@@ -1032,10 +1027,10 @@ export function installLeetCodeIntegration() {
         scheduled = true;
 
         requestAnimationFrame(() => {
-          scheduled = false;
           attempt();
+          scheduled = false;
         });
-      }, 120);
+      }, 32);
     });
 
   observer.observe(
@@ -1065,13 +1060,14 @@ export function installLeetCodeIntegration() {
       lastHref =
         location.href;
 
+      const wasActive = yourVisionActive;
       cleanup();
+      yourVisionActive = wasActive;
 
-      setTimeout(
-        attempt,
-        700
-      );
+      // The old SPA workspace is gone; remount into the new one on the next
+      // frame instead of waiting an arbitrary 700 ms.
+      requestAnimationFrame(attempt);
     },
-    800
+    250
   );
 }
