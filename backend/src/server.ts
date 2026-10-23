@@ -36,6 +36,11 @@ function getExecutionWorkerToken(): string | undefined {
     return value ? value : undefined;
 }
 
+function getWorkerVercelBypassSecret(): string | undefined {
+    const value = process.env.YV_WORKER_VERCEL_BYPASS_SECRET?.trim();
+    return value ? value : undefined;
+}
+
 export const app = express();
 let activeExecutions = 0;
 
@@ -72,7 +77,9 @@ app.get("/readyz", async (_req, res) => {
     let workerReady = false;
     if (workerUrl) {
         try {
+            const bypassSecret = getWorkerVercelBypassSecret();
             const workerResponse = await fetch(new URL("/readyz", workerUrl), {
+                headers: bypassSecret ? { "x-vercel-protection-bypass": bypassSecret } : {},
                 signal: AbortSignal.timeout(3500)
             });
             workerReady = workerResponse.ok;
@@ -184,9 +191,14 @@ app.post("/visualize", async (req, res, next) => {
             let workerResponse: Response;
             try {
                 const runtimeSources = await getJavaRuntimeSources();
+                const bypassSecret = getWorkerVercelBypassSecret();
                 workerResponse = await fetch(new URL("/visualize", workerUrl), {
                     method: "POST",
-                    headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+                    headers: {
+                        "content-type": "application/json",
+                        authorization: `Bearer ${token}`,
+                        ...(bypassSecret ? { "x-vercel-protection-bypass": bypassSecret } : {})
+                    },
                     body: JSON.stringify({ language, source, testcase, runtimeSources }),
                     signal: AbortSignal.timeout(115_000)
                 });
