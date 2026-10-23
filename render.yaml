@@ -1,4 +1,3 @@
-# HEALTH-ONLY FALLBACK ONLY: arbitrary-code execution remains disabled on Render until a separately verified sandbox worker is integrated.
 services:
   - type: web
     name: yourvision-backend
@@ -15,3 +14,7 @@ services:
         value: 2
       - key: JSON_BODY_LIMIT
         value: 256kb
+      - key: YV_EXECUTION_WORKER_URL
+        sync: false
+      - key: YV_EXECUTION_WORKER_TOKEN
+        sync: false
