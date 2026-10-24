@@ -11,6 +11,7 @@ RUN apt-get update \
         coreutils \
         openjdk-21-jdk-headless \
         procps \
+        sudo \
     && java --list-modules | grep -q '^jdk.jdi@' \
     && javac -version \
     && apt-get clean \
