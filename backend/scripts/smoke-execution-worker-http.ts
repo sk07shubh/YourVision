@@ -91,10 +91,16 @@ const execution = interpretRemoteJavaExecution(source, {
     timedOut: payload.timedOut
 });
 assert(execution.kind === "OK", `sandbox test did not execute successfully: ${execution.kind} ${execution.message ?? ""}`);
-const sandboxChecks = String(execution.result);
+const rawSandboxChecks = String(execution.result);
+let sandboxChecks: string;
+try {
+    sandboxChecks = JSON.parse(rawSandboxChecks) as string;
+} catch {
+    throw new Error(`sandbox boundary result was not a JSON string: ${JSON.stringify(rawSandboxChecks)}`);
+}
 assert(
     sandboxChecks === "workerSecretHidden=true,systemFileWriteBlocked=true,outboundNetworkBlocked=true",
-    `sandbox boundary assertion failed: ${JSON.stringify(sandboxChecks)}; length=${sandboxChecks.length}; codes=${Array.from(sandboxChecks, c => c.charCodeAt(0)).join(",")}`
+    `sandbox boundary assertion failed: ${JSON.stringify(sandboxChecks)}; raw=${JSON.stringify(rawSandboxChecks)}`
 );
 
 console.log("PASS: deployed worker hides its bearer secret from Java, blocks actual system-file write access, and blocks outbound network access");
