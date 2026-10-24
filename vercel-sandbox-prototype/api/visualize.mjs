@@ -138,32 +138,21 @@ export default async function handler(req, res) {
       options.teamId = process.env.VERCEL_TEAM_ID;
       options.projectId = process.env.VERCEL_PROJECT_ID;
     }
-    let usedConfiguredImage = Boolean(configuredImage);
-    try {
-      sandbox = await Sandbox.create(options);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "";
-      if (!configuredImage || !/image not found/i.test(message)) throw error;
-      delete options.image;
-      usedConfiguredImage = false;
-      console.warn("[YourVision worker] configured sandbox image not found; retrying with the default image");
-      sandbox = await Sandbox.create(options);
+    if (!configuredImage) {
+      return response(res, 503, {
+        success: false,
+        code: "SANDBOX_IMAGE_MISSING",
+        message: "A prebuilt Java sandbox image must be configured before execution.",
+      });
     }
-    if (!usedConfiguredImage) {
-      startStage("java.provision");
-      const install = await sandbox.runCommand({ cmd: "sh", args: ["-lc", "apt-get update && apt-get install -y openjdk-21-jdk-headless"], sudo: true });
-      if (install.exitCode !== 0) {
-        return response(res, 503, { success: false, code: "SANDBOX_JDK_UNAVAILABLE", message: "Could not provision the Java runtime inside the isolated sandbox." });
-      }
-    }
+    sandbox = await Sandbox.create(options);
     startStage("sandbox.network-policy");
     await sandbox.update({ networkPolicy: "deny-all" });
-    startStage("sandbox.workspace-home");
-    const home = await sandbox.runCommand({ cmd: "sh", args: ["-lc", "printf %s \"$HOME\""] });
-    const homeResult = await readCommand(home);
-    const workspace = `${homeResult.stdout.trim()}/yourvision-run`;
+    startStage("sandbox.unprivileged-user");
+    const javaUser = await sandbox.createUser("yv-executor");
     startStage("sandbox.workspace-create");
-    await sandbox.mkDir(workspace);
+    const workspace = `${javaUser.homeDir}/yourvision-run`;
+    await javaUser.mkDir(workspace);
 
     const source = prepareSource(body.source);
     const files = [{ name: "Solution.java", content: source }];
@@ -174,14 +163,14 @@ export default async function handler(req, res) {
       files.push({ name, content: body.runtimeSources[name] });
     }
     startStage("sandbox.write-files");
-    await sandbox.writeFiles(files.map(({ name, content }) => ({
+    await javaUser.writeFiles(files.map(({ name, content }) => ({
       path: `${workspace}/${name}`,
       content: Buffer.from(content, "utf8"),
     })));
 
     const compileNames = files.map((file) => file.name);
     startStage("java.compile");
-    const compile = await sandbox.runCommand({
+    const compile = await javaUser.runCommand({
       cmd: "timeout",
       args: ["20s", "javac", "-J-Xmx192m", "-J-XX:MaxMetaspaceSize=96m", "-J-XX:+UseSerialGC",
         `-J-Djava.io.tmpdir=${workspace}`, "--add-modules", "jdk.jdi", "-g", "-d", workspace, ...compileNames],
@@ -194,7 +183,7 @@ export default async function handler(req, res) {
 
     const className = body.testcase.mode === "design" ? body.testcase.className : "Solution";
     startStage("java.execute");
-    const run = await sandbox.runCommand({
+    const run = await javaUser.runCommand({
       cmd: "timeout",
       args: ["15s", "java", "-Xmx128m", "-XX:MaxMetaspaceSize=64m", "-XX:+UseSerialGC", "-XX:-UsePerfData",
         `-Djava.io.tmpdir=${workspace}`, "--add-modules", "jdk.jdi", "-cp", workspace,
