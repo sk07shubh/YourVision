@@ -152,6 +152,20 @@ export default async function handler(req, res) {
     startStage("sandbox.network-policy");
     await sandbox.update({ networkPolicy: "deny-all" });
     console.info("[YourVision worker] sandbox network policy applied");
+    startStage("sandbox.hostname-resolution");
+    const hostnameCommand = await sandbox.runCommand({ cmd: "hostname" });
+    const sandboxHostname = (await hostnameCommand.stdout()).trim();
+    if (!/^[a-zA-Z0-9.-]{1,253}$/.test(sandboxHostname)) {
+      throw new Error("Sandbox returned an invalid hostname.");
+    }
+    const hostsFile = await sandbox.fs.readFile("/etc/hosts", "utf8");
+    const hostnameMapped = hostsFile.split(/\r?\n/).some((line) => {
+      const fields = line.trim().split(/\s+/);
+      return fields.length > 1 && fields.slice(1).includes(sandboxHostname);
+    });
+    if (!hostnameMapped) {
+      await sandbox.fs.writeFile("/etc/hosts", `${hostsFile.trimEnd()}\n127.0.0.1 ${sandboxHostname}\n`);
+    }
     startStage("sandbox.unprivileged-user");
     const javaUser = await sandbox.createUser("yv-executor");
     console.info("[YourVision worker] unprivileged user created");
