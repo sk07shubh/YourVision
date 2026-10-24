@@ -17,4 +17,8 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+RUN printf 'Defaults !fqdn\n' > /etc/sudoers.d/yourvision-hostname \
+    && chmod 0440 /etc/sudoers.d/yourvision-hostname \
+    && visudo -cf /etc/sudoers
+
 WORKDIR /vercel/sandbox
