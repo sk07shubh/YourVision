@@ -120,11 +120,12 @@ export default async function handler(req, res) {
     stageTimings[failureStage] = Math.round((now - stageStartedAt) * 100) / 100;
     failureStage = stage;
     stageStartedAt = now;
+    console.info("[YourVision worker] stage started", JSON.stringify({ stage }));
   };
   try {
     const configuredImage = process.env.YV_SANDBOX_IMAGE?.trim();
     const options = {
-      timeout: 180_000,
+      timeout: 90_000,
       resources: { vcpus: 2 },
       persistent: false,
       networkPolicy: "allow-all",
@@ -145,14 +146,19 @@ export default async function handler(req, res) {
         message: "A prebuilt Java sandbox image must be configured before execution.",
       });
     }
+    console.info("[YourVision worker] sandbox creation requested", JSON.stringify({ imageConfigured: Boolean(configuredImage) }));
     sandbox = await Sandbox.create(options);
+    console.info("[YourVision worker] sandbox created");
     startStage("sandbox.network-policy");
     await sandbox.update({ networkPolicy: "deny-all" });
+    console.info("[YourVision worker] sandbox network policy applied");
     startStage("sandbox.unprivileged-user");
     const javaUser = await sandbox.createUser("yv-executor");
+    console.info("[YourVision worker] unprivileged user created");
     startStage("sandbox.workspace-create");
     const workspace = `${javaUser.homeDir}/yourvision-run`;
     await javaUser.mkDir(workspace);
+    console.info("[YourVision worker] workspace created");
 
     const source = prepareSource(body.source);
     const files = [{ name: "Solution.java", content: source }];
@@ -167,6 +173,7 @@ export default async function handler(req, res) {
       path: `${workspace}/${name}`,
       content: Buffer.from(content, "utf8"),
     })));
+    console.info("[YourVision worker] source files written", JSON.stringify({ fileCount: files.length }));
 
     const compileNames = files.map((file) => file.name);
     startStage("java.compile");
@@ -176,6 +183,7 @@ export default async function handler(req, res) {
         `-J-Djava.io.tmpdir=${workspace}`, "--add-modules", "jdk.jdi", "-g", "-d", workspace, ...compileNames],
       cwd: workspace,
     });
+    console.info("[YourVision worker] Java compilation command completed");
     const compiled = await readCommand(compile);
     if (compiled.exitCode !== 0) {
       return response(res, 200, { protocol: "yv-java-raw-v1", phase: "compile", ...compiled });
@@ -190,6 +198,7 @@ export default async function handler(req, res) {
         "YourVisionTracer", workspace, "YourVisionRuntime", className, ...args],
       cwd: workspace,
     });
+    console.info("[YourVision worker] Java execution command completed");
     const execution = await readCommand(run);
     return response(res, 200, { protocol: "yv-java-raw-v1", phase: "run", ...execution });
   } catch (error) {
