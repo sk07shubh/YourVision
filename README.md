@@ -375,149 +375,77 @@ Before finishing:
 4. State limitations and unrun checks honestly; leave changes reviewable and do not merge a PR unless explicitly asked.
 
 
-## Production deployment preparation (Render)
+## Production deployment and release readiness
 
-The backend container is built from the repository root with `backend/Dockerfile`. It pins the current CI baseline (Node.js 22 + OpenJDK 17, including `javac` and `jdk.jdi`) and starts with `npm start`. Render should use Docker runtime, Dockerfile path `./backend/Dockerfile`, Docker context `.`, and health-check path `/health`. A starter `render.yaml` is included at the repository root.
+### Current production architecture
 
-### Configuration
+The production extension sends visualization requests to the Vercel API backend, which forwards Java execution to a separate Vercel worker:
 
-- `PORT`: HTTP port; defaults to 3000 locally and 10000 in the container/Render environment.
-- `HOST`: bind address; defaults to `127.0.0.1` locally and `0.0.0.0` in production.
-- `NODE_ENV`: set to `production` on Render.
-- `MAX_CONCURRENT_EXECUTIONS`: in-process concurrency cap (default 2).
-- `JSON_BODY_LIMIT`: request body limit (default `256kb`).
-- `VITE_YOURVISION_API_URL`: production extension build-time URL, e.g. `https://your-vision-ten.vercel.app`.
-- `YOURVISION_PRODUCTION_BUILD=true`: validates that the extension API URL is HTTPS and replaces the local host permission in the generated manifest.
-
-### Local container smoke test
-
-Run these commands from the repository root:
-
-```bash
-docker build -f backend/Dockerfile -t yourvision-backend:local .
-docker run --rm -p 3000:10000 -e PORT=10000 -e HOST=0.0.0.0 yourvision-backend:local
-curl --fail http://127.0.0.1:3000/health
-curl --fail http://127.0.0.1:3000/readyz
+```text
+Chrome extension
+  └─ POST https://your-vision-ten.vercel.app/visualize
+       └─ Vercel API backend
+            └─ authenticated POST https://your-vision-mxbf.vercel.app/visualize
+                 └─ isolated Java execution worker
 ```
 
-The container starts the API, but production code execution is deliberately **fail-closed**. Until a separately isolated execution worker is integrated and verified, `POST /visualize` returns HTTP 503 whenever `NODE_ENV=production`. Do not enable public code execution by removing this guard or by treating Docker alone as a sandbox.
+- **Production API:** `https://your-vision-ten.vercel.app`
+- **Java execution worker:** `https://your-vision-mxbf.vercel.app`
+- The extension must contain only the API URL. It must never contain the worker URL, worker bearer token, or Vercel bypass secret.
+- Local development continues to use `http://127.0.0.1:3000` unless a different API URL is configured.
 
-### Execution-isolation status — public launch blocker
+### Production environment variables
 
-The current Java runner compiles and launches user-submitted Java in child processes under the backend container's OS identity. Its timeouts and output/trace limits do not provide OS-level isolation. The Render container setup is packaging and deployment reproducibility, not a sandbox.
+Configure these in Vercel's project settings; never commit secret values.
 
-The API therefore disables visualization in production until an actual isolated-worker adapter is implemented. The required next step is to run the Java compiler/tracer in a separate restricted worker boundary with no access to API credentials, no unnecessary network access, per-execution filesystem isolation, CPU/memory/PID/wall-clock/output limits, and reliable process cleanup. The worker boundary must be tested with filesystem, network, fork-bomb, memory-exhaustion, timeout, and cross-request isolation cases before the production guard is lifted.
+**Main API project (`your-vision-ten`)**
 
-### Extension production build
+- `YV_EXECUTION_WORKER_URL=https://your-vision-mxbf.vercel.app`
+- `YV_EXECUTION_WORKER_TOKEN`: strong random secret shared with the worker.
+- `YV_WORKER_VERCEL_BYPASS_SECRET`: configured only when needed to pass the worker's Vercel Deployment Protection.
 
-Build the extension with the deployed API origin:
+Do not set `YV_EXECUTION_WORKER_MODE=true` on the main API project.
+
+**Java worker project (`your-vision-mxbf`)**
+
+- `YV_EXECUTION_WORKER_MODE=true`
+- `YV_EXECUTION_WORKER_TOKEN`: exactly the same value as the main API project's token.
+
+If either token value changes, update both projects and redeploy both. The local HTTP smoke test needs the matching token only when it targets this authenticated worker.
+
+### Production extension build
+
+Run from the repository root:
 
 ```bash
 cd extension
+VITE_YOURVISION_API_URL=https://your-vision-ten.vercel.app YOURVISION_PRODUCTION_BUILD=true npm ci
 VITE_YOURVISION_API_URL=https://your-vision-ten.vercel.app YOURVISION_PRODUCTION_BUILD=true npm run build
 ```
 
-The production build injects the API URL into the service worker and rewrites `dist/manifest.json` host permissions to allow that HTTPS origin while removing the localhost permission. For local development, omit these variables; requests continue to use `http://127.0.0.1:3000`.
+Before packaging, verify that `dist/manifest.json` exists, the production API URL is injected into the build, and the manifest includes `https://your-vision-ten.vercel.app/*` without localhost host permissions.
 
-### Verification and benchmarks
+### Create the Chrome Web Store ZIP
 
-- Backend regressions: `cd backend && npm ci && npm test`.
-- Extension regressions/build: `cd extension && npm ci && npm test && npm run typecheck && npm run build`.
-- Container build and health checks: use the Docker smoke commands above.
-- Measure compile and trace latency separately; the current runner recompiles Java for each request. Record cold container startup, warm `/health`, warm `/readyz`, successful local visualization latency, peak memory, and CPU under concurrent requests.
-#### Initial CI benchmark (2026-10-23)
-
-One GitHub-hosted Linux runner run, Docker image already built, Java execution in development mode. These are baseline measurements, not a Render performance guarantee:
-
-| Measurement | Observed |
-|---|---:|
-| Local container start to first healthy response | 2.228 s |
-| Warm `/health` response | 1.45 ms |
-| Warm `/readyz` dependency checks | 256 ms |
-| First Java compile + trace request | 2.220 s |
-| Second Java compile + trace request | 2.284 s |
-| Container memory snapshot after the requests | 62.98 MiB |
-| Instantaneous CPU snapshot after the requests | 0.03% |
-
-This was a single low-concurrency sample on a runner with substantially more memory than Render Free. The memory value is a post-request snapshot, not peak memory. Render cold-start latency, peak Java memory, concurrent-request performance, and real billing must be measured on the deployed service before production decisions.
-
-#### Render cost envelope (estimate, not a bill quote)
-
-Based on [Render's current pricing page](https://render.com/pricing) and [Free instance limitations](https://render.com/docs/free):
-
-| Plan | Monthly service cost | Relevant limit |
-|---|---:|---|
-| Free web service | $0 | 512 MB RAM, 0.1 CPU, 750 free instance-hours per workspace/month; spins down after 15 minutes idle |
-| Starter web service | $7/month | 512 MB RAM, 0.5 CPU; does not spin down from free-tier inactivity |
-
-The free plan is suitable for a beta, not a production availability promise. Render documents that if a payment method is attached, overages for some workspace-level usage can be billed; without a payment method, services/builds may instead be suspended when certain included limits are exceeded. Check your workspace billing and usage limits before deployment. The $7 plan estimate covers only the web service, not any future isolated execution worker or other add-ons.
-
-No reliable production cost-per-visualization estimate is available yet. It depends on actual request volume, CPU time, memory, bandwidth, build usage, and the sandbox design. Production visualization remains disabled until the isolated worker is implemented and security-tested.
-
-
-
-## Render API + isolated execution worker
-
-Render remains the public API host. The API validates requests, enforces request-size and concurrency limits, and forwards Java execution to a separate Cloud Run service configured with the Cloud Run sandbox launcher. This keeps the original Render deployment plan while placing untrusted compilation and tracing inside the platform sandbox rather than inside Render's web container.
-
-### Why execution is split across two services
-
-The Bubblewrap smoke test failed inside the Docker container with `bwrap: Failed to make / slave: Permission denied`. Do not remove the production fail-closed guard or run arbitrary submitted Java directly on Render to bypass this failure.
-
-The execution worker uses Cloud Run's sandbox launcher, which is currently in Preview. The sandbox blocks outbound network access by default and does not inherit the parent workload's environment variables/secrets. It shares the worker's CPU and memory allocation, so the worker is configured for one concurrent request and 1 GiB memory. See the [Cloud Run code-execution guide](https://docs.cloud.google.com/run/docs/code-execution) and [sandbox configuration for services](https://docs.cloud.google.com/run/docs/configuring/services/sandboxes).
-
-Render receives `YV_EXECUTION_WORKER_URL` and `YV_EXECUTION_WORKER_TOKEN` as private environment variables. The worker receives the same token from Google Secret Manager and rejects every `POST /visualize` request without a matching bearer token. The token must be a strong random secret; never commit it or expose it in extension code. The extension calls only the Render API URL.
-
-### Deployment sequence
-
-1. Deploy the execution worker to a Google Cloud project with billing enabled and Cloud Run sandbox access available. This is a second service, not a replacement for Render. Ordinary Cloud Run free-tier allowances are ongoing, but billing is required and usage beyond allowances can be charged; configure budget alerts first.
-2. Create a random token and store it in Google Secret Manager as `yourvision-execution-worker-token`. For example, after enabling Secret Manager, run `openssl rand -hex 32 | gcloud secrets create yourvision-execution-worker-token --data-file=-`. Grant the Cloud Run service identity permission to access that secret. If using the default Compute Engine service identity, obtain the project number with `gcloud projects describe PROJECT_ID --format='value(projectNumber)'`, then grant access at the secret level with `gcloud secrets add-iam-policy-binding yourvision-execution-worker-token --member="serviceAccount:PROJECT_NUMBER-compute@developer.gserviceaccount.com" --role="roles/secretmanager.secretAccessor"`. Copy the secret value into Render's `YV_EXECUTION_WORKER_TOKEN` setting through a secure terminal-to-dashboard workflow; do not print it into logs or commit it.
-3. Build and push the backend image:
-   
-   ```bash
-   gcloud config set project PROJECT_ID
-   gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com
-   gcloud artifacts repositories create yourvision --repository-format=docker --location=asia-south1
-   gcloud builds submit --config cloudbuild.yaml --substitutions=_IMAGE=asia-south1-docker.pkg.dev/PROJECT_ID/yourvision/yourvision-backend:latest .
-   ```
-
-   If the Artifact Registry repository already exists, skip its create command.
-
-4. Deploy the restricted worker. Replace `PROJECT_ID` and ensure the secret exists and the Cloud Run service identity can access it:
-
-   ```bash
-   gcloud beta run deploy yourvision-execution-worker --image asia-south1-docker.pkg.dev/PROJECT_ID/yourvision/yourvision-backend:latest --region asia-south1 --platform managed --allow-unauthenticated --sandbox-launcher --port 8080 --memory 1Gi --cpu 1 --concurrency 1 --timeout 30 --max 3 --set-env-vars NODE_ENV=production,YV_EXECUTION_SANDBOX=cloud-run,YV_EXECUTION_WORKER_MODE=true,MAX_CONCURRENT_EXECUTIONS=1,JSON_BODY_LIMIT=256kb --set-secrets YV_EXECUTION_WORKER_TOKEN=yourvision-execution-worker-token:latest
-   ```
-
-   The service can be publicly reachable at the HTTP layer, but execution requests are rejected without the secret bearer token. Verify `/readyz` reports `sandbox.available: true` before connecting Render.
-
-5. In the Render dashboard, configure these environment variables for `yourvision-backend`:
-   - `YV_EXECUTION_WORKER_URL`: the worker's HTTPS service URL, with no path.
-   - `YV_EXECUTION_WORKER_TOKEN`: the same random secret value stored in Secret Manager.
-
-   The included `render.yaml` declares both as unsynced secrets so they are configured privately in Render. Keep `NODE_ENV=production`. Render's `/readyz` should return 200 only when the worker is reachable and the worker token is configured.
-
-6. Verify the Render service and then configure the extension to use its HTTPS URL:
-   
-   ```bash
-   curl --fail https://YOUR_RENDER_SERVICE.onrender.com/health
-   curl --fail https://YOUR_RENDER_SERVICE.onrender.com/readyz
-   ```
-
-   Do not build the production extension until its API URL setting points to the Render URL. The extension should never contain the worker URL or token.
-
-### Isolation verification gate
-
-Run the HTTP integration test against the actual deployed worker before exposing the extension to users. This sends a real Java test through the authenticated worker endpoint and verifies that the worker's bearer token is invisible to submitted code, system files are not writable, and outbound network access is blocked:
+Build first using the production command above, then run:
 
 ```bash
-export YV_EXECUTION_WORKER_URL=https://YOUR_WORKER_URL
-export YV_EXECUTION_WORKER_TOKEN="$(gcloud secrets versions access latest --secret=yourvision-execution-worker-token)"
-cd backend
-npm ci
-npm run test:execution-worker-http
-unset YV_EXECUTION_WORKER_TOKEN
+cd dist
+zip -r ../YourVision-production.zip .
+cd ..
+unzip -l YourVision-production.zip
 ```
 
-The test must pass against the deployed Cloud Run service before connecting the extension. A passing Render health check alone is not proof of execution isolation. The platform-level test remains unverified until this command has been run against a real deployment.
+The ZIP must have `manifest.json` at its root, not nested inside a `dist/` directory. Inspect the archive before uploading it in the Chrome Web Store Developer Dashboard. Upload only the production build; do not include source files, local environment files, or secrets.
 
+### Release-readiness checklist
+
+- [ ] Latest `main` commit has a successful Full Regression Lab run.
+- [ ] Backend and worker production deployments are ready.
+- [ ] The deployed worker HTTP smoke test passes: submitted Java cannot read the worker bearer secret, write protected system files, or make outbound network requests.
+- [ ] The extension's production build points to the API URL and has no localhost host permission.
+- [ ] The ZIP has `manifest.json` at its root and contains only built extension assets.
+- [ ] Chrome Web Store listing, screenshots, privacy disclosures, and publisher verification are complete.
+- [ ] The extension is manually loaded from the final build and tested on LeetCode before submission.
+
+The deployed worker's security smoke test has passed. CI success verifies the repository's automated regression and build checks; it does not replace the final package inspection or Chrome Web Store review.
