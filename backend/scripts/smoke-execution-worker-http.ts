@@ -94,7 +94,7 @@ assert(execution.kind === "OK", `sandbox test did not execute successfully: ${ex
 const sandboxChecks = String(execution.result);
 assert(
     sandboxChecks === "workerSecretHidden=true,systemFileWriteBlocked=true,outboundNetworkBlocked=true",
-    `sandbox boundary assertion failed: ${sandboxChecks}`
+    `sandbox boundary assertion failed: ${JSON.stringify(sandboxChecks)}; length=${sandboxChecks.length}; codes=${Array.from(sandboxChecks, c => c.charCodeAt(0)).join(",")}`
 );
 
 console.log("PASS: deployed worker hides its bearer secret from Java, blocks actual system-file write access, and blocks outbound network access");
