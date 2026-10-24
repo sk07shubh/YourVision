@@ -5,3 +5,5 @@ extension/dist/
 extension/.vitest/
 extension/playwright-report/
 extension/test-results/
+.vercel
+.env*
