@@ -158,14 +158,14 @@ export default async function handler(req, res) {
     if (!/^[a-zA-Z0-9.-]{1,253}$/.test(sandboxHostname)) {
       throw new Error("Sandbox returned an invalid hostname.");
     }
-    const hostsFile = await sandbox.fs.readFile("/etc/hosts", "utf8");
-    const hostnameMapped = hostsFile.split(/\r?\n/).some((line) => {
-      const fields = line.trim().split(/\s+/);
-      return fields.length > 1 && fields.slice(1).includes(sandboxHostname);
+    const hostnameMap = await sandbox.runCommand({
+      cmd: "sh",
+      args: ["-lc", "grep -Fq \" " + sandboxHostname + "\" /etc/hosts || printf \"\\n127.0.0.1 " + sandboxHostname + "\\n\" >> /etc/hosts"],
     });
-    if (!hostnameMapped) {
-      await sandbox.fs.writeFile("/etc/hosts", `${hostsFile.trimEnd()}\n127.0.0.1 ${sandboxHostname}\n`);
+    if (hostnameMap.exitCode !== 0) {
+      throw new Error("Could not map the sandbox hostname in /etc/hosts.");
     }
+    console.info("[YourVision worker] sandbox hostname mapped");
     startStage("sandbox.unprivileged-user");
     const javaUser = await sandbox.createUser("yv-executor");
     console.info("[YourVision worker] unprivileged user created");
