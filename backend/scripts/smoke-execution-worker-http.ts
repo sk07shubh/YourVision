@@ -24,15 +24,22 @@ const readiness = await readinessResponse.json() as {
 assert(readiness.status === "ready", "execution worker did not report ready");
 assert(readiness.sandbox?.available === true, `platform sandbox is not ready: ${readiness.sandbox?.message ?? "no details"}`);
 
-const source = `import java.net.InetSocketAddress;
+const source = `import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 
 class Solution {
-    public boolean verifySandbox() {
+    public String verifySandbox() {
         boolean workerSecretHidden = System.getenv("YV_EXECUTION_WORKER_TOKEN") == null;
-        boolean systemFilesReadOnly = !Files.isWritable(Path.of("/etc/passwd"));
+        boolean systemFileWriteBlocked;
+        try (var ignored = Files.newByteChannel(Path.of("/etc/passwd"), StandardOpenOption.WRITE)) {
+            systemFileWriteBlocked = false;
+        } catch (IOException | SecurityException expected) {
+            systemFileWriteBlocked = true;
+        }
         boolean outboundNetworkBlocked;
         try (Socket socket = new Socket()) {
             socket.connect(new InetSocketAddress("1.1.1.1", 53), 750);
@@ -40,7 +47,9 @@ class Solution {
         } catch (Exception expected) {
             outboundNetworkBlocked = true;
         }
-        return workerSecretHidden && systemFilesReadOnly && outboundNetworkBlocked;
+        return "workerSecretHidden=" + workerSecretHidden
+            + ",systemFileWriteBlocked=" + systemFileWriteBlocked
+            + ",outboundNetworkBlocked=" + outboundNetworkBlocked;
     }
 }`;
 
@@ -82,6 +91,10 @@ const execution = interpretRemoteJavaExecution(source, {
     timedOut: payload.timedOut
 });
 assert(execution.kind === "OK", `sandbox test did not execute successfully: ${execution.kind} ${execution.message ?? ""}`);
-assert(execution.result === "true", `sandbox boundary assertion failed: ${String(execution.result)}`);
+const sandboxChecks = String(execution.result);
+assert(
+    sandboxChecks === "workerSecretHidden=true,systemFileWriteBlocked=true,outboundNetworkBlocked=true",
+    `sandbox boundary assertion failed: ${sandboxChecks}`
+);
 
-console.log("PASS: deployed worker hides its bearer secret from Java, blocks system-file writes, and blocks outbound network access");
+console.log("PASS: deployed worker hides its bearer secret from Java, blocks actual system-file write access, and blocks outbound network access");
